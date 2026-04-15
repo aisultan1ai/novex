@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+from datetime import datetime
 from enum import Enum
 
 from sqlalchemy import Boolean, Enum as SqlEnum, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
+
+
+def enum_values(enum_cls: type[Enum]) -> list[str]:
+    return [item.value for item in enum_cls]
 
 
 class RoleCode(str, Enum):
@@ -25,8 +30,8 @@ class BillingMode(str, Enum):
 
 
 class TimestampMixin:
-    created_at: Mapped[str] = mapped_column(server_default=func.now(), nullable=False)
-    updated_at: Mapped[str] = mapped_column(
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
@@ -38,7 +43,11 @@ class Role(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     code: Mapped[RoleCode] = mapped_column(
-        SqlEnum(RoleCode, name="role_code_enum"),
+        SqlEnum(
+            RoleCode,
+            name="role_code_enum",
+            values_callable=enum_values,
+        ),
         unique=True,
         nullable=False,
         index=True,
@@ -79,13 +88,21 @@ class CustomerProfile(Base, TimestampMixin):
         index=True,
     )
     customer_type: Mapped[CustomerType] = mapped_column(
-        SqlEnum(CustomerType, name="customer_type_enum"),
+        SqlEnum(
+            CustomerType,
+            name="customer_type_enum",
+            values_callable=enum_values,
+        ),
         nullable=False,
         default=CustomerType.INDIVIDUAL,
     )
     company_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     billing_mode: Mapped[BillingMode] = mapped_column(
-        SqlEnum(BillingMode, name="billing_mode_enum"),
+        SqlEnum(
+            BillingMode,
+            name="billing_mode_enum",
+            values_callable=enum_values,
+        ),
         nullable=False,
         default=BillingMode.PREPAID,
     )
