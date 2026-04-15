@@ -89,7 +89,7 @@ services:
       MINIO_BUCKET: novex-dev
       MINIO_SECURE: "false"
 
-      BACKEND_CORS_ORIGINS: http://localhost,http://localhost:80,http://localhost:3000
+      BACKEND_CORS_ORIGINS: '["http://localhost","http://localhost:80","http://localhost:3000"]'
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:

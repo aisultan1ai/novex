@@ -1,5 +1,7 @@
+import type { CSSProperties } from "react";
+
 export default function HomePage() {
-  const cardStyle: React.CSSProperties = {
+  const cardStyle: CSSProperties = {
     border: "1px solid #e5e7eb",
     borderRadius: 16,
     padding: 20,
@@ -7,7 +9,7 @@ export default function HomePage() {
     boxShadow: "0 8px 24px rgba(15, 23, 42, 0.06)",
   };
 
-  const badgeStyle: React.CSSProperties = {
+  const badgeStyle: CSSProperties = {
     display: "inline-block",
     padding: "6px 10px",
     borderRadius: 999,
@@ -17,7 +19,7 @@ export default function HomePage() {
     fontWeight: 700,
   };
 
-  const buttonPrimary: React.CSSProperties = {
+  const buttonPrimary: CSSProperties = {
     background: "#0f172a",
     color: "#ffffff",
     border: "none",
@@ -28,7 +30,7 @@ export default function HomePage() {
     cursor: "pointer",
   };
 
-  const buttonSecondary: React.CSSProperties = {
+  const buttonSecondary: CSSProperties = {
     background: "#ffffff",
     color: "#0f172a",
     border: "1px solid #cbd5e1",
@@ -39,7 +41,7 @@ export default function HomePage() {
     cursor: "pointer",
   };
 
-  const inputStyle: React.CSSProperties = {
+  const inputStyle: CSSProperties = {
     width: "100%",
     padding: "12px 14px",
     borderRadius: 12,
@@ -49,7 +51,7 @@ export default function HomePage() {
     boxSizing: "border-box",
   };
 
-  const labelStyle: React.CSSProperties = {
+  const labelStyle: CSSProperties = {
     display: "block",
     fontSize: 13,
     fontWeight: 600,
