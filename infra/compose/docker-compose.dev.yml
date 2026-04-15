@@ -1,0 +1,173 @@
+name: novex-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: novex-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-novex}
+      POSTGRES_USER: ${POSTGRES_USER:-novex}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-novex}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-novex} -d ${POSTGRES_DB:-novex}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: novex-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: novex-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio12345}
+    command: server /data --console-address ":9001"
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+
+  backend:
+    build:
+      context: ../..
+      dockerfile: infra/docker/backend.Dockerfile
+    container_name: novex-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    working_dir: /app
+    environment:
+      PROJECT_NAME: Novex API
+      APP_VERSION: 0.1.0
+      ENVIRONMENT: development
+      DEBUG: "true"
+      API_V1_PREFIX: /api/v1
+
+      BACKEND_HOST: 0.0.0.0
+      BACKEND_PORT: 8000
+
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-novex}
+      POSTGRES_USER: ${POSTGRES_USER:-novex}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-novex}
+      DATABASE_URL: postgresql://novex:novex@postgres:5432/novex
+
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URL: redis://redis:6379/0
+
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minio}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minio12345}
+      MINIO_BUCKET: novex-dev
+      MINIO_SECURE: "false"
+
+      BACKEND_CORS_ORIGINS: http://localhost,http://localhost:80,http://localhost:3000
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - ../../backend:/app
+    command: >
+      sh -c "uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8000
+      --reload"
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: infra/docker/worker.Dockerfile
+    container_name: novex-worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    working_dir: /app
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql://novex:novex@postgres:5432/novex
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minio}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minio12345}
+      MINIO_BUCKET: novex-dev
+      MINIO_SECURE: "false"
+    volumes:
+      - ../../backend:/app
+    command: >
+      sh -c "python -c 'import time; print(\"Novex worker skeleton is running...\"); time.sleep(10**9)'"
+
+  frontend:
+    build:
+      context: ../..
+      dockerfile: infra/docker/frontend.Dockerfile
+    container_name: novex-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+    working_dir: /app
+    environment:
+      NODE_ENV: development
+      NEXT_TELEMETRY_DISABLED: "1"
+      PORT: 3000
+      NEXT_PUBLIC_APP_NAME: Novex
+      NEXT_PUBLIC_API_BASE_URL: http://localhost/api/v1
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    volumes:
+      - ../../frontend:/app
+      - frontend_node_modules:/app/node_modules
+    command: >
+      sh -c "npm install && npm run dev -- --hostname 0.0.0.0 --port 3000"
+
+  nginx:
+    build:
+      context: ../..
+      dockerfile: infra/docker/nginx.Dockerfile
+    container_name: novex-nginx
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+      frontend:
+        condition: service_started
+    ports:
+      - "${NGINX_PORT:-80}:80"
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  frontend_node_modules:
