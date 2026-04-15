@@ -1,8 +1,8 @@
 FROM python:3.12-slim
 
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-ENV PIP_NO_CACHE_DIR=1
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
 
 WORKDIR /app
 
@@ -16,8 +16,11 @@ RUN pip install --upgrade pip && pip install \
     "uvicorn[standard]" \
     pydantic \
     pydantic-settings \
-    python-dotenv \
+    sqlalchemy \
+    psycopg2-binary \
+    alembic \
+    redis \
     httpx \
-    redis
+    python-dotenv
 
 EXPOSE 8000
