@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.modules.quotes.repository import QuotesRepository
 from app.modules.quotes.schemas import (
+    QuoteSelectionRequest,
     RateQuoteItem,
     ShippingQuoteRequest,
     ShippingQuoteResponse,
@@ -19,11 +20,12 @@ from app.modules.quotes.schemas import (
 этой базовой стоимости генерируются 3 тестовых тарифа - Express, Standard и Economy -
 с фиксированными сроками доставки и бейджами fastest, recommended и best_value.
 
-Текущая реализация нужна для того, чтобы уже работал полный flow короткой формы
+Текущая реализация нужна для того, чтобы уже работал полный flow короткой формы:
 создание quote_session, сохранение rate_quotes и возврат вариантов тарифов на frontend.
 В дальнейшем эту логику можно заменить на реальные тарифные таблицы, правила расчёта
 и интеграции с курьерскими службами.
 """
+
 
 class QuotesService:
     def __init__(self, repository: QuotesRepository | None = None) -> None:
@@ -67,7 +69,18 @@ class QuotesService:
 
         db.commit()
 
-        saved_quotes = self.repository.list_rate_quotes_by_session_id(db, quote_session.id)
+        return self.get_quote_session(db, quote_session.id)
+
+    def get_quote_session(
+        self,
+        db: Session,
+        quote_session_id: int,
+    ) -> ShippingQuoteResponse:
+        quote_session = self.repository.get_quote_session_by_id(db, quote_session_id)
+        if quote_session is None:
+            raise ValueError("Quote session not found")
+
+        rate_quotes = self.repository.list_rate_quotes_by_session_id(db, quote_session_id)
 
         return ShippingQuoteResponse(
             quote_session_id=quote_session.id,
@@ -84,9 +97,34 @@ class QuotesService:
                     badge=item.badge,
                     is_selected=item.is_selected,
                 )
-                for item in saved_quotes
+                for item in rate_quotes
             ],
         )
+
+    def select_quote(
+        self,
+        db: Session,
+        *,
+        quote_session_id: int,
+        payload: QuoteSelectionRequest,
+    ) -> ShippingQuoteResponse:
+        quote_session = self.repository.get_quote_session_by_id(db, quote_session_id)
+        if quote_session is None:
+            raise ValueError("Quote session not found")
+
+        rate_quote = self.repository.get_rate_quote_by_id(db, payload.rate_quote_id)
+        if rate_quote is None:
+            raise ValueError("Rate quote not found")
+
+        if rate_quote.quote_session_id != quote_session_id:
+            raise ValueError("Rate quote does not belong to the given quote session")
+
+        self.repository.clear_selected_rate_quotes(db, quote_session_id)
+        self.repository.mark_rate_quote_selected(db, payload.rate_quote_id)
+
+        db.commit()
+
+        return self.get_quote_session(db, quote_session_id)
 
     def _build_mock_quotes(self, payload: ShippingQuoteRequest) -> list[dict]:
         route_multiplier = self._route_multiplier(

@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from decimal import Decimal
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy import select, update
+from sqlalchemy.orm import Session, selectinload
 
 from app.modules.quotes.models import QuoteSession, RateQuote
 
@@ -41,6 +41,18 @@ class QuotesRepository:
         db.flush()
         return quote_session
 
+    def get_quote_session_by_id(
+        self,
+        db: Session,
+        quote_session_id: int,
+    ) -> QuoteSession | None:
+        stmt = (
+            select(QuoteSession)
+            .options(selectinload(QuoteSession.rate_quotes))
+            .where(QuoteSession.id == quote_session_id)
+        )
+        return db.scalar(stmt)
+
     def create_rate_quote(
         self,
         db: Session,
@@ -72,6 +84,14 @@ class QuotesRepository:
         db.flush()
         return rate_quote
 
+    def get_rate_quote_by_id(
+        self,
+        db: Session,
+        rate_quote_id: int,
+    ) -> RateQuote | None:
+        stmt = select(RateQuote).where(RateQuote.id == rate_quote_id)
+        return db.scalar(stmt)
+
     def list_rate_quotes_by_session_id(
         self,
         db: Session,
@@ -83,3 +103,27 @@ class QuotesRepository:
             .order_by(RateQuote.price.asc(), RateQuote.id.asc())
         )
         return db.scalars(stmt).all()
+
+    def clear_selected_rate_quotes(
+        self,
+        db: Session,
+        quote_session_id: int,
+    ) -> None:
+        stmt = (
+            update(RateQuote)
+            .where(RateQuote.quote_session_id == quote_session_id)
+            .values(is_selected=False)
+        )
+        db.execute(stmt)
+
+    def mark_rate_quote_selected(
+        self,
+        db: Session,
+        rate_quote_id: int,
+    ) -> None:
+        stmt = (
+            update(RateQuote)
+            .where(RateQuote.id == rate_quote_id)
+            .values(is_selected=True)
+        )
+        db.execute(stmt)

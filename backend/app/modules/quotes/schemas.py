@@ -46,3 +46,7 @@ class RateQuoteItem(BaseModel):
 class ShippingQuoteResponse(BaseModel):
     quote_session_id: int
     quotes: list[RateQuoteItem]
+
+
+class QuoteSelectionRequest(BaseModel):
+    rate_quote_id: int = Field(gt=0)
