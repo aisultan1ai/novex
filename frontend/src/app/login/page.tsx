@@ -4,7 +4,8 @@ import type { CSSProperties, FormEvent } from "react";
 import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { ApiError, loginUser, saveAccessToken } from "@/lib/api/auth";
+import { useAuth } from "@/components/providers/auth-provider";
+import { ApiError, loginUser } from "@/lib/api/auth";
 
 const pageStyle: CSSProperties = {
   minHeight: "100vh",
@@ -84,11 +85,17 @@ const successStyle: CSSProperties = {
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { login } = useAuth();
 
   const isRegistered = useMemo(
     () => searchParams.get("registered") === "1",
     [searchParams],
   );
+
+  const nextPath = useMemo(() => {
+    const raw = searchParams.get("next");
+    return raw && raw.startsWith("/") ? raw : "/";
+  }, [searchParams]);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -106,8 +113,8 @@ export default function LoginPage() {
         password,
       });
 
-      saveAccessToken(response.access_token);
-      router.push("/");
+      login(response.access_token, response.profile);
+      router.push(nextPath);
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.detail);
@@ -148,7 +155,7 @@ export default function LoginPage() {
 
         {isRegistered ? (
           <div style={successStyle}>
-            Регистрация прошла успешно. Теперь можно войти в систему.
+            Регистрация прошла успешно.
           </div>
         ) : null}
 

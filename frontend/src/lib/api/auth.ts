@@ -8,8 +8,6 @@ import type {
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") || "/api/v1";
 
-export const ACCESS_TOKEN_STORAGE_KEY = "novex_access_token";
-
 class ApiError extends Error {
   status: number;
   detail: string;
@@ -75,21 +73,6 @@ export async function loginUser(payload: LoginRequest): Promise<TokenResponse> {
     method: "POST",
     body: JSON.stringify(payload),
   });
-}
-
-export function saveAccessToken(token: string): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, token);
-}
-
-export function getAccessToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
-}
-
-export function removeAccessToken(): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
 }
 
 export { ApiError };
