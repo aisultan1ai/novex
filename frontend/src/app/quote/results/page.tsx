@@ -76,6 +76,13 @@ const errorStyle: CSSProperties = {
   color: "#b91c1c",
 };
 
+const infoStyle: CSSProperties = {
+  ...cardStyle,
+  border: "1px solid #bfdbfe",
+  background: "#eff6ff",
+  color: "#1e3a8a",
+};
+
 function getBadgeStyle(badge: string | null): CSSProperties {
   switch (badge) {
     case "fastest":
@@ -141,6 +148,11 @@ export default function QuoteResultsPage() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectingId, setSelectingId] = useState<number | null>(null);
+
+  const selectedQuote = useMemo(
+    () => data?.quotes.find((quote) => quote.is_selected) ?? null,
+    [data],
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -210,6 +222,14 @@ export default function QuoteResultsPage() {
     }
   }
 
+  function handleContinueToShipment() {
+    if (!quoteSessionId || !selectedQuote) {
+      return;
+    }
+
+    router.push(`/quote/shipment?quoteSessionId=${quoteSessionId}`);
+  }
+
   return (
     <main style={pageStyle}>
       <div style={containerStyle}>
@@ -238,9 +258,21 @@ export default function QuoteResultsPage() {
             </h1>
           </div>
 
-          <div style={{ display: "flex", gap: 12 }}>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             <button style={buttonSecondary} onClick={() => router.push("/")}>
               Назад к форме
+            </button>
+
+            <button
+              style={{
+                ...buttonPrimary,
+                opacity: selectedQuote ? 1 : 0.6,
+                cursor: selectedQuote ? "pointer" : "not-allowed",
+              }}
+              onClick={handleContinueToShipment}
+              disabled={!selectedQuote}
+            >
+              Продолжить оформление
             </button>
           </div>
         </header>
@@ -271,6 +303,31 @@ export default function QuoteResultsPage() {
                 Найдено тарифов: <strong>{data.quotes.length}</strong>
               </div>
             </div>
+
+            {selectedQuote ? (
+              <div style={{ ...infoStyle, marginBottom: 20 }}>
+                <div style={{ marginBottom: 8 }}>
+                  <strong>Выбранный тариф:</strong>{" "}
+                  {selectedQuote.carrier_name} — {selectedQuote.tariff_name}
+                </div>
+                <div>
+                  Стоимость:{" "}
+                  <strong>
+                    {formatPrice(selectedQuote.price, selectedQuote.currency)}
+                  </strong>
+                  {" • "}
+                  Срок:{" "}
+                  <strong>
+                    {selectedQuote.eta_days_min}-{selectedQuote.eta_days_max} дн.
+                  </strong>
+                </div>
+              </div>
+            ) : (
+              <div style={{ ...infoStyle, marginBottom: 20 }}>
+                Сначала выберите один тариф, после этого можно будет продолжить
+                оформление отправления.
+              </div>
+            )}
 
             <div style={{ display: "grid", gap: 16 }}>
               {data.quotes.map((quote) => (
@@ -328,7 +385,10 @@ export default function QuoteResultsPage() {
                       </p>
 
                       <p style={{ margin: 0, color: "#475569" }}>
-                        Срок доставки: <strong>{quote.eta_days_min}-{quote.eta_days_max} дн.</strong>
+                        Срок доставки:{" "}
+                        <strong>
+                          {quote.eta_days_min}-{quote.eta_days_max} дн.
+                        </strong>
                       </p>
                     </div>
 
@@ -347,7 +407,9 @@ export default function QuoteResultsPage() {
                         style={{
                           ...buttonPrimary,
                           opacity:
-                            selectingId === quote.id || quote.is_selected ? 0.7 : 1,
+                            selectingId === quote.id || quote.is_selected
+                              ? 0.7
+                              : 1,
                           cursor:
                             selectingId === quote.id || quote.is_selected
                               ? "not-allowed"
