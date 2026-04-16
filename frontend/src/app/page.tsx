@@ -54,7 +54,7 @@ export default function HomePage() {
           "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       }}
     >
-      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+      <div style={{ maxWidth: 900, margin: "0 auto" }}>
         <header
           style={{
             display: "flex",
@@ -101,50 +101,10 @@ export default function HomePage() {
           </div>
         </header>
 
-        <section
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1.3fr 0.7fr",
-            gap: 24,
-            alignItems: "start",
-          }}
-        >
+        <section>
           <div style={cardStyle}>
             <ShortQuoteForm />
           </div>
-
-          <aside style={{ display: "grid", gap: 16 }}>
-            <div style={cardStyle}>
-              <h3 style={{ marginTop: 0, marginBottom: 12, fontSize: 18 }}>
-                Что уже заложено
-              </h3>
-              <ul
-                style={{
-                  margin: 0,
-                  paddingLeft: 20,
-                  lineHeight: 1.8,
-                  color: "#475569",
-                }}
-              >
-                <li>Frontend + Backend + Nginx</li>
-                <li>PostgreSQL и Redis</li>
-                <li>S3-compatible storage через MinIO</li>
-                <li>Worker контейнер под фоновые задачи</li>
-                <li>Health endpoint для backend</li>
-                <li>Identity flow и quote flow backend</li>
-              </ul>
-            </div>
-
-            <div style={cardStyle}>
-              <h3 style={{ marginTop: 0, marginBottom: 12, fontSize: 18 }}>
-                Следующий этап
-              </h3>
-              <p style={{ margin: 0, color: "#475569", lineHeight: 1.7 }}>
-                После выбора тарифа следующий слой — shipment details и draft
-                order, а уже затем оплата и интеграции курьерских служб.
-              </p>
-            </div>
-          </aside>
         </section>
       </div>
     </main>
