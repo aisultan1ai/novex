@@ -10,6 +10,7 @@ import {
   createDraftFromQuote,
   updateOrderDraftShipment,
 } from "@/lib/api/orders";
+import type { ProfileResponse } from "@/types/auth";
 import type {
   OrderDraftResponse,
   ShipmentPackageInput,
@@ -199,6 +200,73 @@ function buildShipmentPayload(
   };
 }
 
+function mergeSenderWithCurrentUser(
+  sender: PartyFormState,
+  currentUser: ProfileResponse | null,
+): PartyFormState {
+  return {
+    ...sender,
+    full_name: sender.full_name || currentUser?.full_name || "",
+    phone: sender.phone || currentUser?.phone || "",
+    email: sender.email || currentUser?.email || "",
+    company_name: sender.company_name || currentUser?.company_name || "",
+  };
+}
+
+function mapDraftToForm(
+  createdDraft: OrderDraftResponse,
+  currentUser: ProfileResponse | null,
+): ShipmentFormState {
+  const baseSender = createdDraft.sender
+    ? {
+        full_name: createdDraft.sender.full_name,
+        phone: createdDraft.sender.phone,
+        email: createdDraft.sender.email || "",
+        company_name: createdDraft.sender.company_name || "",
+        country: createdDraft.sender.country,
+        city: createdDraft.sender.city,
+        address_line1: createdDraft.sender.address_line1,
+        address_line2: createdDraft.sender.address_line2 || "",
+        postal_code: createdDraft.sender.postal_code || "",
+        comment: createdDraft.sender.comment || "",
+      }
+    : emptyParty();
+
+  return {
+    sender: mergeSenderWithCurrentUser(baseSender, currentUser),
+    recipient: createdDraft.recipient
+      ? {
+          full_name: createdDraft.recipient.full_name,
+          phone: createdDraft.recipient.phone,
+          email: createdDraft.recipient.email || "",
+          company_name: createdDraft.recipient.company_name || "",
+          country: createdDraft.recipient.country,
+          city: createdDraft.recipient.city,
+          address_line1: createdDraft.recipient.address_line1,
+          address_line2: createdDraft.recipient.address_line2 || "",
+          postal_code: createdDraft.recipient.postal_code || "",
+          comment: createdDraft.recipient.comment || "",
+        }
+      : emptyParty(),
+    packageItem: createdDraft.packages[0]
+      ? {
+          description: createdDraft.packages[0].description,
+          quantity: String(createdDraft.packages[0].quantity),
+          weight_kg: String(createdDraft.packages[0].weight_kg),
+          width_cm: String(createdDraft.packages[0].width_cm),
+          height_cm: String(createdDraft.packages[0].height_cm),
+          depth_cm: String(createdDraft.packages[0].depth_cm),
+          declared_value:
+            createdDraft.packages[0].declared_value != null
+              ? String(createdDraft.packages[0].declared_value)
+              : "",
+          declared_value_currency:
+            createdDraft.packages[0].declared_value_currency || "KZT",
+        }
+      : emptyPackage(),
+  };
+}
+
 export default function ShipmentPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -250,13 +318,7 @@ export default function ShipmentPage() {
 
     setForm((prev) => ({
       ...prev,
-      sender: {
-        ...prev.sender,
-        full_name: prev.sender.full_name || currentUser.full_name || "",
-        phone: prev.sender.phone || currentUser.phone || "",
-        email: prev.sender.email || currentUser.email || "",
-        company_name: prev.sender.company_name || currentUser.company_name || "",
-      },
+      sender: mergeSenderWithCurrentUser(prev.sender, currentUser),
     }));
   }, [currentUser]);
 
@@ -288,55 +350,7 @@ export default function ShipmentPage() {
         });
 
         setDraft(createdDraft);
-
-        if (createdDraft.sender || createdDraft.recipient || createdDraft.packages.length) {
-          setForm({
-            sender: createdDraft.sender
-              ? {
-                  full_name: createdDraft.sender.full_name,
-                  phone: createdDraft.sender.phone,
-                  email: createdDraft.sender.email || "",
-                  company_name: createdDraft.sender.company_name || "",
-                  country: createdDraft.sender.country,
-                  city: createdDraft.sender.city,
-                  address_line1: createdDraft.sender.address_line1,
-                  address_line2: createdDraft.sender.address_line2 || "",
-                  postal_code: createdDraft.sender.postal_code || "",
-                  comment: createdDraft.sender.comment || "",
-                }
-              : emptyParty(),
-            recipient: createdDraft.recipient
-              ? {
-                  full_name: createdDraft.recipient.full_name,
-                  phone: createdDraft.recipient.phone,
-                  email: createdDraft.recipient.email || "",
-                  company_name: createdDraft.recipient.company_name || "",
-                  country: createdDraft.recipient.country,
-                  city: createdDraft.recipient.city,
-                  address_line1: createdDraft.recipient.address_line1,
-                  address_line2: createdDraft.recipient.address_line2 || "",
-                  postal_code: createdDraft.recipient.postal_code || "",
-                  comment: createdDraft.recipient.comment || "",
-                }
-              : emptyParty(),
-            packageItem: createdDraft.packages[0]
-              ? {
-                  description: createdDraft.packages[0].description,
-                  quantity: String(createdDraft.packages[0].quantity),
-                  weight_kg: String(createdDraft.packages[0].weight_kg),
-                  width_cm: String(createdDraft.packages[0].width_cm),
-                  height_cm: String(createdDraft.packages[0].height_cm),
-                  depth_cm: String(createdDraft.packages[0].depth_cm),
-                  declared_value:
-                    createdDraft.packages[0].declared_value != null
-                      ? String(createdDraft.packages[0].declared_value)
-                      : "",
-                  declared_value_currency:
-                    createdDraft.packages[0].declared_value_currency || "KZT",
-                }
-              : emptyPackage(),
-          });
-        }
+        setForm(mapDraftToForm(createdDraft, currentUser));
       } catch (err) {
         if (err instanceof ApiError) {
           if (err.status === 401) {
@@ -355,7 +369,7 @@ export default function ShipmentPage() {
     }
 
     void bootstrapDraft();
-  }, [fullNextUrl, isAuthenticated, isLoading, logout, quoteSessionId]);
+  }, [currentUser, fullNextUrl, isAuthenticated, isLoading, logout, quoteSessionId]);
 
   function updatePartyField(
     role: "sender" | "recipient",
@@ -397,6 +411,7 @@ export default function ShipmentPage() {
       const payload = buildShipmentPayload(form);
       const updatedDraft = await updateOrderDraftShipment(draft.draft_id, payload);
       setDraft(updatedDraft);
+      setForm(mapDraftToForm(updatedDraft, currentUser));
       setSuccessMessage("Данные отправления успешно сохранены в draft order.");
     } catch (err) {
       if (err instanceof ApiError) {
@@ -443,6 +458,10 @@ export default function ShipmentPage() {
             <h1 style={{ margin: "14px 0 8px", fontSize: 34, lineHeight: 1.1 }}>
               Оформление отправления
             </h1>
+            <p style={{ margin: 0, color: "#475569", lineHeight: 1.7 }}>
+              На этом шаге мы создаём draft order и сохраняем sender,
+              recipient и package details.
+            </p>
           </div>
 
           <div style={{ display: "flex", gap: 12 }}>

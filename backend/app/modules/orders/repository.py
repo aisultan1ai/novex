@@ -87,6 +87,11 @@ class OrdersRepository:
         currency_snapshot: str,
         eta_days_min_snapshot: int,
         eta_days_max_snapshot: int,
+        from_country_snapshot: str,
+        from_city_snapshot: str,
+        to_country_snapshot: str,
+        to_city_snapshot: str,
+        shipment_type_snapshot: str,
         status: str = "draft",
     ) -> OrderDraft:
         order_draft = OrderDraft(
@@ -101,6 +106,11 @@ class OrdersRepository:
             currency_snapshot=currency_snapshot,
             eta_days_min_snapshot=eta_days_min_snapshot,
             eta_days_max_snapshot=eta_days_max_snapshot,
+            from_country_snapshot=from_country_snapshot,
+            from_city_snapshot=from_city_snapshot,
+            to_country_snapshot=to_country_snapshot,
+            to_city_snapshot=to_city_snapshot,
+            shipment_type_snapshot=shipment_type_snapshot,
         )
         db.add(order_draft)
         db.flush()
@@ -119,6 +129,11 @@ class OrdersRepository:
         currency_snapshot: str,
         eta_days_min_snapshot: int,
         eta_days_max_snapshot: int,
+        from_country_snapshot: str,
+        from_city_snapshot: str,
+        to_country_snapshot: str,
+        to_city_snapshot: str,
+        shipment_type_snapshot: str,
     ) -> OrderDraft:
         order_draft.selected_rate_quote_id = selected_rate_quote_id
         order_draft.carrier_code_snapshot = carrier_code_snapshot
@@ -128,6 +143,11 @@ class OrdersRepository:
         order_draft.currency_snapshot = currency_snapshot
         order_draft.eta_days_min_snapshot = eta_days_min_snapshot
         order_draft.eta_days_max_snapshot = eta_days_max_snapshot
+        order_draft.from_country_snapshot = from_country_snapshot
+        order_draft.from_city_snapshot = from_city_snapshot
+        order_draft.to_country_snapshot = to_country_snapshot
+        order_draft.to_city_snapshot = to_city_snapshot
+        order_draft.shipment_type_snapshot = shipment_type_snapshot
         db.add(order_draft)
         db.flush()
         return order_draft

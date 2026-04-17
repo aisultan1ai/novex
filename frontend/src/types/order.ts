@@ -72,6 +72,7 @@ export interface OrderDraftResponse {
   quote_session_id: number;
   selected_rate_quote_id: number;
   status: OrderDraftStatus;
+
   carrier_code_snapshot: string;
   carrier_name_snapshot: string;
   tariff_name_snapshot: string;
@@ -79,6 +80,13 @@ export interface OrderDraftResponse {
   currency_snapshot: string;
   eta_days_min_snapshot: number;
   eta_days_max_snapshot: number;
+
+  from_country_snapshot: string;
+  from_city_snapshot: string;
+  to_country_snapshot: string;
+  to_city_snapshot: string;
+  shipment_type_snapshot: string;
+
   sender: ShipmentPartyResponse | null;
   recipient: ShipmentPartyResponse | null;
   packages: ShipmentPackageResponse[];

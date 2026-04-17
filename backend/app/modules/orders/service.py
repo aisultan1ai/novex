@@ -12,6 +12,7 @@ from app.modules.orders.schemas import (
     ShipmentPartyResponse,
     UpdateShipmentDetailsRequest,
 )
+from app.modules.quotes.models import QuoteSession
 
 
 class OrdersService:
@@ -55,7 +56,15 @@ class OrdersService:
                 eta_days_min_snapshot=selected_rate_quote.eta_days_min,
                 eta_days_max_snapshot=selected_rate_quote.eta_days_max,
             )
+
+            self._ensure_prefill_package(
+                db,
+                order_draft=existing_draft,
+                quote_session=quote_session,
+            )
+
             db.commit()
+
             refreshed_draft = self.repository.get_order_draft_by_id(db, existing_draft.id)
             if refreshed_draft is None:
                 raise ValueError("Failed to load updated order draft")
@@ -74,6 +83,13 @@ class OrdersService:
             eta_days_min_snapshot=selected_rate_quote.eta_days_min,
             eta_days_max_snapshot=selected_rate_quote.eta_days_max,
         )
+
+        self._ensure_prefill_package(
+            db,
+            order_draft=created_draft,
+            quote_session=quote_session,
+        )
+
         db.commit()
 
         draft = self.repository.get_order_draft_by_id(db, created_draft.id)
@@ -156,6 +172,42 @@ class OrdersService:
             raise ValueError("Failed to load updated order draft")
 
         return self._build_order_draft_response(refreshed_draft)
+
+    def _ensure_prefill_package(
+        self,
+        db: Session,
+        *,
+        order_draft: OrderDraft,
+        quote_session: QuoteSession,
+    ) -> None:
+        if order_draft.packages:
+            return
+
+        description = self._quote_session_package_description(quote_session)
+
+        self.repository.create_shipment_package(
+            db,
+            order_draft_id=order_draft.id,
+            description=description,
+            quantity=quote_session.quantity,
+            weight_kg=quote_session.weight_kg,
+            width_cm=quote_session.width_cm,
+            height_cm=quote_session.height_cm,
+            depth_cm=quote_session.depth_cm,
+            declared_value=None,
+            declared_value_currency=None,
+        )
+
+    def _quote_session_package_description(self, quote_session: QuoteSession) -> str:
+        shipment_type = quote_session.shipment_type.strip().lower()
+
+        if shipment_type == "document":
+            return "Documents"
+
+        if shipment_type == "parcel":
+            return "Parcel"
+
+        return quote_session.shipment_type.strip() or "Shipment"
 
     def _create_party(
         self,

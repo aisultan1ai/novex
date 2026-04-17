@@ -127,6 +127,12 @@ class OrderDraftResponse(BaseModel):
     eta_days_min_snapshot: int
     eta_days_max_snapshot: int
 
+    from_country_snapshot: str
+    from_city_snapshot: str
+    to_country_snapshot: str
+    to_city_snapshot: str
+    shipment_type_snapshot: str
+
     sender: ShipmentPartyResponse | None = None
     recipient: ShipmentPartyResponse | None = None
     packages: list[ShipmentPackageResponse]

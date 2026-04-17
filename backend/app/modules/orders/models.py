@@ -63,6 +63,12 @@ class OrderDraft(Base, TimestampMixin):
     eta_days_min_snapshot: Mapped[int] = mapped_column(Integer, nullable=False)
     eta_days_max_snapshot: Mapped[int] = mapped_column(Integer, nullable=False)
 
+    from_country_snapshot: Mapped[str] = mapped_column(String(2), nullable=False)
+    from_city_snapshot: Mapped[str] = mapped_column(String(100), nullable=False)
+    to_country_snapshot: Mapped[str] = mapped_column(String(2), nullable=False)
+    to_city_snapshot: Mapped[str] = mapped_column(String(100), nullable=False)
+    shipment_type_snapshot: Mapped[str] = mapped_column(String(20), nullable=False)
+
     parties: Mapped[list["ShipmentParty"]] = relationship(
         back_populates="order_draft",
         cascade="all, delete-orphan",
