@@ -230,7 +230,11 @@ function mapDraftToForm(
         postal_code: createdDraft.sender.postal_code || "",
         comment: createdDraft.sender.comment || "",
       }
-    : emptyParty();
+    : {
+        ...emptyParty(),
+        country: createdDraft.from_country_snapshot || "KZ",
+        city: createdDraft.from_city_snapshot || "",
+      };
 
   return {
     sender: mergeSenderWithCurrentUser(baseSender, currentUser),
@@ -247,7 +251,11 @@ function mapDraftToForm(
           postal_code: createdDraft.recipient.postal_code || "",
           comment: createdDraft.recipient.comment || "",
         }
-      : emptyParty(),
+      : {
+          ...emptyParty(),
+          country: createdDraft.to_country_snapshot || "KZ",
+          city: createdDraft.to_city_snapshot || "",
+        },
     packageItem: createdDraft.packages[0]
       ? {
           description: createdDraft.packages[0].description,
