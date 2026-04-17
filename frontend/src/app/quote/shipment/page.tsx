@@ -443,10 +443,6 @@ export default function ShipmentPage() {
             <h1 style={{ margin: "14px 0 8px", fontSize: 34, lineHeight: 1.1 }}>
               Оформление отправления
             </h1>
-            <p style={{ margin: 0, color: "#475569", lineHeight: 1.7 }}>
-              На этом шаге мы создаём draft order и сохраняем sender,
-              recipient и package details.
-            </p>
           </div>
 
           <div style={{ display: "flex", gap: 12 }}>

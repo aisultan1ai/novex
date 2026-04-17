@@ -169,10 +169,6 @@ export default function ShortQuoteForm() {
       >
         <div>
           <h2 style={cardSectionTitleStyle}>Короткая форма отправления</h2>
-          <p style={cardSectionTextStyle}>
-            Форма рассчитывает тарифы через backend API и перенаправляет на
-            страницу результатов по `quoteSessionId`.
-          </p>
         </div>
         <span style={badgeStyle}>Quote flow</span>
       </div>
