@@ -55,6 +55,11 @@ class OrdersService:
                 currency_snapshot=selected_rate_quote.currency,
                 eta_days_min_snapshot=selected_rate_quote.eta_days_min,
                 eta_days_max_snapshot=selected_rate_quote.eta_days_max,
+                from_country_snapshot=quote_session.from_country,
+                from_city_snapshot=quote_session.from_city,
+                to_country_snapshot=quote_session.to_country,
+                to_city_snapshot=quote_session.to_city,
+                shipment_type_snapshot=quote_session.shipment_type,
             )
 
             self._ensure_prefill_package(
@@ -68,6 +73,7 @@ class OrdersService:
             refreshed_draft = self.repository.get_order_draft_by_id(db, existing_draft.id)
             if refreshed_draft is None:
                 raise ValueError("Failed to load updated order draft")
+
             return self._build_order_draft_response(refreshed_draft)
 
         created_draft = self.repository.create_order_draft(
@@ -82,6 +88,11 @@ class OrdersService:
             currency_snapshot=selected_rate_quote.currency,
             eta_days_min_snapshot=selected_rate_quote.eta_days_min,
             eta_days_max_snapshot=selected_rate_quote.eta_days_max,
+            from_country_snapshot=quote_session.from_country,
+            from_city_snapshot=quote_session.from_city,
+            to_country_snapshot=quote_session.to_country,
+            to_city_snapshot=quote_session.to_city,
+            shipment_type_snapshot=quote_session.shipment_type,
         )
 
         self._ensure_prefill_package(
@@ -253,6 +264,11 @@ class OrdersService:
             currency_snapshot=order_draft.currency_snapshot,
             eta_days_min_snapshot=order_draft.eta_days_min_snapshot,
             eta_days_max_snapshot=order_draft.eta_days_max_snapshot,
+            from_country_snapshot=order_draft.from_country_snapshot,
+            from_city_snapshot=order_draft.from_city_snapshot,
+            to_country_snapshot=order_draft.to_country_snapshot,
+            to_city_snapshot=order_draft.to_city_snapshot,
+            shipment_type_snapshot=order_draft.shipment_type_snapshot,
             sender=self._map_party(sender) if sender else None,
             recipient=self._map_party(recipient) if recipient else None,
             packages=[self._map_package(item) for item in order_draft.packages],
