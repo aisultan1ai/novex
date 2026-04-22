@@ -7,6 +7,7 @@ from app.core.db import get_db
 from app.core.dependencies import get_current_user_id
 from app.modules.orders.schemas import (
     CreateDraftFromQuoteRequest,
+    OrderDraftListResponse,
     OrderDraftResponse,
     UpdateShipmentDetailsRequest,
 )
@@ -37,6 +38,20 @@ def create_order_draft_from_quote(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
+
+
+@router.get(
+    "",
+    response_model=OrderDraftListResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Список заказов текущего клиента",
+)
+def list_orders(
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> OrderDraftListResponse:
+    drafts = orders_service.list_order_drafts(db, user_id=current_user_id)
+    return OrderDraftListResponse(items=drafts, total=len(drafts))
 
 
 @router.get(

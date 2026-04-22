@@ -125,6 +125,15 @@ class OrdersService:
 
         return self._build_order_draft_response(order_draft)
 
+    def list_order_drafts(
+            self,
+            db: Session,
+            *,
+            user_id: int,
+    ) -> list[OrderDraftResponse]:
+        drafts = self.repository.list_drafts_by_user(db, user_id=user_id)
+        return [self._build_order_draft_response(draft) for draft in drafts]
+
     def update_shipment_details(
         self,
         db: Session,

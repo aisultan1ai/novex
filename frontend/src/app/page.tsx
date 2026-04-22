@@ -1,8 +1,14 @@
-import type { CSSProperties } from "react";
+"use client";
 
+import type { CSSProperties } from "react";
+import Link from "next/link";
+
+import { useAuth } from "@/components/providers/auth-provider";
 import ShortQuoteForm from "@/components/forms/short-quote-form";
 
 export default function HomePage() {
+  const { isAuthenticated, isLoading } = useAuth();
+
   const cardStyle: CSSProperties = {
     border: "1px solid #e5e7eb",
     borderRadius: 16,
@@ -91,14 +97,25 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div style={{ display: "flex", gap: 12 }}>
-            <a href="/login" style={{ textDecoration: "none" }}>
-              <button style={buttonSecondary}>Войти</button>
-            </a>
-            <a href="/register" style={{ textDecoration: "none" }}>
-              <button style={buttonPrimary}>Регистрация</button>
-            </a>
-          </div>
+          {/* Кнопки header — зависят от состояния авторизации */}
+          {!isLoading && (
+            <div style={{ display: "flex", gap: 12 }}>
+              {isAuthenticated ? (
+                <Link href="/dashboard" style={{ textDecoration: "none" }}>
+                  <button style={buttonPrimary}>Мой кабинет</button>
+                </Link>
+              ) : (
+                <>
+                  <Link href="/login" style={{ textDecoration: "none" }}>
+                    <button style={buttonSecondary}>Войти</button>
+                  </Link>
+                  <Link href="/register" style={{ textDecoration: "none" }}>
+                    <button style={buttonPrimary}>Регистрация</button>
+                  </Link>
+                </>
+              )}
+            </div>
+          )}
         </header>
 
         <section>

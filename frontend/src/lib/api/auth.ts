@@ -75,4 +75,37 @@ export async function loginUser(payload: LoginRequest): Promise<TokenResponse> {
   });
 }
 
+export async function getProfile(): Promise<ProfileResponse> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/profile`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail ?? "Не удалось получить профиль.");
+  }
+  return res.json() as Promise<ProfileResponse>;
+}
+
+export async function updateProfile(payload: {
+  full_name?: string | null;
+  phone?: string | null;
+  company_name?: string | null;
+}): Promise<ProfileResponse> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/profile`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail ?? "Не удалось обновить профиль.");
+  }
+  return res.json() as Promise<ProfileResponse>;
+}
+
 export { ApiError };

@@ -39,9 +39,9 @@ export interface UpdateShipmentDetailsRequest {
   packages: ShipmentPackageInput[];
 }
 
-export interface ShipmentPartyResponse {
+export type ShipmentPartyResponse = {
   id: number;
-  role: ShipmentPartyRole;
+  role: "sender" | "recipient";
   full_name: string;
   phone: string;
   email: string | null;
@@ -52,9 +52,9 @@ export interface ShipmentPartyResponse {
   address_line2: string | null;
   postal_code: string | null;
   comment: string | null;
-}
+};
 
-export interface ShipmentPackageResponse {
+export type ShipmentPackageResponse = {
   id: number;
   description: string;
   quantity: number;
@@ -64,15 +64,14 @@ export interface ShipmentPackageResponse {
   depth_cm: number;
   declared_value: number | null;
   declared_value_currency: string | null;
-}
+};
 
-export interface OrderDraftResponse {
+export type OrderDraftResponse = {
   draft_id: number;
   user_id: number;
   quote_session_id: number;
   selected_rate_quote_id: number;
   status: OrderDraftStatus;
-
   carrier_code_snapshot: string;
   carrier_name_snapshot: string;
   tariff_name_snapshot: string;
@@ -80,14 +79,19 @@ export interface OrderDraftResponse {
   currency_snapshot: string;
   eta_days_min_snapshot: number;
   eta_days_max_snapshot: number;
-
   from_country_snapshot: string;
   from_city_snapshot: string;
   to_country_snapshot: string;
   to_city_snapshot: string;
   shipment_type_snapshot: string;
+  created_at: string;
 
   sender: ShipmentPartyResponse | null;
   recipient: ShipmentPartyResponse | null;
   packages: ShipmentPackageResponse[];
-}
+};
+
+export type OrderDraftListResponse = {
+  items: OrderDraftResponse[];
+  total: number;
+};

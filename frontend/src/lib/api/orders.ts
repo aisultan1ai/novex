@@ -2,7 +2,7 @@ import { getAuthHeaders } from "@/lib/auth/session";
 import type {
   CreateDraftFromQuoteRequest,
   OrderDraftResponse,
-  UpdateShipmentDetailsRequest,
+  UpdateShipmentDetailsRequest, OrderDraftListResponse,
 } from "@/types/order";
 
 const API_BASE_URL =
@@ -85,6 +85,22 @@ export async function updateOrderDraftShipment(
     method: "PATCH",
     body: JSON.stringify(payload),
   });
+}
+
+export async function listOrders(): Promise<OrderDraftListResponse> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/orders`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.detail ?? "Не удалось получить список заказов.");
+  }
+
+  return res.json() as Promise<OrderDraftListResponse>;
 }
 
 export { ApiError };

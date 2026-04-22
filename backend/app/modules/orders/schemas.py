@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 from typing import Literal
+from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -132,7 +133,12 @@ class OrderDraftResponse(BaseModel):
     to_country_snapshot: str
     to_city_snapshot: str
     shipment_type_snapshot: str
+    created_at: datetime
 
     sender: ShipmentPartyResponse | None = None
     recipient: ShipmentPartyResponse | None = None
     packages: list[ShipmentPackageResponse]
+
+class OrderDraftListResponse(BaseModel):
+    items: list[OrderDraftResponse]
+    total: int

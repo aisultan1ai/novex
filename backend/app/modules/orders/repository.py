@@ -271,3 +271,20 @@ class OrdersRepository:
             .order_by(ShipmentPackage.id.asc())
         )
         return db.scalars(stmt).all()
+
+    def list_drafts_by_user(
+            self,
+            db: Session,
+            *,
+            user_id: int,
+    ) -> list[OrderDraft]:
+        stmt = (
+            select(OrderDraft)
+            .options(
+                selectinload(OrderDraft.parties),
+                selectinload(OrderDraft.packages),
+            )
+            .where(OrderDraft.user_id == user_id)
+            .order_by(OrderDraft.created_at.desc())
+        )
+        return list(db.scalars(stmt).all())

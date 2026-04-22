@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from app.modules.quotes.repository import QuotesRepository
+from app.modules.carriers.tariff_engine import calculate_quotes as _engine_quotes
+from app.modules.quotes.models import QuoteSession, RateQuote
 from app.modules.quotes.schemas import (
     QuoteSelectionRequest,
     RateQuoteItem,
@@ -12,203 +13,130 @@ from app.modules.quotes.schemas import (
     ShippingQuoteResponse,
 )
 
-"""
-Сейчас расчёт тарифов реализован как временный mock-модуль в QuotesService для MVP.
-Логика расчёта следующая: сначала определяется chargeable weight как максимум между
-фактическим весом и объёмным весом, затем применяется коэффициент маршрута в зависимости
-от направления доставки, после чего формируется базовая стоимость отправления. На основе
-этой базовой стоимости генерируются 3 тестовых тарифа - Express, Standard и Economy -
-с фиксированными сроками доставки и бейджами fastest, recommended и best_value.
-
-Текущая реализация нужна для того, чтобы уже работал полный flow короткой формы:
-создание quote_session, сохранение rate_quotes и возврат вариантов тарифов на frontend.
-В дальнейшем эту логику можно заменить на реальные тарифные таблицы, правила расчёта
-и интеграции с курьерскими службами.
-"""
-
 
 class QuotesService:
-    def __init__(self, repository: QuotesRepository | None = None) -> None:
-        self.repository = repository or QuotesRepository()
 
     def calculate_quotes(
         self,
         db: Session,
         payload: ShippingQuoteRequest,
     ) -> ShippingQuoteResponse:
-        quote_session = self.repository.create_quote_session(
-            db,
+        quotes = _engine_quotes(
+            from_city=payload.from_city,
+            to_city=payload.to_city,
+            weight_kg=float(payload.weight_kg),
+            quantity=int(payload.quantity),
+            width_cm=float(payload.width_cm),
+            height_cm=float(payload.height_cm),
+            depth_cm=float(payload.depth_cm),
+        )
+
+        quote_session = QuoteSession(
             from_country=payload.from_country,
             from_city=payload.from_city,
             to_country=payload.to_country,
             to_city=payload.to_city,
-            shipment_type=payload.shipment_type,
-            weight_kg=payload.weight_kg,
+            weight_kg=Decimal(str(payload.weight_kg)),
             quantity=payload.quantity,
-            width_cm=payload.width_cm,
-            height_cm=payload.height_cm,
-            depth_cm=payload.depth_cm,
+            width_cm=Decimal(str(payload.width_cm)),
+            height_cm=Decimal(str(payload.height_cm)),
+            depth_cm=Decimal(str(payload.depth_cm)),
+            shipment_type=payload.shipment_type,
         )
+        db.add(quote_session)
+        db.flush()
 
-        mock_quotes = self._build_mock_quotes(payload)
+        cheapest = min(quotes, key=lambda q: q.price, default=None)
+        fastest  = min(quotes, key=lambda q: q.eta_days_min, default=None)
 
-        for quote in mock_quotes:
-            self.repository.create_rate_quote(
-                db,
+        rate_rows: list[RateQuote] = []
+        for q in quotes:
+            badge = None
+            if cheapest and q.tariff_code == cheapest.tariff_code:
+                badge = "Выгоднее всего"
+            elif fastest and q.tariff_code == fastest.tariff_code:
+                badge = "Быстрее всего"
+
+            rq = RateQuote(
                 quote_session_id=quote_session.id,
-                carrier_code=quote["carrier_code"],
-                carrier_name=quote["carrier_name"],
-                tariff_name=quote["tariff_name"],
-                price=quote["price"],
-                currency=quote["currency"],
-                eta_days_min=quote["eta_days_min"],
-                eta_days_max=quote["eta_days_max"],
-                badge=quote["badge"],
-                is_selected=False,
+                carrier_code=q.carrier_code,
+                carrier_name=q.carrier_name,
+                tariff_name=q.tariff_name,
+                price=q.price,
+                currency=q.currency,
+                eta_days_min=q.eta_days_min,
+                eta_days_max=q.eta_days_max,
+                badge=badge,
             )
+            rate_rows.append(rq)
 
+        db.add_all(rate_rows)
         db.commit()
+        db.refresh(quote_session)
 
-        return self.get_quote_session(db, quote_session.id)
+        return ShippingQuoteResponse(
+            quote_session_id=quote_session.id,
+            quotes=[self._to_item(rq) for rq in rate_rows],
+        )
 
     def get_quote_session(
         self,
         db: Session,
-        quote_session_id: int,
+        session_id: int,
     ) -> ShippingQuoteResponse:
-        quote_session = self.repository.get_quote_session_by_id(db, quote_session_id)
-        if quote_session is None:
-            raise ValueError("Quote session not found")
-
-        rate_quotes = self.repository.list_rate_quotes_by_session_id(db, quote_session_id)
-
+        session = db.query(QuoteSession).filter(QuoteSession.id == session_id).first()
+        if not session:
+            raise ValueError("Quote session not found.")
+        rates = (
+            db.query(RateQuote)
+            .filter(RateQuote.quote_session_id == session_id)
+            .all()
+        )
         return ShippingQuoteResponse(
-            quote_session_id=quote_session.id,
-            quotes=[
-                RateQuoteItem(
-                    id=item.id,
-                    carrier_code=item.carrier_code,
-                    carrier_name=item.carrier_name,
-                    tariff_name=item.tariff_name,
-                    price=item.price,
-                    currency=item.currency,
-                    eta_days_min=item.eta_days_min,
-                    eta_days_max=item.eta_days_max,
-                    badge=item.badge,
-                    is_selected=item.is_selected,
-                )
-                for item in rate_quotes
-            ],
+            quote_session_id=session.id,
+            quotes=[self._to_item(r) for r in rates],
         )
 
     def select_quote(
         self,
         db: Session,
-        *,
         quote_session_id: int,
         payload: QuoteSelectionRequest,
     ) -> ShippingQuoteResponse:
-        quote_session = self.repository.get_quote_session_by_id(db, quote_session_id)
-        if quote_session is None:
-            raise ValueError("Quote session not found")
+        # Снимаем предыдущий выбор в этой сессии
+        db.query(RateQuote).filter(
+            RateQuote.quote_session_id == quote_session_id,
+            RateQuote.is_selected == True,
+        ).update({"is_selected": False})
 
-        rate_quote = self.repository.get_rate_quote_by_id(db, payload.rate_quote_id)
-        if rate_quote is None:
-            raise ValueError("Rate quote not found")
+        # Ставим выбранный
+        rate = (
+            db.query(RateQuote)
+            .filter(
+                RateQuote.quote_session_id == quote_session_id,
+                RateQuote.id == payload.rate_quote_id,
+            )
+            .first()
+        )
+        if not rate:
+            raise ValueError("Rate quote not found.")
 
-        if rate_quote.quote_session_id != quote_session_id:
-            raise ValueError("Rate quote does not belong to the given quote session")
-
-        self.repository.clear_selected_rate_quotes(db, quote_session_id)
-        self.repository.mark_rate_quote_selected(db, payload.rate_quote_id)
-
+        rate.is_selected = True
         db.commit()
 
         return self.get_quote_session(db, quote_session_id)
 
-    def _build_mock_quotes(self, payload: ShippingQuoteRequest) -> list[dict]:
-        route_multiplier = self._route_multiplier(
-            payload.from_country,
-            payload.to_country,
-            payload.from_city,
-            payload.to_city,
+    @staticmethod
+    def _to_item(rq: RateQuote) -> RateQuoteItem:
+        return RateQuoteItem(
+            id=rq.id,
+            carrier_code=rq.carrier_code,
+            carrier_name=rq.carrier_name,
+            tariff_name=rq.tariff_name,
+            price=rq.price,
+            currency=rq.currency,
+            eta_days_min=rq.eta_days_min,
+            eta_days_max=rq.eta_days_max,
+            badge=rq.badge,
+            is_selected=rq.is_selected,
         )
-
-        chargeable_weight = self._chargeable_weight(
-            payload.weight_kg,
-            payload.quantity,
-            payload.width_cm,
-            payload.height_cm,
-            payload.depth_cm,
-        )
-
-        base_price = Decimal("1200.00") * route_multiplier + chargeable_weight * Decimal("900.00")
-
-        shipment_type = payload.shipment_type.lower()
-        if shipment_type == "document":
-            base_price = max(base_price * Decimal("0.75"), Decimal("1500.00"))
-
-        express_price = self._money(base_price * Decimal("1.45"))
-        standard_price = self._money(base_price * Decimal("1.15"))
-        economy_price = self._money(base_price * Decimal("0.95"))
-
-        return [
-            {
-                "carrier_code": "azimuth",
-                "carrier_name": "Azimuth",
-                "tariff_name": "Express",
-                "price": express_price,
-                "currency": "KZT",
-                "eta_days_min": 1,
-                "eta_days_max": 2,
-                "badge": "fastest",
-            },
-            {
-                "carrier_code": "azimuth",
-                "carrier_name": "Azimuth",
-                "tariff_name": "Standard",
-                "price": standard_price,
-                "currency": "KZT",
-                "eta_days_min": 2,
-                "eta_days_max": 4,
-                "badge": "recommended",
-            },
-            {
-                "carrier_code": "partner_economy",
-                "carrier_name": "Partner Economy",
-                "tariff_name": "Economy",
-                "price": economy_price,
-                "currency": "KZT",
-                "eta_days_min": 4,
-                "eta_days_max": 7,
-                "badge": "best_value",
-            },
-        ]
-
-    def _chargeable_weight(
-        self,
-        weight_kg: Decimal,
-        quantity: int,
-        width_cm: Decimal,
-        height_cm: Decimal,
-        depth_cm: Decimal,
-    ) -> Decimal:
-        actual_weight = weight_kg * Decimal(quantity)
-        volumetric_weight = ((width_cm * height_cm * depth_cm) / Decimal("5000")) * Decimal(quantity)
-        return max(actual_weight, volumetric_weight)
-
-    def _route_multiplier(
-        self,
-        from_country: str,
-        to_country: str,
-        from_city: str,
-        to_city: str,
-    ) -> Decimal:
-        if from_country != to_country:
-            return Decimal("2.40")
-        if from_city.strip().lower() == to_city.strip().lower():
-            return Decimal("0.85")
-        return Decimal("1.35")
-
-    def _money(self, value: Decimal) -> Decimal:
-        return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
