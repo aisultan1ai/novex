@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import logging
 from decimal import Decimal
 
-from sqlalchemy.orm import Session
+from sqlalchemy import select, update
+from sqlalchemy.orm import Session, selectinload
 
+from app.core.exceptions import NotFoundError
+
+logger = logging.getLogger(__name__)
 from app.modules.carriers.tariff_engine import calculate_quotes as _engine_quotes
 from app.modules.quotes.models import QuoteSession, RateQuote
 from app.modules.quotes.schemas import (
@@ -74,6 +79,15 @@ class QuotesService:
         db.commit()
         db.refresh(quote_session)
 
+        logger.info(
+            "Quotes calculated: session_id=%s from=%s/%s to=%s/%s quotes=%s",
+            quote_session.id,
+            payload.from_country,
+            payload.from_city,
+            payload.to_country,
+            payload.to_city,
+            len(rate_rows),
+        )
         return ShippingQuoteResponse(
             quote_session_id=quote_session.id,
             quotes=[self._to_item(rq) for rq in rate_rows],
@@ -84,17 +98,19 @@ class QuotesService:
         db: Session,
         session_id: int,
     ) -> ShippingQuoteResponse:
-        session = db.query(QuoteSession).filter(QuoteSession.id == session_id).first()
-        if not session:
-            raise ValueError("Quote session not found.")
-        rates = (
-            db.query(RateQuote)
-            .filter(RateQuote.quote_session_id == session_id)
-            .all()
+        stmt = (
+            select(QuoteSession)
+            .where(QuoteSession.id == session_id)
+            .options(selectinload(QuoteSession.rate_quotes))
         )
+        session = db.scalar(stmt)
+        if not session:
+            logger.warning("Quote session not found: session_id=%s", session_id)
+            raise NotFoundError("Quote session not found.")
+
         return ShippingQuoteResponse(
             quote_session_id=session.id,
-            quotes=[self._to_item(r) for r in rates],
+            quotes=[self._to_item(r) for r in session.rate_quotes],
         )
 
     def select_quote(
@@ -103,27 +119,37 @@ class QuotesService:
         quote_session_id: int,
         payload: QuoteSelectionRequest,
     ) -> ShippingQuoteResponse:
-        # Снимаем предыдущий выбор в этой сессии
-        db.query(RateQuote).filter(
-            RateQuote.quote_session_id == quote_session_id,
-            RateQuote.is_selected == True,
-        ).update({"is_selected": False})
-
-        # Ставим выбранный
-        rate = (
-            db.query(RateQuote)
-            .filter(
+        db.execute(
+            update(RateQuote)
+            .where(
                 RateQuote.quote_session_id == quote_session_id,
-                RateQuote.id == payload.rate_quote_id,
+                RateQuote.is_selected.is_(True),
             )
-            .first()
+            .values(is_selected=False)
         )
+
+        stmt = select(RateQuote).where(
+            RateQuote.quote_session_id == quote_session_id,
+            RateQuote.id == payload.rate_quote_id,
+        )
+        rate = db.scalar(stmt)
         if not rate:
-            raise ValueError("Rate quote not found.")
+            logger.warning(
+                "Rate quote not found: session_id=%s rate_quote_id=%s",
+                quote_session_id,
+                payload.rate_quote_id,
+            )
+            raise NotFoundError("Rate quote not found.")
 
         rate.is_selected = True
         db.commit()
 
+        logger.info(
+            "Rate quote selected: session_id=%s rate_quote_id=%s carrier=%s",
+            quote_session_id,
+            rate.id,
+            rate.carrier_code,
+        )
         return self.get_quote_session(db, quote_session_id)
 
     @staticmethod

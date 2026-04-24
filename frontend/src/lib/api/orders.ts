@@ -87,20 +87,34 @@ export async function updateOrderDraftShipment(
   });
 }
 
-export async function listOrders(): Promise<OrderDraftListResponse> {
-  const token = getToken();
-  const res = await fetch(`${API_BASE}/orders`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+export async function proceedToCheckout(
+  draftId: number,
+): Promise<OrderDraftResponse> {
+  return request<OrderDraftResponse>(`/orders/drafts/${draftId}/checkout`, {
+    method: "POST",
   });
+}
 
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new ApiError(res.status, data.detail ?? "Не удалось получить список заказов.");
-  }
+export async function mockPayOrderDraft(
+  draftId: number,
+): Promise<OrderDraftResponse> {
+  return request<OrderDraftResponse>(`/orders/drafts/${draftId}/pay/mock`, {
+    method: "POST",
+  });
+}
 
-  return res.json() as Promise<OrderDraftListResponse>;
+export async function deleteOrderDraft(draftId: number): Promise<void> {
+  await request<null>(`/orders/drafts/${draftId}`, { method: "DELETE" });
+}
+
+export async function listOrders(
+  page = 1,
+  size = 20,
+): Promise<OrderDraftListResponse> {
+  return request<OrderDraftListResponse>(
+    `/orders?page=${page}&size=${size}`,
+    { method: "GET" },
+  );
 }
 
 export { ApiError };

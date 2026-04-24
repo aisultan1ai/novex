@@ -1,7 +1,10 @@
 export type OrderDraftStatus =
   | "draft"
   | "shipment_details_completed"
-  | "ready_for_checkout";
+  | "ready_for_checkout"
+  | "awaiting_payment"
+  | "paid"
+  | "cancelled";
 
 export type ShipmentPartyRole = "sender" | "recipient";
 
@@ -94,4 +97,7 @@ export type OrderDraftResponse = {
 export type OrderDraftListResponse = {
   items: OrderDraftResponse[];
   total: number;
+  page: number;
+  size: number;
+  pages: number;
 };

@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import warnings
 from functools import lru_cache
 from typing import Any
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_WEAK_POSTGRES_PASSWORDS = {"novex", "postgres", "password", "1234", "admin"}
+_WEAK_MINIO_SECRETS = {"minio12345", "minio", "minioadmin", "password"}
 
 
 class Settings(BaseSettings):
@@ -39,6 +43,30 @@ class Settings(BaseSettings):
     minio_secret_key: str = "minio12345"
     minio_bucket: str = "novex-dev"
     minio_secure: bool = False
+
+    @model_validator(mode="after")
+    def warn_weak_credentials_in_production(self) -> "Settings":
+        if self.environment == "production":
+            if self.postgres_password in _WEAK_POSTGRES_PASSWORDS:
+                raise ValueError(
+                    "postgres_password is a known weak default — set a strong POSTGRES_PASSWORD env var"
+                )
+            if self.minio_secret_key in _WEAK_MINIO_SECRETS:
+                raise ValueError(
+                    "minio_secret_key is a known weak default — set a strong MINIO_SECRET_KEY env var"
+                )
+        elif self.environment != "test":
+            if self.postgres_password in _WEAK_POSTGRES_PASSWORDS:
+                warnings.warn(
+                    "postgres_password uses a weak default. Set POSTGRES_PASSWORD before deploying.",
+                    stacklevel=2,
+                )
+            if self.minio_secret_key in _WEAK_MINIO_SECRETS:
+                warnings.warn(
+                    "minio_secret_key uses a weak default. Set MINIO_SECRET_KEY before deploying.",
+                    stacklevel=2,
+                )
+        return self
 
     backend_cors_origins: list[str] = Field(
         default_factory=lambda: [

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from decimal import Decimal
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select, update as sa_update
 from sqlalchemy.orm import Session, selectinload
 
 from app.modules.orders.models import OrderDraft, ShipmentPackage, ShipmentParty
@@ -159,9 +159,13 @@ class OrdersRepository:
         order_draft: OrderDraft,
         status: str,
     ) -> OrderDraft:
-        order_draft.status = status
-        db.add(order_draft)
+        db.execute(
+            sa_update(OrderDraft)
+            .where(OrderDraft.id == order_draft.id)
+            .values(status=status)
+        )
         db.flush()
+        order_draft.status = status
         return order_draft
 
     def delete_shipment_parties(
@@ -272,19 +276,40 @@ class OrdersRepository:
         )
         return db.scalars(stmt).all()
 
+    def delete_order_draft_by_id(
+        self,
+        db: Session,
+        *,
+        draft_id: int,
+    ) -> None:
+        db.execute(delete(ShipmentParty).where(ShipmentParty.order_draft_id == draft_id))
+        db.execute(delete(ShipmentPackage).where(ShipmentPackage.order_draft_id == draft_id))
+        db.execute(delete(OrderDraft).where(OrderDraft.id == draft_id))
+
     def list_drafts_by_user(
             self,
             db: Session,
             *,
             user_id: int,
-    ) -> list[OrderDraft]:
+            offset: int = 0,
+            limit: int = 20,
+    ) -> tuple[list[OrderDraft], int]:
+        base_where = OrderDraft.user_id == user_id
+
+        total: int = db.scalar(
+            select(func.count(OrderDraft.id)).where(base_where)
+        ) or 0
+
         stmt = (
             select(OrderDraft)
             .options(
                 selectinload(OrderDraft.parties),
                 selectinload(OrderDraft.packages),
             )
-            .where(OrderDraft.user_id == user_id)
+            .where(base_where)
             .order_by(OrderDraft.created_at.desc())
+            .offset(offset)
+            .limit(limit)
         )
-        return list(db.scalars(stmt).all())
+        items = list(db.scalars(stmt).all())
+        return items, total

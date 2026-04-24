@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import logging
+
 from sqlalchemy.orm import Session
 
+from app.core.exceptions import ConflictError, NotFoundError, UnauthorizedError
+
+logger = logging.getLogger(__name__)
 from app.core.security import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     create_access_token,
@@ -24,9 +29,11 @@ class IdentityService:
         self.repository = repository or IdentityRepository()
 
     def register_user(self, db: Session, payload: RegisterRequest) -> ProfileResponse:
+        logger.info("Registering user: email=%s", payload.email)
         existing_user = self.repository.get_user_by_email(db, payload.email)
         if existing_user is not None:
-            raise ValueError("User with this email already exists")
+            logger.warning("Registration conflict: email=%s already exists", payload.email)
+            raise ConflictError("User with this email already exists")
 
         customer_role = self.repository.ensure_role(
             db,
@@ -60,20 +67,21 @@ class IdentityService:
 
         created_user = self.repository.get_user_by_id(db, user.id)
         if created_user is None:
-            raise ValueError("Failed to load created user")
+            raise NotFoundError("Failed to load created user")
 
+        logger.info("User registered: user_id=%s email=%s", created_user.id, created_user.email)
         return self._build_profile_response(created_user)
 
     def authenticate_user(self, db: Session, payload: LoginRequest) -> TokenResponse:
+        logger.info("Login attempt: email=%s", payload.email)
         user = self.repository.get_user_by_email(db, payload.email)
-        if user is None:
-            raise ValueError("Invalid email or password")
-
-        if not verify_password(payload.password, user.password_hash):
-            raise ValueError("Invalid email or password")
+        if user is None or not verify_password(payload.password, user.password_hash):
+            logger.warning("Failed login attempt: email=%s", payload.email)
+            raise UnauthorizedError("Invalid email or password")
 
         if not user.is_active:
-            raise ValueError("User is inactive")
+            logger.warning("Login denied — inactive account: user_id=%s", user.id)
+            raise UnauthorizedError("User account is inactive")
 
         role_code = user.role.code.value if user.role else RoleCode.CUSTOMER.value
 
@@ -86,6 +94,7 @@ class IdentityService:
         )
 
         profile = self._build_profile_response(user)
+        logger.info("User authenticated: user_id=%s email=%s", user.id, user.email)
 
         return TokenResponse(
             access_token=token,
@@ -96,7 +105,7 @@ class IdentityService:
     def get_profile(self, db: Session, user_id: int) -> ProfileResponse:
         user = self.repository.get_user_by_id(db, user_id)
         if user is None:
-            raise ValueError("User not found")
+            raise NotFoundError("User not found")
         return self._build_profile_response(user)
 
     def update_profile(
@@ -108,11 +117,11 @@ class IdentityService:
     ) -> ProfileResponse:
         user = self.repository.get_user_by_id(db, user_id)
         if user is None:
-            raise ValueError("User not found")
+            raise NotFoundError("User not found")
 
         profile = user.customer_profile
         if profile is None:
-            raise ValueError("Customer profile not found")
+            raise NotFoundError("Customer profile not found")
 
         self.repository.update_user(
             db,
@@ -132,7 +141,7 @@ class IdentityService:
 
         updated_user = self.repository.get_user_by_id(db, user_id)
         if updated_user is None:
-            raise ValueError("Failed to load updated user")
+            raise NotFoundError("Failed to load updated user")
 
         return self._build_profile_response(updated_user)
 
@@ -153,7 +162,7 @@ class IdentityService:
     def _build_profile_response(self, user: User) -> ProfileResponse:
         profile = user.customer_profile
         if profile is None:
-            raise ValueError("Customer profile is missing")
+            raise NotFoundError("Customer profile is missing")
 
         role_code = user.role.code if user.role else RoleCode.CUSTOMER
 

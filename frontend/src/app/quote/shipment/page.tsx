@@ -18,6 +18,8 @@ import type {
   UpdateShipmentDetailsRequest,
 } from "@/types/order";
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 type PartyFormState = {
   full_name: string;
   phone: string;
@@ -38,8 +40,6 @@ type PackageFormState = {
   width_cm: string;
   height_cm: string;
   depth_cm: string;
-  declared_value: string;
-  declared_value_currency: string;
 };
 
 type ShipmentFormState = {
@@ -47,6 +47,8 @@ type ShipmentFormState = {
   recipient: PartyFormState;
   packageItem: PackageFormState;
 };
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const pageStyle: CSSProperties = {
   minHeight: "100vh",
@@ -57,10 +59,7 @@ const pageStyle: CSSProperties = {
     "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
 };
 
-const containerStyle: CSSProperties = {
-  maxWidth: 1100,
-  margin: "0 auto",
-};
+const containerStyle: CSSProperties = { maxWidth: 1100, margin: "0 auto" };
 
 const cardStyle: CSSProperties = {
   border: "1px solid #e5e7eb",
@@ -68,6 +67,13 @@ const cardStyle: CSSProperties = {
   padding: 20,
   background: "#ffffff",
   boxShadow: "0 8px 24px rgba(15, 23, 42, 0.06)",
+};
+
+const tariffCardStyle: CSSProperties = {
+  ...cardStyle,
+  border: "1.5px solid #6366f1",
+  background: "linear-gradient(135deg, #f5f3ff 0%, #eff6ff 100%)",
+  marginBottom: 24,
 };
 
 const inputStyle: CSSProperties = {
@@ -93,7 +99,7 @@ const buttonPrimary: CSSProperties = {
   color: "#ffffff",
   border: "none",
   borderRadius: 12,
-  padding: "12px 16px",
+  padding: "12px 24px",
   fontSize: 14,
   fontWeight: 600,
   cursor: "pointer",
@@ -125,14 +131,10 @@ const errorStyle: CSSProperties = {
   border: "1px solid #fecaca",
   background: "#fef2f2",
   color: "#b91c1c",
+  marginBottom: 20,
 };
 
-const successStyle: CSSProperties = {
-  ...cardStyle,
-  border: "1px solid #bbf7d0",
-  background: "#f0fdf4",
-  color: "#166534",
-};
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const emptyParty = (): PartyFormState => ({
   full_name: "",
@@ -154,9 +156,14 @@ const emptyPackage = (): PackageFormState => ({
   width_cm: "",
   height_cm: "",
   depth_cm: "",
-  declared_value: "",
-  declared_value_currency: "KZT",
 });
+
+function formatPrice(price: number, currency: string): string {
+  return `${new Intl.NumberFormat("ru-RU", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(price)} ${currency}`;
+}
 
 function mapPartyFormToPayload(party: PartyFormState): ShipmentPartyInput {
   return {
@@ -173,26 +180,20 @@ function mapPartyFormToPayload(party: PartyFormState): ShipmentPartyInput {
   };
 }
 
-function mapPackageFormToPayload(
-  packageItem: PackageFormState,
-): ShipmentPackageInput {
+function mapPackageFormToPayload(pkg: PackageFormState): ShipmentPackageInput {
   return {
-    description: packageItem.description.trim(),
-    quantity: Number(packageItem.quantity),
-    weight_kg: Number(packageItem.weight_kg),
-    width_cm: Number(packageItem.width_cm),
-    height_cm: Number(packageItem.height_cm),
-    depth_cm: Number(packageItem.depth_cm),
-    declared_value: packageItem.declared_value.trim()
-      ? Number(packageItem.declared_value)
-      : null,
-    declared_value_currency: packageItem.declared_value_currency.trim() || null,
+    description: pkg.description.trim(),
+    quantity: Number(pkg.quantity),
+    weight_kg: Number(pkg.weight_kg),
+    width_cm: Number(pkg.width_cm),
+    height_cm: Number(pkg.height_cm),
+    depth_cm: Number(pkg.depth_cm),
+    declared_value: null,
+    declared_value_currency: null,
   };
 }
 
-function buildShipmentPayload(
-  form: ShipmentFormState,
-): UpdateShipmentDetailsRequest {
+function buildShipmentPayload(form: ShipmentFormState): UpdateShipmentDetailsRequest {
   return {
     sender: mapPartyFormToPayload(form.sender),
     recipient: mapPartyFormToPayload(form.recipient),
@@ -214,66 +215,207 @@ function mergeSenderWithCurrentUser(
 }
 
 function mapDraftToForm(
-  createdDraft: OrderDraftResponse,
+  draft: OrderDraftResponse,
   currentUser: ProfileResponse | null,
 ): ShipmentFormState {
-  const baseSender = createdDraft.sender
+  const baseSender = draft.sender
     ? {
-        full_name: createdDraft.sender.full_name,
-        phone: createdDraft.sender.phone,
-        email: createdDraft.sender.email || "",
-        company_name: createdDraft.sender.company_name || "",
-        country: createdDraft.sender.country,
-        city: createdDraft.sender.city,
-        address_line1: createdDraft.sender.address_line1,
-        address_line2: createdDraft.sender.address_line2 || "",
-        postal_code: createdDraft.sender.postal_code || "",
-        comment: createdDraft.sender.comment || "",
+        full_name: draft.sender.full_name,
+        phone: draft.sender.phone,
+        email: draft.sender.email || "",
+        company_name: draft.sender.company_name || "",
+        country: draft.sender.country,
+        city: draft.sender.city,
+        address_line1: draft.sender.address_line1,
+        address_line2: draft.sender.address_line2 || "",
+        postal_code: draft.sender.postal_code || "",
+        comment: draft.sender.comment || "",
       }
-    : {
-        ...emptyParty(),
-        country: createdDraft.from_country_snapshot || "KZ",
-        city: createdDraft.from_city_snapshot || "",
-      };
+    : { ...emptyParty(), country: draft.from_country_snapshot || "KZ", city: draft.from_city_snapshot || "" };
 
   return {
     sender: mergeSenderWithCurrentUser(baseSender, currentUser),
-    recipient: createdDraft.recipient
+    recipient: draft.recipient
       ? {
-          full_name: createdDraft.recipient.full_name,
-          phone: createdDraft.recipient.phone,
-          email: createdDraft.recipient.email || "",
-          company_name: createdDraft.recipient.company_name || "",
-          country: createdDraft.recipient.country,
-          city: createdDraft.recipient.city,
-          address_line1: createdDraft.recipient.address_line1,
-          address_line2: createdDraft.recipient.address_line2 || "",
-          postal_code: createdDraft.recipient.postal_code || "",
-          comment: createdDraft.recipient.comment || "",
+          full_name: draft.recipient.full_name,
+          phone: draft.recipient.phone,
+          email: draft.recipient.email || "",
+          company_name: draft.recipient.company_name || "",
+          country: draft.recipient.country,
+          city: draft.recipient.city,
+          address_line1: draft.recipient.address_line1,
+          address_line2: draft.recipient.address_line2 || "",
+          postal_code: draft.recipient.postal_code || "",
+          comment: draft.recipient.comment || "",
         }
-      : {
-          ...emptyParty(),
-          country: createdDraft.to_country_snapshot || "KZ",
-          city: createdDraft.to_city_snapshot || "",
-        },
-    packageItem: createdDraft.packages[0]
+      : { ...emptyParty(), country: draft.to_country_snapshot || "KZ", city: draft.to_city_snapshot || "" },
+    packageItem: draft.packages[0]
       ? {
-          description: createdDraft.packages[0].description,
-          quantity: String(createdDraft.packages[0].quantity),
-          weight_kg: String(createdDraft.packages[0].weight_kg),
-          width_cm: String(createdDraft.packages[0].width_cm),
-          height_cm: String(createdDraft.packages[0].height_cm),
-          depth_cm: String(createdDraft.packages[0].depth_cm),
-          declared_value:
-            createdDraft.packages[0].declared_value != null
-              ? String(createdDraft.packages[0].declared_value)
-              : "",
-          declared_value_currency:
-            createdDraft.packages[0].declared_value_currency || "KZT",
+          description: draft.packages[0].description,
+          quantity: String(draft.packages[0].quantity),
+          weight_kg: String(draft.packages[0].weight_kg),
+          width_cm: String(draft.packages[0].width_cm),
+          height_cm: String(draft.packages[0].height_cm),
+          depth_cm: String(draft.packages[0].depth_cm),
         }
       : emptyPackage(),
   };
 }
+
+// ─── Tariff summary card ──────────────────────────────────────────────────────
+
+function TariffCard({
+  draft,
+  onChangeTariff,
+}: {
+  draft: OrderDraftResponse;
+  onChangeTariff: () => void;
+}) {
+  return (
+    <div style={tariffCardStyle}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          flexWrap: "wrap",
+          gap: 16,
+        }}
+      >
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#6366f1", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
+            Выбранный тариф
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: "#0f172a", marginBottom: 4 }}>
+            {draft.carrier_name_snapshot} — {draft.tariff_name_snapshot}
+          </div>
+          <div style={{ fontSize: 14, color: "#475569" }}>
+            {draft.from_city_snapshot} → {draft.to_city_snapshot}
+            {" · "}
+            {draft.shipment_type_snapshot}
+          </div>
+        </div>
+
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: 28, fontWeight: 800, color: "#0f172a" }}>
+            {formatPrice(draft.price_snapshot, draft.currency_snapshot)}
+          </div>
+          <div style={{ fontSize: 13, color: "#6366f1", fontWeight: 600, marginBottom: 12 }}>
+            {draft.eta_days_min_snapshot}–{draft.eta_days_max_snapshot} дн.
+          </div>
+          <button style={{ ...buttonSecondary, fontSize: 13, padding: "8px 14px" }} onClick={onChangeTariff}>
+            Изменить тариф
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Party form section ───────────────────────────────────────────────────────
+
+function PartySection({
+  title,
+  values,
+  onChange,
+}: {
+  title: string;
+  values: PartyFormState;
+  onChange: (key: keyof PartyFormState, value: string) => void;
+}) {
+  const fields: { key: keyof PartyFormState; label: string; required?: boolean }[] = [
+    { key: "full_name", label: "ФИО", required: true },
+    { key: "phone", label: "Телефон", required: true },
+    { key: "email", label: "Email" },
+    { key: "company_name", label: "Компания" },
+    { key: "country", label: "Код страны (2 буквы)", required: true },
+    { key: "city", label: "Город", required: true },
+    { key: "address_line1", label: "Адрес", required: true },
+    { key: "address_line2", label: "Доп. адрес" },
+    { key: "postal_code", label: "Почтовый индекс" },
+    { key: "comment", label: "Комментарий" },
+  ];
+
+  return (
+    <div style={cardStyle}>
+      <h2 style={{ marginTop: 0, marginBottom: 20, fontSize: 20, fontWeight: 700 }}>{title}</h2>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+          gap: 16,
+        }}
+      >
+        {fields.map(({ key, label, required }) => (
+          <div key={key}>
+            <label style={labelStyle}>
+              {label}
+              {required && <span style={{ color: "#ef4444", marginLeft: 2 }}>*</span>}
+            </label>
+            <input
+              style={inputStyle}
+              value={values[key]}
+              onChange={(e) => onChange(key, e.target.value)}
+              required={required}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Package form section ─────────────────────────────────────────────────────
+
+function PackageSection({
+  values,
+  onChange,
+}: {
+  values: PackageFormState;
+  onChange: (key: keyof PackageFormState, value: string) => void;
+}) {
+  const fields: { key: keyof PackageFormState; label: string; mode?: string }[] = [
+    { key: "description", label: "Описание содержимого" },
+    { key: "quantity", label: "Количество мест", mode: "numeric" },
+    { key: "weight_kg", label: "Вес, кг", mode: "decimal" },
+    { key: "width_cm", label: "Ширина, см", mode: "decimal" },
+    { key: "height_cm", label: "Высота, см", mode: "decimal" },
+    { key: "depth_cm", label: "Глубина, см", mode: "decimal" },
+  ];
+
+  return (
+    <div style={cardStyle}>
+      <h2 style={{ marginTop: 0, marginBottom: 20, fontSize: 20, fontWeight: 700 }}>
+        Параметры отправления
+      </h2>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+          gap: 16,
+        }}
+      >
+        {fields.map(({ key, label, mode }) => (
+          <div key={key}>
+            <label style={labelStyle}>
+              {label}
+              <span style={{ color: "#ef4444", marginLeft: 2 }}>*</span>
+            </label>
+            <input
+              style={inputStyle}
+              value={values[key]}
+              onChange={(e) => onChange(key, e.target.value)}
+              inputMode={mode as React.HTMLAttributes<HTMLInputElement>["inputMode"]}
+              required
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ShipmentPage() {
   const router = useRouter();
@@ -283,17 +425,14 @@ export default function ShipmentPage() {
   const quoteSessionId = useMemo(() => {
     const raw = searchParams.get("quoteSessionId");
     if (!raw) return null;
-
     const parsed = Number(raw);
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
   }, [searchParams]);
 
-  const fullNextUrl = useMemo(() => {
-    if (!quoteSessionId) {
-      return "/quote/shipment";
-    }
-    return `/quote/shipment?quoteSessionId=${quoteSessionId}`;
-  }, [quoteSessionId]);
+  const fullNextUrl = useMemo(
+    () => (quoteSessionId ? `/quote/shipment?quoteSessionId=${quoteSessionId}` : "/quote/shipment"),
+    [quoteSessionId],
+  );
 
   const createDraftRequestedRef = useRef(false);
 
@@ -305,35 +444,28 @@ export default function ShipmentPage() {
 
   const [draft, setDraft] = useState<OrderDraftResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Redirect if not authenticated
   useEffect(() => {
-    if (isLoading) {
-      return;
-    }
-
-    if (!isAuthenticated) {
+    if (!isLoading && !isAuthenticated) {
       router.replace(`/login?next=${encodeURIComponent(fullNextUrl)}`);
     }
   }, [fullNextUrl, isAuthenticated, isLoading, router]);
 
+  // Pre-fill sender from current user profile
   useEffect(() => {
-    if (!currentUser) {
-      return;
-    }
-
+    if (!currentUser) return;
     setForm((prev) => ({
       ...prev,
       sender: mergeSenderWithCurrentUser(prev.sender, currentUser),
     }));
   }, [currentUser]);
 
+  // Bootstrap draft
   useEffect(() => {
-    if (isLoading || !isAuthenticated) {
-      return;
-    }
+    if (isLoading || !isAuthenticated) return;
 
     if (!quoteSessionId) {
       setError("Не найден quoteSessionId. Вернитесь к выбору тарифа.");
@@ -341,22 +473,15 @@ export default function ShipmentPage() {
       return;
     }
 
-    if (createDraftRequestedRef.current) {
-      return;
-    }
-
+    if (createDraftRequestedRef.current) return;
     createDraftRequestedRef.current = true;
 
     async function bootstrapDraft() {
       setError(null);
-      setSuccessMessage(null);
       setIsBootstrapping(true);
 
       try {
-        const createdDraft = await createDraftFromQuote({
-          quote_session_id: quoteSessionId,
-        });
-
+        const createdDraft = await createDraftFromQuote({ quote_session_id: quoteSessionId! });
         setDraft(createdDraft);
         setForm(mapDraftToForm(createdDraft, currentUser));
       } catch (err) {
@@ -379,48 +504,30 @@ export default function ShipmentPage() {
     void bootstrapDraft();
   }, [currentUser, fullNextUrl, isAuthenticated, isLoading, logout, quoteSessionId]);
 
-  function updatePartyField(
-    role: "sender" | "recipient",
-    key: keyof PartyFormState,
-    value: string,
-  ) {
-    setForm((prev) => ({
-      ...prev,
-      [role]: {
-        ...prev[role],
-        [key]: value,
-      },
-    }));
+  function updatePartyField(role: "sender" | "recipient", key: keyof PartyFormState, value: string) {
+    setForm((prev) => ({ ...prev, [role]: { ...prev[role], [key]: value } }));
   }
 
   function updatePackageField(key: keyof PackageFormState, value: string) {
-    setForm((prev) => ({
-      ...prev,
-      packageItem: {
-        ...prev.packageItem,
-        [key]: value,
-      },
-    }));
+    setForm((prev) => ({ ...prev, packageItem: { ...prev.packageItem, [key]: value } }));
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!draft) {
-      setError("Draft order ещё не создан.");
+      setError("Черновик заказа ещё не создан.");
       return;
     }
 
     setError(null);
-    setSuccessMessage(null);
     setIsSubmitting(true);
 
     try {
       const payload = buildShipmentPayload(form);
-      const updatedDraft = await updateOrderDraftShipment(draft.draft_id, payload);
-      setDraft(updatedDraft);
-      setForm(mapDraftToForm(updatedDraft, currentUser));
-      setSuccessMessage("Данные отправления успешно сохранены в draft order.");
+      await updateOrderDraftShipment(draft.draft_id, payload);
+      // Navigate to orders list after successful save
+      router.push("/dashboard/orders");
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.status === 401) {
@@ -451,6 +558,7 @@ export default function ShipmentPage() {
   return (
     <main style={pageStyle}>
       <div style={containerStyle}>
+        {/* Header */}
         <header
           style={{
             display: "flex",
@@ -462,461 +570,61 @@ export default function ShipmentPage() {
           }}
         >
           <div>
-            <div style={badgeStyle}>Shipment details</div>
+            <div style={badgeStyle}>Оформление отправления</div>
             <h1 style={{ margin: "14px 0 8px", fontSize: 34, lineHeight: 1.1 }}>
-              Оформление отправления
+              Данные отправления
             </h1>
             <p style={{ margin: 0, color: "#475569", lineHeight: 1.7 }}>
-              На этом шаге мы создаём draft order и сохраняем sender,
-              recipient и package details.
+              Заполните данные отправителя, получателя и параметры посылки.
             </p>
           </div>
 
-          <div style={{ display: "flex", gap: 12 }}>
-            <button
-              style={buttonSecondary}
-              onClick={() =>
-                router.push(
-                  quoteSessionId
-                    ? `/quote/results?quoteSessionId=${quoteSessionId}`
-                    : "/",
-                )
-              }
-            >
-              Назад к тарифам
-            </button>
-          </div>
+          <button
+            style={buttonSecondary}
+            onClick={() =>
+              router.push(
+                quoteSessionId ? `/quote/results?quoteSessionId=${quoteSessionId}` : "/",
+              )
+            }
+          >
+            Назад к тарифам
+          </button>
         </header>
 
-        {error ? <div style={errorStyle}>{error}</div> : null}
-        {successMessage ? <div style={successStyle}>{successMessage}</div> : null}
+        {error && <div style={errorStyle}>{error}</div>}
 
         {isBootstrapping ? (
-          <div style={{ ...cardStyle, marginTop: 20 }}>
-            Подготавливаем draft order...
-          </div>
+          <div style={{ ...cardStyle }}>Подготавливаем черновик заказа...</div>
         ) : draft ? (
           <>
-            <div
-              style={{
-                ...cardStyle,
-                marginTop: 20,
-                marginBottom: 20,
-                display: "grid",
-                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                gap: 16,
-              }}
-            >
-              <div>
-                <div style={{ color: "#64748b", marginBottom: 6 }}>Draft ID</div>
-                <strong>{draft.draft_id}</strong>
-              </div>
-              <div>
-                <div style={{ color: "#64748b", marginBottom: 6 }}>Статус</div>
-                <strong>{draft.status}</strong>
-              </div>
-              <div>
-                <div style={{ color: "#64748b", marginBottom: 6 }}>Тариф</div>
-                <strong>
-                  {draft.carrier_name_snapshot} — {draft.tariff_name_snapshot}
-                </strong>
-              </div>
-              <div>
-                <div style={{ color: "#64748b", marginBottom: 6 }}>Стоимость</div>
-                <strong>
-                  {draft.price_snapshot} {draft.currency_snapshot}
-                </strong>
-              </div>
-              <div>
-                <div style={{ color: "#64748b", marginBottom: 6 }}>Срок</div>
-                <strong>
-                  {draft.eta_days_min_snapshot}-{draft.eta_days_max_snapshot} дн.
-                </strong>
-              </div>
-              <div>
-                <div style={{ color: "#64748b", marginBottom: 6 }}>
-                  Quote session
-                </div>
-                <strong>{draft.quote_session_id}</strong>
-              </div>
-            </div>
+            {/* Selected tariff card */}
+            <TariffCard
+              draft={draft}
+              onChangeTariff={() =>
+                router.push(
+                  quoteSessionId ? `/quote/results?quoteSessionId=${quoteSessionId}` : "/",
+                )
+              }
+            />
 
+            {/* Shipment form */}
             <form onSubmit={handleSubmit} style={{ display: "grid", gap: 20 }}>
-              <div style={cardStyle}>
-                <h2 style={{ marginTop: 0, marginBottom: 16, fontSize: 22 }}>
-                  Отправитель
-                </h2>
+              <PartySection
+                title="Отправитель"
+                values={form.sender}
+                onChange={(key, val) => updatePartyField("sender", key, val)}
+              />
 
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                    gap: 16,
-                  }}
-                >
-                  <div>
-                    <label style={labelStyle}>ФИО</label>
-                    <input
-                      style={inputStyle}
-                      value={form.sender.full_name}
-                      onChange={(e) =>
-                        updatePartyField("sender", "full_name", e.target.value)
-                      }
-                    />
-                  </div>
+              <PartySection
+                title="Получатель"
+                values={form.recipient}
+                onChange={(key, val) => updatePartyField("recipient", key, val)}
+              />
 
-                  <div>
-                    <label style={labelStyle}>Телефон</label>
-                    <input
-                      style={inputStyle}
-                      value={form.sender.phone}
-                      onChange={(e) =>
-                        updatePartyField("sender", "phone", e.target.value)
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>Email</label>
-                    <input
-                      style={inputStyle}
-                      value={form.sender.email}
-                      onChange={(e) =>
-                        updatePartyField("sender", "email", e.target.value)
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>Компания</label>
-                    <input
-                      style={inputStyle}
-                      value={form.sender.company_name}
-                      onChange={(e) =>
-                        updatePartyField("sender", "company_name", e.target.value)
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>Код страны</label>
-                    <input
-                      style={inputStyle}
-                      value={form.sender.country}
-                      onChange={(e) =>
-                        updatePartyField("sender", "country", e.target.value)
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>Город</label>
-                    <input
-                      style={inputStyle}
-                      value={form.sender.city}
-                      onChange={(e) =>
-                        updatePartyField("sender", "city", e.target.value)
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>Адрес</label>
-                    <input
-                      style={inputStyle}
-                      value={form.sender.address_line1}
-                      onChange={(e) =>
-                        updatePartyField("sender", "address_line1", e.target.value)
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>Доп. адрес</label>
-                    <input
-                      style={inputStyle}
-                      value={form.sender.address_line2}
-                      onChange={(e) =>
-                        updatePartyField("sender", "address_line2", e.target.value)
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>Почтовый индекс</label>
-                    <input
-                      style={inputStyle}
-                      value={form.sender.postal_code}
-                      onChange={(e) =>
-                        updatePartyField("sender", "postal_code", e.target.value)
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>Комментарий</label>
-                    <input
-                      style={inputStyle}
-                      value={form.sender.comment}
-                      onChange={(e) =>
-                        updatePartyField("sender", "comment", e.target.value)
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div style={cardStyle}>
-                <h2 style={{ marginTop: 0, marginBottom: 16, fontSize: 22 }}>
-                  Получатель
-                </h2>
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                    gap: 16,
-                  }}
-                >
-                  <div>
-                    <label style={labelStyle}>ФИО</label>
-                    <input
-                      style={inputStyle}
-                      value={form.recipient.full_name}
-                      onChange={(e) =>
-                        updatePartyField("recipient", "full_name", e.target.value)
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>Телефон</label>
-                    <input
-                      style={inputStyle}
-                      value={form.recipient.phone}
-                      onChange={(e) =>
-                        updatePartyField("recipient", "phone", e.target.value)
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>Email</label>
-                    <input
-                      style={inputStyle}
-                      value={form.recipient.email}
-                      onChange={(e) =>
-                        updatePartyField("recipient", "email", e.target.value)
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>Компания</label>
-                    <input
-                      style={inputStyle}
-                      value={form.recipient.company_name}
-                      onChange={(e) =>
-                        updatePartyField(
-                          "recipient",
-                          "company_name",
-                          e.target.value,
-                        )
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>Код страны</label>
-                    <input
-                      style={inputStyle}
-                      value={form.recipient.country}
-                      onChange={(e) =>
-                        updatePartyField("recipient", "country", e.target.value)
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>Город</label>
-                    <input
-                      style={inputStyle}
-                      value={form.recipient.city}
-                      onChange={(e) =>
-                        updatePartyField("recipient", "city", e.target.value)
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>Адрес</label>
-                    <input
-                      style={inputStyle}
-                      value={form.recipient.address_line1}
-                      onChange={(e) =>
-                        updatePartyField(
-                          "recipient",
-                          "address_line1",
-                          e.target.value,
-                        )
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>Доп. адрес</label>
-                    <input
-                      style={inputStyle}
-                      value={form.recipient.address_line2}
-                      onChange={(e) =>
-                        updatePartyField(
-                          "recipient",
-                          "address_line2",
-                          e.target.value,
-                        )
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>Почтовый индекс</label>
-                    <input
-                      style={inputStyle}
-                      value={form.recipient.postal_code}
-                      onChange={(e) =>
-                        updatePartyField(
-                          "recipient",
-                          "postal_code",
-                          e.target.value,
-                        )
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>Комментарий</label>
-                    <input
-                      style={inputStyle}
-                      value={form.recipient.comment}
-                      onChange={(e) =>
-                        updatePartyField("recipient", "comment", e.target.value)
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div style={cardStyle}>
-                <h2 style={{ marginTop: 0, marginBottom: 16, fontSize: 22 }}>
-                  Параметры отправления
-                </h2>
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                    gap: 16,
-                  }}
-                >
-                  <div>
-                    <label style={labelStyle}>Описание</label>
-                    <input
-                      style={inputStyle}
-                      value={form.packageItem.description}
-                      onChange={(e) =>
-                        updatePackageField("description", e.target.value)
-                      }
-                      placeholder="Documents / Parcel / Samples"
-                    />
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>Количество</label>
-                    <input
-                      style={inputStyle}
-                      value={form.packageItem.quantity}
-                      onChange={(e) =>
-                        updatePackageField("quantity", e.target.value)
-                      }
-                      inputMode="numeric"
-                    />
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>Вес, кг</label>
-                    <input
-                      style={inputStyle}
-                      value={form.packageItem.weight_kg}
-                      onChange={(e) =>
-                        updatePackageField("weight_kg", e.target.value)
-                      }
-                      inputMode="decimal"
-                    />
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>Ширина, см</label>
-                    <input
-                      style={inputStyle}
-                      value={form.packageItem.width_cm}
-                      onChange={(e) =>
-                        updatePackageField("width_cm", e.target.value)
-                      }
-                      inputMode="decimal"
-                    />
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>Высота, см</label>
-                    <input
-                      style={inputStyle}
-                      value={form.packageItem.height_cm}
-                      onChange={(e) =>
-                        updatePackageField("height_cm", e.target.value)
-                      }
-                      inputMode="decimal"
-                    />
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>Глубина, см</label>
-                    <input
-                      style={inputStyle}
-                      value={form.packageItem.depth_cm}
-                      onChange={(e) =>
-                        updatePackageField("depth_cm", e.target.value)
-                      }
-                      inputMode="decimal"
-                    />
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>Объявленная стоимость</label>
-                    <input
-                      style={inputStyle}
-                      value={form.packageItem.declared_value}
-                      onChange={(e) =>
-                        updatePackageField("declared_value", e.target.value)
-                      }
-                      inputMode="decimal"
-                    />
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>Валюта стоимости</label>
-                    <input
-                      style={inputStyle}
-                      value={form.packageItem.declared_value_currency}
-                      onChange={(e) =>
-                        updatePackageField(
-                          "declared_value_currency",
-                          e.target.value,
-                        )
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
+              <PackageSection
+                values={form.packageItem}
+                onChange={updatePackageField}
+              />
 
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                 <button
@@ -928,9 +636,7 @@ export default function ShipmentPage() {
                   }}
                   disabled={isSubmitting}
                 >
-                  {isSubmitting
-                    ? "Сохраняем..."
-                    : "Сохранить данные отправления"}
+                  {isSubmitting ? "Сохраняем..." : "Сохранить и продолжить →"}
                 </button>
 
                 <button

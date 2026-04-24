@@ -1,3 +1,4 @@
+import { getAuthHeaders } from "@/lib/auth/session";
 import type {
   LoginRequest,
   ProfileResponse,
@@ -32,11 +33,16 @@ async function parseJsonSafely(response: Response): Promise<unknown> {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(
+  path: string,
+  init?: RequestInit,
+  auth = false,
+): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
+      ...(auth ? getAuthHeaders() : {}),
       ...(init?.headers || {}),
     },
     cache: "no-store",
@@ -76,15 +82,7 @@ export async function loginUser(payload: LoginRequest): Promise<TokenResponse> {
 }
 
 export async function getProfile(): Promise<ProfileResponse> {
-  const token = getToken();
-  const res = await fetch(`${API_BASE}/profile`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new ApiError(res.status, data.detail ?? "Не удалось получить профиль.");
-  }
-  return res.json() as Promise<ProfileResponse>;
+  return request<ProfileResponse>("/auth/profile", { method: "GET" }, true);
 }
 
 export async function updateProfile(payload: {
@@ -92,20 +90,11 @@ export async function updateProfile(payload: {
   phone?: string | null;
   company_name?: string | null;
 }): Promise<ProfileResponse> {
-  const token = getToken();
-  const res = await fetch(`${API_BASE}/profile`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new ApiError(res.status, data.detail ?? "Не удалось обновить профиль.");
-  }
-  return res.json() as Promise<ProfileResponse>;
+  return request<ProfileResponse>(
+    "/auth/profile",
+    { method: "PATCH", body: JSON.stringify(payload) },
+    true,
+  );
 }
 
 export { ApiError };

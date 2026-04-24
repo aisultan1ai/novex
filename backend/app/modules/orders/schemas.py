@@ -6,7 +6,14 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
 
-OrderDraftStatus = Literal["draft", "shipment_details_completed", "ready_for_checkout"]
+OrderDraftStatus = Literal[
+    "draft",
+    "shipment_details_completed",
+    "ready_for_checkout",
+    "awaiting_payment",
+    "paid",
+    "cancelled",
+]
 ShipmentPartyRole = Literal["sender", "recipient"]
 
 
@@ -142,3 +149,6 @@ class OrderDraftResponse(BaseModel):
 class OrderDraftListResponse(BaseModel):
     items: list[OrderDraftResponse]
     total: int
+    page: int
+    size: int
+    pages: int

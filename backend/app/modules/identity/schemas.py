@@ -1,30 +1,18 @@
 from __future__ import annotations
 
-import re
-
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 from app.modules.identity.models import BillingMode, CustomerType, RoleCode
 
-EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-
 
 class RegisterRequest(BaseModel):
-    email: str
+    email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     full_name: str | None = Field(default=None, max_length=255)
     phone: str | None = Field(default=None, max_length=50)
     customer_type: CustomerType = CustomerType.INDIVIDUAL
     company_name: str | None = Field(default=None, max_length=255)
     billing_mode: BillingMode | None = None
-
-    @field_validator("email")
-    @classmethod
-    def validate_email(cls, value: str) -> str:
-        cleaned = value.strip().lower()
-        if not EMAIL_REGEX.match(cleaned):
-            raise ValueError("Invalid email format")
-        return cleaned
 
     @field_validator("full_name", "phone", "company_name")
     @classmethod
@@ -42,16 +30,8 @@ class RegisterRequest(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    email: str
+    email: EmailStr
     password: str = Field(min_length=8, max_length=128)
-
-    @field_validator("email")
-    @classmethod
-    def validate_email(cls, value: str) -> str:
-        cleaned = value.strip().lower()
-        if not EMAIL_REGEX.match(cleaned):
-            raise ValueError("Invalid email format")
-        return cleaned
 
 
 class UserRead(BaseModel):

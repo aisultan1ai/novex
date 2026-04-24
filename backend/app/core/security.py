@@ -1,34 +1,31 @@
 from __future__ import annotations
 
-import base64
 import hashlib
 import hmac
-import json
 import os
 import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-SECRET_KEY = os.getenv("SECRET_KEY", "novex-dev-secret-key-change-in-production")
+import jwt
+from jwt import ExpiredSignatureError, InvalidTokenError
+
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 PASSWORD_HASH_ITERATIONS = 100_000
 
 
-def _b64url_encode(data: bytes) -> str:
-    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("utf-8")
-
-
-def _b64url_decode(data: str) -> bytes:
-    padding = "=" * (-len(data) % 4)
-    return base64.urlsafe_b64decode(data + padding)
+def _secret_key() -> str:
+    key = os.getenv("SECRET_KEY", "")
+    if not key:
+        raise RuntimeError(
+            "SECRET_KEY environment variable is not set. "
+            "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+        )
+    return key
 
 
 def get_password_hash(password: str) -> str:
-    """
-    Сохраняет пароль как:
-    pbkdf2_sha256$<iterations>$<salt_hex>$<hash_hex>
-    """
     salt = secrets.token_hex(16)
     password_hash = hashlib.pbkdf2_hmac(
         "sha256",
@@ -68,61 +65,15 @@ def create_access_token(
     expires_minutes: int | None = None,
 ) -> str:
     now = datetime.now(UTC)
-    expire_delta = timedelta(minutes=expires_minutes or ACCESS_TOKEN_EXPIRE_MINUTES)
-    expire_at = now + expire_delta
-
-    header = {
-        "alg": JWT_ALGORITHM,
-        "typ": "JWT",
-    }
-    payload = {
-        **subject,
-        "iat": int(now.timestamp()),
-        "exp": int(expire_at.timestamp()),
-    }
-
-    encoded_header = _b64url_encode(
-        json.dumps(header, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-    )
-    encoded_payload = _b64url_encode(
-        json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-    )
-
-    signing_input = f"{encoded_header}.{encoded_payload}".encode("utf-8")
-    signature = hmac.new(
-        SECRET_KEY.encode("utf-8"),
-        signing_input,
-        hashlib.sha256,
-    ).digest()
-
-    encoded_signature = _b64url_encode(signature)
-    return f"{encoded_header}.{encoded_payload}.{encoded_signature}"
+    expire = now + timedelta(minutes=expires_minutes or ACCESS_TOKEN_EXPIRE_MINUTES)
+    payload = {**subject, "iat": now, "exp": expire}
+    return jwt.encode(payload, _secret_key(), algorithm=JWT_ALGORITHM)
 
 
 def decode_access_token(token: str) -> dict[str, Any]:
     try:
-        encoded_header, encoded_payload, encoded_signature = token.split(".", 2)
-    except ValueError as exc:
-        raise ValueError("Invalid token format") from exc
-
-    signing_input = f"{encoded_header}.{encoded_payload}".encode("utf-8")
-    expected_signature = hmac.new(
-        SECRET_KEY.encode("utf-8"),
-        signing_input,
-        hashlib.sha256,
-    ).digest()
-
-    if not hmac.compare_digest(_b64url_decode(encoded_signature), expected_signature):
-        raise ValueError("Invalid token signature")
-
-    payload = json.loads(_b64url_decode(encoded_payload).decode("utf-8"))
-
-    exp = payload.get("exp")
-    if not isinstance(exp, int):
-        raise ValueError("Invalid token expiration")
-
-    now_ts = int(datetime.now(UTC).timestamp())
-    if exp < now_ts:
-        raise ValueError("Token has expired")
-
-    return payload
+        return jwt.decode(token, _secret_key(), algorithms=[JWT_ALGORITHM])
+    except ExpiredSignatureError as exc:
+        raise ValueError("Token has expired") from exc
+    except InvalidTokenError as exc:
+        raise ValueError(f"Invalid token: {exc}") from exc

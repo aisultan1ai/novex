@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
@@ -18,57 +18,39 @@ quotes_service = QuotesService()
 @router.post(
     "/quote",
     response_model=ShippingQuoteResponse,
-    status_code=status.HTTP_200_OK,
+    status_code=200,
 )
 def calculate_shipping_quote(
     payload: ShippingQuoteRequest,
     db: Session = Depends(get_db),
 ) -> ShippingQuoteResponse:
-    try:
-        return quotes_service.calculate_quotes(db, payload)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
+    return quotes_service.calculate_quotes(db, payload)
 
 
 @router.get(
     "/quote/{quote_session_id}",
     response_model=ShippingQuoteResponse,
-    status_code=status.HTTP_200_OK,
+    status_code=200,
 )
 def get_shipping_quote(
     quote_session_id: int,
     db: Session = Depends(get_db),
 ) -> ShippingQuoteResponse:
-    try:
-        return quotes_service.get_quote_session(db, quote_session_id)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        ) from exc
+    return quotes_service.get_quote_session(db, quote_session_id)
 
 
 @router.post(
     "/quote/{quote_session_id}/select",
     response_model=ShippingQuoteResponse,
-    status_code=status.HTTP_200_OK,
+    status_code=200,
 )
 def select_shipping_quote(
     quote_session_id: int,
     payload: QuoteSelectionRequest,
     db: Session = Depends(get_db),
 ) -> ShippingQuoteResponse:
-    try:
-        return quotes_service.select_quote(
-            db,
-            quote_session_id=quote_session_id,
-            payload=payload,
-        )
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
+    return quotes_service.select_quote(
+        db,
+        quote_session_id=quote_session_id,
+        payload=payload,
+    )

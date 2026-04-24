@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, func
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -41,6 +41,9 @@ class QuoteSession(Base):
 
 class RateQuote(Base):
     __tablename__ = "rate_quotes"
+    __table_args__ = (
+        Index("ix_rate_quotes_session_selected", "quote_session_id", "is_selected"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     quote_session_id: Mapped[int] = mapped_column(

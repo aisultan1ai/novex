@@ -19,6 +19,9 @@ class Base(DeclarativeBase):
 engine: Engine = create_engine(
     settings.sync_database_url,
     pool_pre_ping=True,
+    pool_size=20,
+    max_overflow=40,
+    pool_recycle=3600,
     future=True,
 )
 
@@ -32,9 +35,6 @@ SessionLocal = sessionmaker(
 
 
 def get_db() -> Generator[Session, None, None]:
-    """
-    FastAPI dependency for getting a database session.
-    """
     db = SessionLocal()
     try:
         yield db
@@ -43,9 +43,6 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def check_database_connection() -> dict[str, Any]:
-    """
-    Lightweight connectivity probe for startup checks and workers.
-    """
     with engine.connect() as connection:
         connection.execute(text("SELECT 1"))
     return {"status": "ok", "database": "connected"}

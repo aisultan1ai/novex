@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
+import { flushSync } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import {
@@ -196,30 +197,43 @@ export default function QuoteResultsPage() {
     };
   }, [quoteSessionId]);
 
-  async function handleSelectQuote(rateQuote: RateQuoteItem) {
-    if (!quoteSessionId || rateQuote.id == null) {
-      return;
-    }
+  async function handleSelectQuote(
+    e: React.MouseEvent<HTMLButtonElement>,
+    rateQuote: RateQuoteItem,
+  ) {
+    if (!quoteSessionId || rateQuote.id == null) return;
 
+    e.currentTarget.blur();
+    const savedScrollY = window.scrollY;
     setSelectingId(rateQuote.id);
     setError(null);
 
+    let nextData: typeof data | null = null;
+    let nextError: string | null = null;
+
     try {
-      const updated = await selectShippingQuote(quoteSessionId, {
+      nextData = await selectShippingQuote(quoteSessionId, {
         rate_quote_id: rateQuote.id,
       });
-      setData(updated);
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.detail);
+        nextError = err.detail;
       } else if (err instanceof Error) {
-        setError(err.message);
+        nextError = err.message;
       } else {
-        setError("Не удалось выбрать тариф.");
+        nextError = "Не удалось выбрать тариф.";
       }
-    } finally {
-      setSelectingId(null);
     }
+
+    // flushSync commits all state changes to the DOM synchronously so that
+    // the scrollTo below runs after layout is stable, not before.
+    flushSync(() => {
+      setSelectingId(null);
+      if (nextData) setData(nextData);
+      if (nextError) setError(nextError);
+    });
+
+    window.scrollTo({ top: savedScrollY, behavior: "instant" });
   }
 
   function handleContinueToShipment() {
@@ -415,7 +429,7 @@ export default function QuoteResultsPage() {
                               ? "not-allowed"
                               : "pointer",
                         }}
-                        onClick={() => handleSelectQuote(quote)}
+                        onClick={(e) => void handleSelectQuote(e, quote)}
                         disabled={
                           quote.id == null ||
                           selectingId === quote.id ||

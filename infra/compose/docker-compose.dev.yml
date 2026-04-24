@@ -89,6 +89,9 @@ services:
       MINIO_BUCKET: novex-dev
       MINIO_SECURE: "false"
 
+      SECRET_KEY: "22e3e65b13f1f00cc9a05d87a3386411f3e305ee9ecf7fd9d24837f13653a32a"
+      ACCESS_TOKEN_EXPIRE_MINUTES: "60"
+
       BACKEND_CORS_ORIGINS: '["http://localhost","http://localhost:80","http://localhost:3000"]'
     ports:
       - "${BACKEND_PORT:-8000}:8000"

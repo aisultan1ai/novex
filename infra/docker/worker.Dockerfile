@@ -19,6 +19,8 @@ RUN pip install --upgrade pip && pip install \
     alembic \
     redis \
     httpx \
-    python-dotenv
+    python-dotenv \
+    "PyJWT>=2.8" \
+    "email-validator>=2.0"
 
 EXPOSE 8001
