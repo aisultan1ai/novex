@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties, FormEvent } from "react";
+import type { FormEvent } from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -8,9 +8,7 @@ import { calculateShippingQuote, ApiError } from "@/lib/api/shipping";
 import type { ShipmentType, ShippingQuoteRequest } from "@/types/quote";
 
 type FormState = {
-  from_country: string;
   from_city: string;
-  to_country: string;
   to_city: string;
   shipment_type: ShipmentType;
   weight_kg: string;
@@ -20,85 +18,9 @@ type FormState = {
   depth_cm: string;
 };
 
-const cardSectionTitleStyle: CSSProperties = {
-  margin: "0 0 8px",
-  fontSize: 24,
-};
-
-const cardSectionTextStyle: CSSProperties = {
-  margin: 0,
-  color: "#64748b",
-  fontSize: 14,
-  lineHeight: 1.6,
-};
-
-const badgeStyle: CSSProperties = {
-  display: "inline-block",
-  padding: "6px 10px",
-  borderRadius: 999,
-  background: "#eff6ff",
-  color: "#1d4ed8",
-  fontSize: 12,
-  fontWeight: 700,
-};
-
-const formStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-  gap: 16,
-};
-
-const labelStyle: CSSProperties = {
-  display: "block",
-  fontSize: 13,
-  fontWeight: 600,
-  marginBottom: 8,
-  color: "#334155",
-};
-
-const inputStyle: CSSProperties = {
-  width: "100%",
-  padding: "12px 14px",
-  borderRadius: 12,
-  border: "1px solid #cbd5e1",
-  fontSize: 14,
-  outline: "none",
-  boxSizing: "border-box",
-};
-
-const buttonPrimary: CSSProperties = {
-  background: "#0f172a",
-  color: "#ffffff",
-  border: "none",
-  borderRadius: 12,
-  padding: "12px 18px",
-  fontSize: 14,
-  fontWeight: 600,
-  cursor: "pointer",
-};
-
-const errorStyle: CSSProperties = {
-  marginTop: 8,
-  padding: "10px 12px",
-  borderRadius: 12,
-  background: "#fef2f2",
-  color: "#b91c1c",
-  fontSize: 13,
-  lineHeight: 1.5,
-};
-
-const helperStyle: CSSProperties = {
-  marginTop: 8,
-  color: "#64748b",
-  fontSize: 12,
-  lineHeight: 1.5,
-};
-
-const initialState: FormState = {
-  from_country: "KZ",
-  from_city: "Almaty",
-  to_country: "KZ",
-  to_city: "Astana",
+const initial: FormState = {
+  from_city: "Алматы",
+  to_city: "Астана",
   shipment_type: "parcel",
   weight_kg: "2.5",
   quantity: "1",
@@ -109,20 +31,19 @@ const initialState: FormState = {
 
 export default function ShortQuoteForm() {
   const router = useRouter();
-
-  const [form, setForm] = useState<FormState>(initialState);
+  const [form, setForm] = useState<FormState>(initial);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
-    setForm((prev) => ({ ...prev, [key]: value }));
+  function set<K extends keyof FormState>(key: K, val: FormState[K]) {
+    setForm((prev) => ({ ...prev, [key]: val }));
   }
 
   function toPayload(): ShippingQuoteRequest {
     return {
-      from_country: form.from_country.trim().toUpperCase(),
+      from_country: "KZ",
       from_city: form.from_city.trim(),
-      to_country: form.to_country.trim().toUpperCase(),
+      to_country: "KZ",
       to_city: form.to_city.trim(),
       shipment_type: form.shipment_type,
       weight_kg: Number(form.weight_kg),
@@ -133,176 +54,237 @@ export default function ShortQuoteForm() {
     };
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
     setError(null);
     setIsSubmitting(true);
-
     try {
-      const payload = toPayload();
-      const result = await calculateShippingQuote(payload);
+      const result = await calculateShippingQuote(toPayload());
       router.push(`/quote/results?quoteSessionId=${result.quote_session_id}`);
     } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.detail);
-      } else if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("Не удалось рассчитать тарифы.");
-      }
+      setError(
+        err instanceof ApiError
+          ? err.detail
+          : err instanceof Error
+            ? err.message
+            : "Не удалось рассчитать тарифы.",
+      );
     } finally {
       setIsSubmitting(false);
     }
   }
 
+  const inp: React.CSSProperties = {
+    width: "100%",
+    padding: "11px 14px",
+    borderRadius: 10,
+    border: "1.5px solid #e5e7eb",
+    fontSize: 15,
+    outline: "none",
+    boxSizing: "border-box",
+    color: "#111827",
+    background: "#fff",
+    fontFamily: "inherit",
+    transition: "border-color 0.15s",
+  };
+
+  const lbl: React.CSSProperties = {
+    display: "block",
+    fontSize: 12,
+    fontWeight: 600,
+    color: "#6b7280",
+    marginBottom: 6,
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+  };
+
   return (
-    <>
+    <form onSubmit={handleSubmit}>
+      {/* Route row */}
       <div
         style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: 16,
-          flexWrap: "wrap",
-          alignItems: "center",
+          display: "grid",
+          gridTemplateColumns: "1fr 36px 1fr",
+          gap: 0,
+          alignItems: "end",
+          marginBottom: 20,
+        }}
+      >
+        <div>
+          <label style={lbl}>Откуда</label>
+          <input
+            style={inp}
+            value={form.from_city}
+            onChange={(e) => set("from_city", e.target.value)}
+            placeholder="Город отправки"
+            required
+          />
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            paddingBottom: 2,
+            color: "#9ca3af",
+            fontSize: 20,
+          }}
+        >
+          →
+        </div>
+
+        <div>
+          <label style={lbl}>Куда</label>
+          <input
+            style={inp}
+            value={form.to_city}
+            onChange={(e) => set("to_city", e.target.value)}
+            placeholder="Город доставки"
+            required
+          />
+        </div>
+      </div>
+
+      {/* Shipment type toggle */}
+      <div style={{ marginBottom: 20 }}>
+        <label style={lbl}>Что отправляете</label>
+        <div style={{ display: "flex", gap: 8 }}>
+          {(
+            [
+              { value: "parcel", label: "Посылка" },
+              { value: "document", label: "Документ" },
+            ] as { value: ShipmentType; label: string }[]
+          ).map(({ value, label }) => {
+            const active = form.shipment_type === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => set("shipment_type", value)}
+                style={{
+                  padding: "9px 20px",
+                  borderRadius: 10,
+                  border: active ? "1.5px solid #111827" : "1.5px solid #e5e7eb",
+                  background: active ? "#111827" : "#fff",
+                  color: active ? "#fff" : "#6b7280",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  transition: "all 0.15s",
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Parameters row */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr",
+          gap: 10,
           marginBottom: 24,
         }}
       >
         <div>
-          <h2 style={cardSectionTitleStyle}>Короткая форма отправления</h2>
-        </div>
-        <span style={badgeStyle}>Quote flow</span>
-      </div>
-
-      <form onSubmit={handleSubmit} style={formStyle}>
-        <div>
-          <label style={labelStyle}>Откуда: код страны</label>
+          <label style={lbl}>Вес, кг</label>
           <input
-            style={inputStyle}
-            value={form.from_country}
-            onChange={(e) => updateField("from_country", e.target.value)}
-            placeholder="KZ"
-            maxLength={2}
-          />
-          <div style={helperStyle}>Используй 2-буквенный код, например KZ.</div>
-        </div>
-
-        <div>
-          <label style={labelStyle}>Откуда: город</label>
-          <input
-            style={inputStyle}
-            value={form.from_city}
-            onChange={(e) => updateField("from_city", e.target.value)}
-            placeholder="Almaty"
-          />
-        </div>
-
-        <div>
-          <label style={labelStyle}>Куда: код страны</label>
-          <input
-            style={inputStyle}
-            value={form.to_country}
-            onChange={(e) => updateField("to_country", e.target.value)}
-            placeholder="KZ"
-            maxLength={2}
-          />
-          <div style={helperStyle}>Используй 2-буквенный код, например KZ.</div>
-        </div>
-
-        <div>
-          <label style={labelStyle}>Куда: город</label>
-          <input
-            style={inputStyle}
-            value={form.to_city}
-            onChange={(e) => updateField("to_city", e.target.value)}
-            placeholder="Astana"
-          />
-        </div>
-
-        <div>
-          <label style={labelStyle}>Тип отправления</label>
-          <select
-            style={inputStyle}
-            value={form.shipment_type}
-            onChange={(e) =>
-              updateField("shipment_type", e.target.value as ShipmentType)
-            }
-          >
-            <option value="parcel">Посылка</option>
-            <option value="document">Документ</option>
-          </select>
-        </div>
-
-        <div>
-          <label style={labelStyle}>Вес, кг</label>
-          <input
-            style={inputStyle}
+            style={inp}
             value={form.weight_kg}
-            onChange={(e) => updateField("weight_kg", e.target.value)}
+            onChange={(e) => set("weight_kg", e.target.value)}
             inputMode="decimal"
             placeholder="2.5"
+            required
           />
         </div>
-
         <div>
-          <label style={labelStyle}>Количество</label>
+          <label style={lbl}>Кол-во</label>
           <input
-            style={inputStyle}
+            style={inp}
             value={form.quantity}
-            onChange={(e) => updateField("quantity", e.target.value)}
+            onChange={(e) => set("quantity", e.target.value)}
             inputMode="numeric"
             placeholder="1"
+            required
           />
         </div>
-
         <div>
-          <label style={labelStyle}>Ширина, см</label>
+          <label style={lbl}>Ширина, см</label>
           <input
-            style={inputStyle}
+            style={inp}
             value={form.width_cm}
-            onChange={(e) => updateField("width_cm", e.target.value)}
+            onChange={(e) => set("width_cm", e.target.value)}
             inputMode="decimal"
             placeholder="20"
+            required
           />
         </div>
-
         <div>
-          <label style={labelStyle}>Высота, см</label>
+          <label style={lbl}>Высота, см</label>
           <input
-            style={inputStyle}
+            style={inp}
             value={form.height_cm}
-            onChange={(e) => updateField("height_cm", e.target.value)}
+            onChange={(e) => set("height_cm", e.target.value)}
             inputMode="decimal"
             placeholder="15"
+            required
           />
         </div>
-
         <div>
-          <label style={labelStyle}>Глубина, см</label>
+          <label style={lbl}>Глубина, см</label>
           <input
-            style={inputStyle}
+            style={inp}
             value={form.depth_cm}
-            onChange={(e) => updateField("depth_cm", e.target.value)}
+            onChange={(e) => set("depth_cm", e.target.value)}
             inputMode="decimal"
             placeholder="10"
+            required
           />
         </div>
+      </div>
 
-        <div style={{ gridColumn: "1 / -1", marginTop: 8 }}>
-          <button
-            style={{
-              ...buttonPrimary,
-              opacity: isSubmitting ? 0.7 : 1,
-              cursor: isSubmitting ? "not-allowed" : "pointer",
-            }}
-            type="submit"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? "Рассчитываем..." : "Рассчитать тарифы"}
-          </button>
+      {/* Submit */}
+      <button
+        type="submit"
+        disabled={isSubmitting}
+        style={{
+          width: "100%",
+          padding: "14px 24px",
+          borderRadius: 12,
+          border: "none",
+          background: isSubmitting ? "#6b7280" : "#111827",
+          color: "#fff",
+          fontSize: 15,
+          fontWeight: 700,
+          cursor: isSubmitting ? "not-allowed" : "pointer",
+          fontFamily: "inherit",
+          letterSpacing: "-0.2px",
+          transition: "background 0.15s",
+        }}
+      >
+        {isSubmitting ? "Рассчитываем..." : "Рассчитать тарифы →"}
+      </button>
+
+      {error && (
+        <div
+          style={{
+            marginTop: 12,
+            padding: "12px 14px",
+            borderRadius: 10,
+            background: "#fef2f2",
+            border: "1px solid #fecaca",
+            color: "#b91c1c",
+            fontSize: 13,
+          }}
+        >
+          {error}
         </div>
-      </form>
-
-      {error ? <div style={errorStyle}>{error}</div> : null}
-    </>
+      )}
+    </form>
   );
 }

@@ -1,86 +1,12 @@
 "use client";
 
-import type { CSSProperties, FormEvent } from "react";
+import type { FormEvent } from "react";
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { useAuth } from "@/components/providers/auth-provider";
 import { ApiError, loginUser } from "@/lib/api/auth";
-
-const pageStyle: CSSProperties = {
-  minHeight: "100vh",
-  background: "linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%)",
-  padding: "32px 20px 64px",
-  color: "#0f172a",
-  fontFamily:
-    "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-};
-
-const cardStyle: CSSProperties = {
-  maxWidth: 520,
-  margin: "48px auto 0",
-  border: "1px solid #e5e7eb",
-  borderRadius: 20,
-  padding: 24,
-  background: "#ffffff",
-  boxShadow: "0 8px 24px rgba(15, 23, 42, 0.06)",
-};
-
-const labelStyle: CSSProperties = {
-  display: "block",
-  fontSize: 13,
-  fontWeight: 600,
-  marginBottom: 8,
-  color: "#334155",
-};
-
-const inputStyle: CSSProperties = {
-  width: "100%",
-  padding: "12px 14px",
-  borderRadius: 12,
-  border: "1px solid #cbd5e1",
-  fontSize: 14,
-  outline: "none",
-  boxSizing: "border-box",
-};
-
-const buttonPrimary: CSSProperties = {
-  background: "#0f172a",
-  color: "#ffffff",
-  border: "none",
-  borderRadius: 12,
-  padding: "12px 18px",
-  fontSize: 14,
-  fontWeight: 600,
-  cursor: "pointer",
-};
-
-const hintStyle: CSSProperties = {
-  marginTop: 8,
-  color: "#64748b",
-  fontSize: 13,
-  lineHeight: 1.6,
-};
-
-const errorStyle: CSSProperties = {
-  marginTop: 12,
-  padding: "10px 12px",
-  borderRadius: 12,
-  background: "#fef2f2",
-  color: "#b91c1c",
-  fontSize: 13,
-  lineHeight: 1.5,
-};
-
-const successStyle: CSSProperties = {
-  marginTop: 12,
-  padding: "10px 12px",
-  borderRadius: 12,
-  background: "#ecfdf5",
-  color: "#166534",
-  fontSize: 13,
-  lineHeight: 1.5,
-};
 
 export default function LoginPage() {
   const router = useRouter();
@@ -91,10 +17,9 @@ export default function LoginPage() {
     () => searchParams.get("registered") === "1",
     [searchParams],
   );
-
   const nextPath = useMemo(() => {
     const raw = searchParams.get("next");
-    return raw && raw.startsWith("/") ? raw : "/";
+    return raw && raw.startsWith("/") ? raw : "/dashboard";
   }, [searchParams]);
 
   const [email, setEmail] = useState("");
@@ -102,110 +27,218 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
     setError(null);
     setIsSubmitting(true);
-
     try {
-      const response = await loginUser({
-        email: email.trim().toLowerCase(),
-        password,
-      });
-
-      login(response.access_token, response.profile);
+      const res = await loginUser({ email: email.trim().toLowerCase(), password });
+      login(res.access_token, res.profile);
       router.push(nextPath);
     } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.detail);
-      } else if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("Не удалось выполнить вход.");
-      }
+      setError(
+        err instanceof ApiError
+          ? err.detail
+          : err instanceof Error
+            ? err.message
+            : "Не удалось выполнить вход.",
+      );
     } finally {
       setIsSubmitting(false);
     }
   }
 
+  const inp: React.CSSProperties = {
+    width: "100%",
+    padding: "12px 14px",
+    borderRadius: 10,
+    border: "1.5px solid #e5e7eb",
+    fontSize: 15,
+    outline: "none",
+    boxSizing: "border-box",
+    color: "#111827",
+    background: "#fff",
+    fontFamily: "inherit",
+  };
+
   return (
-    <main style={pageStyle}>
-      <div style={cardStyle}>
-        <div
+    <div style={{ minHeight: "100vh", background: "#f9fafb" }}>
+
+      {/* Navbar */}
+      <nav
+        style={{
+          background: "#fff",
+          borderBottom: "1px solid #f3f4f6",
+          padding: "0 32px",
+          height: 60,
+          display: "flex",
+          alignItems: "center",
+        }}
+      >
+        <Link
+          href="/"
           style={{
-            display: "inline-block",
-            padding: "6px 10px",
-            borderRadius: 999,
-            background: "#eff6ff",
-            color: "#1d4ed8",
-            fontSize: 12,
-            fontWeight: 700,
-            marginBottom: 14,
+            fontSize: 20,
+            fontWeight: 900,
+            letterSpacing: "-0.8px",
+            color: "#111827",
+            textDecoration: "none",
           }}
         >
-          Novex Auth
-        </div>
+          Novex
+        </Link>
+      </nav>
 
-        <h1 style={{ margin: "0 0 8px", fontSize: 32, lineHeight: 1.1 }}>
-          Войти
-        </h1>
-        <p style={{ margin: 0, color: "#475569", lineHeight: 1.7 }}>
-          Вход в личный кабинет Novex.
-        </p>
-
-        {isRegistered ? (
-          <div style={successStyle}>
-            Регистрация прошла успешно.
-          </div>
-        ) : null}
-
-        <form
-          onSubmit={handleSubmit}
-          style={{ display: "grid", gap: 16, marginTop: 24 }}
+      {/* Form card */}
+      <div
+        style={{
+          maxWidth: 440,
+          margin: "60px auto 0",
+          padding: "0 16px",
+        }}
+      >
+        <div
+          style={{
+            background: "#fff",
+            border: "1px solid #e5e7eb",
+            borderRadius: 20,
+            padding: "36px 32px",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.05), 0 8px 30px rgba(0,0,0,0.06)",
+          }}
         >
-          <div>
-            <label style={labelStyle}>Email</label>
-            <input
-              style={inputStyle}
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Введите email"
-              autoComplete="email"
-            />
-          </div>
-
-          <div>
-            <label style={labelStyle}>Пароль</label>
-            <input
-              style={inputStyle}
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Введите пароль"
-              autoComplete="current-password"
-            />
-          </div>
-
-          <button
-            type="submit"
+          <h1
             style={{
-              ...buttonPrimary,
-              opacity: isSubmitting ? 0.7 : 1,
-              cursor: isSubmitting ? "not-allowed" : "pointer",
+              margin: "0 0 6px",
+              fontSize: 26,
+              fontWeight: 800,
+              letterSpacing: "-0.5px",
+              color: "#111827",
             }}
-            disabled={isSubmitting}
           >
-            {isSubmitting ? "Входим..." : "Войти"}
-          </button>
-        </form>
+            Вход в аккаунт
+          </h1>
+          <p style={{ margin: "0 0 28px", fontSize: 14, color: "#9ca3af" }}>
+            Добро пожаловать в Novex
+          </p>
 
-        {error ? <div style={errorStyle}>{error}</div> : null}
+          {isRegistered && (
+            <div
+              style={{
+                marginBottom: 20,
+                padding: "12px 14px",
+                borderRadius: 10,
+                background: "#f0fdf4",
+                border: "1px solid #bbf7d0",
+                color: "#166534",
+                fontSize: 14,
+                fontWeight: 500,
+              }}
+            >
+              Аккаунт создан — теперь войдите.
+            </div>
+          )}
 
-        <div style={hintStyle}>
-          Нет аккаунта? <a href="/register">Создать аккаунт</a>
+          <form onSubmit={handleSubmit} style={{ display: "grid", gap: 16 }}>
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "#374151",
+                  marginBottom: 6,
+                }}
+              >
+                Email
+              </label>
+              <input
+                style={inp}
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                autoComplete="email"
+                required
+              />
+            </div>
+
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "#374151",
+                  marginBottom: 6,
+                }}
+              >
+                Пароль
+              </label>
+              <input
+                style={inp}
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Минимум 8 символов"
+                autoComplete="current-password"
+                required
+              />
+            </div>
+
+            {error && (
+              <div
+                style={{
+                  padding: "11px 14px",
+                  borderRadius: 10,
+                  background: "#fef2f2",
+                  border: "1px solid #fecaca",
+                  color: "#b91c1c",
+                  fontSize: 13,
+                }}
+              >
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              style={{
+                width: "100%",
+                padding: "13px",
+                borderRadius: 11,
+                border: "none",
+                background: isSubmitting ? "#6b7280" : "#111827",
+                color: "#fff",
+                fontSize: 15,
+                fontWeight: 700,
+                cursor: isSubmitting ? "not-allowed" : "pointer",
+                fontFamily: "inherit",
+                marginTop: 4,
+              }}
+            >
+              {isSubmitting ? "Входим..." : "Войти"}
+            </button>
+          </form>
+
+          <p
+            style={{
+              margin: "20px 0 0",
+              fontSize: 14,
+              color: "#6b7280",
+              textAlign: "center",
+            }}
+          >
+            Нет аккаунта?{" "}
+            <Link
+              href="/register"
+              style={{ color: "#111827", fontWeight: 600, textDecoration: "none" }}
+            >
+              Зарегистрироваться
+            </Link>
+          </p>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

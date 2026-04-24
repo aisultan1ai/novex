@@ -130,6 +130,7 @@ class OrdersService:
         )
 
         db.commit()
+        db.expire(created_draft)  # force fresh load — expire_on_commit=False leaves packages=[] stale
 
         draft = self.repository.get_order_draft_by_id(db, created_draft.id)
         if draft is None:

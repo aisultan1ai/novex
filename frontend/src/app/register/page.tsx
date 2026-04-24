@@ -1,85 +1,14 @@
 "use client";
 
-import type { CSSProperties, FormEvent } from "react";
+import type { FormEvent } from "react";
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { ApiError, registerUser } from "@/lib/api/auth";
 import type { CustomerType, RegisterRequest } from "@/types/auth";
 
-const pageStyle: CSSProperties = {
-  minHeight: "100vh",
-  background: "linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%)",
-  padding: "32px 20px 64px",
-  color: "#0f172a",
-  fontFamily:
-    "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-};
-
-const cardStyle: CSSProperties = {
-  maxWidth: 640,
-  margin: "48px auto 0",
-  border: "1px solid #e5e7eb",
-  borderRadius: 20,
-  padding: 24,
-  background: "#ffffff",
-  boxShadow: "0 8px 24px rgba(15, 23, 42, 0.06)",
-};
-
-const formGridStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-  gap: 16,
-  marginTop: 24,
-};
-
-const labelStyle: CSSProperties = {
-  display: "block",
-  fontSize: 13,
-  fontWeight: 600,
-  marginBottom: 8,
-  color: "#334155",
-};
-
-const inputStyle: CSSProperties = {
-  width: "100%",
-  padding: "12px 14px",
-  borderRadius: 12,
-  border: "1px solid #cbd5e1",
-  fontSize: 14,
-  outline: "none",
-  boxSizing: "border-box",
-};
-
-const buttonPrimary: CSSProperties = {
-  background: "#0f172a",
-  color: "#ffffff",
-  border: "none",
-  borderRadius: 12,
-  padding: "12px 18px",
-  fontSize: 14,
-  fontWeight: 600,
-  cursor: "pointer",
-};
-
-const hintStyle: CSSProperties = {
-  marginTop: 8,
-  color: "#64748b",
-  fontSize: 13,
-  lineHeight: 1.6,
-};
-
-const errorStyle: CSSProperties = {
-  marginTop: 12,
-  padding: "10px 12px",
-  borderRadius: 12,
-  background: "#fef2f2",
-  color: "#b91c1c",
-  fontSize: 13,
-  lineHeight: 1.5,
-};
-
-type RegisterFormState = {
+type FormState = {
   email: string;
   password: string;
   full_name: string;
@@ -88,7 +17,7 @@ type RegisterFormState = {
   company_name: string;
 };
 
-const initialState: RegisterFormState = {
+const initial: FormState = {
   email: "",
   password: "",
   full_name: "",
@@ -99,20 +28,13 @@ const initialState: RegisterFormState = {
 
 export default function RegisterPage() {
   const router = useRouter();
-
-  const [form, setForm] = useState<RegisterFormState>(initialState);
+  const [form, setForm] = useState<FormState>(initial);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const isCompany = useMemo(
-    () => form.customer_type === "company",
-    [form.customer_type],
-  );
+  const isCompany = useMemo(() => form.customer_type === "company", [form.customer_type]);
 
-  function updateField<K extends keyof RegisterFormState>(
-    key: K,
-    value: RegisterFormState[K],
-  ) {
+  function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
@@ -127,144 +49,258 @@ export default function RegisterPage() {
     };
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
     setError(null);
     setIsSubmitting(true);
-
     try {
       await registerUser(toPayload());
       router.push("/login?registered=1");
     } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.detail);
-      } else if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("Не удалось выполнить регистрацию.");
-      }
+      setError(
+        err instanceof ApiError
+          ? err.detail
+          : err instanceof Error
+            ? err.message
+            : "Не удалось создать аккаунт.",
+      );
     } finally {
       setIsSubmitting(false);
     }
   }
 
+  const inp: React.CSSProperties = {
+    width: "100%",
+    padding: "12px 14px",
+    borderRadius: 10,
+    border: "1.5px solid #e5e7eb",
+    fontSize: 14,
+    outline: "none",
+    boxSizing: "border-box",
+    color: "#111827",
+    background: "#fff",
+    fontFamily: "inherit",
+  };
+
+  const lbl: React.CSSProperties = {
+    display: "block",
+    fontSize: 13,
+    fontWeight: 600,
+    color: "#374151",
+    marginBottom: 6,
+  };
+
   return (
-    <main style={pageStyle}>
-      <div style={cardStyle}>
-        <div
+    <div style={{ minHeight: "100vh", background: "#f9fafb" }}>
+
+      {/* Navbar */}
+      <nav
+        style={{
+          background: "#fff",
+          borderBottom: "1px solid #f3f4f6",
+          padding: "0 32px",
+          height: 60,
+          display: "flex",
+          alignItems: "center",
+        }}
+      >
+        <Link
+          href="/"
           style={{
-            display: "inline-block",
-            padding: "6px 10px",
-            borderRadius: 999,
-            background: "#eff6ff",
-            color: "#1d4ed8",
-            fontSize: 12,
-            fontWeight: 700,
-            marginBottom: 14,
+            fontSize: 20,
+            fontWeight: 900,
+            letterSpacing: "-0.8px",
+            color: "#111827",
+            textDecoration: "none",
           }}
         >
-          Novex Auth
-        </div>
+          Novex
+        </Link>
+      </nav>
 
-        <h1 style={{ margin: "0 0 8px", fontSize: 32, lineHeight: 1.1 }}>
-          Регистрация
-        </h1>
-        <p style={{ margin: 0, color: "#475569", lineHeight: 1.7 }}>
-          Создание клиентского аккаунта Novex.
-        </p>
+      {/* Form card */}
+      <div style={{ maxWidth: 520, margin: "48px auto 60px", padding: "0 16px" }}>
+        <div
+          style={{
+            background: "#fff",
+            border: "1px solid #e5e7eb",
+            borderRadius: 20,
+            padding: "36px 32px",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.05), 0 8px 30px rgba(0,0,0,0.06)",
+          }}
+        >
+          <h1
+            style={{
+              margin: "0 0 6px",
+              fontSize: 26,
+              fontWeight: 800,
+              letterSpacing: "-0.5px",
+              color: "#111827",
+            }}
+          >
+            Создать аккаунт
+          </h1>
+          <p style={{ margin: "0 0 28px", fontSize: 14, color: "#9ca3af" }}>
+            Регистрация займёт меньше минуты
+          </p>
 
-        <form onSubmit={handleSubmit} style={formGridStyle}>
-          <div>
-            <label style={labelStyle}>Email</label>
-            <input
-              style={inputStyle}
-              type="email"
-              value={form.email}
-              onChange={(e) => updateField("email", e.target.value)}
-              placeholder="Введите email"
-              autoComplete="email"
-            />
-          </div>
+          <form onSubmit={handleSubmit} style={{ display: "grid", gap: 16 }}>
 
-          <div>
-            <label style={labelStyle}>Пароль</label>
-            <input
-              style={inputStyle}
-              type="password"
-              value={form.password}
-              onChange={(e) => updateField("password", e.target.value)}
-              placeholder="Введите пароль"
-              autoComplete="new-password"
-            />
-          </div>
+            {/* Email + Password */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={lbl}>Email</label>
+                <input
+                  style={inp}
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => set("email", e.target.value)}
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                  required
+                />
+              </div>
+              <div>
+                <label style={lbl}>Пароль</label>
+                <input
+                  style={inp}
+                  type="password"
+                  value={form.password}
+                  onChange={(e) => set("password", e.target.value)}
+                  placeholder="Минимум 8 символов"
+                  autoComplete="new-password"
+                  required
+                />
+              </div>
+            </div>
 
-          <div>
-            <label style={labelStyle}>ФИО</label>
-            <input
-              style={inputStyle}
-              value={form.full_name}
-              onChange={(e) => updateField("full_name", e.target.value)}
-              placeholder="Введите ФИО"
-            />
-          </div>
+            {/* Name + Phone */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={lbl}>ФИО</label>
+                <input
+                  style={inp}
+                  value={form.full_name}
+                  onChange={(e) => set("full_name", e.target.value)}
+                  placeholder="Иванов Иван"
+                />
+              </div>
+              <div>
+                <label style={lbl}>Телефон</label>
+                <input
+                  style={inp}
+                  value={form.phone}
+                  onChange={(e) => set("phone", e.target.value)}
+                  placeholder="+7 700 000 0000"
+                  inputMode="tel"
+                />
+              </div>
+            </div>
 
-          <div>
-            <label style={labelStyle}>Телефон</label>
-            <input
-              style={inputStyle}
-              value={form.phone}
-              onChange={(e) => updateField("phone", e.target.value)}
-              placeholder="Введите номер телефона"
-            />
-          </div>
+            {/* Customer type toggle */}
+            <div>
+              <label style={lbl}>Тип аккаунта</label>
+              <div style={{ display: "flex", gap: 8 }}>
+                {(
+                  [
+                    { value: "individual", label: "Физическое лицо" },
+                    { value: "company", label: "Компания" },
+                  ] as { value: CustomerType; label: string }[]
+                ).map(({ value, label }) => {
+                  const active = form.customer_type === value;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => set("customer_type", value)}
+                      style={{
+                        flex: 1,
+                        padding: "10px",
+                        borderRadius: 10,
+                        border: active ? "1.5px solid #111827" : "1.5px solid #e5e7eb",
+                        background: active ? "#111827" : "#fff",
+                        color: active ? "#fff" : "#6b7280",
+                        fontSize: 14,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-          <div>
-            <label style={labelStyle}>Тип клиента</label>
-            <select
-              style={inputStyle}
-              value={form.customer_type}
-              onChange={(e) =>
-                updateField("customer_type", e.target.value as CustomerType)
-              }
-            >
-              <option value="individual">Физическое лицо</option>
-              <option value="company">Компания</option>
-            </select>
-          </div>
+            {/* Company name — only when type = company */}
+            {isCompany && (
+              <div>
+                <label style={lbl}>Название компании</label>
+                <input
+                  style={inp}
+                  value={form.company_name}
+                  onChange={(e) => set("company_name", e.target.value)}
+                  placeholder="ТОО «Название»"
+                  required={isCompany}
+                />
+              </div>
+            )}
 
-          <div>
-            <label style={labelStyle}>Компания</label>
-            <input
-              style={inputStyle}
-              value={form.company_name}
-              onChange={(e) => updateField("company_name", e.target.value)}
-              placeholder="Введите название компании"
-              disabled={!isCompany}
-            />
-            <div style={hintStyle}>Для типа `company` поле обязательно.</div>
-          </div>
+            {error && (
+              <div
+                style={{
+                  padding: "11px 14px",
+                  borderRadius: 10,
+                  background: "#fef2f2",
+                  border: "1px solid #fecaca",
+                  color: "#b91c1c",
+                  fontSize: 13,
+                }}
+              >
+                {error}
+              </div>
+            )}
 
-          <div style={{ gridColumn: "1 / -1" }}>
             <button
               type="submit"
-              style={{
-                ...buttonPrimary,
-                opacity: isSubmitting ? 0.7 : 1,
-                cursor: isSubmitting ? "not-allowed" : "pointer",
-              }}
               disabled={isSubmitting}
+              style={{
+                width: "100%",
+                padding: "13px",
+                borderRadius: 11,
+                border: "none",
+                background: isSubmitting ? "#6b7280" : "#111827",
+                color: "#fff",
+                fontSize: 15,
+                fontWeight: 700,
+                cursor: isSubmitting ? "not-allowed" : "pointer",
+                fontFamily: "inherit",
+                marginTop: 4,
+              }}
             >
-              {isSubmitting ? "Регистрируем..." : "Создать аккаунт"}
+              {isSubmitting ? "Создаём аккаунт..." : "Создать аккаунт"}
             </button>
-          </div>
-        </form>
+          </form>
 
-        {error ? <div style={errorStyle}>{error}</div> : null}
-
-        <div style={hintStyle}>
-          Уже есть аккаунт? <a href="/login">Перейти ко входу</a>
+          <p
+            style={{
+              margin: "20px 0 0",
+              fontSize: 14,
+              color: "#6b7280",
+              textAlign: "center",
+            }}
+          >
+            Уже есть аккаунт?{" "}
+            <Link
+              href="/login"
+              style={{ color: "#111827", fontWeight: 600, textDecoration: "none" }}
+            >
+              Войти
+            </Link>
+          </p>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

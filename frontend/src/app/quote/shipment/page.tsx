@@ -476,15 +476,19 @@ export default function ShipmentPage() {
     if (createDraftRequestedRef.current) return;
     createDraftRequestedRef.current = true;
 
+    let cancelled = false;
+
     async function bootstrapDraft() {
       setError(null);
       setIsBootstrapping(true);
 
       try {
         const createdDraft = await createDraftFromQuote({ quote_session_id: quoteSessionId! });
+        if (cancelled) return;
         setDraft(createdDraft);
         setForm(mapDraftToForm(createdDraft, currentUser));
       } catch (err) {
+        if (cancelled) return;
         if (err instanceof ApiError) {
           if (err.status === 401) {
             logout(`/login?next=${encodeURIComponent(fullNextUrl)}`);
@@ -497,11 +501,16 @@ export default function ShipmentPage() {
           setError("Не удалось подготовить черновик заказа.");
         }
       } finally {
-        setIsBootstrapping(false);
+        if (!cancelled) setIsBootstrapping(false);
       }
     }
 
     void bootstrapDraft();
+
+    return () => {
+      cancelled = true;
+      createDraftRequestedRef.current = false;
+    };
   }, [currentUser, fullNextUrl, isAuthenticated, isLoading, logout, quoteSessionId]);
 
   function updatePartyField(role: "sender" | "recipient", key: keyof PartyFormState, value: string) {
