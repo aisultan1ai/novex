@@ -26,6 +26,28 @@ const initial: FormState = {
   company_name: "",
 };
 
+const inp: React.CSSProperties = {
+  width: "100%",
+  padding: "12px 14px",
+  borderRadius: 10,
+  border: "1px solid #e5e7eb",
+  fontSize: 14,
+  outline: "none",
+  boxSizing: "border-box",
+  color: "#0f172a",
+  background: "#f8fafc",
+  fontFamily: "inherit",
+  transition: "border-color 0.15s, background 0.15s",
+};
+
+const lbl: React.CSSProperties = {
+  display: "block",
+  fontSize: 13,
+  fontWeight: 600,
+  color: "#334155",
+  marginBottom: 8,
+};
+
 export default function RegisterPage() {
   const router = useRouter();
   const [form, setForm] = useState<FormState>(initial);
@@ -69,83 +91,65 @@ export default function RegisterPage() {
     }
   }
 
-  const inp: React.CSSProperties = {
-    width: "100%",
-    padding: "12px 14px",
-    borderRadius: 10,
-    border: "1.5px solid #e5e7eb",
-    fontSize: 14,
-    outline: "none",
-    boxSizing: "border-box",
-    color: "#111827",
-    background: "#fff",
-    fontFamily: "inherit",
-  };
+  function focusStyle(e: React.FocusEvent<HTMLInputElement>) {
+    e.currentTarget.style.borderColor = "#0f172a";
+    e.currentTarget.style.background = "#ffffff";
+  }
 
-  const lbl: React.CSSProperties = {
-    display: "block",
-    fontSize: 13,
-    fontWeight: 600,
-    color: "#374151",
-    marginBottom: 6,
-  };
+  function blurStyle(e: React.FocusEvent<HTMLInputElement>) {
+    e.currentTarget.style.borderColor = "#e5e7eb";
+    e.currentTarget.style.background = "#f8fafc";
+  }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f9fafb" }}>
-
-      {/* Navbar */}
-      <nav
-        style={{
-          background: "#fff",
-          borderBottom: "1px solid #f3f4f6",
-          padding: "0 32px",
-          height: 60,
-          display: "flex",
-          alignItems: "center",
-        }}
-      >
+    <div
+      style={{
+        background: "#f1f5f9",
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "20px 16px",
+      }}
+    >
+      <div style={{ width: "100%", maxWidth: 440 }}>
+        {/* Back link */}
         <Link
           href="/"
-          style={{
-            fontSize: 20,
-            fontWeight: 900,
-            letterSpacing: "-0.8px",
-            color: "#111827",
-            textDecoration: "none",
-          }}
+          style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13, color: "#64748b", textDecoration: "none", fontWeight: 500, marginBottom: 24 }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "#0f172a"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "#64748b"; }}
         >
-          Novex
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          На главную
         </Link>
-      </nav>
 
-      {/* Form card */}
-      <div style={{ maxWidth: 520, margin: "48px auto 60px", padding: "0 16px" }}>
+        {/* Logo */}
+        <div style={{ textAlign: "center", marginBottom: 28 }}>
+          <Link href="/" style={{ fontSize: 26, fontWeight: 800, color: "#0f172a", textDecoration: "none", letterSpacing: "-0.5px" }}>
+            Novex
+          </Link>
+        </div>
+
         <div
           style={{
-            background: "#fff",
+            background: "#ffffff",
             border: "1px solid #e5e7eb",
-            borderRadius: 20,
-            padding: "36px 32px",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.05), 0 8px 30px rgba(0,0,0,0.06)",
+            borderRadius: 16,
+            padding: 40,
+            boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04)",
           }}
         >
-          <h1
-            style={{
-              margin: "0 0 6px",
-              fontSize: 26,
-              fontWeight: 800,
-              letterSpacing: "-0.5px",
-              color: "#111827",
-            }}
-          >
+          <h1 style={{ margin: "0 0 6px", fontSize: 20, fontWeight: 700, color: "#0f172a" }}>
             Создать аккаунт
           </h1>
-          <p style={{ margin: "0 0 28px", fontSize: 14, color: "#9ca3af" }}>
+          <p style={{ margin: "0 0 24px", fontSize: 14, color: "#64748b" }}>
             Регистрация займёт меньше минуты
           </p>
 
           <form onSubmit={handleSubmit} style={{ display: "grid", gap: 16 }}>
-
             {/* Email + Password */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div>
@@ -158,6 +162,8 @@ export default function RegisterPage() {
                   placeholder="you@example.com"
                   autoComplete="email"
                   required
+                  onFocus={focusStyle}
+                  onBlur={blurStyle}
                 />
               </div>
               <div>
@@ -170,6 +176,8 @@ export default function RegisterPage() {
                   placeholder="Минимум 8 символов"
                   autoComplete="new-password"
                   required
+                  onFocus={focusStyle}
+                  onBlur={blurStyle}
                 />
               </div>
             </div>
@@ -183,6 +191,8 @@ export default function RegisterPage() {
                   value={form.full_name}
                   onChange={(e) => set("full_name", e.target.value)}
                   placeholder="Иванов Иван"
+                  onFocus={focusStyle}
+                  onBlur={blurStyle}
                 />
               </div>
               <div>
@@ -193,6 +203,8 @@ export default function RegisterPage() {
                   onChange={(e) => set("phone", e.target.value)}
                   placeholder="+7 700 000 0000"
                   inputMode="tel"
+                  onFocus={focusStyle}
+                  onBlur={blurStyle}
                 />
               </div>
             </div>
@@ -217,9 +229,9 @@ export default function RegisterPage() {
                         flex: 1,
                         padding: "10px",
                         borderRadius: 10,
-                        border: active ? "1.5px solid #111827" : "1.5px solid #e5e7eb",
-                        background: active ? "#111827" : "#fff",
-                        color: active ? "#fff" : "#6b7280",
+                        border: active ? "none" : "1px solid #e5e7eb",
+                        background: active ? "#0f172a" : "#ffffff",
+                        color: active ? "#ffffff" : "#64748b",
                         fontSize: 14,
                         fontWeight: 600,
                         cursor: "pointer",
@@ -233,7 +245,7 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            {/* Company name — only when type = company */}
+            {/* Company name */}
             {isCompany && (
               <div>
                 <label style={lbl}>Название компании</label>
@@ -243,21 +255,14 @@ export default function RegisterPage() {
                   onChange={(e) => set("company_name", e.target.value)}
                   placeholder="ТОО «Название»"
                   required={isCompany}
+                  onFocus={focusStyle}
+                  onBlur={blurStyle}
                 />
               </div>
             )}
 
             {error && (
-              <div
-                style={{
-                  padding: "11px 14px",
-                  borderRadius: 10,
-                  background: "#fef2f2",
-                  border: "1px solid #fecaca",
-                  color: "#b91c1c",
-                  fontSize: 13,
-                }}
-              >
+              <div style={{ padding: "11px 14px", borderRadius: 10, background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c", fontSize: 13 }}>
                 {error}
               </div>
             )}
@@ -267,35 +272,29 @@ export default function RegisterPage() {
               disabled={isSubmitting}
               style={{
                 width: "100%",
-                padding: "13px",
-                borderRadius: 11,
+                height: 52,
+                borderRadius: 12,
                 border: "none",
-                background: isSubmitting ? "#6b7280" : "#111827",
-                color: "#fff",
-                fontSize: 15,
-                fontWeight: 700,
+                background: "#0f172a",
+                color: "#ffffff",
+                fontSize: 16,
+                fontWeight: 600,
                 cursor: isSubmitting ? "not-allowed" : "pointer",
+                opacity: isSubmitting ? 0.7 : 1,
                 fontFamily: "inherit",
                 marginTop: 4,
+                transition: "background 0.15s",
               }}
+              onMouseEnter={(e) => { if (!isSubmitting) e.currentTarget.style.background = "#1e293b"; }}
+              onMouseLeave={(e) => { if (!isSubmitting) e.currentTarget.style.background = "#0f172a"; }}
             >
               {isSubmitting ? "Создаём аккаунт..." : "Создать аккаунт"}
             </button>
           </form>
 
-          <p
-            style={{
-              margin: "20px 0 0",
-              fontSize: 14,
-              color: "#6b7280",
-              textAlign: "center",
-            }}
-          >
+          <p style={{ margin: "20px 0 0", fontSize: 14, color: "#64748b", textAlign: "center" }}>
             Уже есть аккаунт?{" "}
-            <Link
-              href="/login"
-              style={{ color: "#111827", fontWeight: 600, textDecoration: "none" }}
-            >
+            <Link href="/login" style={{ color: "#0f172a", fontWeight: 600, textDecoration: "none" }}>
               Войти
             </Link>
           </p>

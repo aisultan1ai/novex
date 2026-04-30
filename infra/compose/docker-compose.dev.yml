@@ -77,7 +77,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-novex}
       POSTGRES_USER: ${POSTGRES_USER:-novex}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-novex}
-      DATABASE_URL: postgresql://novex:novex@postgres:5432/novex
+      DATABASE_URL: postgresql://${POSTGRES_USER:-novex}:${POSTGRES_PASSWORD:-novex}@postgres:5432/${POSTGRES_DB:-novex}
 
       REDIS_HOST: redis
       REDIS_PORT: 6379
@@ -89,10 +89,26 @@ services:
       MINIO_BUCKET: novex-dev
       MINIO_SECURE: "false"
 
-      SECRET_KEY: "22e3e65b13f1f00cc9a05d87a3386411f3e305ee9ecf7fd9d24837f13653a32a"
+      SECRET_KEY: "${SECRET_KEY}"
       ACCESS_TOKEN_EXPIRE_MINUTES: "60"
 
       BACKEND_CORS_ORIGINS: '["http://localhost","http://localhost:80","http://localhost:3000"]'
+
+      # SMTP (заполнить для отправки писем)
+      SMTP_HOST: "${SMTP_HOST:-}"
+      SMTP_PORT: "${SMTP_PORT:-587}"
+      SMTP_USER: "${SMTP_USER:-}"
+      SMTP_PASSWORD: "${SMTP_PASSWORD:-}"
+      SMTP_FROM: "${SMTP_FROM:-}"
+      SMTP_TLS: "${SMTP_TLS:-true}"
+
+      # Kaspi Pay (заполнить после регистрации мерчанта)
+      KASPI_MERCHANT_ID: "${KASPI_MERCHANT_ID:-}"
+      KASPI_API_KEY: "${KASPI_API_KEY:-}"
+      KASPI_WEBHOOK_SECRET: "${KASPI_WEBHOOK_SECRET:-}"
+      KASPI_API_URL: "${KASPI_API_URL:-https://api.kaspi.kz/merchant}"
+      FRONTEND_URL: "http://localhost:3000"
+      BACKEND_URL: "http://localhost:8000"
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
@@ -119,7 +135,7 @@ services:
     working_dir: /app
     environment:
       ENVIRONMENT: development
-      DATABASE_URL: postgresql://novex:novex@postgres:5432/novex
+      DATABASE_URL: postgresql://${POSTGRES_USER:-novex}:${POSTGRES_PASSWORD:-novex}@postgres:5432/${POSTGRES_DB:-novex}
       REDIS_URL: redis://redis:6379/0
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minio}

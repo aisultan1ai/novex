@@ -23,6 +23,8 @@ RUN pip install --upgrade pip && pip install \
     httpx \
     python-dotenv \
     "PyJWT>=2.8" \
-    "email-validator>=2.0"
+    "email-validator>=2.0" \
+    "python-multipart>=0.0.9" \
+    "slowapi>=0.1.9"
 
 EXPOSE 8000

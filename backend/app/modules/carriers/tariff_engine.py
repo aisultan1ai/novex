@@ -175,7 +175,7 @@ def calculate_quotes(
     std_price = _lookup_standard_price(kg, col_map_std.get(zone, _STD_Z3))
     std_eta = BESTSENDER_STANDARD_ETA[zone]
     results.append(QuoteResult(
-        carrier_code="bestsender", carrier_name="Bestsender",
+        carrier_code="azimuth", carrier_name="Azimuth",
         tariff_code="standard", tariff_name="Стандарт",
         price=Decimal(str(std_price)), currency="KZT",
         eta_days_min=std_eta[0], eta_days_max=std_eta[1],
@@ -190,7 +190,7 @@ def calculate_quotes(
         exp_price = _lookup_standard_price(kg, col_map_exp.get(zone, _EXP_Z3))
     exp_eta = BESTSENDER_EXPRESS_ETA[zone]
     results.append(QuoteResult(
-        carrier_code="bestsender", carrier_name="Bestsender",
+        carrier_code="azimuth", carrier_name="Azimuth",
         tariff_code="express", tariff_name="Экспресс",
         price=Decimal(str(exp_price)), currency="KZT",
         eta_days_min=exp_eta[0], eta_days_max=exp_eta[1],
@@ -202,7 +202,7 @@ def calculate_quotes(
         eco_price = _economy_price(kg, zone)
         eco_eta = BESTSENDER_ECONOMY_ETA.get(zone, (7, 14))
         results.append(QuoteResult(
-            carrier_code="bestsender", carrier_name="Bestsender",
+            carrier_code="azimuth", carrier_name="Azimuth",
             tariff_code="economy", tariff_name="Эконом",
             price=Decimal(str(eco_price)), currency="KZT",
             eta_days_min=eco_eta[0], eta_days_max=eco_eta[1],

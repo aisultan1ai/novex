@@ -8,15 +8,34 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
 import { ApiError, loginUser } from "@/lib/api/auth";
 
+const inp: React.CSSProperties = {
+  width: "100%",
+  padding: "12px 14px",
+  borderRadius: 10,
+  border: "1px solid #e5e7eb",
+  fontSize: 15,
+  outline: "none",
+  boxSizing: "border-box",
+  color: "#0f172a",
+  background: "#f8fafc",
+  fontFamily: "inherit",
+  transition: "border-color 0.15s, background 0.15s",
+};
+
+const lbl: React.CSSProperties = {
+  display: "block",
+  fontSize: 13,
+  fontWeight: 600,
+  color: "#334155",
+  marginBottom: 8,
+};
+
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuth();
 
-  const isRegistered = useMemo(
-    () => searchParams.get("registered") === "1",
-    [searchParams],
-  );
+  const isRegistered = useMemo(() => searchParams.get("registered") === "1", [searchParams]);
   const nextPath = useMemo(() => {
     const raw = searchParams.get("next");
     return raw && raw.startsWith("/") ? raw : "/dashboard";
@@ -48,109 +67,63 @@ export default function LoginPage() {
     }
   }
 
-  const inp: React.CSSProperties = {
-    width: "100%",
-    padding: "12px 14px",
-    borderRadius: 10,
-    border: "1.5px solid #e5e7eb",
-    fontSize: 15,
-    outline: "none",
-    boxSizing: "border-box",
-    color: "#111827",
-    background: "#fff",
-    fontFamily: "inherit",
-  };
-
   return (
-    <div style={{ minHeight: "100vh", background: "#f9fafb" }}>
-
-      {/* Navbar */}
-      <nav
-        style={{
-          background: "#fff",
-          borderBottom: "1px solid #f3f4f6",
-          padding: "0 32px",
-          height: 60,
-          display: "flex",
-          alignItems: "center",
-        }}
-      >
+    <div
+      style={{
+        background: "#f1f5f9",
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "20px 16px",
+      }}
+    >
+      <div style={{ width: "100%", maxWidth: 400 }}>
+        {/* Back link */}
         <Link
           href="/"
-          style={{
-            fontSize: 20,
-            fontWeight: 900,
-            letterSpacing: "-0.8px",
-            color: "#111827",
-            textDecoration: "none",
-          }}
+          style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13, color: "#64748b", textDecoration: "none", fontWeight: 500, marginBottom: 24 }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "#0f172a"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "#64748b"; }}
         >
-          Novex
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          На главную
         </Link>
-      </nav>
 
-      {/* Form card */}
-      <div
-        style={{
-          maxWidth: 440,
-          margin: "60px auto 0",
-          padding: "0 16px",
-        }}
-      >
+        {/* Logo */}
+        <div style={{ textAlign: "center", marginBottom: 28 }}>
+          <Link href="/" style={{ fontSize: 26, fontWeight: 800, color: "#0f172a", textDecoration: "none", letterSpacing: "-0.5px" }}>
+            Novex
+          </Link>
+        </div>
+
         <div
           style={{
-            background: "#fff",
+            background: "#ffffff",
             border: "1px solid #e5e7eb",
-            borderRadius: 20,
-            padding: "36px 32px",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.05), 0 8px 30px rgba(0,0,0,0.06)",
+            borderRadius: 16,
+            padding: 40,
+            boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04)",
           }}
         >
-          <h1
-            style={{
-              margin: "0 0 6px",
-              fontSize: 26,
-              fontWeight: 800,
-              letterSpacing: "-0.5px",
-              color: "#111827",
-            }}
-          >
-            Вход в аккаунт
+          <h1 style={{ margin: "0 0 6px", fontSize: 20, fontWeight: 700, color: "#0f172a" }}>
+            Войти в аккаунт
           </h1>
-          <p style={{ margin: "0 0 28px", fontSize: 14, color: "#9ca3af" }}>
+          <p style={{ margin: "0 0 24px", fontSize: 14, color: "#64748b" }}>
             Добро пожаловать в Novex
           </p>
 
           {isRegistered && (
-            <div
-              style={{
-                marginBottom: 20,
-                padding: "12px 14px",
-                borderRadius: 10,
-                background: "#f0fdf4",
-                border: "1px solid #bbf7d0",
-                color: "#166534",
-                fontSize: 14,
-                fontWeight: 500,
-              }}
-            >
+            <div style={{ marginBottom: 20, padding: "12px 14px", borderRadius: 10, background: "#f0fdf4", border: "1px solid #bbf7d0", color: "#166534", fontSize: 14, fontWeight: 500 }}>
               Аккаунт создан — теперь войдите.
             </div>
           )}
 
           <form onSubmit={handleSubmit} style={{ display: "grid", gap: 16 }}>
             <div>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: "#374151",
-                  marginBottom: 6,
-                }}
-              >
-                Email
-              </label>
+              <label style={lbl}>Email</label>
               <input
                 style={inp}
                 type="email"
@@ -159,21 +132,18 @@ export default function LoginPage() {
                 placeholder="you@example.com"
                 autoComplete="email"
                 required
+                onFocus={(e) => { e.currentTarget.style.borderColor = "#0f172a"; e.currentTarget.style.background = "#ffffff"; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
               />
             </div>
 
             <div>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: "#374151",
-                  marginBottom: 6,
-                }}
-              >
-                Пароль
-              </label>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <label style={{ ...lbl, marginBottom: 0 }}>Пароль</label>
+                <Link href="/forgot-password" style={{ fontSize: 13, color: "#64748b", textDecoration: "none", fontWeight: 500 }}>
+                  Забыли пароль?
+                </Link>
+              </div>
               <input
                 style={inp}
                 type="password"
@@ -182,20 +152,13 @@ export default function LoginPage() {
                 placeholder="Минимум 8 символов"
                 autoComplete="current-password"
                 required
+                onFocus={(e) => { e.currentTarget.style.borderColor = "#0f172a"; e.currentTarget.style.background = "#ffffff"; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
               />
             </div>
 
             {error && (
-              <div
-                style={{
-                  padding: "11px 14px",
-                  borderRadius: 10,
-                  background: "#fef2f2",
-                  border: "1px solid #fecaca",
-                  color: "#b91c1c",
-                  fontSize: 13,
-                }}
-              >
+              <div style={{ padding: "11px 14px", borderRadius: 10, background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c", fontSize: 13 }}>
                 {error}
               </div>
             )}
@@ -205,35 +168,29 @@ export default function LoginPage() {
               disabled={isSubmitting}
               style={{
                 width: "100%",
-                padding: "13px",
-                borderRadius: 11,
+                height: 52,
+                borderRadius: 12,
                 border: "none",
-                background: isSubmitting ? "#6b7280" : "#111827",
-                color: "#fff",
-                fontSize: 15,
-                fontWeight: 700,
+                background: "#0f172a",
+                color: "#ffffff",
+                fontSize: 16,
+                fontWeight: 600,
                 cursor: isSubmitting ? "not-allowed" : "pointer",
+                opacity: isSubmitting ? 0.7 : 1,
                 fontFamily: "inherit",
                 marginTop: 4,
+                transition: "background 0.15s",
               }}
+              onMouseEnter={(e) => { if (!isSubmitting) e.currentTarget.style.background = "#1e293b"; }}
+              onMouseLeave={(e) => { if (!isSubmitting) e.currentTarget.style.background = "#0f172a"; }}
             >
               {isSubmitting ? "Входим..." : "Войти"}
             </button>
           </form>
 
-          <p
-            style={{
-              margin: "20px 0 0",
-              fontSize: 14,
-              color: "#6b7280",
-              textAlign: "center",
-            }}
-          >
+          <p style={{ margin: "20px 0 0", fontSize: 14, color: "#64748b", textAlign: "center" }}>
             Нет аккаунта?{" "}
-            <Link
-              href="/register"
-              style={{ color: "#111827", fontWeight: 600, textDecoration: "none" }}
-            >
+            <Link href="/register" style={{ color: "#0f172a", fontWeight: 600, textDecoration: "none" }}>
               Зарегистрироваться
             </Link>
           </p>

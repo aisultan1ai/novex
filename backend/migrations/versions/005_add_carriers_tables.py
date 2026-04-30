@@ -78,10 +78,10 @@ def upgrade() -> None:
     )
     op.create_index("ix_carrier_zone_cities_normalized", "carrier_zone_cities", ["city_name_normalized"])
 
-    # Seed: Bestsender
+    # Seed: Azimuth
     op.execute("""
         INSERT INTO carriers (code, name, description, is_active)
-        VALUES ('bestsender', 'Bestsender',
+        VALUES ('azimuth', 'Azimuth',
                 'Казахстанская курьерская служба. Тарифы 2026 г. (с НДС).',
                 true)
     """)
@@ -93,7 +93,7 @@ def upgrade() -> None:
         op.execute(f"""
             INSERT INTO carrier_services (carrier_id, code, name, shipment_type, is_active)
             SELECT id, '{svc_code}', '{svc_name}', '{svc_type}', true
-            FROM carriers WHERE code = 'bestsender'
+            FROM carriers WHERE code = 'azimuth'
         """)
 
     regional = [
@@ -115,13 +115,13 @@ def upgrade() -> None:
         op.execute(f"""
             INSERT INTO carrier_zone_cities (carrier_id, city_name, city_name_normalized, zone, city_type)
             SELECT id, '{city_name}', '{normalized}', 1, 'regional_center'
-            FROM carriers WHERE code = 'bestsender'
+            FROM carriers WHERE code = 'azimuth'
         """)
     for city_name, normalized in district:
         op.execute(f"""
             INSERT INTO carrier_zone_cities (carrier_id, city_name, city_name_normalized, zone, city_type)
             SELECT id, '{city_name}', '{normalized}', 2, 'district_center'
-            FROM carriers WHERE code = 'bestsender'
+            FROM carriers WHERE code = 'azimuth'
         """)
 
 

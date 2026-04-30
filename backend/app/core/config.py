@@ -68,6 +68,22 @@ class Settings(BaseSettings):
                 )
         return self
 
+    # SMTP (email)
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    smtp_tls: bool = True
+
+    # Kaspi Pay
+    kaspi_merchant_id: str = ""
+    kaspi_api_key: str = ""
+    kaspi_api_url: str = "https://api.kaspi.kz/merchant"
+    kaspi_webhook_secret: str = ""
+    frontend_url: str = "http://localhost:3000"
+    backend_url: str = "http://localhost:8000"
+
     backend_cors_origins: list[str] = Field(
         default_factory=lambda: [
             "http://localhost",

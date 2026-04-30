@@ -39,13 +39,27 @@ const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
   return: { bg: "#fee2e2", color: "#991b1b" },
 };
 
+const FILTER_GROUPS: Record<string, string[]> = {
+  all: [],
+  active: ["draft", "shipment_details_completed", "ready_for_checkout", "awaiting_payment", "sent_to_carrier", "picked_up", "in_transit", "arrived"],
+  completed: ["delivered", "paid"],
+  cancelled: ["cancelled", "return"],
+};
+
+const FILTER_LABELS: Record<string, string> = {
+  all: "Все",
+  active: "Активные",
+  completed: "Завершённые",
+  cancelled: "Отменённые",
+};
+
 function StatusBadge({ status }: { status: string }) {
   const colors = STATUS_COLORS[status] ?? { bg: "#f1f5f9", color: "#475569" };
   return (
     <span
       style={{
         display: "inline-block",
-        padding: "4px 10px",
+        padding: "4px 12px",
         borderRadius: 999,
         fontSize: 12,
         fontWeight: 600,
@@ -60,18 +74,11 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function formatDate(isoString: string): string {
-  return new Date(isoString).toLocaleDateString("ru-RU", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+  return new Date(isoString).toLocaleDateString("ru-RU", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 function formatPrice(price: number, currency: string): string {
-  return `${new Intl.NumberFormat("ru-RU", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(price)} ${currency}`;
+  return `${new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(price)} ${currency}`;
 }
 
 function IconTrash() {
@@ -87,17 +94,7 @@ function IconTrash() {
 
 function IconTruck() {
   return (
-    <svg
-      width="40"
-      height="40"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="#94a3b8"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      style={{ marginBottom: 12 }}
-    >
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 12 }}>
       <rect x="1" y="3" width="15" height="13" rx="2" />
       <path d="M16 8h4l3 6v3h-7V8z" />
       <circle cx="5.5" cy="18.5" r="2.5" />
@@ -110,24 +107,7 @@ const cardStyle: CSSProperties = {
   border: "1px solid #e5e7eb",
   borderRadius: 16,
   background: "#ffffff",
-  boxShadow: "0 2px 12px rgba(15, 23, 42, 0.05)",
   overflow: "hidden",
-};
-
-const newShipmentBtn: CSSProperties = {
-  background: "#0f172a",
-  color: "#ffffff",
-  border: "none",
-  borderRadius: 10,
-  padding: "10px 18px",
-  fontSize: 14,
-  fontWeight: 600,
-  cursor: "pointer",
-  textDecoration: "none",
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 6,
-  fontFamily: "inherit",
 };
 
 const PAYABLE_STATUSES = new Set(["shipment_details_completed", "ready_for_checkout"]);
@@ -144,29 +124,24 @@ export default function MyOrdersPage() {
   const [error, setError] = useState<string | null>(null);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [activeFilter, setActiveFilter] = useState<string>("all");
 
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push("/login");
-    }
+    if (!authLoading && !isAuthenticated) router.push("/login");
   }, [isAuthenticated, authLoading, router]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
-
     async function fetchOrders() {
       try {
         const data = await listOrders();
         setOrders(data.items);
       } catch (err) {
-        setError(
-          err instanceof ApiError ? err.detail : "Не удалось загрузить заказы.",
-        );
+        setError(err instanceof ApiError ? err.detail : "Не удалось загрузить заказы.");
       } finally {
         setIsLoading(false);
       }
     }
-
     void fetchOrders();
   }, [isAuthenticated]);
 
@@ -177,9 +152,7 @@ export default function MyOrdersPage() {
       await deleteOrderDraft(draftId);
       setOrders((prev) => prev.filter((o) => o.draft_id !== draftId));
     } catch (err) {
-      setError(
-        err instanceof ApiError ? err.detail : "Не удалось удалить черновик.",
-      );
+      setError(err instanceof ApiError ? err.detail : "Не удалось удалить черновик.");
     } finally {
       setDeletingId(null);
     }
@@ -187,120 +160,87 @@ export default function MyOrdersPage() {
 
   if (authLoading || (!isAuthenticated && !authLoading)) return null;
 
+  const filteredOrders = activeFilter === "all"
+    ? orders
+    : orders.filter((o) => FILTER_GROUPS[activeFilter]?.includes(o.status));
+
   return (
     <>
-      {/* Payment success banner */}
       {justPaid && (
-        <div
-          style={{
-            marginBottom: 20,
-            padding: "14px 20px",
-            background: "#dcfce7",
-            border: "1px solid #86efac",
-            borderRadius: 12,
-            fontSize: 14,
-            fontWeight: 600,
-            color: "#166534",
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-          }}
-        >
+        <div style={{ marginBottom: 20, padding: "14px 20px", background: "#dcfce7", border: "1px solid #86efac", borderRadius: 12, fontSize: 14, fontWeight: 600, color: "#166534", display: "flex", alignItems: "center", gap: 10 }}>
           ✓ Заказ успешно оплачен! Статус обновлён.
         </div>
       )}
 
       {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          marginBottom: 28,
-          flexWrap: "wrap",
-          gap: 12,
-        }}
-      >
-        <div>
-          <h1
-            style={{ margin: 0, fontSize: 26, fontWeight: 800, color: "#0f172a" }}
-          >
-            Мои заказы
-          </h1>
-          <p style={{ margin: "4px 0 0", fontSize: 14, color: "#64748b" }}>
-            История отправлений и черновики
-            {orders.length > 0 && (
-              <span
-                style={{
-                  marginLeft: 8,
-                  padding: "2px 8px",
-                  borderRadius: 999,
-                  background: "#f1f5f9",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: "#475569",
-                }}
-              >
-                {orders.length}
-              </span>
-            )}
-          </p>
-        </div>
-
-        <Link href="/" style={newShipmentBtn}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
+        <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "#0f172a" }}>
+          Мои заказы
+        </h1>
+        <Link
+          href="/"
+          style={{
+            background: "#0f172a",
+            color: "#ffffff",
+            borderRadius: 10,
+            padding: "10px 20px",
+            fontSize: 14,
+            fontWeight: 600,
+            textDecoration: "none",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+          }}
+        >
           + Новая доставка
         </Link>
       </div>
 
+      {/* Filters */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+        {Object.entries(FILTER_LABELS).map(([key, label]) => {
+          const active = activeFilter === key;
+          return (
+            <button
+              key={key}
+              onClick={() => setActiveFilter(key)}
+              style={{
+                padding: "6px 16px",
+                borderRadius: 999,
+                border: active ? "none" : "1px solid #e5e7eb",
+                background: active ? "#0f172a" : "#ffffff",
+                color: active ? "#ffffff" : "#64748b",
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Content */}
       {isLoading ? (
-        <div
-          style={{
-            ...cardStyle,
-            padding: 48,
-            textAlign: "center",
-            color: "#64748b",
-            fontSize: 14,
-          }}
-        >
+        <div style={{ ...cardStyle, padding: 48, textAlign: "center", color: "#64748b", fontSize: 14 }}>
           Загружаем заказы…
         </div>
       ) : error ? (
-        <div
-          style={{
-            ...cardStyle,
-            border: "1px solid #fecaca",
-            background: "#fef2f2",
-            color: "#b91c1c",
-            padding: "20px 24px",
-            fontSize: 14,
-          }}
-        >
+        <div style={{ ...cardStyle, border: "1px solid #fecaca", background: "#fef2f2", color: "#b91c1c", padding: "20px 24px", fontSize: 14 }}>
           {error}
         </div>
-      ) : orders.length === 0 ? (
-        <div
-          style={{
-            ...cardStyle,
-            padding: "64px 24px",
-            textAlign: "center",
-          }}
-        >
+      ) : filteredOrders.length === 0 ? (
+        <div style={{ ...cardStyle, padding: "64px 24px", textAlign: "center" }}>
           <IconTruck />
-          <p
-            style={{
-              fontSize: 16,
-              fontWeight: 700,
-              margin: "0 0 8px",
-              color: "#0f172a",
-            }}
-          >
-            Заказов пока нет
+          <p style={{ fontSize: 16, fontWeight: 700, margin: "0 0 8px", color: "#0f172a" }}>
+            {activeFilter === "all" ? "Заказов пока нет" : "Заказов в этой категории нет"}
           </p>
           <p style={{ margin: "0 0 24px", fontSize: 14, color: "#64748b" }}>
             Оформите первую доставку прямо сейчас
           </p>
-          <Link href="/" style={newShipmentBtn}>
+          <Link href="/" style={{ background: "#0f172a", color: "#ffffff", borderRadius: 10, padding: "10px 20px", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
             Рассчитать тариф
           </Link>
         </div>
@@ -310,79 +250,72 @@ export default function MyOrdersPage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "56px 1fr 1fr 140px 110px 120px",
+              gridTemplateColumns: "120px 1fr 180px 140px 140px",
               gap: 12,
-              alignItems: "center",
-              padding: "12px 20px",
+              padding: "12px 24px",
               background: "#f8fafc",
               borderBottom: "1px solid #e5e7eb",
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: 700,
               color: "#94a3b8",
               textTransform: "uppercase",
               letterSpacing: "0.05em",
+              alignItems: "center",
             }}
           >
-            <span>#</span>
-            <span>Маршрут</span>
+            <span>Реф. №</span>
+            <span>Адрес получателя</span>
             <span>Служба / Тариф</span>
-            <span>Статус</span>
-            <span style={{ textAlign: "right" }}>Сумма</span>
-            <span style={{ textAlign: "right" }}>Действие</span>
+            <span>Статус заказа</span>
+            <span>Оплата</span>
           </div>
 
           {/* Rows */}
-          {orders.map((order, idx) => {
+          {filteredOrders.map((order, idx) => {
             const isDraft = order.status === "draft";
             const isPayable = PAYABLE_STATUSES.has(order.status);
             const isConfirming = confirmingDeleteId === order.draft_id;
             const isDeleting = deletingId === order.draft_id;
-            const isLast = idx === orders.length - 1;
+            const isLast = idx === filteredOrders.length - 1;
+            const isPaid = (order.status as string) === "paid" || (order.status as string) === "delivered";
 
             return (
               <div key={order.draft_id}>
-                {/* Main row */}
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "56px 1fr 1fr 140px 110px 120px",
+                    gridTemplateColumns: "120px 1fr 180px 140px 140px",
                     gap: 12,
-                    alignItems: "center",
-                    padding: "16px 20px",
+                    padding: "16px 24px",
                     borderBottom: isConfirming || !isLast ? "1px solid #f1f5f9" : "none",
-                    fontSize: 14,
-                    color: "#0f172a",
+                    alignItems: "center",
                     background: isDeleting ? "#fff5f5" : undefined,
                     opacity: isDeleting ? 0.6 : 1,
+                    cursor: "pointer",
+                    transition: "background 0.1s",
                   }}
+                  onMouseEnter={(e) => { if (!isDeleting) e.currentTarget.style.background = "#f8fafc"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = isDeleting ? "#fff5f5" : ""; }}
                 >
-                  <span
-                    style={{
-                      fontFamily: "monospace",
-                      fontSize: 13,
-                      color: "#94a3b8",
-                      fontWeight: 600,
-                    }}
-                  >
+                  <span style={{ fontFamily: "monospace", fontSize: 13, color: "#475569", fontWeight: 600 }}>
                     #{order.draft_id}
                   </span>
 
                   <div>
-                    <div style={{ fontWeight: 600, marginBottom: 3 }}>
-                      {order.from_city_snapshot} → {order.to_city_snapshot}
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a", marginBottom: 3 }}>
+                      {order.to_city_snapshot || "—"}
                     </div>
                     <div style={{ fontSize: 12, color: "#94a3b8" }}>
-                      {order.shipment_type_snapshot} · {formatDate(order.created_at)}
+                      {order.from_city_snapshot} → {order.to_city_snapshot} · {formatDate(order.created_at)}
                     </div>
                   </div>
 
                   <div>
-                    <div style={{ fontWeight: 500, marginBottom: 3 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: "#0f172a", marginBottom: 3 }}>
                       {order.carrier_name_snapshot}
                     </div>
                     <div style={{ fontSize: 12, color: "#94a3b8" }}>
-                      {order.tariff_name_snapshot} · {order.eta_days_min_snapshot}–
-                      {order.eta_days_max_snapshot} дн.
+                      {order.tariff_name_snapshot} · {order.eta_days_min_snapshot}–{order.eta_days_max_snapshot} дн.
                     </div>
                   </div>
 
@@ -390,57 +323,26 @@ export default function MyOrdersPage() {
                     <StatusBadge status={order.status} />
                   </div>
 
-                  <div style={{ textAlign: "right", fontWeight: 700, fontSize: 15 }}>
-                    {formatPrice(order.price_snapshot, order.currency_snapshot)}
-                  </div>
-
-                  {/* Actions cell */}
-                  <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, alignItems: "center" }}>
-                    {/* Pay button */}
-                    {isPayable && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {isPayable ? (
                       <Link
                         href={`/checkout?draftId=${order.draft_id}`}
-                        style={{
-                          display: "inline-block",
-                          padding: "6px 12px",
-                          borderRadius: 8,
-                          background: "#0f172a",
-                          color: "#fff",
-                          fontSize: 12,
-                          fontWeight: 600,
-                          textDecoration: "none",
-                          whiteSpace: "nowrap",
-                        }}
+                        style={{ display: "inline-block", padding: "6px 12px", borderRadius: 8, background: "#0f172a", color: "#fff", fontSize: 12, fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap" }}
                       >
                         Оплатить
                       </Link>
+                    ) : (
+                      <span style={{ padding: "4px 12px", borderRadius: 999, fontSize: 12, fontWeight: 600, background: isPaid ? "#dcfce7" : "#f1f5f9", color: isPaid ? "#166534" : "#94a3b8" }}>
+                        {isPaid ? "Оплачен" : "—"}
+                      </span>
                     )}
 
-                    {/* Delete button (drafts only) */}
                     {isDraft && (
                       <button
-                        onClick={() =>
-                          isConfirming
-                            ? setConfirmingDeleteId(null)
-                            : setConfirmingDeleteId(order.draft_id)
-                        }
+                        onClick={() => isConfirming ? setConfirmingDeleteId(null) : setConfirmingDeleteId(order.draft_id)}
                         disabled={isDeleting}
                         title="Удалить черновик"
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          width: 32,
-                          height: 32,
-                          borderRadius: 8,
-                          border: isConfirming ? "1px solid #fca5a5" : "1px solid #fecaca",
-                          background: isConfirming ? "#fee2e2" : "#fff",
-                          color: "#ef4444",
-                          cursor: isDeleting ? "not-allowed" : "pointer",
-                          opacity: isDeleting ? 0.4 : 1,
-                          padding: 0,
-                          flexShrink: 0,
-                        }}
+                        style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: 8, border: isConfirming ? "1px solid #fca5a5" : "1px solid #fecaca", background: isConfirming ? "#fee2e2" : "#fff", color: "#ef4444", cursor: isDeleting ? "not-allowed" : "pointer", opacity: isDeleting ? 0.4 : 1, padding: 0, flexShrink: 0 }}
                       >
                         <IconTrash />
                       </button>
@@ -448,54 +350,13 @@ export default function MyOrdersPage() {
                   </div>
                 </div>
 
-                {/* Confirmation banner */}
                 {isConfirming && (
-                  <div
-                    style={{
-                      padding: "12px 20px",
-                      background: "#fef2f2",
-                      borderBottom: isLast ? "none" : "1px solid #fecaca",
-                      borderTop: "1px solid #fecaca",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 12,
-                      fontSize: 13,
-                      color: "#7f1d1d",
-                    }}
-                  >
-                    <span style={{ flex: 1 }}>
-                      Удалить черновик #{order.draft_id}? Это действие нельзя отменить.
-                    </span>
-                    <button
-                      onClick={() => void handleDelete(order.draft_id)}
-                      style={{
-                        padding: "6px 14px",
-                        borderRadius: 8,
-                        border: "none",
-                        background: "#ef4444",
-                        color: "#fff",
-                        fontSize: 13,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        fontFamily: "inherit",
-                      }}
-                    >
+                  <div style={{ padding: "12px 24px", background: "#fef2f2", borderBottom: isLast ? "none" : "1px solid #fecaca", borderTop: "1px solid #fecaca", display: "flex", alignItems: "center", gap: 12, fontSize: 13, color: "#7f1d1d" }}>
+                    <span style={{ flex: 1 }}>Удалить черновик #{order.draft_id}? Это нельзя отменить.</span>
+                    <button onClick={() => void handleDelete(order.draft_id)} style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#ef4444", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                       Удалить
                     </button>
-                    <button
-                      onClick={() => setConfirmingDeleteId(null)}
-                      style={{
-                        padding: "6px 14px",
-                        borderRadius: 8,
-                        border: "1px solid #fca5a5",
-                        background: "#fff",
-                        color: "#b91c1c",
-                        fontSize: 13,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        fontFamily: "inherit",
-                      }}
-                    >
+                    <button onClick={() => setConfirmingDeleteId(null)} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #fca5a5", background: "#fff", color: "#b91c1c", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                       Отмена
                     </button>
                   </div>

@@ -1,7 +1,7 @@
 """
-zone_mapper.py — определение зоны доставки Bestsender по городам.
+zone_mapper.py — определение зоны доставки Azimuth по городам.
 
-Зоны согласно тарифным документам Bestsender 2026:
+Зоны согласно тарифным документам Azimuth 2026:
   Зона 0 — внутригородская доставка (отправка и получение в одном городе)
   Зона 1 — пересылка между областными центрами РК
   Зона 2 — из областных центров в районные центры РК (Аксай, Экибастуз, Рудный и др.)
@@ -81,9 +81,6 @@ def get_zone(from_city: str, to_city: str) -> int:
         return 1
 
     if (frm_is_regional or frm_is_district) and (too_is_regional or too_is_district):
-        return 2
-
-    if (frm_is_regional and too_is_district) or (frm_is_district and too_is_regional):
         return 2
 
     return 3

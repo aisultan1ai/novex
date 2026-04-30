@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import logging
+import secrets
 
 from sqlalchemy.orm import Session
 
+from app.core.email import send_email
 from app.core.exceptions import ConflictError, NotFoundError, UnauthorizedError
+from app.core.redis import get_redis
 
 logger = logging.getLogger(__name__)
 from app.core.security import (
@@ -16,12 +19,16 @@ from app.core.security import (
 from app.modules.identity.models import BillingMode, CustomerType, RoleCode, User
 from app.modules.identity.repository import IdentityRepository
 from app.modules.identity.schemas import (
+    ForgotPasswordRequest,
     LoginRequest,
     ProfileResponse,
     ProfileUpdateRequest,
     RegisterRequest,
+    ResetPasswordRequest,
     TokenResponse,
 )
+
+_RESET_TTL = 3600  # 1 час
 
 
 class IdentityService:
@@ -144,6 +151,51 @@ class IdentityService:
             raise NotFoundError("Failed to load updated user")
 
         return self._build_profile_response(updated_user)
+
+    def forgot_password(self, db: Session, payload: ForgotPasswordRequest, frontend_url: str) -> None:
+        user = self.repository.get_user_by_email(db, payload.email)
+        if not user:
+            # не раскрываем существование аккаунта
+            return
+
+        token = secrets.token_urlsafe(32)
+        r = get_redis()
+        r.setex(f"reset:{token}", _RESET_TTL, str(user.id))
+
+        reset_link = f"{frontend_url}/reset-password?token={token}"
+        send_email(
+            to=user.email,
+            subject="Сброс пароля — Novex",
+            html=f"""
+            <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px">
+              <h2 style="color:#0f172a">Сброс пароля</h2>
+              <p style="color:#475569">Вы запросили сброс пароля для аккаунта <b>{user.email}</b>.</p>
+              <a href="{reset_link}"
+                 style="display:inline-block;margin:24px 0;padding:12px 28px;background:#0f172a;color:#fff;
+                        border-radius:10px;text-decoration:none;font-weight:600">
+                Сбросить пароль
+              </a>
+              <p style="color:#94a3b8;font-size:13px">Ссылка действует 1 час. Если вы не запрашивали сброс — проигнорируйте это письмо.</p>
+            </div>
+            """,
+        )
+        logger.info("Токен сброса пароля создан: user_id=%s", user.id)
+
+    def reset_password(self, db: Session, payload: ResetPasswordRequest) -> None:
+        r = get_redis()
+        user_id_str = r.get(f"reset:{payload.token}")
+        if not user_id_str:
+            raise UnauthorizedError("Ссылка недействительна или устарела")
+
+        user = self.repository.get_user_by_id(db, int(user_id_str))
+        if not user:
+            raise NotFoundError("Пользователь не найден")
+
+        user.password_hash = get_password_hash(payload.new_password)
+        db.commit()
+
+        r.delete(f"reset:{payload.token}")
+        logger.info("Пароль сброшен: user_id=%s", user.id)
 
     def _resolve_billing_mode(
         self,
