@@ -9,15 +9,25 @@ tariff_engine.py — движок расчёта тарифов.
 
 Объёмный вес = (Д × Ш × В) / 6000
 Расчётный вес = max(фактический, объёмный), округл. до 0,5 кг вверх
+
+При вызове с аргументом db= сначала пробуем тарифы из БД (carrier_tariff_rates).
+Если таблица пуста — падаем обратно на хардкод Azimuth.
 """
 
 from __future__ import annotations
 
+import logging
 import math
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from app.modules.carriers.zone_mapper import get_zone
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 # Индексы колонок в таблице цен
 _STD_Z0 = 0
@@ -160,14 +170,36 @@ def calculate_quotes(
     width_cm: float,
     height_cm: float,
     depth_cm: float,
+    db: "Session | None" = None,
 ) -> list[QuoteResult]:
     """
-    Рассчитать стоимость по всем тарифам .
+    Рассчитать стоимость по всем тарифам.
     Возвращает список, отсортированный по цене (от дешёвого к дорогому).
+
+    Если передан db= — пробует загрузить тарифы из БД (carrier_tariff_rates).
+    Если в БД нет активных ставок — использует встроенную таблицу Azimuth.
     """
     zone = get_zone(from_city, to_city)
     kg = chargeable_weight(weight_kg, quantity, width_cm, height_cm, depth_cm)
 
+    if db is not None:
+        db_results = _calculate_from_db(db, zone, kg)
+        if db_results:
+            logger.debug(
+                "tariff_engine: DB rates used (%d quotes, zone=%d, kg=%.2f)",
+                len(db_results),
+                zone,
+                kg,
+            )
+            db_results.sort(key=lambda r: (r.price, r.eta_days_min))
+            return db_results
+        logger.debug("tariff_engine: DB has no rates, falling back to hardcoded Azimuth table")
+
+    return _calculate_hardcoded(zone, kg)
+
+
+def _calculate_hardcoded(zone: int, kg: float) -> list[QuoteResult]:
+    """Расчёт по встроенной таблице Azimuth (fallback)."""
     results: list[QuoteResult] = []
 
     # 1. Стандарт (зоны 0-3)
@@ -210,4 +242,88 @@ def calculate_quotes(
         ))
 
     results.sort(key=lambda r: (r.price, r.eta_days_min))
+    return results
+
+
+def _db_rate_price(rate: object, kg: float) -> int:
+    """
+    Рассчитать цену по одной строке CarrierTariffRate.
+
+    Формула:
+      base_price  — если kg ≤ weight_to_kg (или weight_to_kg IS NULL без надбавки)
+      base_price + ceil((kg - weight_from_kg) / per_unit_weight_kg) * per_unit_price
+                  — для открытого верхнего диапазона с per_unit_price
+    """
+    base = float(rate.base_price)  # type: ignore[attr-defined]
+    wf = float(rate.weight_from_kg)  # type: ignore[attr-defined]
+    per_price = float(rate.per_unit_price) if rate.per_unit_price is not None else 0.0  # type: ignore[attr-defined]
+    per_w = float(rate.per_unit_weight_kg) if rate.per_unit_weight_kg is not None else 0.5  # type: ignore[attr-defined]
+
+    if per_price > 0 and kg > wf:
+        excess = kg - wf
+        extra_units = math.ceil(excess / per_w)
+        return int(base + extra_units * per_price)
+    return int(base)
+
+
+def _calculate_from_db(db: "Session", zone: int, kg: float) -> list[QuoteResult]:
+    """Загружает тарифы из БД и строит котировки для всех активных перевозчиков."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+    from app.modules.carriers.models import Carrier, CarrierService, CarrierTariffRate
+
+    carriers = db.scalars(
+        select(Carrier)
+        .where(Carrier.is_active.is_(True))
+        .options(
+            selectinload(Carrier.services).selectinload(CarrierService.tariff_rates)
+        )
+    ).all()
+
+    results: list[QuoteResult] = []
+
+    for carrier in carriers:
+        for service in carrier.services:
+            if not service.is_active:
+                continue
+
+            # Фильтруем активные ставки для нужной зоны, сортируем по нижней границе веса
+            zone_rates: list[CarrierTariffRate] = sorted(
+                [r for r in service.tariff_rates if r.is_active and r.zone == zone],
+                key=lambda r: float(r.weight_from_kg),
+            )
+
+            if not zone_rates:
+                continue
+
+            # Найти подходящую строку: weight_from_kg <= kg <= weight_to_kg
+            applicable = None
+            for rate in zone_rates:
+                wf = float(rate.weight_from_kg)
+                wt = float(rate.weight_to_kg) if rate.weight_to_kg is not None else None
+                if wf <= kg and (wt is None or kg <= wt):
+                    applicable = rate
+                    break
+
+            # Если вес превышает все диапазоны — берём последнюю строку (надбавка сверху)
+            if applicable is None:
+                applicable = zone_rates[-1]
+
+            price = _db_rate_price(applicable, kg)
+            eta_min = applicable.eta_days_min if applicable.eta_days_min is not None else 1
+            eta_max = applicable.eta_days_max if applicable.eta_days_max is not None else 14
+
+            results.append(QuoteResult(
+                carrier_code=carrier.code,
+                carrier_name=carrier.name,
+                tariff_code=service.code,
+                tariff_name=service.name,
+                price=Decimal(str(price)),
+                currency=applicable.currency,
+                eta_days_min=eta_min,
+                eta_days_max=eta_max,
+                zone=zone,
+                chargeable_kg=kg,
+            ))
+
     return results

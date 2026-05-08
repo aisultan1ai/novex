@@ -34,6 +34,7 @@ class QuotesService:
             width_cm=float(payload.width_cm),
             height_cm=float(payload.height_cm),
             depth_cm=float(payload.depth_cm),
+            db=db,
         )
 
         quote_session = QuoteSession(

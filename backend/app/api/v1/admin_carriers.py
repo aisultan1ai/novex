@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import date
 from typing import Optional
 
@@ -13,6 +14,7 @@ from app.core.db import get_db
 from app.core.dependencies import require_admin
 from app.modules.carriers.models import Carrier, CarrierService, CarrierTariffRate, CarrierZoneCity
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin/carriers", tags=["admin:carriers"])
 
 
@@ -115,6 +117,7 @@ def create_carrier(
     db.add(carrier)
     db.commit()
     db.refresh(carrier)
+    logger.info("Carrier created: id=%d code=%s", carrier.id, carrier.code)
     return _carrier_dict(carrier)
 
 
@@ -310,6 +313,12 @@ async def upload_tariff_grid(
         inserted += 1
 
     db.commit()
+    logger.info(
+        "Tariff grid uploaded: carrier_id=%d service_id=%d rows=%d",
+        carrier_id,
+        service_id,
+        inserted,
+    )
     return {"inserted": inserted, "service_id": service_id}
 
 

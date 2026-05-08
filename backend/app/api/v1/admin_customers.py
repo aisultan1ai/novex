@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import math
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -12,6 +14,7 @@ from app.core.dependencies import require_admin
 from app.modules.identity.models import CustomerProfile, Role, RoleCode, User
 from app.modules.orders.models import OrderDraft
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin/users", tags=["admin:users"])
 
 
@@ -95,7 +98,9 @@ def list_users(
         for u in users
     ]
 
-    return {"items": items, "total": total, "page": page, "size": size}
+    pages = math.ceil(total / size) if total > 0 else 1
+    logger.debug("admin list_users: page=%d size=%d total=%d", page, size, total)
+    return {"items": items, "total": total, "page": page, "size": size, "pages": pages}
 
 
 # ── User detail ───────────────────────────────────────────────────────────────
