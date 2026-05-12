@@ -10,11 +10,13 @@ from app.core.db import get_db
 from app.core.dependencies import get_current_user_id
 from decimal import Decimal
 
+from app.modules.carriers.dispatch_service import CarrierDispatchService
 from app.modules.commissions.service import CommissionsService
 from app.modules.notifications.service import NotificationsService
 from app.modules.orders.repository import OrdersRepository
 from app.modules.payments.kaspi_service import KaspiPayService
 from app.modules.platform_settings.repository import PlatformSettingsRepository
+from app.modules.shipments.repository import ShipmentsRepository
 from app.modules.shipments.service import ShipmentsService
 from app.modules.tracking.repository import TrackingRepository
 
@@ -24,6 +26,8 @@ router = APIRouter(prefix="/payments", tags=["payments"])
 kaspi = KaspiPayService()
 order_repo = OrdersRepository()
 shipments_svc = ShipmentsService()
+shipments_repo = ShipmentsRepository()
+dispatch_svc = CarrierDispatchService()
 commissions_svc = CommissionsService()
 notifications_svc = NotificationsService()
 tracking_repo = TrackingRepository()
@@ -100,6 +104,14 @@ async def kaspi_webhook(request: Request, db: Session = Depends(get_db)) -> dict
             order_draft_id=order.id,
             carrier_code=order.carrier_code_snapshot,
         )
+
+        carrier_tracking = dispatch_svc.dispatch(db, order)
+        if carrier_tracking:
+            shipment = shipments_repo.get_by_order_id(db, order.id)
+            if shipment:
+                shipment.carrier_tracking_number = carrier_tracking
+                shipment.status = "dispatched"
+            order.status = "dispatched"
 
         rate = Decimal(settings_repo.get(db, "commission_rate", default="0.00"))
         commissions_svc.record_commission(

@@ -181,6 +181,16 @@ class IdentityService:
         )
         logger.info("Токен сброса пароля создан: user_id=%s", user.id)
 
+    def change_password(self, db: Session, user_id: int, payload: "ChangePasswordRequest") -> None:
+        user = self.repository.get_user_by_id(db, user_id)
+        if not user:
+            raise NotFoundError("Пользователь не найден")
+        if not verify_password(payload.current_password, user.password_hash):
+            raise UnauthorizedError("Текущий пароль неверный")
+        user.password_hash = get_password_hash(payload.new_password)
+        db.commit()
+        logger.info("Пароль изменён: user_id=%s", user_id)
+
     def reset_password(self, db: Session, payload: ResetPasswordRequest) -> None:
         r = get_redis()
         user_id_str = r.get(f"reset:{payload.token}")

@@ -11,9 +11,11 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.core.db import get_db
 from app.core.dependencies import require_admin
+from app.modules.carriers.dispatch_service import CarrierDispatchService
 from app.modules.identity.models import User
 from app.modules.notifications.service import NotificationsService
 from app.modules.orders.models import OrderDraft
+from app.modules.shipments.repository import ShipmentsRepository
 from app.modules.tracking.repository import TrackingRepository
 
 logger = logging.getLogger(__name__)
@@ -21,6 +23,8 @@ router = APIRouter(prefix="/admin/orders", tags=["admin:orders"])
 
 _notifications_svc = NotificationsService()
 _tracking_repo = TrackingRepository()
+_shipments_repo = ShipmentsRepository()
+_dispatch_svc = CarrierDispatchService()
 
 VALID_STATUSES = {
     "draft", "shipment_details_completed", "ready_for_checkout",
@@ -31,6 +35,36 @@ VALID_STATUSES = {
 
 class OrderStatusUpdate(BaseModel):
     status: str
+
+
+class MarkDispatchedPayload(BaseModel):
+    tracking_number: str
+
+
+@router.get("/dispatch-queue")
+def get_dispatch_queue(
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+) -> dict:
+    stmt = (
+        select(OrderDraft)
+        .where(OrderDraft.status.in_(["dispatch_failed", "pending_manual"]))
+        .order_by(OrderDraft.created_at.desc())
+    )
+    orders = db.scalars(stmt).all()
+    items = [
+        {
+            "id": o.id,
+            "carrier_code_snapshot": o.carrier_code_snapshot,
+            "carrier_name_snapshot": o.carrier_name_snapshot,
+            "status": o.status,
+            "dispatch_error": o.dispatch_error,
+            "created_at": o.created_at.isoformat(),
+            "updated_at": o.updated_at.isoformat(),
+        }
+        for o in orders
+    ]
+    return {"items": items, "total": len(items)}
 
 
 @router.get("")
@@ -167,3 +201,53 @@ def update_order_status(
     )
     db.commit()
     return {"id": order.id, "status": order.status}
+
+
+@router.post("/{draft_id}/retry-dispatch")
+def retry_dispatch(
+    draft_id: int,
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+) -> dict:
+    order = db.get(OrderDraft, draft_id)
+    if not order:
+        raise HTTPException(404, "Заказ не найден")
+    tracking_number = _dispatch_svc.dispatch(db, order)
+    if tracking_number:
+        shipment = _shipments_repo.get_by_order_id(db, order.id)
+        if shipment:
+            shipment.carrier_tracking_number = tracking_number
+            shipment.status = "dispatched"
+        order.status = "dispatched"
+    db.commit()
+    return {"ok": True, "tracking_number": tracking_number}
+
+
+@router.post("/{draft_id}/mark-dispatched")
+def mark_dispatched(
+    draft_id: int,
+    payload: MarkDispatchedPayload,
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+) -> dict:
+    order = db.get(OrderDraft, draft_id)
+    if not order:
+        raise HTTPException(404, "Заказ не найден")
+    shipment = _shipments_repo.get_by_order_id(db, order.id)
+    if shipment:
+        shipment.carrier_tracking_number = payload.tracking_number
+        shipment.status = "dispatched"
+    order.status = "dispatched"
+    order.dispatch_error = None
+    _tracking_repo.add_event(
+        db,
+        order_draft_id=order.id,
+        status="picked_up",
+        description="Передан перевозчику вручную",
+    )
+    db.commit()
+    return {
+        "id": order.id,
+        "status": order.status,
+        "carrier_tracking_number": payload.tracking_number,
+    }

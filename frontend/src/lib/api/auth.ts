@@ -111,4 +111,14 @@ export async function resetPassword(token: string, new_password: string): Promis
   });
 }
 
+export async function changePassword(payload: {
+  current_password: string;
+  new_password: string;
+}): Promise<void> {
+  await request("/profile/change-password", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }, true);
+}
+
 export { ApiError };

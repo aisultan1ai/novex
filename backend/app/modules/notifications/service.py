@@ -20,6 +20,9 @@ _STATUS_TITLES: dict[str, str] = {
     "delivered": "Доставлен",
     "cancelled": "Отменён",
     "return": "Возврат",
+    "dispatched": "Заказ передан перевозчику",
+    "dispatch_failed": "Заказ оформлен, уточняем детали доставки",
+    "pending_manual": "Заказ оформлен, передаётся перевозчику",
 }
 
 

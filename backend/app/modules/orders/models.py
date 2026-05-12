@@ -52,6 +52,7 @@ class OrderDraft(Base, TimestampMixin):
     )
 
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="draft")
+    dispatch_error: Mapped[str | None] = mapped_column(String, nullable=True)
 
     carrier_code_snapshot: Mapped[str] = mapped_column(String(50), nullable=False)
     carrier_name_snapshot: Mapped[str] = mapped_column(String(100), nullable=False)

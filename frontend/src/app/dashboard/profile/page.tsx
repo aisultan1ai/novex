@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/providers/auth-provider";
 import { getAccessToken, saveAuthSession } from "@/lib/auth/session";
-import { ApiError, getProfile, updateProfile } from "@/lib/api/auth";
+import { ApiError, changePassword, getProfile, updateProfile } from "@/lib/api/auth";
 import type { ProfileResponse } from "@/types/auth";
 
 const BILLING_LABELS: Record<string, string> = {
@@ -77,6 +77,13 @@ export default function ProfilePage() {
   const [phone, setPhone] = useState(currentUser?.phone ?? "");
   const [companyName, setCompanyName] = useState(currentUser?.company_name ?? "");
 
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwError, setPwError] = useState<string | null>(null);
+  const [pwSuccess, setPwSuccess] = useState<string | null>(null);
+
   useEffect(() => {
     if (!authLoading && !isAuthenticated) router.push("/login");
   }, [isAuthenticated, authLoading, router]);
@@ -124,6 +131,33 @@ export default function ProfilePage() {
       setError(err instanceof ApiError ? err.detail : "Не удалось сохранить профиль.");
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function handleChangePassword(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setPwError(null);
+    setPwSuccess(null);
+    if (newPassword !== confirmPassword) {
+      setPwError("Новые пароли не совпадают");
+      return;
+    }
+    if (newPassword.length < 8) {
+      setPwError("Минимум 8 символов");
+      return;
+    }
+    setPwSaving(true);
+    try {
+      await changePassword({ current_password: currentPassword, new_password: newPassword });
+      setPwSuccess("Пароль успешно изменён");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setTimeout(() => setPwSuccess(null), 3000);
+    } catch (err) {
+      setPwError(err instanceof ApiError ? err.detail : "Не удалось изменить пароль.");
+    } finally {
+      setPwSaving(false);
     }
   }
 
@@ -263,6 +297,75 @@ export default function ProfilePage() {
                 {error}
               </div>
             )}
+          </div>
+
+          {/* Change password */}
+          <div style={{ marginTop: 24, background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, padding: 32 }}>
+            <h2 style={{ margin: "0 0 20px", fontSize: 16, fontWeight: 700, color: "#0f172a" }}>
+              Сменить пароль
+            </h2>
+            <form onSubmit={handleChangePassword}>
+              <div style={{ display: "grid", gap: 16, maxWidth: 400 }}>
+                <div>
+                  <label style={lbl}>Текущий пароль</label>
+                  <input
+                    type="password"
+                    style={inp}
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    onFocus={(e) => { e.currentTarget.style.borderColor = "#0f172a"; e.currentTarget.style.background = "#ffffff"; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
+                  />
+                </div>
+                <div>
+                  <label style={lbl}>Новый пароль</label>
+                  <input
+                    type="password"
+                    style={inp}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Минимум 8 символов"
+                    required
+                    onFocus={(e) => { e.currentTarget.style.borderColor = "#0f172a"; e.currentTarget.style.background = "#ffffff"; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
+                  />
+                </div>
+                <div>
+                  <label style={lbl}>Повторите новый пароль</label>
+                  <input
+                    type="password"
+                    style={inp}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    onFocus={(e) => { e.currentTarget.style.borderColor = "#0f172a"; e.currentTarget.style.background = "#ffffff"; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={pwSaving}
+                style={{ marginTop: 20, background: "#0f172a", color: "#ffffff", border: "none", borderRadius: 10, padding: "12px 32px", fontWeight: 600, fontSize: 15, cursor: pwSaving ? "not-allowed" : "pointer", opacity: pwSaving ? 0.7 : 1, fontFamily: "inherit" }}
+              >
+                {pwSaving ? "Сохраняем…" : "Изменить пароль"}
+              </button>
+
+              {pwSuccess && (
+                <div style={{ marginTop: 16, padding: "12px 16px", borderRadius: 10, background: "#f0fdf4", border: "1px solid #bbf7d0", color: "#166534", fontSize: 14, fontWeight: 600 }}>
+                  ✓ {pwSuccess}
+                </div>
+              )}
+              {pwError && (
+                <div style={{ marginTop: 16, padding: "12px 16px", borderRadius: 10, background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c", fontSize: 14 }}>
+                  {pwError}
+                </div>
+              )}
+            </form>
           </div>
         </div>
       )}
