@@ -65,7 +65,7 @@ export default function AdminCarrierDetailPage() {
   const loadRates = useCallback((svc: AdminCarrierService) => {
     setRatesLoading(true);
     listAdminRates(carrierId, svc.id)
-      .then(setRates)
+      .then((res) => setRates(res.items))
       .catch((e: Error) => setError(e.message))
       .finally(() => setRatesLoading(false));
   }, [carrierId]);

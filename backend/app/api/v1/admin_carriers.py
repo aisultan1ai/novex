@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
-from sqlalchemy import select, update as sa_update
+from sqlalchemy import func, select, update as sa_update
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.db import get_db
@@ -214,15 +215,20 @@ def update_service(
 def list_rates(
     carrier_id: int,
     service_id: int,
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
     _=Depends(require_admin),
-) -> list[dict]:
-    rates = db.scalars(
+) -> dict:
+    base = (
         select(CarrierTariffRate)
         .where(CarrierTariffRate.service_id == service_id)
         .order_by(CarrierTariffRate.zone, CarrierTariffRate.weight_from_kg)
-    ).all()
-    return [_rate_dict(r) for r in rates]
+    )
+    total = db.scalar(select(func.count()).select_from(base.subquery())) or 0
+    rates = db.scalars(base.offset((page - 1) * size).limit(size)).all()
+    pages = math.ceil(total / size) if total > 0 else 1
+    return {"items": [_rate_dict(r) for r in rates], "total": total, "page": page, "size": size, "pages": pages}
 
 
 @router.post("/{carrier_id}/services/{service_id}/rates", status_code=201)
@@ -327,15 +333,21 @@ async def upload_tariff_grid(
 @router.get("/{carrier_id}/cities")
 def list_zone_cities(
     carrier_id: int,
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
     _=Depends(require_admin),
-) -> list[dict]:
-    cities = db.scalars(
+) -> dict:
+    base = (
         select(CarrierZoneCity)
         .where(CarrierZoneCity.carrier_id == carrier_id)
         .order_by(CarrierZoneCity.zone, CarrierZoneCity.city_name)
-    ).all()
-    return [{"id": c.id, "city_name": c.city_name, "zone": c.zone, "city_type": c.city_type} for c in cities]
+    )
+    total = db.scalar(select(func.count()).select_from(base.subquery())) or 0
+    cities = db.scalars(base.offset((page - 1) * size).limit(size)).all()
+    pages = math.ceil(total / size) if total > 0 else 1
+    items = [{"id": c.id, "city_name": c.city_name, "zone": c.zone, "city_type": c.city_type} for c in cities]
+    return {"items": items, "total": total, "page": page, "size": size, "pages": pages}
 
 
 @router.post("/{carrier_id}/cities", status_code=201)

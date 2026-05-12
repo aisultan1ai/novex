@@ -1,9 +1,9 @@
 import { getAuthHeaders } from "@/lib/auth/session";
 import type {
   AdminCarrier, AdminCarrierDetail, AdminCarrierService,
-  AdminOrderDetail, AdminOrderRow, AdminStats,
-  AdminTariffRate, AdminUser, AdminUserDetail,
-  PaginatedResponse,
+  AdminCommission, AdminOrderDetail, AdminOrderRow, AdminStats,
+  AdminTariffRate, AdminUser, AdminUserDetail, AdminZoneCity,
+  CommissionSummary, PaginatedResponse, PlatformSettings,
 } from "@/types/admin";
 
 const BASE = (process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") || "/api/v1");
@@ -86,11 +86,28 @@ export const createAdminService = (carrierId: number, body: { code: string; name
   req(`/admin/carriers/${carrierId}/services`, { method: "POST", body: JSON.stringify(body) });
 
 // Rates
-export const listAdminRates = (carrierId: number, serviceId: number): Promise<AdminTariffRate[]> =>
-  req(`/admin/carriers/${carrierId}/services/${serviceId}/rates`);
+export const listAdminRates = (carrierId: number, serviceId: number, page = 1, size = 50): Promise<PaginatedResponse<AdminTariffRate>> =>
+  req(`/admin/carriers/${carrierId}/services/${serviceId}/rates?page=${page}&size=${size}`);
+
+export const listAdminZoneCities = (carrierId: number, page = 1, size = 50): Promise<PaginatedResponse<AdminZoneCity>> =>
+  req(`/admin/carriers/${carrierId}/cities?page=${page}&size=${size}`);
 
 export const deleteAdminRate = (carrierId: number, serviceId: number, rateId: number): Promise<void> =>
   req(`/admin/carriers/${carrierId}/services/${serviceId}/rates/${rateId}`, { method: "DELETE" });
 
 export const uploadTariffGrid = (carrierId: number, serviceId: number, file: File): Promise<{ inserted: number }> =>
   upload(`/admin/carriers/${carrierId}/services/${serviceId}/rates/upload`, file);
+
+// ── Commissions ────────────────────────────────────────────────────────────────
+export const listAdminCommissions = (page = 1, size = 50): Promise<PaginatedResponse<AdminCommission>> =>
+  req(`/admin/commissions?page=${page}&size=${size}`);
+
+export const getCommissionsSummary = (): Promise<CommissionSummary> =>
+  req("/admin/commissions/summary");
+
+// ── Settings ───────────────────────────────────────────────────────────────────
+export const getAdminSettings = (): Promise<PlatformSettings> =>
+  req("/admin/settings");
+
+export const updateAdminSettings = (body: Partial<PlatformSettings>): Promise<PlatformSettings> =>
+  req("/admin/settings", { method: "PATCH", body: JSON.stringify(body) });

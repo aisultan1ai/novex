@@ -1,19 +1,12 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/providers/auth-provider";
-
-function IconBell() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-    </svg>
-  );
-}
+import { listNotifications } from "@/lib/api/notifications";
 
 function IconLogout() {
   return (
@@ -25,17 +18,75 @@ function IconLogout() {
   );
 }
 
+function BellButton({ unread, onClick }: { unread: number; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      title="Уведомления"
+      style={{
+        position: "relative",
+        width: 36,
+        height: 36,
+        borderRadius: "50%",
+        border: "1px solid #e5e7eb",
+        background: "#ffffff",
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: unread > 0 ? "#0f172a" : "#94a3b8",
+      }}
+    >
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+      </svg>
+      {unread > 0 && (
+        <span
+          style={{
+            position: "absolute",
+            top: -3,
+            right: -3,
+            minWidth: 16,
+            height: 16,
+            borderRadius: 999,
+            background: "#ef4444",
+            color: "#fff",
+            fontSize: 10,
+            fontWeight: 700,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "0 4px",
+            border: "2px solid #fff",
+          }}
+        >
+          {unread > 9 ? "9+" : unread}
+        </span>
+      )}
+    </button>
+  );
+}
+
 const BASE_TABS = [
-  { label: "Мои заказы",      href: "/dashboard/orders",       admin: false },
-  { label: "Адресная книга",  href: "/dashboard/address-book", admin: false },
-  { label: "Профиль",         href: "/dashboard/profile",      admin: false },
-  { label: "Отчёты",          href: "/dashboard/reports",      admin: false },
+  { label: "Мои заказы",      href: "/dashboard/orders",        admin: false },
+  { label: "Адресная книга",  href: "/dashboard/address-book",  admin: false },
+  { label: "Уведомления",     href: "/dashboard/notifications", admin: false },
+  { label: "Профиль",         href: "/dashboard/profile",       admin: false },
 ];
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { logout, currentUser } = useAuth();
+  const { logout, currentUser, isAuthenticated } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    listNotifications()
+      .then((res) => setUnreadCount(res.unread_count))
+      .catch(() => {/* silent */});
+  }, [isAuthenticated, pathname]);
 
   const navTabs = [
     ...BASE_TABS,
@@ -80,22 +131,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: "50%",
-              border: "1px solid #e5e7eb",
-              background: "#ffffff",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#64748b",
-            }}
-          >
-            <IconBell />
-          </button>
+          <BellButton
+            unread={unreadCount}
+            onClick={() => router.push("/dashboard/notifications")}
+          />
           <button
             onClick={handleLogout}
             style={{
@@ -134,6 +173,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           const activeColor = admin ? "#d97706" : "#0f172a";
           const activeBorder = admin ? "#d97706" : "#0f172a";
           const idleColor = admin ? "#b45309" : "#64748b";
+          const showDot = href === "/dashboard/notifications" && unreadCount > 0 && !active;
           return (
             <Link
               key={href}
@@ -148,6 +188,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 marginBottom: -1,
                 transition: "color 0.15s",
                 whiteSpace: "nowrap",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                position: "relative",
               }}
               onMouseEnter={(e) => {
                 if (!active) (e.currentTarget as HTMLAnchorElement).style.color = activeColor;
@@ -157,6 +201,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               }}
             >
               {label}
+              {showDot && (
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#ef4444", display: "inline-block", marginBottom: 1 }} />
+              )}
             </Link>
           );
         })}

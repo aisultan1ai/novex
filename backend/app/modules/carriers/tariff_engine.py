@@ -179,23 +179,22 @@ def calculate_quotes(
     Если передан db= — пробует загрузить тарифы из БД (carrier_tariff_rates).
     Если в БД нет активных ставок — использует встроенную таблицу Azimuth.
     """
-    zone = get_zone(from_city, to_city)
+    fallback_zone = get_zone(from_city, to_city)
     kg = chargeable_weight(weight_kg, quantity, width_cm, height_cm, depth_cm)
 
     if db is not None:
-        db_results = _calculate_from_db(db, zone, kg)
+        db_results = _calculate_from_db(db, from_city, to_city, fallback_zone, kg)
         if db_results:
             logger.debug(
-                "tariff_engine: DB rates used (%d quotes, zone=%d, kg=%.2f)",
+                "tariff_engine: DB rates used (%d quotes, kg=%.2f)",
                 len(db_results),
-                zone,
                 kg,
             )
             db_results.sort(key=lambda r: (r.price, r.eta_days_min))
             return db_results
         logger.debug("tariff_engine: DB has no rates, falling back to hardcoded Azimuth table")
 
-    return _calculate_hardcoded(zone, kg)
+    return _calculate_hardcoded(fallback_zone, kg)
 
 
 def _calculate_hardcoded(zone: int, kg: float) -> list[QuoteResult]:
@@ -266,7 +265,44 @@ def _db_rate_price(rate: object, kg: float) -> int:
     return int(base)
 
 
-def _calculate_from_db(db: "Session", zone: int, kg: float) -> list[QuoteResult]:
+def _zone_from_carrier_cities(
+    from_city: str,
+    to_city: str,
+    zone_cities: list,
+) -> int | None:
+    """
+    Определить зону маршрута по таблице CarrierZoneCity.
+    Возвращает None если хотя бы один из городов не найден.
+    """
+    frm = from_city.strip().lower()
+    too = to_city.strip().lower()
+
+    if frm == too:
+        return 0
+
+    city_map: dict[str, int] = {zc.city_name_normalized: zc.zone for zc in zone_cities}
+
+    from_zone = city_map.get(frm)
+    to_zone = city_map.get(too)
+
+    if to_zone is not None:
+        # Зона маршрута — зона города назначения.
+        # Если оба города найдены и от_зона > до_зоны — берём максимум
+        # (дорогостоящий конец определяет тариф).
+        if from_zone is not None:
+            return max(from_zone, to_zone)
+        return to_zone
+
+    return None
+
+
+def _calculate_from_db(
+    db: "Session",
+    from_city: str,
+    to_city: str,
+    fallback_zone: int,
+    kg: float,
+) -> list[QuoteResult]:
     """Загружает тарифы из БД и строит котировки для всех активных перевозчиков."""
     from sqlalchemy import select
     from sqlalchemy.orm import selectinload
@@ -276,18 +312,33 @@ def _calculate_from_db(db: "Session", zone: int, kg: float) -> list[QuoteResult]
         select(Carrier)
         .where(Carrier.is_active.is_(True))
         .options(
-            selectinload(Carrier.services).selectinload(CarrierService.tariff_rates)
+            selectinload(Carrier.services).selectinload(CarrierService.tariff_rates),
+            selectinload(Carrier.zone_cities),
         )
     ).all()
 
     results: list[QuoteResult] = []
 
     for carrier in carriers:
+        # Пробуем определить зону по городам конкретного перевозчика;
+        # если не найдено — используем хардкодный fallback.
+        zone = _zone_from_carrier_cities(from_city, to_city, carrier.zone_cities)
+        if zone is None:
+            zone = fallback_zone
+            logger.debug(
+                "tariff_engine: carrier=%s cities not in zone_cities, using fallback zone=%d",
+                carrier.code, zone,
+            )
+        else:
+            logger.debug(
+                "tariff_engine: carrier=%s zone=%d from DB city mapping (%s→%s)",
+                carrier.code, zone, from_city, to_city,
+            )
+
         for service in carrier.services:
             if not service.is_active:
                 continue
 
-            # Фильтруем активные ставки для нужной зоны, сортируем по нижней границе веса
             zone_rates: list[CarrierTariffRate] = sorted(
                 [r for r in service.tariff_rates if r.is_active and r.zone == zone],
                 key=lambda r: float(r.weight_from_kg),
@@ -296,7 +347,6 @@ def _calculate_from_db(db: "Session", zone: int, kg: float) -> list[QuoteResult]
             if not zone_rates:
                 continue
 
-            # Найти подходящую строку: weight_from_kg <= kg <= weight_to_kg
             applicable = None
             for rate in zone_rates:
                 wf = float(rate.weight_from_kg)
@@ -305,7 +355,6 @@ def _calculate_from_db(db: "Session", zone: int, kg: float) -> list[QuoteResult]
                     applicable = rate
                     break
 
-            # Если вес превышает все диапазоны — берём последнюю строку (надбавка сверху)
             if applicable is None:
                 applicable = zone_rates[-1]
 

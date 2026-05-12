@@ -111,6 +111,7 @@ const cardStyle: CSSProperties = {
 };
 
 const PAYABLE_STATUSES = new Set(["shipment_details_completed", "ready_for_checkout"]);
+const TRACKABLE_STATUSES = new Set(["paid", "sent_to_carrier", "picked_up", "in_transit", "arrived", "delivered"]);
 
 export default function MyOrdersPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -274,6 +275,7 @@ export default function MyOrdersPage() {
           {filteredOrders.map((order, idx) => {
             const isDraft = order.status === "draft";
             const isPayable = PAYABLE_STATUSES.has(order.status);
+            const isTrackable = TRACKABLE_STATUSES.has(order.status);
             const isConfirming = confirmingDeleteId === order.draft_id;
             const isDeleting = deletingId === order.draft_id;
             const isLast = idx === filteredOrders.length - 1;
@@ -330,6 +332,13 @@ export default function MyOrdersPage() {
                         style={{ display: "inline-block", padding: "6px 12px", borderRadius: 8, background: "#0f172a", color: "#fff", fontSize: 12, fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap" }}
                       >
                         Оплатить
+                      </Link>
+                    ) : isTrackable ? (
+                      <Link
+                        href={`/dashboard/orders/${order.draft_id}/tracking`}
+                        style={{ display: "inline-block", padding: "6px 12px", borderRadius: 8, background: "#ede9fe", color: "#5b21b6", fontSize: 12, fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap" }}
+                      >
+                        Отследить
                       </Link>
                     ) : (
                       <span style={{ padding: "4px 12px", borderRadius: 999, fontSize: 12, fontWeight: 600, background: isPaid ? "#dcfce7" : "#f1f5f9", color: isPaid ? "#166534" : "#94a3b8" }}>

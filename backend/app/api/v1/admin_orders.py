@@ -12,10 +12,15 @@ from sqlalchemy.orm import Session, selectinload
 from app.core.db import get_db
 from app.core.dependencies import require_admin
 from app.modules.identity.models import User
+from app.modules.notifications.service import NotificationsService
 from app.modules.orders.models import OrderDraft
+from app.modules.tracking.repository import TrackingRepository
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin/orders", tags=["admin:orders"])
+
+_notifications_svc = NotificationsService()
+_tracking_repo = TrackingRepository()
 
 VALID_STATUSES = {
     "draft", "shipment_details_completed", "ready_for_checkout",
@@ -148,5 +153,17 @@ def update_order_status(
     if not order:
         raise HTTPException(404, "Заказ не найден")
     order.status = payload.status
+    _tracking_repo.add_event(
+        db,
+        order_draft_id=order.id,
+        status=payload.status,
+        description=f"Статус обновлён администратором: {payload.status}",
+    )
+    _notifications_svc.notify_order_status(
+        db,
+        user_id=order.user_id,
+        order_id=order.id,
+        status=payload.status,
+    )
     db.commit()
     return {"id": order.id, "status": order.status}

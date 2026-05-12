@@ -96,7 +96,7 @@ export default function AdminOverviewPage() {
         <QuickLink href="/dashboard/admin/orders" title="Управление заказами" desc="Просмотр всех заказов, смена статуса" icon="📦" />
         <QuickLink href="/dashboard/admin/users" title="Пользователи" desc="Список клиентов, детали аккаунтов" icon="👥" />
         <QuickLink href="/dashboard/admin/carriers" title="Перевозчики" desc="Добавить перевозчика, загрузить тарифы" icon="🚚" />
-        <QuickLink href="/dashboard/admin/carriers" title="Тарифные сетки" desc="Загрузка тарифов через JSON-файл" icon="📋" />
+        <QuickLink href="/dashboard/admin/commissions" title="Комиссии" desc="Отчёт по комиссиям Novex от заказов" icon="💰" />
       </div>
     </>
   );

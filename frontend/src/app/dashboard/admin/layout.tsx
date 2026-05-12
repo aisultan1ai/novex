@@ -12,6 +12,7 @@ const ADMIN_TABS = [
   { label: "Заказы",        href: "/dashboard/admin/orders" },
   { label: "Пользователи",  href: "/dashboard/admin/users" },
   { label: "Перевозчики",   href: "/dashboard/admin/carriers" },
+  { label: "Комиссии",      href: "/dashboard/admin/commissions" },
 ];
 
 export default function AdminSubLayout({ children }: { children: ReactNode }) {

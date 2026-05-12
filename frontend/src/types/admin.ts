@@ -86,4 +86,34 @@ export interface PaginatedResponse<T> {
   total: number;
   page: number;
   size: number;
+  pages?: number;
+}
+
+export interface AdminZoneCity {
+  id: number;
+  city_name: string;
+  zone: number;
+  city_type: string | null;
+}
+
+export interface AdminCommission {
+  id: number;
+  order_draft_id: number;
+  carrier_code: string;
+  gross_amount: number;
+  commission_rate: number;
+  commission_amount: number;
+  currency: string;
+  created_at: string;
+}
+
+export interface CommissionSummary {
+  total_gross: number;
+  total_commission: number;
+  currency: string;
+  count: number;
+}
+
+export interface PlatformSettings {
+  commission_rate: string;
 }

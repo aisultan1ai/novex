@@ -8,14 +8,26 @@ from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.dependencies import get_current_user_id
+from decimal import Decimal
+
+from app.modules.commissions.service import CommissionsService
+from app.modules.notifications.service import NotificationsService
 from app.modules.orders.repository import OrdersRepository
 from app.modules.payments.kaspi_service import KaspiPayService
+from app.modules.platform_settings.repository import PlatformSettingsRepository
+from app.modules.shipments.service import ShipmentsService
+from app.modules.tracking.repository import TrackingRepository
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/payments", tags=["payments"])
 
 kaspi = KaspiPayService()
 order_repo = OrdersRepository()
+shipments_svc = ShipmentsService()
+commissions_svc = CommissionsService()
+notifications_svc = NotificationsService()
+tracking_repo = TrackingRepository()
+settings_repo = PlatformSettingsRepository()
 
 
 class InitiatePaymentResponse(BaseModel):
@@ -67,7 +79,8 @@ async def kaspi_webhook(request: Request, db: Session = Depends(get_db)) -> dict
         logger.warning("Kaspi webhook: неверная подпись")
         raise HTTPException(status_code=400, detail="Invalid signature")
 
-    body = await request.json()
+    import json as _json
+    body = _json.loads(raw_body)
     order_id_str, status = kaspi.parse_webhook(body)
 
     if not order_id_str or not status:
@@ -81,9 +94,47 @@ async def kaspi_webhook(request: Request, db: Session = Depends(get_db)) -> dict
     if status == "paid":
         order.status = "paid"
         logger.info("Заказ #%s оплачен через Kaspi", order_id_str)
+
+        shipments_svc.create_for_order(
+            db,
+            order_draft_id=order.id,
+            carrier_code=order.carrier_code_snapshot,
+        )
+
+        rate = Decimal(settings_repo.get(db, "commission_rate", default="0.00"))
+        commissions_svc.record_commission(
+            db,
+            order_draft_id=order.id,
+            carrier_code=order.carrier_code_snapshot,
+            gross_amount=order.price_snapshot,
+            currency=order.currency_snapshot,
+            rate=rate,
+        )
+
+        tracking_repo.add_event(
+            db,
+            order_draft_id=order.id,
+            status="paid",
+            description="Оплата подтверждена, заказ передаётся перевозчику",
+        )
+
+        notifications_svc.notify_order_status(
+            db,
+            user_id=order.user_id,
+            order_id=order.id,
+            status="paid",
+        )
+
     elif status == "cancelled":
         order.status = "cancelled"
         logger.info("Заказ #%s отменён через Kaspi", order_id_str)
+
+        notifications_svc.notify_order_status(
+            db,
+            user_id=order.user_id,
+            order_id=order.id,
+            status="cancelled",
+        )
 
     db.commit()
     return {"ok": True}
