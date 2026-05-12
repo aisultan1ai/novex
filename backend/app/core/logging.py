@@ -13,7 +13,7 @@ def setup_logging(level: str = "INFO") -> None:
         handlers=[logging.StreamHandler(sys.stdout)],
         force=True,
     )
-    # Убираем шум от сторонних библиотек
+
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
