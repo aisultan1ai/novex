@@ -182,7 +182,7 @@ export default function AdminCommissionsPage() {
           <div style={{ padding: 48, textAlign: "center", color: "#64748b", fontSize: 14 }}>Загружаем…</div>
         ) : items.length === 0 ? (
           <div style={{ padding: "48px 24px", textAlign: "center", color: "#64748b", fontSize: 14 }}>
-            Записей пока нет — они появятся после первой оплаты
+            Записей пока нет - они появятся после первой оплаты
           </div>
         ) : (
           items.map((c, idx) => (

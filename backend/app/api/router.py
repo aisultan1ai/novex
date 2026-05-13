@@ -16,6 +16,7 @@ from app.api.v1.admin_commissions import router as admin_commissions_router
 from app.api.v1.admin_carrier_webhooks import router as admin_carrier_webhooks_router
 from app.api.v1.admin_settings import router as admin_settings_router
 from app.api.v1.carrier_tracking import router as carrier_tracking_router
+from app.api.v1.carrier_portal import router as carrier_portal_router
 
 api_router = APIRouter()
 
@@ -35,3 +36,4 @@ api_router.include_router(admin_commissions_router)
 api_router.include_router(admin_settings_router)
 api_router.include_router(admin_carrier_webhooks_router)
 api_router.include_router(carrier_tracking_router)
+api_router.include_router(carrier_portal_router)

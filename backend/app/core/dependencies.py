@@ -95,3 +95,13 @@ def require_admin(current_user: User = Depends(get_current_user)) -> User:
             detail="Доступ только для администраторов",
         )
     return current_user
+
+
+def require_carrier(current_user: User = Depends(get_current_user)) -> User:
+    from app.modules.identity.models import RoleCode
+    if current_user.role.code != RoleCode.CARRIER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Доступ только для перевозчиков",
+        )
+    return current_user

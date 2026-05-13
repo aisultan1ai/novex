@@ -70,24 +70,24 @@ export default function AdminOverviewPage() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20, marginBottom: 32 }}>
         <StatCard
           label="Пользователи"
-          value={stats?.total_users ?? "—"}
+          value={stats?.total_users ?? "-"}
           sub={stats ? `${stats.active_users} активных` : undefined}
           href="/dashboard/admin/users"
         />
         <StatCard
           label="Заказы"
-          value={stats?.total_orders ?? "—"}
+          value={stats?.total_orders ?? "-"}
           href="/dashboard/admin/orders"
         />
         <StatCard
           label="Оплачено"
-          value={stats?.paid_orders ?? "—"}
+          value={stats?.paid_orders ?? "-"}
           color="#16a34a"
           sub="заказов"
         />
         <StatCard
           label="Конверсия"
-          value={stats ? `${Math.round((stats.paid_orders / Math.max(stats.total_orders, 1)) * 100)}%` : "—"}
+          value={stats ? `${Math.round((stats.paid_orders / Math.max(stats.total_orders, 1)) * 100)}%` : "-"}
           sub="заказов оплачено"
         />
       </div>

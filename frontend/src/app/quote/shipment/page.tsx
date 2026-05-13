@@ -287,7 +287,7 @@ function TariffCard({
             Выбранный тариф
           </div>
           <div style={{ fontSize: 20, fontWeight: 800, color: "#0f172a", marginBottom: 4 }}>
-            {draft.carrier_name_snapshot} — {draft.tariff_name_snapshot}
+            {draft.carrier_name_snapshot} - {draft.tariff_name_snapshot}
           </div>
           <div style={{ fontSize: 14, color: "#475569" }}>
             {draft.from_city_snapshot} → {draft.to_city_snapshot}

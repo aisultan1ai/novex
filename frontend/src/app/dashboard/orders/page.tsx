@@ -305,7 +305,7 @@ export default function MyOrdersPage() {
 
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a", marginBottom: 3 }}>
-                      {order.to_city_snapshot || "—"}
+                      {order.to_city_snapshot || "-"}
                     </div>
                     <div style={{ fontSize: 12, color: "#94a3b8" }}>
                       {order.from_city_snapshot} → {order.to_city_snapshot} · {formatDate(order.created_at)}
@@ -342,7 +342,7 @@ export default function MyOrdersPage() {
                       </Link>
                     ) : (
                       <span style={{ padding: "4px 12px", borderRadius: 999, fontSize: 12, fontWeight: 600, background: isPaid ? "#dcfce7" : "#f1f5f9", color: isPaid ? "#166534" : "#94a3b8" }}>
-                        {isPaid ? "Оплачен" : "—"}
+                        {isPaid ? "Оплачен" : "-"}
                       </span>
                     )}
 

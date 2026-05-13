@@ -96,9 +96,9 @@ export default function AdminUserDetailPage() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
           {[
             ["ID", `#${user.id}`],
-            ["Телефон", user.phone || "—"],
-            ["Компания", user.company_name || "—"],
-            ["Тип оплаты", user.billing_mode || "—"],
+            ["Телефон", user.phone || "-"],
+            ["Компания", user.company_name || "-"],
+            ["Тип оплаты", user.billing_mode || "-"],
             ["Заказов", user.orders.length],
             ["Зарегистрирован", new Date(user.created_at).toLocaleDateString("ru-RU")],
           ].map(([label, value]) => (

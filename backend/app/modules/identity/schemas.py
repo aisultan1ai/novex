@@ -52,9 +52,10 @@ class ProfileResponse(BaseModel):
     phone: str | None
     is_active: bool
     role: RoleCode
-    customer_type: CustomerType
-    company_name: str | None
-    billing_mode: BillingMode
+    customer_type: CustomerType | None = None
+    company_name: str | None = None
+    billing_mode: BillingMode | None = None
+    carrier_id: int | None = None
 
 
 class ProfileUpdateRequest(BaseModel):

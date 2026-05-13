@@ -98,6 +98,13 @@ export const deleteAdminRate = (carrierId: number, serviceId: number, rateId: nu
 export const uploadTariffGrid = (carrierId: number, serviceId: number, file: File): Promise<{ inserted: number }> =>
   upload(`/admin/carriers/${carrierId}/services/${serviceId}/rates/upload`, file);
 
+// Carrier account
+export const createCarrierAccount = (
+  carrierId: number,
+  body: { email: string; full_name?: string; temp_password: string },
+): Promise<{ user_id: number; email: string; carrier_id: number }> =>
+  req(`/admin/carriers/${carrierId}/account`, { method: "POST", body: JSON.stringify(body) });
+
 // ── Commissions ────────────────────────────────────────────────────────────────
 export const listAdminCommissions = (page = 1, size = 50): Promise<PaginatedResponse<AdminCommission>> =>
   req(`/admin/commissions?page=${page}&size=${size}`);

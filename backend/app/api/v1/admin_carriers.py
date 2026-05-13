@@ -11,12 +11,15 @@ from pydantic import BaseModel
 from sqlalchemy import func, select, update as sa_update
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.config import get_settings
 from app.core.db import get_db
 from app.core.dependencies import require_admin
 from app.modules.carriers.models import Carrier, CarrierService, CarrierTariffRate, CarrierZoneCity
+from app.modules.identity.service import CreateCarrierAccountRequest, IdentityService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin/carriers", tags=["admin:carriers"])
+_identity_service = IdentityService()
 
 
 # ── Pydantic schemas ──────────────────────────────────────────────────────────
@@ -370,3 +373,27 @@ def add_zone_city(
     db.commit()
     db.refresh(city)
     return {"id": city.id, "city_name": city.city_name, "zone": city.zone}
+
+
+# ── Carrier portal account ─────────────────────────────────────────────────────
+
+@router.post("/{carrier_id}/account", status_code=201)
+def create_carrier_account(
+    carrier_id: int,
+    payload: CreateCarrierAccountRequest,
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+) -> dict:
+    carrier = db.get(Carrier, carrier_id)
+    if not carrier:
+        raise HTTPException(404, "Перевозчик не найден")
+    settings = get_settings()
+    profile = _identity_service.create_carrier_account(
+        db,
+        carrier_id=carrier_id,
+        carrier_name=carrier.name,
+        payload=payload,
+        frontend_url=settings.frontend_url,
+    )
+    logger.info("Carrier account created: carrier_id=%d email=%s", carrier_id, payload.email)
+    return {"user_id": profile.user_id, "email": profile.email, "carrier_id": carrier_id}

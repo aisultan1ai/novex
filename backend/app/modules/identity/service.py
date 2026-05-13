@@ -16,7 +16,7 @@ from app.core.security import (
     get_password_hash,
     verify_password,
 )
-from app.modules.identity.models import BillingMode, CustomerType, RoleCode, User
+from app.modules.identity.models import BillingMode, CarrierProfile, CustomerType, RoleCode, User
 from app.modules.identity.repository import IdentityRepository
 from app.modules.identity.schemas import (
     ForgotPasswordRequest,
@@ -27,6 +27,14 @@ from app.modules.identity.schemas import (
     ResetPasswordRequest,
     TokenResponse,
 )
+
+from pydantic import BaseModel, EmailStr
+
+
+class CreateCarrierAccountRequest(BaseModel):
+    email: EmailStr
+    full_name: str | None = None
+    temp_password: str
 
 _RESET_TTL = 3600  # 1 час
 
@@ -221,12 +229,90 @@ class IdentityService:
 
         return BillingMode.PREPAID
 
+    def create_carrier_account(
+        self,
+        db: Session,
+        *,
+        carrier_id: int,
+        carrier_name: str,
+        payload: "CreateCarrierAccountRequest",
+        frontend_url: str,
+    ) -> ProfileResponse:
+        if self.repository.get_user_by_email(db, payload.email):
+            raise ConflictError("Пользователь с таким email уже существует")
+
+        carrier_role = self.repository.ensure_role(db, RoleCode.CARRIER, "Carrier")
+
+        user = self.repository.create_user(
+            db,
+            email=payload.email,
+            password_hash=get_password_hash(payload.temp_password),
+            full_name=payload.full_name or carrier_name,
+            phone=None,
+            role=carrier_role,
+        )
+
+        carrier_profile = CarrierProfile(user_id=user.id, carrier_id=carrier_id)
+        db.add(carrier_profile)
+        db.flush()
+
+        db.commit()
+
+        send_email(
+            to=payload.email,
+            subject=f"Добро пожаловать в Novex — доступ открыт для {carrier_name}",
+            html=f"""
+            <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px">
+              <h2 style="color:#0f172a">Ваш аккаунт перевозчика активирован</h2>
+              <p style="color:#475569">Платформа Novex открыла для вас доступ как перевозчику <b>{carrier_name}</b>.</p>
+              <p style="color:#475569">Войдите в личный кабинет чтобы получить API-ключи и документацию интеграции:</p>
+              <a href="{frontend_url}/login"
+                 style="display:inline-block;margin:20px 0;padding:12px 28px;background:#0f172a;color:#fff;
+                        border-radius:10px;text-decoration:none;font-weight:600">
+                Войти в кабинет
+              </a>
+              <table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:14px">
+                <tr><td style="padding:8px 0;color:#64748b;width:120px">Email:</td><td style="color:#0f172a;font-weight:600">{payload.email}</td></tr>
+                <tr><td style="padding:8px 0;color:#64748b">Пароль:</td><td style="color:#0f172a;font-weight:600">{payload.temp_password}</td></tr>
+              </table>
+              <p style="color:#94a3b8;font-size:13px">Рекомендуем сменить пароль после первого входа.</p>
+            </div>
+            """,
+        )
+
+        created = self.repository.get_user_by_id(db, user.id)
+        if not created:
+            raise NotFoundError("Не удалось загрузить созданного пользователя")
+        return self._build_profile_response(created)
+
     def _build_profile_response(self, user: User) -> ProfileResponse:
+        role_code = user.role.code if user.role else RoleCode.CUSTOMER
+
+        if role_code == RoleCode.CARRIER:
+            cp = user.carrier_profile
+            return ProfileResponse(
+                user_id=user.id,
+                email=user.email,
+                full_name=user.full_name,
+                phone=user.phone,
+                is_active=user.is_active,
+                role=role_code,
+                carrier_id=cp.carrier_id if cp else None,
+            )
+
+        if role_code in (RoleCode.ADMIN, RoleCode.OPERATOR):
+            return ProfileResponse(
+                user_id=user.id,
+                email=user.email,
+                full_name=user.full_name,
+                phone=user.phone,
+                is_active=user.is_active,
+                role=role_code,
+            )
+
         profile = user.customer_profile
         if profile is None:
             raise NotFoundError("Customer profile is missing")
-
-        role_code = user.role.code if user.role else RoleCode.CUSTOMER
 
         return ProfileResponse(
             user_id=user.id,

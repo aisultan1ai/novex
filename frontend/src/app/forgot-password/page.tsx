@@ -60,7 +60,7 @@ export default function ForgotPasswordPage() {
               </div>
               <h1 style={{ margin: "0 0 10px", fontSize: 20, fontWeight: 700, color: "#0f172a" }}>Письмо отправлено</h1>
               <p style={{ margin: "0 0 24px", fontSize: 14, color: "#64748b", lineHeight: 1.6 }}>
-                Если аккаунт с адресом <b>{email}</b> существует — вы получите письмо со ссылкой для сброса пароля. Проверьте папку «Спам».
+                Если аккаунт с адресом <b>{email}</b> существует - вы получите письмо со ссылкой для сброса пароля. Проверьте папку «Спам».
               </p>
               <Link href="/login" style={{ fontSize: 14, color: "#0f172a", fontWeight: 600, textDecoration: "none" }}>
                 ← Вернуться ко входу
@@ -70,7 +70,7 @@ export default function ForgotPasswordPage() {
             <>
               <h1 style={{ margin: "0 0 6px", fontSize: 20, fontWeight: 700, color: "#0f172a" }}>Сброс пароля</h1>
               <p style={{ margin: "0 0 24px", fontSize: 14, color: "#64748b" }}>
-                Введите email — мы пришлём ссылку для создания нового пароля.
+                Введите email - мы пришлём ссылку для создания нового пароля.
               </p>
 
               <form onSubmit={handleSubmit} style={{ display: "grid", gap: 16 }}>

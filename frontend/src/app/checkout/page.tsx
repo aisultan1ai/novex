@@ -116,7 +116,7 @@ export default function CheckoutPage() {
           data = await proceedToCheckout(draftId!);
         }
 
-        // If already paid — redirect straight to orders
+        // If already paid - redirect straight to orders
         if (data.status === "paid") {
           router.replace("/dashboard/orders");
           return;
@@ -210,7 +210,7 @@ export default function CheckoutPage() {
                     {draft.shipment_type_snapshot} · {draft.eta_days_min_snapshot}–{draft.eta_days_max_snapshot} дн.
                   </div>
                   <div style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>
-                    {draft.carrier_name_snapshot} — {draft.tariff_name_snapshot}
+                    {draft.carrier_name_snapshot} - {draft.tariff_name_snapshot}
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
@@ -325,7 +325,7 @@ export default function CheckoutPage() {
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 15 }}>Kaspi Pay</div>
                   <div style={{ fontSize: 13, color: "#94a3b8", marginTop: 2 }}>
-                    Оплата через Kaspi.kz — подключается в следующем этапе
+                    Оплата через Kaspi.kz - подключается в следующем этапе
                   </div>
                 </div>
               </div>

@@ -203,7 +203,7 @@ export default function ProfilePage() {
               </div>
               <div>
                 <div style={{ fontSize: 22, fontWeight: 700, color: "#0f172a", marginBottom: 4 }}>
-                  {dp?.full_name || dp?.email || "—"}
+                  {dp?.full_name || dp?.email || "-"}
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600, background: "#ede9fe", color: "#5b21b6" }}>

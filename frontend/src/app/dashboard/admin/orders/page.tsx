@@ -140,7 +140,7 @@ export default function AdminOrdersPage() {
 
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {order.user_name || order.user_email || "—"}
+                      {order.user_name || order.user_email || "-"}
                     </div>
                     <div style={{ fontSize: 11, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {order.user_email}

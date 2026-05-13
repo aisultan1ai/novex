@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.modules.identity.models import (
     BillingMode,
+    CarrierProfile,
     CustomerProfile,
     CustomerType,
     Role,
@@ -31,7 +32,7 @@ class IdentityRepository:
     def get_user_by_email(self, db: Session, email: str) -> User | None:
         stmt = (
             select(User)
-            .options(joinedload(User.role), joinedload(User.customer_profile))
+            .options(joinedload(User.role), joinedload(User.customer_profile), joinedload(User.carrier_profile))
             .where(User.email == email)
         )
         return db.scalar(stmt)
@@ -39,7 +40,7 @@ class IdentityRepository:
     def get_user_by_id(self, db: Session, user_id: int) -> User | None:
         stmt = (
             select(User)
-            .options(joinedload(User.role), joinedload(User.customer_profile))
+            .options(joinedload(User.role), joinedload(User.customer_profile), joinedload(User.carrier_profile))
             .where(User.id == user_id)
         )
         return db.scalar(stmt)

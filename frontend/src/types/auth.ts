@@ -1,4 +1,4 @@
-export type RoleCode = "customer" | "admin" | "operator";
+export type RoleCode = "customer" | "admin" | "operator" | "carrier";
 export type CustomerType = "individual" | "company";
 export type BillingMode = "prepaid" | "postpaid";
 
@@ -24,9 +24,10 @@ export interface ProfileResponse {
   phone: string | null;
   is_active: boolean;
   role: RoleCode;
-  customer_type: CustomerType;
+  customer_type: CustomerType | null;
   company_name: string | null;
-  billing_mode: BillingMode;
+  billing_mode: BillingMode | null;
+  carrier_id: number | null;
 }
 
 export interface TokenResponse {

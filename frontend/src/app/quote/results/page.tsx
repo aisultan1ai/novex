@@ -322,7 +322,7 @@ export default function QuoteResultsPage() {
               <div style={{ ...infoStyle, marginBottom: 20 }}>
                 <div style={{ marginBottom: 8 }}>
                   <strong>Выбранный тариф:</strong>{" "}
-                  {selectedQuote.carrier_name} — {selectedQuote.tariff_name}
+                  {selectedQuote.carrier_name} - {selectedQuote.tariff_name}
                 </div>
                 <div>
                   Стоимость:{" "}
@@ -391,7 +391,7 @@ export default function QuoteResultsPage() {
                       </div>
 
                       <h2 style={{ margin: "0 0 8px", fontSize: 22 }}>
-                        {quote.carrier_name} — {quote.tariff_name}
+                        {quote.carrier_name} - {quote.tariff_name}
                       </h2>
 
                       <p style={{ margin: "0 0 6px", color: "#475569" }}>

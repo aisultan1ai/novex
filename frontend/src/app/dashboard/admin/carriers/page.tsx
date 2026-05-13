@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
-import { createAdminCarrier, listAdminCarriers, updateAdminCarrier } from "@/lib/api/admin";
+import { createAdminCarrier, createCarrierAccount, listAdminCarriers, updateAdminCarrier } from "@/lib/api/admin";
 import type { AdminCarrier } from "@/types/admin";
 
 export default function AdminCarriersPage() {
@@ -15,6 +15,10 @@ export default function AdminCarriersPage() {
   const [togglingId, setTogglingId] = useState<number | null>(null);
 
   const [form, setForm] = useState({ code: "", name: "", description: "" });
+
+  const [accountModal, setAccountModal] = useState<AdminCarrier | null>(null);
+  const [accountForm, setAccountForm] = useState({ email: "", full_name: "", temp_password: "" });
+  const [accountSaving, setAccountSaving] = useState(false);
 
   function load() {
     setIsLoading(true);
@@ -50,6 +54,26 @@ export default function AdminCarriersPage() {
       alert((e as Error).message);
     } finally {
       setTogglingId(null);
+    }
+  }
+
+  async function handleCreateAccount(e: React.FormEvent) {
+    e.preventDefault();
+    if (!accountModal) return;
+    setAccountSaving(true);
+    try {
+      await createCarrierAccount(accountModal.id, {
+        email: accountForm.email.trim(),
+        full_name: accountForm.full_name.trim() || undefined,
+        temp_password: accountForm.temp_password,
+      });
+      alert(`Аккаунт создан. Приглашение отправлено на ${accountForm.email}`);
+      setAccountModal(null);
+      setAccountForm({ email: "", full_name: "", temp_password: "" });
+    } catch (err: unknown) {
+      alert((err as Error).message);
+    } finally {
+      setAccountSaving(false);
     }
   }
 
@@ -125,6 +149,12 @@ export default function AdminCarriersPage() {
               </div>
 
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <button
+                  onClick={() => { setAccountModal(carrier); setAccountForm({ email: "", full_name: "", temp_password: "" }); }}
+                  style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid #c7d2fe", background: "#eef2ff", color: "#4338ca", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                >
+                  Аккаунт
+                </button>
                 <Link
                   href={`/dashboard/admin/carriers/${carrier.id}`}
                   style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#ffffff", color: "#0f172a", fontSize: 13, fontWeight: 600, textDecoration: "none" }}
@@ -141,6 +171,39 @@ export default function AdminCarriersPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+      {/* Create carrier account modal */}
+      {accountModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}>
+          <div style={{ background: "#ffffff", borderRadius: 16, padding: "28px 32px", width: "100%", maxWidth: 460, boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }}>
+            <h3 style={{ margin: "0 0 6px", fontSize: 17, fontWeight: 700, color: "#0f172a" }}>Создать аккаунт перевозчика</h3>
+            <p style={{ margin: "0 0 20px", fontSize: 13, color: "#64748b" }}>
+              Аккаунт для <b>{accountModal.name}</b>. После создания на email придёт приглашение с данными для входа.
+            </p>
+            <form onSubmit={handleCreateAccount} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#334155", marginBottom: 6 }}>Email перевозчика</label>
+                <input style={inp} type="email" required value={accountForm.email} onChange={(e) => setAccountForm((f) => ({ ...f, email: e.target.value }))} placeholder="carrier@example.com" />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#334155", marginBottom: 6 }}>Имя (необязательно)</label>
+                <input style={inp} value={accountForm.full_name} onChange={(e) => setAccountForm((f) => ({ ...f, full_name: e.target.value }))} placeholder="Иван Иванов" />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#334155", marginBottom: 6 }}>Временный пароль</label>
+                <input style={inp} required minLength={8} value={accountForm.temp_password} onChange={(e) => setAccountForm((f) => ({ ...f, temp_password: e.target.value }))} placeholder="Минимум 8 символов" />
+              </div>
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
+                <button type="button" onClick={() => setAccountModal(null)} style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#ffffff", color: "#64748b", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                  Отмена
+                </button>
+                <button type="submit" disabled={accountSaving} style={{ padding: "10px 24px", borderRadius: 10, border: "none", background: "#0f172a", color: "#ffffff", fontSize: 14, fontWeight: 600, cursor: accountSaving ? "not-allowed" : "pointer", opacity: accountSaving ? 0.7 : 1, fontFamily: "inherit" }}>
+                  {accountSaving ? "Создаём..." : "Создать и отправить"}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </>

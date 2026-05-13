@@ -54,7 +54,7 @@ function formatPrice(price: number, currency: string): string {
 }
 
 function calcChargeable(weightKg: number, widthCm: number, heightCm: number, depthCm: number, qty: number): number {
-  const vol = (widthCm * heightCm * depthCm) / 5000;
+  const vol = (widthCm * heightCm * depthCm) / 6000;
   return Math.max(weightKg, vol) * qty;
 }
 

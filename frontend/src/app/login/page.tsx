@@ -53,7 +53,11 @@ export default function LoginPage() {
     try {
       const res = await loginUser({ email: email.trim().toLowerCase(), password });
       login(res.access_token, res.profile);
-      router.push(nextPath);
+      const destination =
+        res.profile.role === "carrier" ? "/dashboard/carrier" :
+        res.profile.role === "admin" ? "/dashboard/admin" :
+        nextPath;
+      router.push(destination);
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -117,7 +121,7 @@ export default function LoginPage() {
 
           {isRegistered && (
             <div style={{ marginBottom: 20, padding: "12px 14px", borderRadius: 10, background: "#f0fdf4", border: "1px solid #bbf7d0", color: "#166534", fontSize: 14, fontWeight: 500 }}>
-              Аккаунт создан — теперь войдите.
+              Аккаунт создан - теперь войдите.
             </div>
           )}
 

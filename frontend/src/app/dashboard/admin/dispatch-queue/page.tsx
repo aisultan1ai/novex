@@ -129,7 +129,7 @@ export default function DispatchQueuePage() {
                   </span>
                 </td>
                 <td style={{ ...td, maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#64748b" }}>
-                  {item.dispatch_error ?? "—"}
+                  {item.dispatch_error ?? "-"}
                 </td>
                 <td style={{ ...td, color: "#64748b" }}>{new Date(item.created_at).toLocaleString("ru-RU")}</td>
                 <td style={td}>

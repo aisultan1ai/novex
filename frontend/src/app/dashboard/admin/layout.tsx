@@ -15,6 +15,7 @@ const ADMIN_TABS = [
   { label: "Комиссии",          href: "/dashboard/admin/commissions" },
   { label: "Конфиги перевозчиков", href: "/dashboard/admin/carrier-webhooks" },
   { label: "Очередь заказов",   href: "/dashboard/admin/dispatch-queue" },
+  { label: "API",               href: "/dashboard/admin/api" },
 ];
 
 export default function AdminSubLayout({ children }: { children: ReactNode }) {

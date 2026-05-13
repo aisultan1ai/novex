@@ -12,7 +12,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Novex — Доставка по Казахстану",
+  title: "Novex - Доставка по Казахстану",
   description:
     "Сравните тарифы курьерских служб и оформите доставку онлайн",
 };

@@ -17,6 +17,7 @@ class RoleCode(str, Enum):
     CUSTOMER = "customer"
     ADMIN = "admin"
     OPERATOR = "operator"
+    CARRIER = "carrier"
 
 
 class CustomerType(str, Enum):
@@ -75,6 +76,11 @@ class User(Base, TimestampMixin):
         uselist=False,
         cascade="all, delete-orphan",
     )
+    carrier_profile: Mapped["CarrierProfile | None"] = relationship(
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
 
 
 class CustomerProfile(Base, TimestampMixin):
@@ -108,3 +114,22 @@ class CustomerProfile(Base, TimestampMixin):
     )
 
     user: Mapped["User"] = relationship(back_populates="customer_profile")
+
+
+class CarrierProfile(Base, TimestampMixin):
+    __tablename__ = "carrier_profiles"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"),
+        unique=True,
+        nullable=False,
+        index=True,
+    )
+    carrier_id: Mapped[int] = mapped_column(
+        ForeignKey("carriers.id"),
+        nullable=False,
+        index=True,
+    )
+
+    user: Mapped["User"] = relationship(back_populates="carrier_profile")
