@@ -63,6 +63,17 @@ class CarrierTariffRate(Base):
     service = relationship("CarrierService", back_populates="tariff_rates")
 
 
+class CarrierCommissionConfig(Base):
+    __tablename__ = "carrier_commission_configs"
+
+    id = Column(Integer, primary_key=True)
+    carrier_code = Column(String(50), unique=True, nullable=False, index=True)
+    commission_type = Column(String(20), nullable=False, default="percentage")
+    commission_rate = Column(Numeric(5, 4), nullable=True)
+    fixed_amount = Column(Numeric(12, 2), nullable=True)
+    currency = Column(String(3), nullable=False, default="KZT")
+
+
 class CarrierZoneCity(Base):
     __tablename__ = "carrier_zone_cities"
     __table_args__ = (UniqueConstraint("carrier_id", "city_name_normalized", name="uq_carrier_city"),)

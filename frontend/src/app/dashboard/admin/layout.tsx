@@ -12,6 +12,7 @@ const ADMIN_TABS = [
   { label: "Заказы",        href: "/dashboard/admin/orders" },
   { label: "Пользователи",  href: "/dashboard/admin/users" },
   { label: "Перевозчики",       href: "/dashboard/admin/carriers" },
+  { label: "Отзывы",            href: "/dashboard/admin/reviews" },
   { label: "Комиссии",          href: "/dashboard/admin/commissions" },
   { label: "Конфиги перевозчиков", href: "/dashboard/admin/carrier-webhooks" },
   { label: "Очередь заказов",   href: "/dashboard/admin/dispatch-queue" },

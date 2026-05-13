@@ -15,6 +15,16 @@ from app.modules.tracking.schemas import (
 
 logger = logging.getLogger(__name__)
 
+_TRACKING_TO_ORDER_STATUS: dict[str, str] = {
+    "sent_to_carrier": "sent_to_carrier",
+    "picked_up": "picked_up",
+    "in_transit": "in_transit",
+    "arrived": "arrived",
+    "delivered": "delivered",
+    "returned": "return",
+    "cancelled": "cancelled",
+}
+
 
 class TrackingService:
     def __init__(
@@ -63,6 +73,15 @@ class TrackingService:
             location=payload.location,
             carrier_status=payload.carrier_status,
         )
+        new_order_status = _TRACKING_TO_ORDER_STATUS.get(payload.status)
+        if new_order_status is not None:
+            order.status = new_order_status
+            logger.info(
+                "Order status synced via tracking: order_id=%s -> %s",
+                order_draft_id,
+                new_order_status,
+            )
+
         db.commit()
         logger.info(
             "Tracking event added: order_id=%s status=%s",

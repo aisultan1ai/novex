@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -53,6 +53,10 @@ class OrderDraft(Base, TimestampMixin):
 
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="draft")
     dispatch_error: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    call_before_delivery: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    insurance: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    fragile: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     carrier_code_snapshot: Mapped[str] = mapped_column(String(50), nullable=False)
     carrier_name_snapshot: Mapped[str] = mapped_column(String(100), nullable=False)

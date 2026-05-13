@@ -31,6 +31,7 @@ type PartyFormState = {
   address_line2: string;
   postal_code: string;
   comment: string;
+  save_to_address_book: boolean;
 };
 
 type PackageFormState = {
@@ -46,6 +47,9 @@ type ShipmentFormState = {
   sender: PartyFormState;
   recipient: PartyFormState;
   packageItem: PackageFormState;
+  call_before_delivery: boolean;
+  insurance: boolean;
+  fragile: boolean;
 };
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -147,6 +151,7 @@ const emptyParty = (): PartyFormState => ({
   address_line2: "",
   postal_code: "",
   comment: "",
+  save_to_address_book: false,
 });
 
 const emptyPackage = (): PackageFormState => ({
@@ -177,6 +182,7 @@ function mapPartyFormToPayload(party: PartyFormState): ShipmentPartyInput {
     address_line2: party.address_line2.trim() || null,
     postal_code: party.postal_code.trim() || null,
     comment: party.comment.trim() || null,
+    save_to_address_book: party.save_to_address_book,
   };
 }
 
@@ -198,6 +204,9 @@ function buildShipmentPayload(form: ShipmentFormState): UpdateShipmentDetailsReq
     sender: mapPartyFormToPayload(form.sender),
     recipient: mapPartyFormToPayload(form.recipient),
     packages: [mapPackageFormToPayload(form.packageItem)],
+    call_before_delivery: form.call_before_delivery,
+    insurance: form.insurance,
+    fragile: form.fragile,
   };
 }
 
@@ -230,6 +239,7 @@ function mapDraftToForm(
         address_line2: draft.sender.address_line2 || "",
         postal_code: draft.sender.postal_code || "",
         comment: draft.sender.comment || "",
+        save_to_address_book: false,
       }
     : { ...emptyParty(), country: draft.from_country_snapshot || "KZ", city: draft.from_city_snapshot || "" };
 
@@ -247,6 +257,7 @@ function mapDraftToForm(
           address_line2: draft.recipient.address_line2 || "",
           postal_code: draft.recipient.postal_code || "",
           comment: draft.recipient.comment || "",
+          save_to_address_book: false,
         }
       : { ...emptyParty(), country: draft.to_country_snapshot || "KZ", city: draft.to_city_snapshot || "" },
     packageItem: draft.packages[0]
@@ -259,6 +270,9 @@ function mapDraftToForm(
           depth_cm: String(draft.packages[0].depth_cm),
         }
       : emptyPackage(),
+    call_before_delivery: draft.call_before_delivery ?? false,
+    insurance:            draft.insurance ?? false,
+    fragile:              draft.fragile ?? false,
   };
 }
 
@@ -318,12 +332,14 @@ function PartySection({
   title,
   values,
   onChange,
+  onToggleSave,
 }: {
   title: string;
   values: PartyFormState;
   onChange: (key: keyof PartyFormState, value: string) => void;
+  onToggleSave: (val: boolean) => void;
 }) {
-  const fields: { key: keyof PartyFormState; label: string; required?: boolean }[] = [
+  const textFields: { key: keyof PartyFormState; label: string; required?: boolean }[] = [
     { key: "full_name", label: "ФИО", required: true },
     { key: "phone", label: "Телефон", required: true },
     { key: "email", label: "Email" },
@@ -339,28 +355,42 @@ function PartySection({
   return (
     <div style={cardStyle}>
       <h2 style={{ marginTop: 0, marginBottom: 20, fontSize: 20, fontWeight: 700 }}>{title}</h2>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-          gap: 16,
-        }}
-      >
-        {fields.map(({ key, label, required }) => (
-          <div key={key}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 16 }}>
+        {textFields.map(({ key, label, required }) => (
+          <div key={key as string}>
             <label style={labelStyle}>
               {label}
               {required && <span style={{ color: "#ef4444", marginLeft: 2 }}>*</span>}
             </label>
             <input
               style={inputStyle}
-              value={values[key]}
+              value={values[key] as string}
               onChange={(e) => onChange(key, e.target.value)}
               required={required}
             />
           </div>
         ))}
       </div>
+      <label
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          marginTop: 16,
+          cursor: "pointer",
+          fontSize: 14,
+          color: "#334155",
+          fontWeight: 500,
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={values.save_to_address_book}
+          onChange={(e) => onToggleSave(e.target.checked)}
+          style={{ width: 16, height: 16, cursor: "pointer" }}
+        />
+        Сохранить в адресную книгу
+      </label>
     </div>
   );
 }
@@ -440,6 +470,9 @@ export default function ShipmentPage() {
     sender: emptyParty(),
     recipient: emptyParty(),
     packageItem: emptyPackage(),
+    call_before_delivery: false,
+    insurance: false,
+    fragile: false,
   });
 
   const [draft, setDraft] = useState<OrderDraftResponse | null>(null);
@@ -515,6 +548,14 @@ export default function ShipmentPage() {
 
   function updatePartyField(role: "sender" | "recipient", key: keyof PartyFormState, value: string) {
     setForm((prev) => ({ ...prev, [role]: { ...prev[role], [key]: value } }));
+  }
+
+  function toggleSaveAddress(role: "sender" | "recipient", val: boolean) {
+    setForm((prev) => ({ ...prev, [role]: { ...prev[role], save_to_address_book: val } }));
+  }
+
+  function toggleService(key: "call_before_delivery" | "insurance" | "fragile", val: boolean) {
+    setForm((prev) => ({ ...prev, [key]: val }));
   }
 
   function updatePackageField(key: keyof PackageFormState, value: string) {
@@ -622,18 +663,49 @@ export default function ShipmentPage() {
                 title="Отправитель"
                 values={form.sender}
                 onChange={(key, val) => updatePartyField("sender", key, val)}
+                onToggleSave={(val) => toggleSaveAddress("sender", val)}
               />
 
               <PartySection
                 title="Получатель"
                 values={form.recipient}
                 onChange={(key, val) => updatePartyField("recipient", key, val)}
+                onToggleSave={(val) => toggleSaveAddress("recipient", val)}
               />
 
               <PackageSection
                 values={form.packageItem}
                 onChange={updatePackageField}
               />
+
+              {/* Additional services */}
+              <div style={cardStyle}>
+                <h2 style={{ marginTop: 0, marginBottom: 16, fontSize: 20, fontWeight: 700 }}>
+                  Дополнительные услуги
+                </h2>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {(
+                    [
+                      { key: "call_before_delivery", label: "Звонок перед доставкой" },
+                      { key: "insurance", label: "Страхование груза" },
+                      { key: "fragile", label: "Хрупкий груз" },
+                    ] as { key: "call_before_delivery" | "insurance" | "fragile"; label: string }[]
+                  ).map(({ key, label }) => (
+                    <label
+                      key={key}
+                      style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 14, color: "#334155", fontWeight: 500 }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={form[key]}
+                        onChange={(e) => toggleService(key, e.target.checked)}
+                        style={{ width: 16, height: 16, cursor: "pointer" }}
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </div>
 
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                 <button

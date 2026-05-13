@@ -17,14 +17,20 @@ from app.modules.orders.schemas import (
     ShipmentPartyResponse,
     UpdateShipmentDetailsRequest,
 )
+from app.modules.address_book.repository import AddressBookRepository
 from app.modules.quotes.models import QuoteSession
 
 logger = logging.getLogger(__name__)
 
 
 class OrdersService:
-    def __init__(self, repository: OrdersRepository | None = None) -> None:
+    def __init__(
+        self,
+        repository: OrdersRepository | None = None,
+        address_book_repo: AddressBookRepository | None = None,
+    ) -> None:
         self.repository = repository or OrdersRepository()
+        self.address_book_repo = address_book_repo or AddressBookRepository()
 
     def create_draft_from_quote(
         self,
@@ -330,6 +336,15 @@ class OrdersService:
                 declared_value_currency=item.declared_value_currency,
             )
 
+        order_draft.call_before_delivery = payload.call_before_delivery
+        order_draft.insurance = payload.insurance
+        order_draft.fragile = payload.fragile
+
+        if payload.sender.save_to_address_book:
+            self._save_address_book(db, user_id=user_id, party=payload.sender)
+        if payload.recipient.save_to_address_book:
+            self._save_address_book(db, user_id=user_id, party=payload.recipient)
+
         self.repository.update_order_draft_status(
             db,
             order_draft=order_draft,
@@ -383,6 +398,30 @@ class OrdersService:
             return "Parcel"
         return quote_session.shipment_type.strip() or "Shipment"
 
+    def _save_address_book(
+        self,
+        db: Session,
+        *,
+        user_id: int,
+        party: ShipmentPartyInput,
+    ) -> None:
+        self.address_book_repo.create(
+            db,
+            user_id=user_id,
+            label=None,
+            full_name=party.full_name,
+            phone=party.phone,
+            email=party.email,
+            company_name=party.company_name,
+            country=party.country,
+            city=party.city,
+            address_line1=party.address_line1,
+            address_line2=party.address_line2,
+            postal_code=party.postal_code,
+            is_default=False,
+        )
+        logger.debug("Address auto-saved for user_id=%s", user_id)
+
     def _create_party(
         self,
         db: Session,
@@ -429,6 +468,9 @@ class OrdersService:
             to_country_snapshot=order_draft.to_country_snapshot,
             to_city_snapshot=order_draft.to_city_snapshot,
             shipment_type_snapshot=order_draft.shipment_type_snapshot,
+            call_before_delivery=order_draft.call_before_delivery,
+            insurance=order_draft.insurance,
+            fragile=order_draft.fragile,
             created_at=order_draft.created_at,
             sender=self._map_party(sender) if sender else None,
             recipient=self._map_party(recipient) if recipient else None,

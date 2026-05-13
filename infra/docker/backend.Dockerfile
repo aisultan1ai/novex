@@ -9,6 +9,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     build-essential \
+    fonts-dejavu \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --upgrade pip && pip install \
@@ -25,6 +26,7 @@ RUN pip install --upgrade pip && pip install \
     "PyJWT>=2.8" \
     "email-validator>=2.0" \
     "python-multipart>=0.0.9" \
-    "slowapi>=0.1.9"
+    "slowapi>=0.1.9" \
+    "fpdf2>=2.7,<3.0"
 
 EXPOSE 8000

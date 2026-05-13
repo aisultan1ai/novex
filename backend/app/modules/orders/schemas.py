@@ -12,7 +12,15 @@ OrderDraftStatus = Literal[
     "ready_for_checkout",
     "awaiting_payment",
     "paid",
+    "sent_to_carrier",
+    "picked_up",
+    "in_transit",
+    "arrived",
+    "delivered",
     "cancelled",
+    "return",
+    "dispatch_failed",
+    "pending_manual",
 ]
 ShipmentPartyRole = Literal["sender", "recipient"]
 
@@ -33,6 +41,7 @@ class ShipmentPartyInput(BaseModel):
     address_line2: str | None = Field(default=None, max_length=255)
     postal_code: str | None = Field(default=None, max_length=50)
     comment: str | None = Field(default=None, max_length=500)
+    save_to_address_book: bool = False
 
     @field_validator("country")
     @classmethod
@@ -49,6 +58,7 @@ class ShipmentPartyInput(BaseModel):
         "address_line2",
         "postal_code",
         "comment",
+        check_fields=False,
     )
     @classmethod
     def strip_text_fields(cls, value: str | None) -> str | None:
@@ -87,6 +97,9 @@ class UpdateShipmentDetailsRequest(BaseModel):
     sender: ShipmentPartyInput
     recipient: ShipmentPartyInput
     packages: list[ShipmentPackageInput] = Field(min_length=1)
+    call_before_delivery: bool = False
+    insurance: bool = False
+    fragile: bool = False
 
 
 class ShipmentPartyResponse(BaseModel):
@@ -141,6 +154,10 @@ class OrderDraftResponse(BaseModel):
     to_city_snapshot: str
     shipment_type_snapshot: str
     created_at: datetime
+
+    call_before_delivery: bool = False
+    insurance: bool = False
+    fragile: bool = False
 
     sender: ShipmentPartyResponse | None = None
     recipient: ShipmentPartyResponse | None = None

@@ -4,7 +4,15 @@ export type OrderDraftStatus =
   | "ready_for_checkout"
   | "awaiting_payment"
   | "paid"
-  | "cancelled";
+  | "sent_to_carrier"
+  | "picked_up"
+  | "in_transit"
+  | "arrived"
+  | "delivered"
+  | "cancelled"
+  | "return"
+  | "dispatch_failed"
+  | "pending_manual";
 
 export type ShipmentPartyRole = "sender" | "recipient";
 
@@ -23,6 +31,7 @@ export interface ShipmentPartyInput {
   address_line2?: string | null;
   postal_code?: string | null;
   comment?: string | null;
+  save_to_address_book?: boolean;
 }
 
 export interface ShipmentPackageInput {
@@ -40,6 +49,9 @@ export interface UpdateShipmentDetailsRequest {
   sender: ShipmentPartyInput;
   recipient: ShipmentPartyInput;
   packages: ShipmentPackageInput[];
+  call_before_delivery?: boolean;
+  insurance?: boolean;
+  fragile?: boolean;
 }
 
 export type ShipmentPartyResponse = {
@@ -88,6 +100,10 @@ export type OrderDraftResponse = {
   to_city_snapshot: string;
   shipment_type_snapshot: string;
   created_at: string;
+
+  call_before_delivery: boolean;
+  insurance: boolean;
+  fragile: boolean;
 
   sender: ShipmentPartyResponse | null;
   recipient: ShipmentPartyResponse | null;

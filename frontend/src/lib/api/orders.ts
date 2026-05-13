@@ -117,4 +117,16 @@ export async function listOrders(
   );
 }
 
+export async function downloadOrderLabel(draftId: number): Promise<Blob> {
+  const response = await fetch(`${API_BASE_URL}/orders/${draftId}/label`, {
+    method: "GET",
+    headers: { ...getAuthHeaders() },
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new ApiError(response.status, `Не удалось скачать накладную (${response.status})`);
+  }
+  return response.blob();
+}
+
 export { ApiError };

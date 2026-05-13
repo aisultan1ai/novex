@@ -77,12 +77,16 @@ export default function ProfilePage() {
   const [phone, setPhone] = useState(currentUser?.phone ?? "");
   const [companyName, setCompanyName] = useState(currentUser?.company_name ?? "");
 
+  // Password modal
+  const [showPwModal, setShowPwModal] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
   const [pwSaving, setPwSaving] = useState(false);
   const [pwError, setPwError] = useState<string | null>(null);
-  const [pwSuccess, setPwSuccess] = useState<string | null>(null);
+  const [pwSuccess, setPwSuccess] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) router.push("/login");
@@ -134,26 +138,27 @@ export default function ProfilePage() {
     }
   }
 
+  function openPwModal() {
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setPwError(null);
+    setPwSuccess(false);
+    setShowCurrent(false);
+    setShowNew(false);
+    setShowPwModal(true);
+  }
+
   async function handleChangePassword(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setPwError(null);
-    setPwSuccess(null);
-    if (newPassword !== confirmPassword) {
-      setPwError("Новые пароли не совпадают");
-      return;
-    }
-    if (newPassword.length < 8) {
-      setPwError("Минимум 8 символов");
-      return;
-    }
+    if (newPassword !== confirmPassword) { setPwError("Новые пароли не совпадают"); return; }
+    if (newPassword.length < 8) { setPwError("Минимум 8 символов"); return; }
     setPwSaving(true);
     try {
       await changePassword({ current_password: currentPassword, new_password: newPassword });
-      setPwSuccess("Пароль успешно изменён");
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      setTimeout(() => setPwSuccess(null), 3000);
+      setPwSuccess(true);
+      setTimeout(() => setShowPwModal(false), 1500);
     } catch (err) {
       setPwError(err instanceof ApiError ? err.detail : "Не удалось изменить пароль.");
     } finally {
@@ -180,25 +185,13 @@ export default function ProfilePage() {
           Загружаем профиль…
         </div>
       ) : (
-        <div style={{ maxWidth: 640 }}>
-          <div style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, padding: 32 }}>
+        <div style={{ display: "flex", gap: 20, alignItems: "flex-start", maxWidth: 900 }}>
+
+          {/* ── Main profile card ──────────────────────────────── */}
+          <div style={{ flex: 1, minWidth: 0, background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, padding: 32 }}>
             {/* Avatar + name */}
             <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 32 }}>
-              <div
-                style={{
-                  width: 72,
-                  height: 72,
-                  borderRadius: "50%",
-                  background: "#0f172a",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 28,
-                  fontWeight: 800,
-                  color: "#ffffff",
-                  flexShrink: 0,
-                }}
-              >
+              <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#0f172a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 800, color: "#ffffff", flexShrink: 0 }}>
                 {initials}
               </div>
               <div>
@@ -236,37 +229,30 @@ export default function ProfilePage() {
                   <label style={lbl}>Эл. почта</label>
                   <input style={inpDisabled} value={dp?.email ?? ""} disabled readOnly />
                 </div>
-
                 <div>
                   <label style={lbl}>Контактный телефон</label>
                   <input
-                    style={inp}
-                    value={phone}
+                    style={inp} value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+7 700 000 0000"
-                    inputMode="tel"
+                    placeholder="+7 700 000 0000" inputMode="tel"
                     onFocus={(e) => { e.currentTarget.style.borderColor = "#0f172a"; e.currentTarget.style.background = "#ffffff"; }}
                     onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
                   />
                 </div>
-
                 <div>
                   <label style={lbl}>Имя / ФИО</label>
                   <input
-                    style={inp}
-                    value={fullName}
+                    style={inp} value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="Иван Иванов"
                     onFocus={(e) => { e.currentTarget.style.borderColor = "#0f172a"; e.currentTarget.style.background = "#ffffff"; }}
                     onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
                   />
                 </div>
-
                 <div>
                   <label style={lbl}>Название компании</label>
                   <input
-                    style={inp}
-                    value={companyName}
+                    style={inp} value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
                     placeholder="ТОО «Компания»"
                     onFocus={(e) => { e.currentTarget.style.borderColor = "#0f172a"; e.currentTarget.style.background = "#ffffff"; }}
@@ -275,15 +261,12 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  style={{ background: "#0f172a", color: "#ffffff", border: "none", borderRadius: 10, padding: "12px 32px", fontWeight: 600, fontSize: 15, cursor: isSaving ? "not-allowed" : "pointer", opacity: isSaving ? 0.7 : 1, fontFamily: "inherit" }}
-                >
-                  {isSaving ? "Сохраняем…" : "Сохранить"}
-                </button>
-              </div>
+              <button
+                type="submit" disabled={isSaving}
+                style={{ background: "#0f172a", color: "#ffffff", border: "none", borderRadius: 10, padding: "12px 32px", fontWeight: 600, fontSize: 15, cursor: isSaving ? "not-allowed" : "pointer", opacity: isSaving ? 0.7 : 1, fontFamily: "inherit" }}
+              >
+                {isSaving ? "Сохраняем…" : "Сохранить"}
+              </button>
             </form>
 
             {successMsg && (
@@ -291,7 +274,6 @@ export default function ProfilePage() {
                 ✓ {successMsg}
               </div>
             )}
-
             {error && (
               <div style={{ marginTop: 16, padding: "12px 16px", borderRadius: 10, background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c", fontSize: 14 }}>
                 {error}
@@ -299,73 +281,134 @@ export default function ProfilePage() {
             )}
           </div>
 
-          {/* Change password */}
-          <div style={{ marginTop: 24, background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, padding: 32 }}>
-            <h2 style={{ margin: "0 0 20px", fontSize: 16, fontWeight: 700, color: "#0f172a" }}>
-              Сменить пароль
-            </h2>
-            <form onSubmit={handleChangePassword}>
-              <div style={{ display: "grid", gap: 16, maxWidth: 400 }}>
-                <div>
+          {/* ── Password card ──────────────────────────────────── */}
+          <div style={{ width: 240, flexShrink: 0, background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, padding: 24, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 16 }}>
+            <div style={{ width: 52, height: 52, borderRadius: 14, background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            </div>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 6 }}>Сменить пароль</div>
+              <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.5 }}>
+                Рекомендуем использовать надёжный пароль
+              </div>
+            </div>
+            <button
+              onClick={openPwModal}
+              style={{ width: "100%", padding: "11px 0", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", color: "#0f172a", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "background 0.15s" }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "#f8fafc"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "#fff"; }}
+            >
+              Изменить пароль
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Password modal ──────────────────────────────────────── */}
+      {showPwModal && (
+        <div
+          onClick={(e) => { if (e.target === e.currentTarget) setShowPwModal(false); }}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center" }}
+        >
+          <div style={{ background: "#fff", borderRadius: 20, padding: "36px 40px", width: 420, boxShadow: "0 24px 64px rgba(0,0,0,0.16)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 26 }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#0f172a" }}>Сменить пароль</h2>
+                <p style={{ margin: "4px 0 0", fontSize: 13, color: "#94a3b8" }}>Минимум 8 символов</p>
+              </div>
+              <button
+                onClick={() => setShowPwModal(false)}
+                style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", fontSize: 18, fontFamily: "inherit" }}
+              >×</button>
+            </div>
+
+            {pwSuccess ? (
+              <div style={{ padding: "24px 0", textAlign: "center" }}>
+                <div style={{ width: 52, height: 52, borderRadius: "50%", background: "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>Пароль изменён</div>
+              </div>
+            ) : (
+              <form onSubmit={(e) => void handleChangePassword(e)}>
+                {/* Current password */}
+                <div style={{ marginBottom: 16 }}>
                   <label style={lbl}>Текущий пароль</label>
-                  <input
-                    type="password"
-                    style={inp}
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                    onFocus={(e) => { e.currentTarget.style.borderColor = "#0f172a"; e.currentTarget.style.background = "#ffffff"; }}
-                    onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
-                  />
+                  <div style={{ display: "flex", alignItems: "center", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", background: "#f8fafc" }}>
+                    <input
+                      type={showCurrent ? "text" : "password"}
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      placeholder="••••••••" required
+                      style={{ flex: 1, border: "none", background: "transparent", padding: "11px 14px", fontSize: 14, outline: "none", fontFamily: "inherit", color: "#0f172a" }}
+                    />
+                    <button type="button" onClick={() => setShowCurrent(v => !v)}
+                      style={{ padding: "0 14px", background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 12, fontFamily: "inherit" }}>
+                      {showCurrent ? "Скрыть" : "Показать"}
+                    </button>
+                  </div>
                 </div>
-                <div>
+
+                {/* New password */}
+                <div style={{ marginBottom: 16 }}>
                   <label style={lbl}>Новый пароль</label>
-                  <input
-                    type="password"
-                    style={inp}
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Минимум 8 символов"
-                    required
-                    onFocus={(e) => { e.currentTarget.style.borderColor = "#0f172a"; e.currentTarget.style.background = "#ffffff"; }}
-                    onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
-                  />
+                  <div style={{ display: "flex", alignItems: "center", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", background: "#f8fafc" }}>
+                    <input
+                      type={showNew ? "text" : "password"}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Минимум 8 символов" required
+                      style={{ flex: 1, border: "none", background: "transparent", padding: "11px 14px", fontSize: 14, outline: "none", fontFamily: "inherit", color: "#0f172a" }}
+                    />
+                    <button type="button" onClick={() => setShowNew(v => !v)}
+                      style={{ padding: "0 14px", background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 12, fontFamily: "inherit" }}>
+                      {showNew ? "Скрыть" : "Показать"}
+                    </button>
+                  </div>
                 </div>
-                <div>
+
+                {/* Confirm */}
+                <div style={{ marginBottom: 22 }}>
                   <label style={lbl}>Повторите новый пароль</label>
                   <input
                     type="password"
-                    style={inp}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                    onFocus={(e) => { e.currentTarget.style.borderColor = "#0f172a"; e.currentTarget.style.background = "#ffffff"; }}
-                    onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
+                    placeholder="••••••••" required
+                    style={{ ...inp, background: confirmPassword && confirmPassword !== newPassword ? "#fef2f2" : "#f8fafc", borderColor: confirmPassword && confirmPassword !== newPassword ? "#fecaca" : "#e5e7eb" }}
                   />
+                  {confirmPassword && confirmPassword !== newPassword && (
+                    <div style={{ fontSize: 12, color: "#dc2626", marginTop: 4 }}>Пароли не совпадают</div>
+                  )}
                 </div>
-              </div>
 
-              <button
-                type="submit"
-                disabled={pwSaving}
-                style={{ marginTop: 20, background: "#0f172a", color: "#ffffff", border: "none", borderRadius: 10, padding: "12px 32px", fontWeight: 600, fontSize: 15, cursor: pwSaving ? "not-allowed" : "pointer", opacity: pwSaving ? 0.7 : 1, fontFamily: "inherit" }}
-              >
-                {pwSaving ? "Сохраняем…" : "Изменить пароль"}
-              </button>
+                {pwError && (
+                  <div style={{ marginBottom: 14, padding: "10px 14px", borderRadius: 8, background: "#fef2f2", color: "#b91c1c", fontSize: 13 }}>
+                    {pwError}
+                  </div>
+                )}
 
-              {pwSuccess && (
-                <div style={{ marginTop: 16, padding: "12px 16px", borderRadius: 10, background: "#f0fdf4", border: "1px solid #bbf7d0", color: "#166534", fontSize: 14, fontWeight: 600 }}>
-                  ✓ {pwSuccess}
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button
+                    type="submit" disabled={pwSaving}
+                    style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", background: "#0f172a", color: "#fff", fontSize: 14, fontWeight: 600, cursor: pwSaving ? "not-allowed" : "pointer", opacity: pwSaving ? 0.6 : 1, fontFamily: "inherit" }}
+                  >
+                    {pwSaving ? "Сохраняем…" : "Изменить пароль"}
+                  </button>
+                  <button
+                    type="button" onClick={() => setShowPwModal(false)}
+                    style={{ padding: "12px 20px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", color: "#475569", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+                  >
+                    Отмена
+                  </button>
                 </div>
-              )}
-              {pwError && (
-                <div style={{ marginTop: 16, padding: "12px 16px", borderRadius: 10, background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c", fontSize: 14 }}>
-                  {pwError}
-                </div>
-              )}
-            </form>
+              </form>
+            )}
           </div>
         </div>
       )}

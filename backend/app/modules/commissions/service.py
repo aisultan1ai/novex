@@ -4,8 +4,10 @@ import logging
 import math
 from decimal import Decimal
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.modules.carriers.models import CarrierCommissionConfig
 from app.modules.commissions.repository import CommissionsRepository
 from app.modules.commissions.schemas import CommissionResponse, CommissionSummary
 
@@ -28,23 +30,57 @@ class CommissionsService:
         currency: str = "KZT",
         rate: Decimal = DEFAULT_COMMISSION_RATE,
     ) -> CommissionResponse:
-        commission_amount = (gross_amount * rate).quantize(Decimal("0.01"))
+        config = db.scalar(
+            select(CarrierCommissionConfig).where(
+                CarrierCommissionConfig.carrier_code == carrier_code
+            )
+        )
+
+        if config is not None:
+            commission_amount = self._calculate(
+                gross_amount=gross_amount,
+                commission_type=config.commission_type,
+                commission_rate=Decimal(str(config.commission_rate)) if config.commission_rate else Decimal("0"),
+                fixed_amount=Decimal(str(config.fixed_amount)) if config.fixed_amount else Decimal("0"),
+            )
+            effective_rate = (
+                Decimal(str(config.commission_rate)) if config.commission_rate else Decimal("0")
+            )
+        else:
+            commission_amount = (gross_amount * rate).quantize(Decimal("0.01"))
+            effective_rate = rate
+
         c = self.repo.create(
             db,
             order_draft_id=order_draft_id,
             carrier_code=carrier_code,
             gross_amount=gross_amount,
-            commission_rate=rate,
+            commission_rate=effective_rate,
             commission_amount=commission_amount,
             currency=currency,
         )
         logger.info(
-            "Commission recorded: order_id=%s amount=%s rate=%s",
+            "Commission recorded: order_id=%s amount=%s carrier=%s",
             order_draft_id,
             commission_amount,
-            rate,
+            carrier_code,
         )
         return CommissionResponse.model_validate(c)
+
+    def _calculate(
+        self,
+        *,
+        gross_amount: Decimal,
+        commission_type: str,
+        commission_rate: Decimal,
+        fixed_amount: Decimal,
+    ) -> Decimal:
+        if commission_type == "percentage":
+            return (gross_amount * commission_rate).quantize(Decimal("0.01"))
+        if commission_type == "fixed":
+            return fixed_amount.quantize(Decimal("0.01"))
+        # combined
+        return (gross_amount * commission_rate + fixed_amount).quantize(Decimal("0.01"))
 
     def list_commissions(
         self,

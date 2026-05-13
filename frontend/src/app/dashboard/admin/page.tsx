@@ -16,6 +16,9 @@ function StatCard({ label, value, sub, href, color }: { label: string; value: nu
         padding: "24px 28px",
         cursor: href ? "pointer" : "default",
         transition: "box-shadow 0.15s",
+        height: "100%",
+        boxSizing: "border-box",
+        minHeight: 110,
       }}
       onMouseEnter={(e) => { if (href) e.currentTarget.style.boxShadow = "0 4px 20px rgba(0,0,0,0.08)"; }}
       onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; }}

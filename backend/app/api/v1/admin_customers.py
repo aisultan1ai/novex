@@ -2,15 +2,16 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.db import get_db
 from app.core.dependencies import require_admin
+from app.core.security import get_password_hash
 from app.modules.identity.models import CustomerProfile, Role, RoleCode, User
 from app.modules.orders.models import OrderDraft
 
@@ -22,6 +23,60 @@ router = APIRouter(prefix="/admin/users", tags=["admin:users"])
 
 class UserUpdate(BaseModel):
     is_active: Optional[bool] = None
+
+
+AdminRoleCode = Literal["customer", "operator", "admin"]
+
+
+class AdminUserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    role: AdminRoleCode = "customer"
+
+
+# ── Create user ──────────────────────────────────────────────────────────────
+
+@router.post("", status_code=201)
+def create_user(
+    payload: AdminUserCreate,
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+) -> dict:
+    if db.scalar(select(User).where(User.email == payload.email)):
+        raise HTTPException(409, "Пользователь с таким email уже существует")
+
+    role_code = RoleCode(payload.role)
+    role = db.scalar(select(Role).where(Role.code == role_code))
+    if not role:
+        role = Role(code=role_code, name=payload.role.capitalize())
+        db.add(role)
+        db.flush()
+
+    user = User(
+        email=payload.email,
+        password_hash=get_password_hash(payload.password),
+        full_name=payload.full_name,
+        phone=payload.phone,
+        role_id=role.id,
+        is_active=True,
+    )
+    db.add(user)
+    db.flush()
+
+    if role_code == RoleCode.CUSTOMER:
+        db.add(CustomerProfile(user_id=user.id, customer_type="individual"))
+
+    db.commit()
+    db.refresh(user)
+    return {
+        "id": user.id,
+        "email": user.email,
+        "full_name": user.full_name,
+        "role": payload.role,
+        "is_active": user.is_active,
+    }
 
 
 # ── Stats ─────────────────────────────────────────────────────────────────────

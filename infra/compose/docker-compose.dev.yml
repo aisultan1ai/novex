@@ -90,7 +90,7 @@ services:
       MINIO_SECURE: "false"
 
       SECRET_KEY: "${SECRET_KEY}"
-      ACCESS_TOKEN_EXPIRE_MINUTES: "60"
+      ACCESS_TOKEN_EXPIRE_MINUTES: "10080"
 
       BACKEND_CORS_ORIGINS: '["http://localhost","http://localhost:80","http://localhost:3000"]'
 

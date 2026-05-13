@@ -52,6 +52,17 @@ export const getAdminUser = (id: number): Promise<AdminUserDetail> =>
 export const updateAdminUser = (id: number, body: { is_active: boolean }): Promise<{ id: number; is_active: boolean }> =>
   req(`/admin/users/${id}`, { method: "PATCH", body: JSON.stringify(body) });
 
+export interface AdminUserCreatePayload {
+  email: string;
+  password: string;
+  full_name?: string;
+  phone?: string;
+  role: "customer" | "operator" | "admin";
+}
+
+export const createAdminUser = (body: AdminUserCreatePayload): Promise<{ id: number; email: string; full_name: string | null; role: string; is_active: boolean }> =>
+  req("/admin/users", { method: "POST", body: JSON.stringify(body) });
+
 // ── Orders ────────────────────────────────────────────────────────────────────
 export const listAdminOrders = (params: { page?: number; size?: number; status?: string; user_id?: number } = {}): Promise<PaginatedResponse<AdminOrderRow>> => {
   const q = new URLSearchParams();

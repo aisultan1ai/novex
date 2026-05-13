@@ -92,6 +92,11 @@ class CarrierDispatchService:
             ],
             "declared_value": float(order.price_snapshot),
             "currency": order.currency_snapshot,
+            "additional_services": {
+                "call_before_delivery": order.call_before_delivery,
+                "insurance": order.insurance,
+                "fragile": order.fragile,
+            },
         }
 
     def _mark_dispatch_failed(self, db: Session, order: OrderDraft, error_msg: str) -> None:
