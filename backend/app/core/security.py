@@ -20,7 +20,7 @@ def _secret_key() -> str:
     if not key:
         raise RuntimeError(
             "SECRET_KEY environment variable is not set. "
-            "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+            'Generate one with: python -c "import secrets; print(secrets.token_hex(32))"'  # noqa: E501
         )
     return key
 
@@ -38,7 +38,9 @@ def get_password_hash(password: str) -> str:
 
 def verify_password(plain_password: str, stored_password_hash: str) -> bool:
     try:
-        algorithm, iterations_str, salt_hex, expected_hash = stored_password_hash.split("$", 3)
+        algorithm, iterations_str, salt_hex, expected_hash = stored_password_hash.split(
+            "$", 3
+        )
     except ValueError:
         return False
 

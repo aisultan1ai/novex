@@ -52,8 +52,12 @@ class CommissionsRepository:
     def summary(self, db: Session) -> dict:
         row = db.execute(
             select(
-                func.coalesce(func.sum(Commission.gross_amount), 0).label("total_gross"),
-                func.coalesce(func.sum(Commission.commission_amount), 0).label("total_commission"),
+                func.coalesce(func.sum(Commission.gross_amount), 0).label(
+                    "total_gross"
+                ),
+                func.coalesce(func.sum(Commission.commission_amount), 0).label(
+                    "total_commission"
+                ),
                 func.count(Commission.id).label("count"),
             )
         ).one()

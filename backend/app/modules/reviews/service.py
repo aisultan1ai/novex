@@ -5,7 +5,12 @@ import math
 
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
+from app.core.exceptions import (
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+    ValidationError,
+)
 from app.modules.orders.repository import OrdersRepository
 from app.modules.reviews.repository import ReviewsRepository
 from app.modules.reviews.schemas import (

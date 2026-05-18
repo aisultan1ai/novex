@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
-from sqlalchemy.orm import Mapped, mapped_column, Session
+from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from app.core.db import Base
 
@@ -28,11 +28,15 @@ class CarrierWebhookConfig(Base):
         DateTime(timezone=False), server_default=func.now(), nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=False), server_default=func.now(), onupdate=func.now(), nullable=False
+        DateTime(timezone=False),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
     )
 
 
 # ── Pydantic schemas ──────────────────────────────────────────────────────────
+
 
 class CarrierWebhookCreate(BaseModel):
     carrier_code: str
@@ -65,24 +69,35 @@ class CarrierWebhookResponse(BaseModel):
 
 # ── Repository ────────────────────────────────────────────────────────────────
 
+
 class CarrierWebhookRepository:
-    def get_by_carrier_code(self, db: Session, carrier_code: str) -> CarrierWebhookConfig | None:
+    def get_by_carrier_code(
+        self, db: Session, carrier_code: str
+    ) -> CarrierWebhookConfig | None:
         from sqlalchemy import select
+
         return db.scalar(
-            select(CarrierWebhookConfig).where(CarrierWebhookConfig.carrier_code == carrier_code)
+            select(CarrierWebhookConfig).where(
+                CarrierWebhookConfig.carrier_code == carrier_code
+            )
         )
 
     def list_all(self, db: Session) -> list[CarrierWebhookConfig]:
         from sqlalchemy import select
+
         return list(db.scalars(select(CarrierWebhookConfig)).all())
 
-    def create(self, db: Session, payload: CarrierWebhookCreate) -> CarrierWebhookConfig:
+    def create(
+        self, db: Session, payload: CarrierWebhookCreate
+    ) -> CarrierWebhookConfig:
         cfg = CarrierWebhookConfig(**payload.model_dump())
         db.add(cfg)
         db.flush()
         return cfg
 
-    def update(self, db: Session, carrier_code: str, payload: CarrierWebhookUpdate) -> CarrierWebhookConfig:
+    def update(
+        self, db: Session, carrier_code: str, payload: CarrierWebhookUpdate
+    ) -> CarrierWebhookConfig:
         cfg = self.get_by_carrier_code(db, carrier_code)
         if cfg is None:
             raise ValueError(f"CarrierWebhookConfig not found: {carrier_code}")

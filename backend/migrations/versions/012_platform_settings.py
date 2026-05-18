@@ -4,6 +4,7 @@ Revision ID: 012_platform_settings
 Revises: 011_address_book
 Create Date: 2026-05-12
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa
@@ -27,7 +28,9 @@ def upgrade() -> None:
             server_default=sa.text("NOW()"),
         ),
     )
-    op.execute("INSERT INTO platform_settings (key, value) VALUES ('commission_rate', '0.00')")
+    op.execute(
+        "INSERT INTO platform_settings (key, value) VALUES ('commission_rate', '0.00')"
+    )
 
 
 def downgrade() -> None:

@@ -4,17 +4,22 @@ import json
 import logging
 import math
 from datetime import date
-from typing import Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
-from sqlalchemy import func, select, update as sa_update
+from sqlalchemy import func, select
+from sqlalchemy import update as sa_update
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import get_settings
 from app.core.db import get_db
 from app.core.dependencies import require_admin
-from app.modules.carriers.models import Carrier, CarrierService, CarrierTariffRate, CarrierZoneCity
+from app.modules.carriers.models import (
+    Carrier,
+    CarrierService,
+    CarrierTariffRate,
+    CarrierZoneCity,
+)
 from app.modules.identity.service import CreateCarrierAccountRequest, IdentityService
 
 logger = logging.getLogger(__name__)
@@ -24,73 +29,86 @@ _identity_service = IdentityService()
 
 # ── Pydantic schemas ──────────────────────────────────────────────────────────
 
+
 class CarrierCreate(BaseModel):
     code: str
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     is_active: bool = True
 
 
 class CarrierUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    is_active: Optional[bool] = None
+    name: str | None = None
+    description: str | None = None
+    is_active: bool | None = None
 
 
 class ServiceCreate(BaseModel):
     code: str
     name: str
-    shipment_type: Optional[str] = None
+    shipment_type: str | None = None
     is_active: bool = True
 
 
 class ServiceUpdate(BaseModel):
-    name: Optional[str] = None
-    is_active: Optional[bool] = None
+    name: str | None = None
+    is_active: bool | None = None
 
 
 class RateRow(BaseModel):
     zone: int
     weight_from_kg: float
-    weight_to_kg: Optional[float] = None
+    weight_to_kg: float | None = None
     base_price: float
-    per_unit_price: Optional[float] = None
-    per_unit_weight_kg: Optional[float] = None
+    per_unit_price: float | None = None
+    per_unit_weight_kg: float | None = None
     currency: str = "KZT"
-    eta_days_min: Optional[int] = None
-    eta_days_max: Optional[int] = None
+    eta_days_min: int | None = None
+    eta_days_max: int | None = None
 
 
 class ZoneCityCreate(BaseModel):
     city_name: str
     zone: int
-    city_type: Optional[str] = None
+    city_type: str | None = None
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+
 def _carrier_dict(c: Carrier) -> dict:
     return {
-        "id": c.id, "code": c.code, "name": c.name,
-        "description": c.description, "is_active": c.is_active,
+        "id": c.id,
+        "code": c.code,
+        "name": c.name,
+        "description": c.description,
+        "is_active": c.is_active,
     }
 
 
 def _service_dict(s: CarrierService) -> dict:
     return {
-        "id": s.id, "code": s.code, "name": s.name,
-        "shipment_type": s.shipment_type, "is_active": s.is_active,
+        "id": s.id,
+        "code": s.code,
+        "name": s.name,
+        "shipment_type": s.shipment_type,
+        "is_active": s.is_active,
     }
 
 
 def _rate_dict(r: CarrierTariffRate) -> dict:
     return {
-        "id": r.id, "zone": r.zone,
+        "id": r.id,
+        "zone": r.zone,
         "weight_from_kg": float(r.weight_from_kg),
         "weight_to_kg": float(r.weight_to_kg) if r.weight_to_kg is not None else None,
         "base_price": float(r.base_price),
-        "per_unit_price": float(r.per_unit_price) if r.per_unit_price is not None else None,
-        "per_unit_weight_kg": float(r.per_unit_weight_kg) if r.per_unit_weight_kg is not None else None,
+        "per_unit_price": float(r.per_unit_price)
+        if r.per_unit_price is not None
+        else None,
+        "per_unit_weight_kg": float(r.per_unit_weight_kg)
+        if r.per_unit_weight_kg is not None
+        else None,
         "currency": r.currency,
         "eta_days_min": r.eta_days_min,
         "eta_days_max": r.eta_days_max,
@@ -99,6 +117,7 @@ def _rate_dict(r: CarrierTariffRate) -> dict:
 
 
 # ── Carriers CRUD ─────────────────────────────────────────────────────────────
+
 
 @router.get("")
 def list_carriers(
@@ -133,7 +152,9 @@ def get_carrier(
 ) -> dict:
     carrier = db.scalar(
         select(Carrier)
-        .options(selectinload(Carrier.services).selectinload(CarrierService.tariff_rates))
+        .options(
+            selectinload(Carrier.services).selectinload(CarrierService.tariff_rates)
+        )
         .where(Carrier.id == carrier_id)
     )
     if not carrier:
@@ -161,6 +182,7 @@ def update_carrier(
 
 
 # ── Services ──────────────────────────────────────────────────────────────────
+
 
 @router.get("/{carrier_id}/services")
 def list_services(
@@ -214,6 +236,7 @@ def update_service(
 
 # ── Tariff rates ──────────────────────────────────────────────────────────────
 
+
 @router.get("/{carrier_id}/services/{service_id}/rates")
 def list_rates(
     carrier_id: int,
@@ -231,7 +254,13 @@ def list_rates(
     total = db.scalar(select(func.count()).select_from(base.subquery())) or 0
     rates = db.scalars(base.offset((page - 1) * size).limit(size)).all()
     pages = math.ceil(total / size) if total > 0 else 1
-    return {"items": [_rate_dict(r) for r in rates], "total": total, "page": page, "size": size, "pages": pages}
+    return {
+        "items": [_rate_dict(r) for r in rates],
+        "total": total,
+        "page": page,
+        "size": size,
+        "pages": pages,
+    }
 
 
 @router.post("/{carrier_id}/services/{service_id}/rates", status_code=201)
@@ -282,7 +311,8 @@ async def upload_tariff_grid(
     """
     Загрузить тарифную сетку из JSON-файла.
     Формат: список объектов с полями zone, weight_from_kg, weight_to_kg,
-    base_price, per_unit_price, per_unit_weight_kg, currency, eta_days_min, eta_days_max.
+    base_price, per_unit_price, per_unit_weight_kg,
+    currency, eta_days_min, eta_days_max.
     Заменяет все активные строки для данного тарифа.
     """
     service = db.get(CarrierService, service_id)
@@ -333,6 +363,7 @@ async def upload_tariff_grid(
 
 # ── Zone cities ───────────────────────────────────────────────────────────────
 
+
 @router.get("/{carrier_id}/cities")
 def list_zone_cities(
     carrier_id: int,
@@ -349,7 +380,10 @@ def list_zone_cities(
     total = db.scalar(select(func.count()).select_from(base.subquery())) or 0
     cities = db.scalars(base.offset((page - 1) * size).limit(size)).all()
     pages = math.ceil(total / size) if total > 0 else 1
-    items = [{"id": c.id, "city_name": c.city_name, "zone": c.zone, "city_type": c.city_type} for c in cities]
+    items = [
+        {"id": c.id, "city_name": c.city_name, "zone": c.zone, "city_type": c.city_type}
+        for c in cities
+    ]
     return {"items": items, "total": total, "page": page, "size": size, "pages": pages}
 
 
@@ -377,6 +411,7 @@ def add_zone_city(
 
 # ── Carrier portal account ─────────────────────────────────────────────────────
 
+
 @router.post("/{carrier_id}/account", status_code=201)
 def create_carrier_account(
     carrier_id: int,
@@ -395,5 +430,11 @@ def create_carrier_account(
         payload=payload,
         frontend_url=settings.frontend_url,
     )
-    logger.info("Carrier account created: carrier_id=%d email=%s", carrier_id, payload.email)
-    return {"user_id": profile.user_id, "email": profile.email, "carrier_id": carrier_id}
+    logger.info(
+        "Carrier account created: carrier_id=%d email=%s", carrier_id, payload.email
+    )
+    return {
+        "user_id": profile.user_id,
+        "email": profile.email,
+        "carrier_id": carrier_id,
+    }

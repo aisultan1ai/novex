@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 from typing import Literal
-from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -78,7 +78,9 @@ class ShipmentPackageInput(BaseModel):
     depth_cm: Decimal = Field(gt=0)
 
     declared_value: Decimal | None = Field(default=None, ge=0)
-    declared_value_currency: str | None = Field(default=None, min_length=3, max_length=3)
+    declared_value_currency: str | None = Field(
+        default=None, min_length=3, max_length=3
+    )
 
     @field_validator("description")
     @classmethod
@@ -162,6 +164,7 @@ class OrderDraftResponse(BaseModel):
     sender: ShipmentPartyResponse | None = None
     recipient: ShipmentPartyResponse | None = None
     packages: list[ShipmentPackageResponse]
+
 
 class OrderDraftListResponse(BaseModel):
     items: list[OrderDraftResponse]

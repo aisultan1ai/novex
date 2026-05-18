@@ -5,7 +5,10 @@ import logging
 from sqlalchemy.orm import Session
 
 from app.modules.notifications.repository import NotificationsRepository
-from app.modules.notifications.schemas import NotificationListResponse, NotificationResponse
+from app.modules.notifications.schemas import (
+    NotificationListResponse,
+    NotificationResponse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -40,10 +43,19 @@ class NotificationsService:
     ) -> None:
         title = _STATUS_TITLES.get(status, f"Статус обновлён: {status}")
         body = f"Заказ #{order_id}: {title.lower()}"
-        self.repo.create(db, user_id=user_id, type="order_status", title=title, body=body)
-        logger.info("Notification sent: user_id=%s order_id=%s status=%s", user_id, order_id, status)
+        self.repo.create(
+            db, user_id=user_id, type="order_status", title=title, body=body
+        )
+        logger.info(
+            "Notification sent: user_id=%s order_id=%s status=%s",
+            user_id,
+            order_id,
+            status,
+        )
 
-    def list_notifications(self, db: Session, *, user_id: int) -> NotificationListResponse:
+    def list_notifications(
+        self, db: Session, *, user_id: int
+    ) -> NotificationListResponse:
         items = self.repo.list_for_user(db, user_id=user_id)
         unread = self.repo.count_unread(db, user_id=user_id)
         return NotificationListResponse(

@@ -33,7 +33,7 @@ class QuoteSession(Base):
         nullable=False,
     )
 
-    rate_quotes: Mapped[list["RateQuote"]] = relationship(
+    rate_quotes: Mapped[list[RateQuote]] = relationship(
         back_populates="quote_session",
         cascade="all, delete-orphan",
     )
@@ -71,4 +71,4 @@ class RateQuote(Base):
         nullable=False,
     )
 
-    quote_session: Mapped["QuoteSession"] = relationship(back_populates="rate_quotes")
+    quote_session: Mapped[QuoteSession] = relationship(back_populates="rate_quotes")

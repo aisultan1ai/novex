@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from app.common.pagination import PageParams, PaginatedResponse
 
@@ -24,15 +25,15 @@ class TestPageParams:
         assert params.offset == 20
 
     def test_min_page_validation(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             PageParams(page=0)
 
     def test_max_size_validation(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             PageParams(size=101)
 
     def test_min_size_validation(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             PageParams(size=0)
 
 

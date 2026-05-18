@@ -4,6 +4,7 @@ Revision ID: 016_reviews
 Revises: 015_carrier_profiles
 Create Date: 2026-05-13
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa
@@ -43,7 +44,9 @@ def upgrade() -> None:
         ),
         sa.CheckConstraint("rating BETWEEN 1 AND 5", name="ck_reviews_rating_range"),
     )
-    op.create_index("ix_reviews_order_draft_id", "reviews", ["order_draft_id"], unique=True)
+    op.create_index(
+        "ix_reviews_order_draft_id", "reviews", ["order_draft_id"], unique=True
+    )
     op.create_index("ix_reviews_user_id", "reviews", ["user_id"])
     op.create_index("ix_reviews_carrier_code", "reviews", ["carrier_code"])
 

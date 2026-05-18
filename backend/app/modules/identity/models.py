@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
+from enum import Enum, StrEnum
 
-from sqlalchemy import Boolean, Enum as SqlEnum, ForeignKey, String, func
+from sqlalchemy import Boolean, ForeignKey, String, func
+from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -13,25 +14,27 @@ def enum_values(enum_cls: type[Enum]) -> list[str]:
     return [item.value for item in enum_cls]
 
 
-class RoleCode(str, Enum):
+class RoleCode(StrEnum):
     CUSTOMER = "customer"
     ADMIN = "admin"
     OPERATOR = "operator"
     CARRIER = "carrier"
 
 
-class CustomerType(str, Enum):
+class CustomerType(StrEnum):
     INDIVIDUAL = "individual"
     COMPANY = "company"
 
 
-class BillingMode(str, Enum):
+class BillingMode(StrEnum):
     PREPAID = "prepaid"
     POSTPAID = "postpaid"
 
 
 class TimestampMixin:
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        server_default=func.now(), nullable=False
+    )
     updated_at: Mapped[datetime] = mapped_column(
         server_default=func.now(),
         onupdate=func.now(),
@@ -55,14 +58,16 @@ class Role(Base, TimestampMixin):
     )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
 
-    users: Mapped[list["User"]] = relationship(back_populates="role")
+    users: Mapped[list[User]] = relationship(back_populates="role")
 
 
 class User(Base, TimestampMixin):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    email: Mapped[str] = mapped_column(
+        String(255), unique=True, nullable=False, index=True
+    )
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
@@ -70,13 +75,13 @@ class User(Base, TimestampMixin):
 
     role_id: Mapped[int] = mapped_column(ForeignKey("roles.id"), nullable=False)
 
-    role: Mapped["Role"] = relationship(back_populates="users")
-    customer_profile: Mapped["CustomerProfile | None"] = relationship(
+    role: Mapped[Role] = relationship(back_populates="users")
+    customer_profile: Mapped[CustomerProfile | None] = relationship(
         back_populates="user",
         uselist=False,
         cascade="all, delete-orphan",
     )
-    carrier_profile: Mapped["CarrierProfile | None"] = relationship(
+    carrier_profile: Mapped[CarrierProfile | None] = relationship(
         back_populates="user",
         uselist=False,
         cascade="all, delete-orphan",
@@ -113,7 +118,7 @@ class CustomerProfile(Base, TimestampMixin):
         default=BillingMode.PREPAID,
     )
 
-    user: Mapped["User"] = relationship(back_populates="customer_profile")
+    user: Mapped[User] = relationship(back_populates="customer_profile")
 
 
 class CarrierProfile(Base, TimestampMixin):
@@ -132,4 +137,4 @@ class CarrierProfile(Base, TimestampMixin):
         index=True,
     )
 
-    user: Mapped["User"] = relationship(back_populates="carrier_profile")
+    user: Mapped[User] = relationship(back_populates="carrier_profile")

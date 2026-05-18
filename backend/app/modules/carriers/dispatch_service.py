@@ -24,7 +24,6 @@ def _hmac_sign(payload: dict, secret: str) -> str:
 
 
 class CarrierDispatchService:
-
     def dispatch(self, db: Session, order: OrderDraft) -> str | None:
         cfg = _webhook_repo.get_by_carrier_code(db, order.carrier_code_snapshot)
         if cfg is None or not cfg.is_active:
@@ -41,7 +40,9 @@ class CarrierDispatchService:
                     "X-Novex-Platform": "novex-logistics",
                 }
                 if cfg.webhook_secret:
-                    headers["X-Novex-Signature"] = _hmac_sign(payload, cfg.webhook_secret)
+                    headers["X-Novex-Signature"] = _hmac_sign(
+                        payload, cfg.webhook_secret
+                    )
 
                 resp = httpx.post(
                     cfg.push_url,
@@ -54,7 +55,10 @@ class CarrierDispatchService:
             except Exception as exc:
                 logger.warning(
                     "dispatch attempt %d/%d failed for order %s: %s",
-                    attempt, cfg.retry_count, order.id, exc,
+                    attempt,
+                    cfg.retry_count,
+                    order.id,
+                    exc,
                 )
                 if attempt == cfg.retry_count:
                     self._mark_dispatch_failed(db, order, str(exc))
@@ -99,7 +103,9 @@ class CarrierDispatchService:
             },
         }
 
-    def _mark_dispatch_failed(self, db: Session, order: OrderDraft, error_msg: str) -> None:
+    def _mark_dispatch_failed(
+        self, db: Session, order: OrderDraft, error_msg: str
+    ) -> None:
         order.status = "dispatch_failed"
         order.dispatch_error = error_msg
         _notifications_svc.notify_order_status(

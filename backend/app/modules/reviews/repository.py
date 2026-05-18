@@ -29,9 +29,7 @@ class ReviewsRepository:
         return review
 
     def get_by_order_id(self, db: Session, order_draft_id: int) -> Review | None:
-        return db.scalar(
-            select(Review).where(Review.order_draft_id == order_draft_id)
-        )
+        return db.scalar(select(Review).where(Review.order_draft_id == order_draft_id))
 
     def list_for_admin(
         self,

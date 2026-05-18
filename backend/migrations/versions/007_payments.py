@@ -31,7 +31,14 @@ def upgrade() -> None:
         sa.Column("currency", sa.String(3), nullable=False, server_default="KZT"),
         sa.Column(
             "status",
-            sa.Enum("pending", "paid", "failed", "cancelled", "refunded", name="payment_status_enum"),
+            sa.Enum(
+                "pending",
+                "paid",
+                "failed",
+                "cancelled",
+                "refunded",
+                name="payment_status_enum",
+            ),
             nullable=False,
             server_default="pending",
         ),
@@ -47,11 +54,15 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=False,
         ),
-        sa.ForeignKeyConstraint(["order_draft_id"], ["order_drafts.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["order_draft_id"], ["order_drafts.id"], ondelete="CASCADE"
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_payments_order_draft_id", "payments", ["order_draft_id"])
-    op.create_index("ix_payments_provider_payment_id", "payments", ["provider_payment_id"])
+    op.create_index(
+        "ix_payments_provider_payment_id", "payments", ["provider_payment_id"]
+    )
     op.create_index("ix_payments_status", "payments", ["status"])
 
 

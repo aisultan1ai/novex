@@ -55,10 +55,14 @@ class AddressBookRepository:
         return db.scalars(
             select(AddressBookEntry)
             .where(AddressBookEntry.user_id == user_id)
-            .order_by(AddressBookEntry.is_default.desc(), AddressBookEntry.created_at.desc())
+            .order_by(
+                AddressBookEntry.is_default.desc(), AddressBookEntry.created_at.desc()
+            )
         ).all()
 
-    def get_by_id(self, db: Session, *, entry_id: int, user_id: int) -> AddressBookEntry | None:
+    def get_by_id(
+        self, db: Session, *, entry_id: int, user_id: int
+    ) -> AddressBookEntry | None:
         return db.scalar(
             select(AddressBookEntry).where(
                 AddressBookEntry.id == entry_id,

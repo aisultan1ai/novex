@@ -14,9 +14,7 @@ router = APIRouter(prefix="/carrier", tags=["carrier-portal"])
 
 
 def _get_carrier_profile(user: User, db: Session) -> CarrierProfile:
-    profile = db.scalar(
-        select(CarrierProfile).where(CarrierProfile.user_id == user.id)
-    )
+    profile = db.scalar(select(CarrierProfile).where(CarrierProfile.user_id == user.id))
     if not profile:
         raise HTTPException(404, "Профиль перевозчика не найден")
     return profile
@@ -33,7 +31,9 @@ def get_me(
         raise HTTPException(404, "Перевозчик не найден")
 
     webhook = db.scalar(
-        select(CarrierWebhookConfig).where(CarrierWebhookConfig.carrier_code == carrier.code)
+        select(CarrierWebhookConfig).where(
+            CarrierWebhookConfig.carrier_code == carrier.code
+        )
     )
 
     return {
@@ -66,7 +66,9 @@ def get_integration_config(
         raise HTTPException(404, "Перевозчик не найден")
 
     webhook = db.scalar(
-        select(CarrierWebhookConfig).where(CarrierWebhookConfig.carrier_code == carrier.code)
+        select(CarrierWebhookConfig).where(
+            CarrierWebhookConfig.carrier_code == carrier.code
+        )
     )
 
     return {
@@ -83,7 +85,9 @@ def get_integration_config(
             },
             "inbound": {
                 "description": "Вы отправляете трекинг-события на наш webhook (push)",
-                "your_calls_our_url": f"/api/v1/carriers/{carrier.code}/tracking-webhook",
+                "your_calls_our_url": (
+                    f"/api/v1/carriers/{carrier.code}/tracking-webhook"
+                ),
                 "method": "POST",
                 "hmac_header": "X-Carrier-Signature",
                 "hmac_algorithm": "HMAC-SHA256",

@@ -3,7 +3,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from decimal import Decimal
 
-from sqlalchemy import delete, func, select, update as sa_update
+from sqlalchemy import delete, func, select
+from sqlalchemy import update as sa_update
 from sqlalchemy.orm import Session, selectinload
 
 from app.modules.orders.models import OrderDraft, ShipmentPackage, ShipmentParty
@@ -174,7 +175,9 @@ class OrdersRepository:
         *,
         order_draft_id: int,
     ) -> None:
-        stmt = delete(ShipmentParty).where(ShipmentParty.order_draft_id == order_draft_id)
+        stmt = delete(ShipmentParty).where(
+            ShipmentParty.order_draft_id == order_draft_id
+        )
         db.execute(stmt)
 
     def delete_shipment_packages(
@@ -183,7 +186,9 @@ class OrdersRepository:
         *,
         order_draft_id: int,
     ) -> None:
-        stmt = delete(ShipmentPackage).where(ShipmentPackage.order_draft_id == order_draft_id)
+        stmt = delete(ShipmentPackage).where(
+            ShipmentPackage.order_draft_id == order_draft_id
+        )
         db.execute(stmt)
 
     def create_shipment_party(
@@ -282,23 +287,25 @@ class OrdersRepository:
         *,
         draft_id: int,
     ) -> None:
-        db.execute(delete(ShipmentParty).where(ShipmentParty.order_draft_id == draft_id))
-        db.execute(delete(ShipmentPackage).where(ShipmentPackage.order_draft_id == draft_id))
+        db.execute(
+            delete(ShipmentParty).where(ShipmentParty.order_draft_id == draft_id)
+        )
+        db.execute(
+            delete(ShipmentPackage).where(ShipmentPackage.order_draft_id == draft_id)
+        )
         db.execute(delete(OrderDraft).where(OrderDraft.id == draft_id))
 
     def list_drafts_by_user(
-            self,
-            db: Session,
-            *,
-            user_id: int,
-            offset: int = 0,
-            limit: int = 20,
+        self,
+        db: Session,
+        *,
+        user_id: int,
+        offset: int = 0,
+        limit: int = 20,
     ) -> tuple[list[OrderDraft], int]:
         base_where = OrderDraft.user_id == user_id
 
-        total: int = db.scalar(
-            select(func.count(OrderDraft.id)).where(base_where)
-        ) or 0
+        total: int = db.scalar(select(func.count(OrderDraft.id)).where(base_where)) or 0
 
         stmt = (
             select(OrderDraft)

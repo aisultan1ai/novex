@@ -6,7 +6,11 @@ from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.core.dependencies import get_current_user_id
 from app.core.exceptions import NotFoundError, UnauthorizedError
-from app.modules.identity.schemas import ChangePasswordRequest, ProfileResponse, ProfileUpdateRequest
+from app.modules.identity.schemas import (
+    ChangePasswordRequest,
+    ProfileResponse,
+    ProfileUpdateRequest,
+)
 from app.modules.identity.service import IdentityService
 
 router = APIRouter(prefix="/profile", tags=["profile"])
@@ -66,6 +70,10 @@ def change_password(
     try:
         identity_service.change_password(db, current_user_id, payload)
     except UnauthorizedError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
     except NotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc

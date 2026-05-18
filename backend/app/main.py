@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,7 +11,6 @@ from slowapi.errors import RateLimitExceeded
 
 from app.api.router import api_router
 from app.core.config import get_settings
-from app.core.limiter import limiter
 from app.core.exceptions import (
     ConflictError,
     ForbiddenError,
@@ -19,6 +18,7 @@ from app.core.exceptions import (
     UnauthorizedError,
     ValidationError,
 )
+from app.core.limiter import limiter
 from app.core.logging import setup_logging
 
 settings = get_settings()
@@ -48,7 +48,7 @@ app = FastAPI(
     openapi_url="/openapi.json",
 )
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 
 app.add_middleware(
     CORSMiddleware,
@@ -75,7 +75,9 @@ async def validation_handler(request: Request, exc: ValidationError) -> JSONResp
 
 
 @app.exception_handler(UnauthorizedError)
-async def unauthorized_handler(request: Request, exc: UnauthorizedError) -> JSONResponse:
+async def unauthorized_handler(
+    request: Request, exc: UnauthorizedError
+) -> JSONResponse:
     return JSONResponse(status_code=401, content={"detail": str(exc)})
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import Literal, Optional
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, EmailStr
@@ -21,8 +21,9 @@ router = APIRouter(prefix="/admin/users", tags=["admin:users"])
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
 
+
 class UserUpdate(BaseModel):
-    is_active: Optional[bool] = None
+    is_active: bool | None = None
 
 
 AdminRoleCode = Literal["customer", "operator", "admin"]
@@ -31,12 +32,13 @@ AdminRoleCode = Literal["customer", "operator", "admin"]
 class AdminUserCreate(BaseModel):
     email: EmailStr
     password: str
-    full_name: Optional[str] = None
-    phone: Optional[str] = None
+    full_name: str | None = None
+    phone: str | None = None
     role: AdminRoleCode = "customer"
 
 
 # ── Create user ──────────────────────────────────────────────────────────────
+
 
 @router.post("", status_code=201)
 def create_user(
@@ -81,19 +83,21 @@ def create_user(
 
 # ── Stats ─────────────────────────────────────────────────────────────────────
 
+
 @router.get("/stats")
 def get_stats(
     db: Session = Depends(get_db),
     _=Depends(require_admin),
 ) -> dict:
     total_users = db.scalar(select(func.count(User.id))) or 0
-    active_users = db.scalar(
-        select(func.count(User.id)).where(User.is_active.is_(True))
-    ) or 0
+    active_users = (
+        db.scalar(select(func.count(User.id)).where(User.is_active.is_(True))) or 0
+    )
     total_orders = db.scalar(select(func.count(OrderDraft.id))) or 0
-    paid_orders = db.scalar(
-        select(func.count(OrderDraft.id)).where(OrderDraft.status == "paid")
-    ) or 0
+    paid_orders = (
+        db.scalar(select(func.count(OrderDraft.id)).where(OrderDraft.status == "paid"))
+        or 0
+    )
 
     return {
         "total_users": total_users,
@@ -105,11 +109,12 @@ def get_stats(
 
 # ── Users list ────────────────────────────────────────────────────────────────
 
+
 @router.get("")
 def list_users(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
-    search: Optional[str] = Query(default=None),
+    search: str | None = Query(default=None),
     db: Session = Depends(get_db),
     _=Depends(require_admin),
 ) -> dict:
@@ -159,6 +164,7 @@ def list_users(
 
 
 # ── User detail ───────────────────────────────────────────────────────────────
+
 
 @router.get("/{user_id}")
 def get_user(
@@ -216,6 +222,7 @@ def get_user(
 
 
 # ── User update ───────────────────────────────────────────────────────────────
+
 
 @router.patch("/{user_id}")
 def update_user(

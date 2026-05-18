@@ -20,7 +20,9 @@ def list_notifications(
     return _service.list_notifications(db, user_id=current_user_id)
 
 
-@router.patch("/{notification_id}/read", status_code=204, summary="Отметить прочитанным")
+@router.patch(
+    "/{notification_id}/read", status_code=204, summary="Отметить прочитанным"
+)
 def mark_read(
     notification_id: int,
     current_user_id: int = Depends(get_current_user_id),

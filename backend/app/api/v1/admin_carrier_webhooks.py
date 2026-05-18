@@ -63,8 +63,8 @@ def update_carrier_webhook(
 ) -> CarrierWebhookResponse:
     try:
         cfg = _repo.update(db, carrier_code, payload)
-    except ValueError:
-        raise HTTPException(404, "Конфиг не найден")
+    except ValueError as err:
+        raise HTTPException(404, "Конфиг не найден") from err
     db.commit()
     return CarrierWebhookResponse.model_validate(cfg)
 
@@ -95,7 +95,10 @@ def test_carrier_webhook(
         resp = httpx.post(
             cfg.push_url,
             content=body.encode(),
-            headers={"Content-Type": "application/json", "X-Novex-Platform": "novex-logistics"},
+            headers={
+                "Content-Type": "application/json",
+                "X-Novex-Platform": "novex-logistics",
+            },
             timeout=cfg.timeout_seconds,
         )
         elapsed_ms = int((time.monotonic() - start) * 1000)

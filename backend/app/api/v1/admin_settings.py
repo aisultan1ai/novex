@@ -41,11 +41,15 @@ def update_settings(
 ) -> PlatformSettingsResponse:
     try:
         rate = Decimal(payload.commission_rate)
-    except InvalidOperation:
-        raise HTTPException(status_code=422, detail="commission_rate должен быть числом")
+    except InvalidOperation as err:
+        raise HTTPException(
+            status_code=422, detail="commission_rate должен быть числом"
+        ) from err
 
     if not (Decimal("0") <= rate <= Decimal("1")):
-        raise HTTPException(status_code=422, detail="commission_rate должен быть от 0 до 1")
+        raise HTTPException(
+            status_code=422, detail="commission_rate должен быть от 0 до 1"
+        )
 
     rate_str = str(rate.quantize(Decimal("0.0001")))
     _repo.set(db, COMMISSION_RATE_KEY, rate_str)

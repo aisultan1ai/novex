@@ -45,7 +45,9 @@ def poll_all_active_shipments(db: Session) -> None:
         except Exception as exc:
             logger.warning(
                 "polling failed for shipment %s (%s): %s",
-                shipment.id, shipment.carrier_tracking_number, exc,
+                shipment.id,
+                shipment.carrier_tracking_number,
+                exc,
             )
             continue
 
@@ -78,5 +80,7 @@ def poll_all_active_shipments(db: Session) -> None:
         try:
             db.commit()
         except Exception as exc:
-            logger.error("commit failed after polling shipment %s: %s", shipment.id, exc)
+            logger.error(
+                "commit failed after polling shipment %s: %s", shipment.id, exc
+            )
             db.rollback()

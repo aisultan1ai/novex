@@ -6,7 +6,9 @@ Create Date: 2026-04-22
 """
 
 from __future__ import annotations
+
 from datetime import date
+
 import sqlalchemy as sa
 from alembic import op
 
@@ -47,7 +49,9 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("service_id", sa.Integer(), nullable=False),
         sa.Column("zone", sa.Integer(), nullable=False),
-        sa.Column("weight_from_kg", sa.Numeric(10, 3), nullable=False, server_default="0"),
+        sa.Column(
+            "weight_from_kg", sa.Numeric(10, 3), nullable=False, server_default="0"
+        ),
         sa.Column("weight_to_kg", sa.Numeric(10, 3), nullable=True),
         sa.Column("base_price", sa.Numeric(12, 2), nullable=False),
         sa.Column("per_unit_price", sa.Numeric(12, 2), nullable=True),
@@ -56,13 +60,24 @@ def upgrade() -> None:
         sa.Column("eta_days_min", sa.Integer(), nullable=True),
         sa.Column("eta_days_max", sa.Integer(), nullable=True),
         sa.Column("version", sa.Integer(), nullable=False, server_default="1"),
-        sa.Column("effective_from", sa.Date(), nullable=False, server_default=str(date.today())),
+        sa.Column(
+            "effective_from",
+            sa.Date(),
+            nullable=False,
+            server_default=str(date.today()),
+        ),
         sa.Column("effective_to", sa.Date(), nullable=True),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default="true"),
-        sa.ForeignKeyConstraint(["service_id"], ["carrier_services.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["service_id"], ["carrier_services.id"], ondelete="CASCADE"
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_carrier_tariff_rates_service_zone", "carrier_tariff_rates", ["service_id", "zone"])
+    op.create_index(
+        "ix_carrier_tariff_rates_service_zone",
+        "carrier_tariff_rates",
+        ["service_id", "zone"],
+    )
 
     op.create_table(
         "carrier_zone_cities",
@@ -74,9 +89,15 @@ def upgrade() -> None:
         sa.Column("city_type", sa.String(50), nullable=True),
         sa.ForeignKeyConstraint(["carrier_id"], ["carriers.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("carrier_id", "city_name_normalized", name="uq_carrier_city"),
+        sa.UniqueConstraint(
+            "carrier_id", "city_name_normalized", name="uq_carrier_city"
+        ),
     )
-    op.create_index("ix_carrier_zone_cities_normalized", "carrier_zone_cities", ["city_name_normalized"])
+    op.create_index(
+        "ix_carrier_zone_cities_normalized",
+        "carrier_zone_cities",
+        ["city_name_normalized"],
+    )
 
     # Seed: Azimuth
     op.execute("""
@@ -87,8 +108,8 @@ def upgrade() -> None:
     """)
     for svc_code, svc_name, svc_type in [
         ("standard", "Стандарт", "parcel"),
-        ("express",  "Экспресс", "parcel"),
-        ("economy",  "Эконом",   "cargo"),
+        ("express", "Экспресс", "parcel"),
+        ("economy", "Эконом", "cargo"),
     ]:
         op.execute(f"""
             INSERT INTO carrier_services (carrier_id, code, name, shipment_type, is_active)
@@ -97,19 +118,38 @@ def upgrade() -> None:
         """)
 
     regional = [
-        ("Актобе","актобе"), ("Алматы","алматы"), ("Астана","астана"),
-        ("Атырау","атырау"), ("Жезказган","жезказган"), ("Караганда","караганда"),
-        ("Кокшетау","кокшетау"), ("Костанай","костанай"), ("Кызылорда","кызылорда"),
-        ("Оскемен","оскемен"), ("Усть-Каменогорск","усть-каменогорск"),
-        ("Павлодар","павлодар"), ("Петропавловск","петропавловск"),
-        ("Семей","семей"), ("Талдыкорган","талдыкорган"), ("Тараз","тараз"),
-        ("Уральск","уральск"), ("Шымкент","шымкент"), ("Актау","актау"),
+        ("Актобе", "актобе"),
+        ("Алматы", "алматы"),
+        ("Астана", "астана"),
+        ("Атырау", "атырау"),
+        ("Жезказган", "жезказган"),
+        ("Караганда", "караганда"),
+        ("Кокшетау", "кокшетау"),
+        ("Костанай", "костанай"),
+        ("Кызылорда", "кызылорда"),
+        ("Оскемен", "оскемен"),
+        ("Усть-Каменогорск", "усть-каменогорск"),
+        ("Павлодар", "павлодар"),
+        ("Петропавловск", "петропавловск"),
+        ("Семей", "семей"),
+        ("Талдыкорган", "талдыкорган"),
+        ("Тараз", "тараз"),
+        ("Уральск", "уральск"),
+        ("Шымкент", "шымкент"),
+        ("Актау", "актау"),
     ]
     district = [
-        ("Аксай","аксай"), ("Экибастуз","экибастуз"), ("Рудный","рудный"),
-        ("Темиртау","темиртау"), ("Сарыагаш","сарыагаш"), ("Жанаозен","жанаозен"),
-        ("Аксу","аксу"), ("Капшагай","капшагай"), ("Щучинск","щучинск"),
-        ("Степногорск","степногорск"), ("Туркестан","туркестан"),
+        ("Аксай", "аксай"),
+        ("Экибастуз", "экибастуз"),
+        ("Рудный", "рудный"),
+        ("Темиртау", "темиртау"),
+        ("Сарыагаш", "сарыагаш"),
+        ("Жанаозен", "жанаозен"),
+        ("Аксу", "аксу"),
+        ("Капшагай", "капшагай"),
+        ("Щучинск", "щучинск"),
+        ("Степногорск", "степногорск"),
+        ("Туркестан", "туркестан"),
     ]
     for city_name, normalized in regional:
         op.execute(f"""

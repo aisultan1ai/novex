@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 revision = "004_order_draft_route_snapshots"
 down_revision = "003_order_draft_core"

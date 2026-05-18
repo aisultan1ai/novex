@@ -1,15 +1,8 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { Inter } from "next/font/google";
 import "./globals.css";
 
 import { AuthProvider } from "@/components/providers/auth-provider";
-
-const inter = Inter({
-  subsets: ["latin", "cyrillic"],
-  display: "swap",
-  variable: "--font-inter",
-});
 
 export const metadata: Metadata = {
   title: "Novex - Доставка по Казахстану",
@@ -19,12 +12,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="ru" className={inter.variable}>
+    <html lang="ru">
       <body
         style={{
           margin: 0,
-          fontFamily:
-            "var(--font-inter), Inter, ui-sans-serif, system-ui, -apple-system, sans-serif",
+          fontFamily: "var(--font-inter)",
           WebkitFontSmoothing: "antialiased",
         }}
       >

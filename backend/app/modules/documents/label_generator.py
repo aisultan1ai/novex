@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import os
 import platform
-from io import BytesIO
 
 try:
     from fpdf import FPDF
+
     _FPDF_AVAILABLE = True
 except ImportError:
     _FPDF_AVAILABLE = False
@@ -186,7 +186,9 @@ def generate_label_pdf(order: OrderDraft) -> bytes:
     pdf.cell(20, 6, "Кол-во", border=1, align="C", new_x="RIGHT", new_y="TOP")
     pdf.cell(25, 6, "Вес, кг", border=1, align="C", new_x="RIGHT", new_y="TOP")
     pdf.cell(30, 6, "Ш×В×Г, см", border=1, align="C", new_x="RIGHT", new_y="TOP")
-    pdf.cell(0, 6, "Объявл. ценность", border=1, align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(
+        0, 6, "Объявл. ценность", border=1, align="C", new_x="LMARGIN", new_y="NEXT"
+    )
 
     regular(9)
     for pkg in order.packages:
@@ -197,8 +199,12 @@ def generate_label_pdf(order: OrderDraft) -> bytes:
             else "—"
         )
         pdf.cell(60, 6, pkg.description[:35], border=1, new_x="RIGHT", new_y="TOP")
-        pdf.cell(20, 6, str(pkg.quantity), border=1, align="C", new_x="RIGHT", new_y="TOP")
-        pdf.cell(25, 6, str(pkg.weight_kg), border=1, align="C", new_x="RIGHT", new_y="TOP")
+        pdf.cell(
+            20, 6, str(pkg.quantity), border=1, align="C", new_x="RIGHT", new_y="TOP"
+        )
+        pdf.cell(
+            25, 6, str(pkg.weight_kg), border=1, align="C", new_x="RIGHT", new_y="TOP"
+        )
         pdf.cell(30, 6, dims, border=1, align="C", new_x="RIGHT", new_y="TOP")
         pdf.cell(0, 6, declared, border=1, align="C", new_x="LMARGIN", new_y="NEXT")
 
@@ -214,13 +220,17 @@ def generate_label_pdf(order: OrderDraft) -> bytes:
         services.append("Хрупкий груз")
     if services:
         bold(10)
-        pdf.cell(0, 7, "Доп. услуги: " + ", ".join(services), new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(
+            0, 7, "Доп. услуги: " + ", ".join(services), new_x="LMARGIN", new_y="NEXT"
+        )
         pdf.ln(2)
 
     # Reference barcode-style footer
     pdf.line(10, pdf.get_y(), 200, pdf.get_y())
     pdf.ln(4)
     bold(14)
-    pdf.cell(0, 10, f"REF: NOVEX-{order.id:08d}", new_x="LMARGIN", new_y="NEXT", align="C")
+    pdf.cell(
+        0, 10, f"REF: NOVEX-{order.id:08d}", new_x="LMARGIN", new_y="NEXT", align="C"
+    )
 
     return bytes(pdf.output())

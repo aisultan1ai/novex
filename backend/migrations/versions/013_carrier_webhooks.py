@@ -4,8 +4,9 @@ Revision ID: 013_carrier_webhooks
 Revises: 012_platform_settings
 Create Date: 2026-05-12
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 
 revision = "013_carrier_webhooks"
 down_revision = "012_platform_settings"
@@ -25,7 +26,9 @@ def upgrade() -> None:
         sa.Column("timeout_seconds", sa.Integer(), nullable=False, server_default="10"),
         sa.Column("created_at", sa.DateTime(), server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(), server_default=sa.func.now()),
-        sa.ForeignKeyConstraint(["carrier_code"], ["carriers.code"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["carrier_code"], ["carriers.code"], ondelete="CASCADE"
+        ),
         sa.UniqueConstraint("carrier_code", name="uq_carrier_webhooks_carrier_code"),
     )
 

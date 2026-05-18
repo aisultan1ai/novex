@@ -21,7 +21,9 @@ class Shipment(Base):
     tracking_number: Mapped[str] = mapped_column(
         String(100), nullable=False, unique=True, index=True
     )
-    carrier_tracking_number: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    carrier_tracking_number: Mapped[str | None] = mapped_column(
+        String(100), nullable=True
+    )
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="created")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=False),

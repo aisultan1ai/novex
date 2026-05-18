@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Literal, Optional
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, model_validator
@@ -12,21 +12,28 @@ from app.core.db import get_db
 from app.core.dependencies import require_admin
 from app.modules.carriers.models import CarrierCommissionConfig
 
-router = APIRouter(prefix="/admin/commission-configs", tags=["admin:commission-configs"])
+router = APIRouter(
+    prefix="/admin/commission-configs", tags=["admin:commission-configs"]
+)
 
 CommissionType = Literal["percentage", "fixed", "combined"]
 
 
 class CommissionConfigUpsert(BaseModel):
     commission_type: CommissionType = "percentage"
-    commission_rate: Optional[Decimal] = Field(default=None, ge=0, le=1)
-    fixed_amount: Optional[Decimal] = Field(default=None, ge=0)
+    commission_rate: Decimal | None = Field(default=None, ge=0, le=1)
+    fixed_amount: Decimal | None = Field(default=None, ge=0)
     currency: str = Field(default="KZT", min_length=3, max_length=3)
 
     @model_validator(mode="after")
-    def validate_fields(self) -> "CommissionConfigUpsert":
-        if self.commission_type in ("percentage", "combined") and self.commission_rate is None:
-            raise ValueError("commission_rate обязателен для типов 'percentage' и 'combined'")
+    def validate_fields(self) -> CommissionConfigUpsert:
+        if (
+            self.commission_type in ("percentage", "combined")
+            and self.commission_rate is None
+        ):
+            raise ValueError(
+                "commission_rate обязателен для типов 'percentage' и 'combined'"
+            )
         if self.commission_type in ("fixed", "combined") and self.fixed_amount is None:
             raise ValueError("fixed_amount обязателен для типов 'fixed' и 'combined'")
         return self
@@ -36,8 +43,8 @@ class CommissionConfigResponse(BaseModel):
     id: int
     carrier_code: str
     commission_type: str
-    commission_rate: Optional[Decimal]
-    fixed_amount: Optional[Decimal]
+    commission_rate: Decimal | None
+    fixed_amount: Decimal | None
     currency: str
 
     model_config = {"from_attributes": True}

@@ -1,12 +1,8 @@
 from __future__ import annotations
 
-import math
 from decimal import Decimal
 
-import pytest
-
 from app.modules.carriers.tariff_engine import (
-    QuoteResult,
     _calculate_hardcoded,
     _db_rate_price,
     _economy_price,

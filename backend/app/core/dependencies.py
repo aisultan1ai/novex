@@ -8,8 +8,8 @@ from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.security import decode_access_token
-from app.modules.identity.repository import IdentityRepository
 from app.modules.identity.models import User
+from app.modules.identity.repository import IdentityRepository
 
 bearer_scheme = HTTPBearer(auto_error=False)
 identity_repository = IdentityRepository()
@@ -89,6 +89,7 @@ def get_current_user(
 
 def require_admin(current_user: User = Depends(get_current_user)) -> User:
     from app.modules.identity.models import RoleCode
+
     if current_user.role.code != RoleCode.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -99,6 +100,7 @@ def require_admin(current_user: User = Depends(get_current_user)) -> User:
 
 def require_carrier(current_user: User = Depends(get_current_user)) -> User:
     from app.modules.identity.models import RoleCode
+
     if current_user.role.code != RoleCode.CARRIER:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

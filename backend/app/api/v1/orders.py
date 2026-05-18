@@ -82,7 +82,9 @@ def proceed_to_checkout(
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> OrderDraftResponse:
-    return orders_service.proceed_to_checkout(db, user_id=current_user_id, draft_id=draft_id)
+    return orders_service.proceed_to_checkout(
+        db, user_id=current_user_id, draft_id=draft_id
+    )
 
 
 @router.post(
@@ -96,7 +98,9 @@ def mock_pay_order_draft(
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> OrderDraftResponse:
-    return orders_service.confirm_payment_mock(db, user_id=current_user_id, draft_id=draft_id)
+    return orders_service.confirm_payment_mock(
+        db, user_id=current_user_id, draft_id=draft_id
+    )
 
 
 @router.delete(

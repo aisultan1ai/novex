@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -27,9 +26,18 @@ _shipments_repo = ShipmentsRepository()
 _dispatch_svc = CarrierDispatchService()
 
 VALID_STATUSES = {
-    "draft", "shipment_details_completed", "ready_for_checkout",
-    "awaiting_payment", "paid", "sent_to_carrier", "picked_up",
-    "in_transit", "arrived", "delivered", "cancelled", "return",
+    "draft",
+    "shipment_details_completed",
+    "ready_for_checkout",
+    "awaiting_payment",
+    "paid",
+    "sent_to_carrier",
+    "picked_up",
+    "in_transit",
+    "arrived",
+    "delivered",
+    "cancelled",
+    "return",
 }
 
 
@@ -71,8 +79,8 @@ def get_dispatch_queue(
 def list_all_orders(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
-    status: Optional[str] = Query(default=None),
-    user_id: Optional[int] = Query(default=None),
+    status: str | None = Query(default=None),
+    user_id: int | None = Query(default=None),
     db: Session = Depends(get_db),
     _=Depends(require_admin),
 ) -> dict:
@@ -96,8 +104,12 @@ def list_all_orders(
             "id": o.id,
             "status": o.status,
             "user_id": o.user_id,
-            "user_email": users_map[o.user_id].email if o.user_id in users_map else None,
-            "user_name": users_map[o.user_id].full_name if o.user_id in users_map else None,
+            "user_email": users_map[o.user_id].email
+            if o.user_id in users_map
+            else None,
+            "user_name": users_map[o.user_id].full_name
+            if o.user_id in users_map
+            else None,
             "from_city": o.from_city_snapshot,
             "to_city": o.to_city_snapshot,
             "carrier_name": o.carrier_name_snapshot,

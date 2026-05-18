@@ -40,11 +40,17 @@ class CommissionsService:
             commission_amount = self._calculate(
                 gross_amount=gross_amount,
                 commission_type=config.commission_type,
-                commission_rate=Decimal(str(config.commission_rate)) if config.commission_rate else Decimal("0"),
-                fixed_amount=Decimal(str(config.fixed_amount)) if config.fixed_amount else Decimal("0"),
+                commission_rate=Decimal(str(config.commission_rate))
+                if config.commission_rate
+                else Decimal("0"),
+                fixed_amount=Decimal(str(config.fixed_amount))
+                if config.fixed_amount
+                else Decimal("0"),
             )
             effective_rate = (
-                Decimal(str(config.commission_rate)) if config.commission_rate else Decimal("0")
+                Decimal(str(config.commission_rate))
+                if config.commission_rate
+                else Decimal("0")
             )
         else:
             commission_amount = (gross_amount * rate).quantize(Decimal("0.01"))

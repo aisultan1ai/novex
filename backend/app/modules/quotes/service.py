@@ -7,8 +7,6 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.exceptions import NotFoundError
-
-logger = logging.getLogger(__name__)
 from app.modules.carriers.tariff_engine import calculate_quotes as _engine_quotes
 from app.modules.quotes.models import QuoteSession, RateQuote
 from app.modules.quotes.schemas import (
@@ -18,9 +16,10 @@ from app.modules.quotes.schemas import (
     ShippingQuoteResponse,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class QuotesService:
-
     def calculate_quotes(
         self,
         db: Session,
@@ -53,7 +52,7 @@ class QuotesService:
         db.flush()
 
         cheapest = min(quotes, key=lambda q: q.price, default=None)
-        fastest  = min(quotes, key=lambda q: q.eta_days_min, default=None)
+        fastest = min(quotes, key=lambda q: q.eta_days_min, default=None)
 
         rate_rows: list[RateQuote] = []
         for q in quotes:

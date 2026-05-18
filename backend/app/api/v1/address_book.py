@@ -20,7 +20,9 @@ def list_addresses(
     return _service.list_addresses(db, user_id=current_user_id)
 
 
-@router.post("", response_model=AddressEntryResponse, status_code=201, summary="Добавить адрес")
+@router.post(
+    "", response_model=AddressEntryResponse, status_code=201, summary="Добавить адрес"
+)
 def create_address(
     payload: AddressEntryCreate,
     current_user_id: int = Depends(get_current_user_id),

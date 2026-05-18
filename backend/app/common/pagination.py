@@ -10,7 +10,9 @@ T = TypeVar("T")
 
 class PageParams(BaseModel):
     page: int = Field(default=1, ge=1, description="Номер страницы (начиная с 1)")
-    size: int = Field(default=20, ge=1, le=100, description="Элементов на странице (макс 100)")
+    size: int = Field(
+        default=20, ge=1, le=100, description="Элементов на странице (макс 100)"
+    )
 
     @property
     def offset(self) -> int:
@@ -30,7 +32,7 @@ class PaginatedResponse(BaseModel, Generic[T]):
         items: list[T],
         total: int,
         params: PageParams,
-    ) -> "PaginatedResponse[T]":
+    ) -> PaginatedResponse[T]:
         pages = math.ceil(total / params.size) if total > 0 else 1
         return cls(
             items=items,

@@ -41,7 +41,9 @@ class AddressBookService:
         logger.info("Address entry created: user_id=%s id=%s", user_id, entry.id)
         return AddressEntryResponse.model_validate(entry)
 
-    def list_addresses(self, db: Session, *, user_id: int) -> list[AddressEntryResponse]:
+    def list_addresses(
+        self, db: Session, *, user_id: int
+    ) -> list[AddressEntryResponse]:
         entries = self.repo.list_for_user(db, user_id=user_id)
         return [AddressEntryResponse.model_validate(e) for e in entries]
 

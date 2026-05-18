@@ -7,6 +7,7 @@ Docs: https://kaspi.kz/o/business  (раздел "API для разработч�
   - KASPI_API_KEY
   - KASPI_WEBHOOK_SECRET  (для проверки подписи колбэков)
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -58,8 +59,14 @@ class KaspiPayService:
             "Amount": round(amount_kzt * 100),  # в тиынах (kopeck-equivalent)
             "Currency": "KZT",
             "Description": description,
-            "ReturnUrl": f"{settings.frontend_url}/dashboard/orders?payment=success&order={order_id}",
-            "FailUrl":   f"{settings.frontend_url}/dashboard/orders?payment=fail&order={order_id}",
+            "ReturnUrl": (
+                f"{settings.frontend_url}"
+                f"/dashboard/orders?payment=success&order={order_id}"
+            ),
+            "FailUrl": (
+                f"{settings.frontend_url}"
+                f"/dashboard/orders?payment=fail&order={order_id}"
+            ),
             "CallbackUrl": f"{settings.backend_url}/api/v1/payments/kaspi/webhook",
         }
 
@@ -102,8 +109,8 @@ class KaspiPayService:
         # Маппинг статусов Kaspi → наши статусы
         STATUS_MAP: dict[str, str] = {
             "APPROVED": "paid",
-            "PAID":     "paid",
-            "FAILED":   "cancelled",
+            "PAID": "paid",
+            "FAILED": "cancelled",
             "CANCELLED": "cancelled",
             "DECLINED": "cancelled",
         }

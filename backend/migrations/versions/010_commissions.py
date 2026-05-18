@@ -32,7 +32,9 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=False,
         ),
-        sa.ForeignKeyConstraint(["order_draft_id"], ["order_drafts.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["order_draft_id"], ["order_drafts.id"], ondelete="CASCADE"
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("order_draft_id", name="uq_commissions_order_draft_id"),
     )

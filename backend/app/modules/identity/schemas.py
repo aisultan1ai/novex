@@ -1,6 +1,13 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from app.modules.identity.models import BillingMode, CustomerType, RoleCode
 
@@ -23,7 +30,7 @@ class RegisterRequest(BaseModel):
         return cleaned or None
 
     @model_validator(mode="after")
-    def validate_company_fields(self) -> "RegisterRequest":
+    def validate_company_fields(self) -> RegisterRequest:
         if self.customer_type == CustomerType.COMPANY and not self.company_name:
             raise ValueError("company_name is required for company customer type")
         return self

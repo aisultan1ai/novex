@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -8,8 +9,6 @@ from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.dependencies import get_current_user_id
-from decimal import Decimal
-
 from app.modules.carriers.dispatch_service import CarrierDispatchService
 from app.modules.commissions.service import CommissionsService
 from app.modules.notifications.service import NotificationsService
@@ -84,6 +83,7 @@ async def kaspi_webhook(request: Request, db: Session = Depends(get_db)) -> dict
         raise HTTPException(status_code=400, detail="Invalid signature")
 
     import json as _json
+
     body = _json.loads(raw_body)
     order_id_str, status = kaspi.parse_webhook(body)
 

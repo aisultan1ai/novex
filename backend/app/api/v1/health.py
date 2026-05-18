@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter
 
@@ -17,5 +17,5 @@ async def healthcheck() -> dict[str, str]:
         "service": settings.project_name,
         "version": settings.app_version,
         "environment": settings.environment,
-        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "timestamp_utc": datetime.now(UTC).isoformat(),
     }

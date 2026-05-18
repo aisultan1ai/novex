@@ -4,6 +4,7 @@ Revision ID: 018_commission_models
 Revises: 017_order_additional_services
 Create Date: 2026-05-13
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa
@@ -28,7 +29,9 @@ def upgrade() -> None:
         ),
         sa.Column("commission_rate", sa.Numeric(5, 4), nullable=True),
         sa.Column("fixed_amount", sa.Numeric(12, 2), nullable=True),
-        sa.Column("currency", sa.String(3), nullable=False, server_default=sa.text("'KZT'")),
+        sa.Column(
+            "currency", sa.String(3), nullable=False, server_default=sa.text("'KZT'")
+        ),
         sa.CheckConstraint(
             "commission_type IN ('percentage', 'fixed', 'combined')",
             name="ck_commission_config_type",

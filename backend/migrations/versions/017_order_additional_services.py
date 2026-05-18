@@ -4,6 +4,7 @@ Revision ID: 017_order_additional_services
 Revises: 016_reviews
 Create Date: 2026-05-13
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa
@@ -18,15 +19,24 @@ depends_on = None
 def upgrade() -> None:
     op.add_column(
         "order_drafts",
-        sa.Column("call_before_delivery", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+        sa.Column(
+            "call_before_delivery",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.text("false"),
+        ),
     )
     op.add_column(
         "order_drafts",
-        sa.Column("insurance", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+        sa.Column(
+            "insurance", sa.Boolean(), nullable=False, server_default=sa.text("false")
+        ),
     )
     op.add_column(
         "order_drafts",
-        sa.Column("fragile", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+        sa.Column(
+            "fragile", sa.Boolean(), nullable=False, server_default=sa.text("false")
+        ),
     )
 
 

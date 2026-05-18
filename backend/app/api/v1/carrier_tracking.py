@@ -49,8 +49,8 @@ async def carrier_tracking_webhook(
 
     try:
         body = json.loads(raw_body)
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON")
+    except json.JSONDecodeError as err:
+        raise HTTPException(status_code=400, detail="Invalid JSON") from err
 
     novex_order_id = body.get("novex_order_id")
     raw_status = body.get("status", "")

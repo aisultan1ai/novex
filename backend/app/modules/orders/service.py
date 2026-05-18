@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.common.pagination import PageParams
 from app.core.exceptions import ForbiddenError, NotFoundError, ValidationError
+from app.modules.address_book.repository import AddressBookRepository
 from app.modules.orders.models import OrderDraft, ShipmentPackage, ShipmentParty
 from app.modules.orders.repository import OrdersRepository
 from app.modules.orders.schemas import (
@@ -17,7 +18,6 @@ from app.modules.orders.schemas import (
     ShipmentPartyResponse,
     UpdateShipmentDetailsRequest,
 )
-from app.modules.address_book.repository import AddressBookRepository
 from app.modules.quotes.models import QuoteSession
 
 logger = logging.getLogger(__name__)
@@ -45,7 +45,9 @@ class OrdersService:
             payload.quote_session_id,
         )
 
-        quote_session = self.repository.get_quote_session_by_id(db, payload.quote_session_id)
+        quote_session = self.repository.get_quote_session_by_id(
+            db, payload.quote_session_id
+        )
         if quote_session is None:
             logger.warning(
                 "Quote session not found: quote_session_id=%s user_id=%s",
@@ -104,7 +106,9 @@ class OrdersService:
 
             db.commit()
 
-            refreshed_draft = self.repository.get_order_draft_by_id(db, existing_draft.id)
+            refreshed_draft = self.repository.get_order_draft_by_id(
+                db, existing_draft.id
+            )
             if refreshed_draft is None:
                 raise NotFoundError("Failed to load updated order draft")
 
@@ -136,7 +140,9 @@ class OrdersService:
         )
 
         db.commit()
-        db.expire(created_draft)  # force fresh load — expire_on_commit=False leaves packages=[] stale
+        db.expire(
+            created_draft
+        )  # force fresh load — expire_on_commit=False leaves packages=[] stale
 
         draft = self.repository.get_order_draft_by_id(db, created_draft.id)
         if draft is None:
@@ -159,7 +165,9 @@ class OrdersService:
     ) -> OrderDraftResponse:
         order_draft = self.repository.get_order_draft_by_id(db, draft_id)
         if order_draft is None:
-            logger.warning("Order draft not found: draft_id=%s user_id=%s", draft_id, user_id)
+            logger.warning(
+                "Order draft not found: draft_id=%s user_id=%s", draft_id, user_id
+            )
             raise NotFoundError("Order draft not found")
 
         if order_draft.user_id != user_id:
@@ -221,16 +229,22 @@ class OrdersService:
                 "Expected 'shipment_details_completed'."
             )
         if not order_draft.parties or not order_draft.packages:
-            raise ValidationError("Sender, recipient and at least one package are required")
+            raise ValidationError(
+                "Sender, recipient and at least one package are required"
+            )
 
-        self.repository.update_order_draft_status(db, order_draft=order_draft, status="ready_for_checkout")
+        self.repository.update_order_draft_status(
+            db, order_draft=order_draft, status="ready_for_checkout"
+        )
         db.commit()
 
         refreshed = self.repository.get_order_draft_by_id(db, draft_id)
         if refreshed is None:
             raise NotFoundError("Failed to load order draft")
 
-        logger.info("Order draft moved to checkout: draft_id=%s user_id=%s", draft_id, user_id)
+        logger.info(
+            "Order draft moved to checkout: draft_id=%s user_id=%s", draft_id, user_id
+        )
         return self._build_order_draft_response(refreshed)
 
     def confirm_payment_mock(
@@ -240,7 +254,10 @@ class OrdersService:
         user_id: int,
         draft_id: int,
     ) -> OrderDraftResponse:
-        """Заглушка подтверждения оплаты. Заменить вызовом реального шлюза при интеграции."""
+        """Заглушка подтверждения оплаты.
+
+        Заменить вызовом реального шлюза при интеграции.
+        """
         order_draft = self.repository.get_order_draft_by_id(db, draft_id)
         if order_draft is None:
             raise NotFoundError("Order draft not found")
@@ -251,14 +268,18 @@ class OrdersService:
                 f"Cannot confirm payment from status '{order_draft.status}'"
             )
 
-        self.repository.update_order_draft_status(db, order_draft=order_draft, status="paid")
+        self.repository.update_order_draft_status(
+            db, order_draft=order_draft, status="paid"
+        )
         db.commit()
 
         refreshed = self.repository.get_order_draft_by_id(db, draft_id)
         if refreshed is None:
             raise NotFoundError("Failed to load order draft")
 
-        logger.info("Order draft paid (mock): draft_id=%s user_id=%s", draft_id, user_id)
+        logger.info(
+            "Order draft paid (mock): draft_id=%s user_id=%s", draft_id, user_id
+        )
         return self._build_order_draft_response(refreshed)
 
     def delete_draft(
@@ -270,7 +291,9 @@ class OrdersService:
     ) -> None:
         order_draft = self.repository.get_order_draft_by_id(db, draft_id)
         if order_draft is None:
-            logger.warning("Order draft not found: draft_id=%s user_id=%s", draft_id, user_id)
+            logger.warning(
+                "Order draft not found: draft_id=%s user_id=%s", draft_id, user_id
+            )
             raise NotFoundError("Order draft not found")
 
         if order_draft.user_id != user_id:
@@ -304,7 +327,9 @@ class OrdersService:
     ) -> OrderDraftResponse:
         order_draft = self.repository.get_order_draft_by_id(db, draft_id)
         if order_draft is None:
-            logger.warning("Order draft not found: draft_id=%s user_id=%s", draft_id, user_id)
+            logger.warning(
+                "Order draft not found: draft_id=%s user_id=%s", draft_id, user_id
+            )
             raise NotFoundError("Order draft not found")
 
         if order_draft.user_id != user_id:
@@ -319,8 +344,12 @@ class OrdersService:
         self.repository.delete_shipment_parties(db, order_draft_id=draft_id)
         self.repository.delete_shipment_packages(db, order_draft_id=draft_id)
 
-        self._create_party(db, order_draft_id=draft_id, role="sender", payload=payload.sender)
-        self._create_party(db, order_draft_id=draft_id, role="recipient", payload=payload.recipient)
+        self._create_party(
+            db, order_draft_id=draft_id, role="sender", payload=payload.sender
+        )
+        self._create_party(
+            db, order_draft_id=draft_id, role="recipient", payload=payload.recipient
+        )
 
         for item in payload.packages:
             self.repository.create_shipment_package(
@@ -446,7 +475,9 @@ class OrdersService:
             comment=payload.comment,
         )
 
-    def _build_order_draft_response(self, order_draft: OrderDraft) -> OrderDraftResponse:
+    def _build_order_draft_response(
+        self, order_draft: OrderDraft
+    ) -> OrderDraftResponse:
         sender = self._find_party(order_draft.parties, "sender")
         recipient = self._find_party(order_draft.parties, "recipient")
 
@@ -455,7 +486,7 @@ class OrdersService:
             user_id=order_draft.user_id,
             quote_session_id=order_draft.quote_session_id,
             selected_rate_quote_id=order_draft.selected_rate_quote_id,
-            status=order_draft.status,
+            status=order_draft.status,  # type: ignore[arg-type]
             carrier_code_snapshot=order_draft.carrier_code_snapshot,
             carrier_name_snapshot=order_draft.carrier_name_snapshot,
             tariff_name_snapshot=order_draft.tariff_name_snapshot,
@@ -477,7 +508,9 @@ class OrdersService:
             packages=[self._map_package(item) for item in order_draft.packages],
         )
 
-    def _find_party(self, parties: list[ShipmentParty], role: str) -> ShipmentParty | None:
+    def _find_party(
+        self, parties: list[ShipmentParty], role: str
+    ) -> ShipmentParty | None:
         for party in parties:
             if party.role == role:
                 return party

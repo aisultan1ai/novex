@@ -433,7 +433,7 @@ export default function MyOrdersPage() {
                         )}
                         {isDraft && (
                           <button
-                            onClick={(e) => { e.stopPropagation(); isConfirming ? setConfirmingDeleteId(null) : setConfirmingDeleteId(order.draft_id); }}
+                            onClick={(e) => { e.stopPropagation(); setConfirmingDeleteId(isConfirming ? null : order.draft_id); }}
                             disabled={isDeleting}
                             style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "1px solid #fecaca", background: "#fff", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: isDeleting ? "not-allowed" : "pointer", opacity: isDeleting ? 0.4 : 1, fontFamily: "inherit" }}
                           >

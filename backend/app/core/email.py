@@ -14,7 +14,9 @@ def send_email(*, to: str, subject: str, html: str) -> None:
     settings = get_settings()
 
     if not settings.smtp_host or not settings.smtp_user:
-        logger.warning("SMTP не настроен — письмо не отправлено. To: %s | Subject: %s", to, subject)
+        logger.warning(
+            "SMTP не настроен — письмо не отправлено. To: %s | Subject: %s", to, subject
+        )
         return
 
     msg = MIMEMultipart("alternative")

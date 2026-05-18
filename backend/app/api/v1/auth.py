@@ -3,9 +3,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.db import get_db
 from app.core.dependencies import get_current_user_id
-from app.core.config import get_settings
 from app.core.limiter import limiter
 from app.modules.identity.schemas import (
     ForgotPasswordRequest,

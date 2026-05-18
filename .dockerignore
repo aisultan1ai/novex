@@ -1,0 +1,27 @@
+# Python
+backend/.venv
+backend/__pycache__
+backend/**/__pycache__
+backend/**/*.pyc
+backend/**/*.pyo
+backend/.pytest_cache
+backend/*.egg-info
+backend/dist
+backend/build
+backend/.mypy_cache
+backend/.ruff_cache
+
+# Node
+frontend/node_modules
+frontend/.next
+frontend/out
+frontend/.turbo
+
+# Infra
+infra/compose/.env
+
+# Git / IDE
+.git
+.gitignore
+**/.DS_Store
+**/*.swp

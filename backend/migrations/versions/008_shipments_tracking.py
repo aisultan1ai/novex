@@ -36,7 +36,9 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=False,
         ),
-        sa.ForeignKeyConstraint(["order_draft_id"], ["order_drafts.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["order_draft_id"], ["order_drafts.id"], ondelete="CASCADE"
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("order_draft_id", name="uq_shipments_order_draft_id"),
         sa.UniqueConstraint("tracking_number", name="uq_shipments_tracking_number"),
@@ -64,11 +66,17 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=False,
         ),
-        sa.ForeignKeyConstraint(["order_draft_id"], ["order_drafts.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["order_draft_id"], ["order_drafts.id"], ondelete="CASCADE"
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_tracking_events_order_draft_id", "tracking_events", ["order_draft_id"])
-    op.create_index("ix_tracking_events_occurred_at", "tracking_events", ["occurred_at"])
+    op.create_index(
+        "ix_tracking_events_order_draft_id", "tracking_events", ["order_draft_id"]
+    )
+    op.create_index(
+        "ix_tracking_events_occurred_at", "tracking_events", ["occurred_at"]
+    )
 
 
 def downgrade() -> None:

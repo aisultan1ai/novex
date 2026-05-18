@@ -45,25 +45,29 @@ class Settings(BaseSettings):
     minio_secure: bool = False
 
     @model_validator(mode="after")
-    def warn_weak_credentials_in_production(self) -> "Settings":
+    def warn_weak_credentials_in_production(self) -> Settings:
         if self.environment == "production":
             if self.postgres_password in _WEAK_POSTGRES_PASSWORDS:
                 raise ValueError(
-                    "postgres_password is a known weak default — set a strong POSTGRES_PASSWORD env var"
+                    "postgres_password is a known weak default — "
+                    "set a strong POSTGRES_PASSWORD env var"
                 )
             if self.minio_secret_key in _WEAK_MINIO_SECRETS:
                 raise ValueError(
-                    "minio_secret_key is a known weak default — set a strong MINIO_SECRET_KEY env var"
+                    "minio_secret_key is a known weak default — "
+                    "set a strong MINIO_SECRET_KEY env var"
                 )
         elif self.environment != "test":
             if self.postgres_password in _WEAK_POSTGRES_PASSWORDS:
                 warnings.warn(
-                    "postgres_password uses a weak default. Set POSTGRES_PASSWORD before deploying.",
+                    "postgres_password uses a weak default. "
+                    "Set POSTGRES_PASSWORD before deploying.",
                     stacklevel=2,
                 )
             if self.minio_secret_key in _WEAK_MINIO_SECRETS:
                 warnings.warn(
-                    "minio_secret_key uses a weak default. Set MINIO_SECRET_KEY before deploying.",
+                    "minio_secret_key uses a weak default. "
+                    "Set MINIO_SECRET_KEY before deploying.",
                     stacklevel=2,
                 )
         return self

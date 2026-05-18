@@ -30,7 +30,9 @@ class ShipmentsRepository:
             select(Shipment).where(Shipment.order_draft_id == order_draft_id)
         )
 
-    def get_by_tracking_number(self, db: Session, tracking_number: str) -> Shipment | None:
+    def get_by_tracking_number(
+        self, db: Session, tracking_number: str
+    ) -> Shipment | None:
         return db.scalar(
             select(Shipment).where(Shipment.tracking_number == tracking_number)
         )

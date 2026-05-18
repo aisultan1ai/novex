@@ -3,7 +3,16 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, UniqueConstraint, func
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -54,7 +63,9 @@ class OrderDraft(Base, TimestampMixin):
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="draft")
     dispatch_error: Mapped[str | None] = mapped_column(String, nullable=True)
 
-    call_before_delivery: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    call_before_delivery: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
     insurance: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     fragile: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
@@ -74,11 +85,11 @@ class OrderDraft(Base, TimestampMixin):
     to_city_snapshot: Mapped[str] = mapped_column(String(100), nullable=False)
     shipment_type_snapshot: Mapped[str] = mapped_column(String(20), nullable=False)
 
-    parties: Mapped[list["ShipmentParty"]] = relationship(
+    parties: Mapped[list[ShipmentParty]] = relationship(
         back_populates="order_draft",
         cascade="all, delete-orphan",
     )
-    packages: Mapped[list["ShipmentPackage"]] = relationship(
+    packages: Mapped[list[ShipmentPackage]] = relationship(
         back_populates="order_draft",
         cascade="all, delete-orphan",
     )
@@ -108,7 +119,7 @@ class ShipmentParty(Base, TimestampMixin):
     postal_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
     comment: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
-    order_draft: Mapped["OrderDraft"] = relationship(back_populates="parties")
+    order_draft: Mapped[OrderDraft] = relationship(back_populates="parties")
 
 
 class ShipmentPackage(Base, TimestampMixin):
@@ -129,7 +140,11 @@ class ShipmentPackage(Base, TimestampMixin):
     height_cm: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     depth_cm: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
 
-    declared_value: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
-    declared_value_currency: Mapped[str | None] = mapped_column(String(3), nullable=True)
+    declared_value: Mapped[Decimal | None] = mapped_column(
+        Numeric(12, 2), nullable=True
+    )
+    declared_value_currency: Mapped[str | None] = mapped_column(
+        String(3), nullable=True
+    )
 
-    order_draft: Mapped["OrderDraft"] = relationship(back_populates="packages")
+    order_draft: Mapped[OrderDraft] = relationship(back_populates="packages")

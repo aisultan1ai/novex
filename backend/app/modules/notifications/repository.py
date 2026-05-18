@@ -4,6 +4,7 @@ from collections.abc import Sequence
 
 from sqlalchemy import func, select
 from sqlalchemy import update as sa_update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 
 from app.modules.notifications.models import Notification
@@ -39,15 +40,18 @@ class NotificationsRepository:
         ).all()
 
     def count_unread(self, db: Session, *, user_id: int) -> int:
-        return db.scalar(
-            select(func.count(Notification.id)).where(
-                Notification.user_id == user_id,
-                Notification.is_read.is_(False),
+        return (
+            db.scalar(
+                select(func.count(Notification.id)).where(
+                    Notification.user_id == user_id,
+                    Notification.is_read.is_(False),
+                )
             )
-        ) or 0
+            or 0
+        )
 
     def mark_read(self, db: Session, *, notification_id: int, user_id: int) -> bool:
-        result = db.execute(
+        result: CursorResult = db.execute(  # type: ignore[assignment]
             sa_update(Notification)
             .where(
                 Notification.id == notification_id,
@@ -58,7 +62,7 @@ class NotificationsRepository:
         return result.rowcount > 0
 
     def mark_all_read(self, db: Session, *, user_id: int) -> int:
-        result = db.execute(
+        result: CursorResult = db.execute(  # type: ignore[assignment]
             sa_update(Notification)
             .where(
                 Notification.user_id == user_id,

@@ -3,22 +3,28 @@ from __future__ import annotations
 import logging
 import secrets
 
+from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 
 from app.core.email import send_email
 from app.core.exceptions import ConflictError, NotFoundError, UnauthorizedError
 from app.core.redis import get_redis
-
-logger = logging.getLogger(__name__)
 from app.core.security import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     create_access_token,
     get_password_hash,
     verify_password,
 )
-from app.modules.identity.models import BillingMode, CarrierProfile, CustomerType, RoleCode, User
+from app.modules.identity.models import (
+    BillingMode,
+    CarrierProfile,
+    CustomerType,
+    RoleCode,
+    User,
+)
 from app.modules.identity.repository import IdentityRepository
 from app.modules.identity.schemas import (
+    ChangePasswordRequest,
     ForgotPasswordRequest,
     LoginRequest,
     ProfileResponse,
@@ -28,13 +34,14 @@ from app.modules.identity.schemas import (
     TokenResponse,
 )
 
-from pydantic import BaseModel, EmailStr
+logger = logging.getLogger(__name__)
 
 
 class CreateCarrierAccountRequest(BaseModel):
     email: EmailStr
     full_name: str | None = None
     temp_password: str
+
 
 _RESET_TTL = 3600  # 1 час
 
@@ -47,7 +54,9 @@ class IdentityService:
         logger.info("Registering user: email=%s", payload.email)
         existing_user = self.repository.get_user_by_email(db, payload.email)
         if existing_user is not None:
-            logger.warning("Registration conflict: email=%s already exists", payload.email)
+            logger.warning(
+                "Registration conflict: email=%s already exists", payload.email
+            )
             raise ConflictError("User with this email already exists")
 
         customer_role = self.repository.ensure_role(
@@ -84,7 +93,9 @@ class IdentityService:
         if created_user is None:
             raise NotFoundError("Failed to load created user")
 
-        logger.info("User registered: user_id=%s email=%s", created_user.id, created_user.email)
+        logger.info(
+            "User registered: user_id=%s email=%s", created_user.id, created_user.email
+        )
         return self._build_profile_response(created_user)
 
     def authenticate_user(self, db: Session, payload: LoginRequest) -> TokenResponse:
@@ -160,7 +171,9 @@ class IdentityService:
 
         return self._build_profile_response(updated_user)
 
-    def forgot_password(self, db: Session, payload: ForgotPasswordRequest, frontend_url: str) -> None:
+    def forgot_password(
+        self, db: Session, payload: ForgotPasswordRequest, frontend_url: str
+    ) -> None:
         user = self.repository.get_user_by_email(db, payload.email)
         if not user:
             # не раскрываем существование аккаунта
@@ -189,7 +202,9 @@ class IdentityService:
         )
         logger.info("Токен сброса пароля создан: user_id=%s", user.id)
 
-    def change_password(self, db: Session, user_id: int, payload: "ChangePasswordRequest") -> None:
+    def change_password(
+        self, db: Session, user_id: int, payload: ChangePasswordRequest
+    ) -> None:
         user = self.repository.get_user_by_id(db, user_id)
         if not user:
             raise NotFoundError("Пользователь не найден")
@@ -205,7 +220,7 @@ class IdentityService:
         if not user_id_str:
             raise UnauthorizedError("Ссылка недействительна или устарела")
 
-        user = self.repository.get_user_by_id(db, int(user_id_str))
+        user = self.repository.get_user_by_id(db, int(user_id_str))  # type: ignore[arg-type]
         if not user:
             raise NotFoundError("Пользователь не найден")
 
@@ -235,7 +250,7 @@ class IdentityService:
         *,
         carrier_id: int,
         carrier_name: str,
-        payload: "CreateCarrierAccountRequest",
+        payload: CreateCarrierAccountRequest,
         frontend_url: str,
     ) -> ProfileResponse:
         if self.repository.get_user_by_email(db, payload.email):

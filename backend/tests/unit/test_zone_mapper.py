@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from app.modules.carriers.zone_mapper import get_zone, is_known_city
 
 

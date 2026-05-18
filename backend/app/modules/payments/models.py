@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
-from sqlalchemy import DateTime, Enum as SqlEnum, ForeignKey, Numeric, String, func
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import DateTime, ForeignKey, Numeric, String, func
+from sqlalchemy import Enum as SqlEnum
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
 
 
-class PaymentStatus(str, Enum):
+class PaymentStatus(StrEnum):
     PENDING = "pending"
     PAID = "paid"
     FAILED = "failed"
@@ -17,7 +18,7 @@ class PaymentStatus(str, Enum):
     REFUNDED = "refunded"
 
 
-class PaymentProvider(str, Enum):
+class PaymentProvider(StrEnum):
     KASPI = "kaspi"
     MOCK = "mock"
 
@@ -35,7 +36,9 @@ class Payment(Base):
         SqlEnum(PaymentProvider, name="payment_provider_enum"),
         nullable=False,
     )
-    provider_payment_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    provider_payment_id: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, index=True
+    )
     amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="KZT")
     status: Mapped[PaymentStatus] = mapped_column(
