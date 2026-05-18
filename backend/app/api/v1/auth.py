@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.db import get_db
 from app.core.dependencies import get_current_user_id
 from app.core.limiter import limiter
+from app.core.security import ACCESS_TOKEN_EXPIRE_MINUTES
 from app.modules.identity.schemas import (
     ForgotPasswordRequest,
     LoginRequest,
@@ -20,6 +21,19 @@ from app.modules.identity.service import IdentityService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 identity_service = IdentityService()
+
+
+def _set_auth_cookie(response: Response, token: str) -> None:
+    settings = get_settings()
+    response.set_cookie(
+        key="access_token",
+        value=token,
+        httponly=True,
+        secure=settings.environment == "production",
+        samesite="lax",
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
+    )
 
 
 @router.post(
@@ -42,10 +56,23 @@ def register_user(
 @limiter.limit("10/minute")
 def login_user(
     request: Request,
+    response: Response,
     payload: LoginRequest,
     db: Session = Depends(get_db),
 ) -> TokenResponse:
-    return identity_service.authenticate_user(db, payload)
+    result = identity_service.authenticate_user(db, payload)
+    _set_auth_cookie(response, result.access_token)
+    return result
+
+
+@router.post(
+    "/logout",
+    status_code=200,
+    summary="Завершить сессию — удаляет HttpOnly-cookie",
+)
+def logout_user(response: Response) -> dict:
+    response.delete_cookie(key="access_token", path="/")
+    return {"detail": "Вышли из системы"}
 
 
 @router.get(
@@ -70,7 +97,9 @@ def update_my_profile(
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> ProfileResponse:
-    return identity_service.update_profile(db, user_id=current_user_id, payload=payload)
+    return identity_service.update_profile(
+        db, user_id=current_user_id, payload=payload
+    )
 
 
 @router.post(

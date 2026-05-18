@@ -1,4 +1,3 @@
-import { getAuthHeaders } from "@/lib/auth/session";
 import type { NotificationListResponse } from "@/types/notifications";
 
 const BASE = (process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") || "/api/v1");
@@ -6,7 +5,8 @@ const BASE = (process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") || "/api
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
-    headers: { "Content-Type": "application/json", ...getAuthHeaders(), ...(init?.headers ?? {}) },
+    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    credentials: "include",
     cache: "no-store",
   });
   const data = await res.json().catch(() => null);

@@ -54,10 +54,13 @@ services:
       context: ../..
       dockerfile: infra/docker/backend.Dockerfile
     working_dir: /app
-    env_file: ../env/backend.env
+    env_file:
+      - path: ../env/backend.env
+        required: false
     environment:
       ENVIRONMENT: production
       DEBUG: "false"
+      SECRET_KEY: ${SECRET_KEY}
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
     depends_on:
       postgres:
@@ -81,12 +84,15 @@ services:
       migrate:
         condition: service_completed_successfully
     working_dir: /app
-    env_file: ../env/backend.env
+    env_file:
+      - path: ../env/backend.env
+        required: false
     environment:
       PROJECT_NAME: Novex API
       APP_VERSION: 0.1.0
       ENVIRONMENT: production
       DEBUG: "false"
+      SECRET_KEY: ${SECRET_KEY}
       API_V1_PREFIX: /api/v1
       BACKEND_HOST: 0.0.0.0
       BACKEND_PORT: 8000
@@ -140,9 +146,12 @@ services:
       migrate:
         condition: service_completed_successfully
     working_dir: /app
-    env_file: ../env/worker.env
+    env_file:
+      - path: ../env/worker.env
+        required: false
     environment:
       ENVIRONMENT: production
+      SECRET_KEY: ${SECRET_KEY}
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       MINIO_ENDPOINT: minio:9000
@@ -156,9 +165,6 @@ services:
     build:
       context: ../..
       dockerfile: infra/docker/frontend.Dockerfile
-      args:
-        # NEXT_PUBLIC_* vars are baked into the JS bundle at build time
-        NEXT_PUBLIC_API_BASE_URL: https://${DOMAIN}/api/v1
     container_name: novex-frontend
     restart: unless-stopped
     depends_on:
@@ -169,6 +175,8 @@ services:
       NEXT_TELEMETRY_DISABLED: "1"
       PORT: 3000
       NEXT_PUBLIC_APP_NAME: Novex
+      # Used by Next.js rewrites when the standalone server proxies /api/*
+      BACKEND_URL: http://backend:8000
     # CMD is defined in Dockerfile: node server.js (Next.js standalone)
 
   nginx:

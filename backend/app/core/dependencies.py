@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Cookie, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
@@ -17,24 +17,18 @@ identity_repository = IdentityRepository()
 
 def get_token_payload(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    access_token: str | None = Cookie(default=None),
 ) -> dict[str, Any]:
-    if credentials is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authorization credentials are required",
-        )
+    # HttpOnly cookie takes priority; Bearer header is accepted as fallback
+    token = access_token
+    if token is None and credentials is not None:
+        if credentials.scheme.lower() == "bearer":
+            token = credentials.credentials
 
-    if credentials.scheme.lower() != "bearer":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization scheme",
-        )
-
-    token = credentials.credentials
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Access token is missing",
+            detail="Authorization credentials are required",
         )
 
     try:

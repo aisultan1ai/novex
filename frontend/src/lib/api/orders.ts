@@ -1,4 +1,3 @@
-import { getAuthHeaders } from "@/lib/auth/session";
 import type {
   CreateDraftFromQuoteRequest,
   OrderDraftResponse,
@@ -37,9 +36,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      ...getAuthHeaders(),
       ...(init?.headers || {}),
     },
+    credentials: "include",
     cache: "no-store",
   });
 
@@ -120,7 +119,7 @@ export async function listOrders(
 export async function downloadOrderLabel(draftId: number): Promise<Blob> {
   const response = await fetch(`${API_BASE_URL}/orders/${draftId}/label`, {
     method: "GET",
-    headers: { ...getAuthHeaders() },
+    credentials: "include",
     cache: "no-store",
   });
   if (!response.ok) {

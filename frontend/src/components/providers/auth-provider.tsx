@@ -13,17 +13,17 @@ import { usePathname, useRouter } from "next/navigation";
 
 import {
   clearAuthSession,
-  getAuthSession,
+  getStoredCurrentUser,
   saveAuthSession,
 } from "@/lib/auth/session";
+import { logoutUser } from "@/lib/api/auth";
 import type { ProfileResponse } from "@/types/auth";
 
 type AuthContextValue = {
   currentUser: ProfileResponse | null;
-  accessToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (accessToken: string, profile: ProfileResponse) => void;
+  login: (profile: ProfileResponse) => void;
   logout: (redirectTo?: string) => void;
   refreshSession: () => void;
 };
@@ -38,13 +38,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const router = useRouter();
 
   const [currentUser, setCurrentUser] = useState<ProfileResponse | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const refreshSession = useCallback(() => {
-    const session = getAuthSession();
-    setAccessToken(session.accessToken);
-    setCurrentUser(session.profile);
+    setCurrentUser(getStoredCurrentUser());
     setIsLoading(false);
   }, []);
 
@@ -52,16 +49,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
     refreshSession();
   }, [refreshSession]);
 
-  const login = useCallback((newAccessToken: string, profile: ProfileResponse) => {
-    saveAuthSession(newAccessToken, profile);
-    setAccessToken(newAccessToken);
+  const login = useCallback((profile: ProfileResponse) => {
+    saveAuthSession(profile);
     setCurrentUser(profile);
   }, []);
 
   const logout = useCallback(
-    (redirectTo = "/login") => {
+    async (redirectTo = "/login") => {
+      try {
+        await logoutUser();
+      } catch {
+        // cookie cleared server-side; ignore network errors
+      }
       clearAuthSession();
-      setAccessToken(null);
       setCurrentUser(null);
       router.push(redirectTo);
     },
@@ -71,14 +71,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const value = useMemo<AuthContextValue>(
     () => ({
       currentUser,
-      accessToken,
-      isAuthenticated: Boolean(accessToken),
+      isAuthenticated: Boolean(currentUser),
       isLoading,
       login,
       logout,
       refreshSession,
     }),
-    [currentUser, accessToken, isLoading, login, logout, refreshSession],
+    [currentUser, isLoading, login, logout, refreshSession],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

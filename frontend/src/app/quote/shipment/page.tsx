@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties, FormEvent } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { useAuth } from "@/components/providers/auth-provider";
@@ -447,7 +447,7 @@ function PackageSection({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function ShipmentPage() {
+function ShipmentPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { currentUser, isAuthenticated, isLoading, logout } = useAuth();
@@ -733,5 +733,13 @@ export default function ShipmentPage() {
         ) : null}
       </div>
     </main>
+  );
+}
+
+export default function ShipmentPage() {
+  return (
+    <Suspense>
+      <ShipmentPageInner />
+    </Suspense>
   );
 }

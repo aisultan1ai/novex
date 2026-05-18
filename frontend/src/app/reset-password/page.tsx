@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -12,7 +12,7 @@ const inp: React.CSSProperties = {
   background: "#f8fafc", fontFamily: "inherit", transition: "border-color 0.15s, background 0.15s",
 };
 
-export default function ResetPasswordPage() {
+function ResetPasswordPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? "";
@@ -137,4 +137,8 @@ export default function ResetPasswordPage() {
       </div>
     </div>
   );
+}
+
+export default function ResetPasswordPage() {
+  return <Suspense><ResetPasswordPageInner /></Suspense>;
 }

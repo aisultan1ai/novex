@@ -1,7 +1,7 @@
 "use client";
 
 import type { FormEvent } from "react";
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -30,7 +30,7 @@ const lbl: React.CSSProperties = {
   marginBottom: 8,
 };
 
-export default function LoginPage() {
+function LoginPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuth();
@@ -52,7 +52,7 @@ export default function LoginPage() {
     setIsSubmitting(true);
     try {
       const res = await loginUser({ email: email.trim().toLowerCase(), password });
-      login(res.access_token, res.profile);
+      login(res.profile);
       const destination =
         res.profile.role === "carrier" ? "/dashboard/carrier" :
         res.profile.role === "admin" ? "/dashboard/admin" :
@@ -202,4 +202,8 @@ export default function LoginPage() {
       </div>
     </div>
   );
+}
+
+export default function LoginPage() {
+  return <Suspense><LoginPageInner /></Suspense>;
 }

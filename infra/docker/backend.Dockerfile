@@ -33,9 +33,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /opt/venv /opt/venv
 
-COPY backend/app         ./app
-COPY backend/migrations  ./migrations
-COPY backend/alembic.ini .
+COPY backend/app          ./app
+COPY backend/integrations ./integrations
+COPY backend/migrations   ./migrations
+COPY backend/scripts      ./scripts
+COPY backend/alembic.ini  .
 COPY backend/pyproject.toml .
 
 EXPOSE 8000

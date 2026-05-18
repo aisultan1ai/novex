@@ -1,4 +1,3 @@
-import { getAuthHeaders } from "@/lib/auth/session";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") || "/api/v1";
@@ -34,9 +33,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      ...getAuthHeaders(),
       ...(init?.headers || {}),
     },
+    credentials: "include",
     cache: "no-store",
   });
   const contentType = response.headers.get("content-type") || "";
@@ -68,7 +67,7 @@ export async function upsertCommissionConfig(
 export async function deleteCommissionConfig(carrierCode: string): Promise<void> {
   await fetch(`${API_BASE_URL}/admin/commission-configs/${carrierCode}`, {
     method: "DELETE",
-    headers: { ...getAuthHeaders() },
+    credentials: "include",
     cache: "no-store",
   });
 }

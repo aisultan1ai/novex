@@ -1,33 +1,14 @@
 import type { ProfileResponse } from "@/types/auth";
 
-export const ACCESS_TOKEN_STORAGE_KEY = "novex_access_token";
-export const AUTH_PROFILE_STORAGE_KEY = "novex_auth_profile";
-
-export interface StoredAuthSession {
-  accessToken: string | null;
-  profile: ProfileResponse | null;
-}
+const AUTH_PROFILE_STORAGE_KEY = "novex_auth_profile";
 
 function isBrowser(): boolean {
   return typeof window !== "undefined";
 }
 
-export function saveAuthSession(
-  accessToken: string,
-  profile: ProfileResponse,
-): void {
+export function saveAuthSession(profile: ProfileResponse): void {
   if (!isBrowser()) return;
-
-  window.localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, accessToken);
-  window.localStorage.setItem(
-    AUTH_PROFILE_STORAGE_KEY,
-    JSON.stringify(profile),
-  );
-}
-
-export function getAccessToken(): string | null {
-  if (!isBrowser()) return null;
-  return window.localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
+  window.localStorage.setItem(AUTH_PROFILE_STORAGE_KEY, JSON.stringify(profile));
 }
 
 export function getStoredCurrentUser(): ProfileResponse | null {
@@ -43,32 +24,11 @@ export function getStoredCurrentUser(): ProfileResponse | null {
   }
 }
 
-export function getAuthSession(): StoredAuthSession {
-  return {
-    accessToken: getAccessToken(),
-    profile: getStoredCurrentUser(),
-  };
-}
-
 export function clearAuthSession(): void {
   if (!isBrowser()) return;
-
-  window.localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
   window.localStorage.removeItem(AUTH_PROFILE_STORAGE_KEY);
 }
 
 export function isAuthenticated(): boolean {
-  return Boolean(getAccessToken());
-}
-
-export function getAuthHeaders(): HeadersInit {
-  const token = getAccessToken();
-
-  if (!token) {
-    return {};
-  }
-
-  return {
-    Authorization: `Bearer ${token}`,
-  };
+  return Boolean(getStoredCurrentUser());
 }

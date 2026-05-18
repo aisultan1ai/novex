@@ -1,4 +1,3 @@
-import { getAuthHeaders } from "@/lib/auth/session";
 import type {
   LoginRequest,
   ProfileResponse,
@@ -36,15 +35,14 @@ async function parseJsonSafely(response: Response): Promise<unknown> {
 async function request<T>(
   path: string,
   init?: RequestInit,
-  auth = false,
 ): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      ...(auth ? getAuthHeaders() : {}),
       ...(init?.headers || {}),
     },
+    credentials: "include",
     cache: "no-store",
   });
 
@@ -81,8 +79,12 @@ export async function loginUser(payload: LoginRequest): Promise<TokenResponse> {
   });
 }
 
+export async function logoutUser(): Promise<void> {
+  await request("/auth/logout", { method: "POST" });
+}
+
 export async function getProfile(): Promise<ProfileResponse> {
-  return request<ProfileResponse>("/auth/profile", { method: "GET" }, true);
+  return request<ProfileResponse>("/auth/profile", { method: "GET" });
 }
 
 export async function updateProfile(payload: {
@@ -90,11 +92,10 @@ export async function updateProfile(payload: {
   phone?: string | null;
   company_name?: string | null;
 }): Promise<ProfileResponse> {
-  return request<ProfileResponse>(
-    "/auth/profile",
-    { method: "PATCH", body: JSON.stringify(payload) },
-    true,
-  );
+  return request<ProfileResponse>("/auth/profile", {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function forgotPassword(email: string): Promise<void> {
@@ -118,7 +119,7 @@ export async function changePassword(payload: {
   await request("/profile/change-password", {
     method: "POST",
     body: JSON.stringify(payload),
-  }, true);
+  });
 }
 
 export { ApiError };

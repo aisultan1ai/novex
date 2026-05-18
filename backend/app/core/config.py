@@ -22,7 +22,11 @@ class Settings(BaseSettings):
     project_name: str = "Novex API"
     app_version: str = "0.1.0"
     environment: str = "development"
-    debug: bool = True
+    debug: bool = False
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment == "production"
 
     api_v1_prefix: str = "/api/v1"
 

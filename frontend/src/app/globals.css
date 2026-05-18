@@ -1,6 +1,5 @@
 /* Inter Variable — bundled via npm, no network fetch during build */
 @import "@fontsource-variable/inter";
-@import "@fontsource-variable/inter/wdth.css";
 
 :root {
   --font-inter: "Inter Variable", ui-sans-serif, system-ui, -apple-system,

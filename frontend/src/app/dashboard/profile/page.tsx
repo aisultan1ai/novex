@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/providers/auth-provider";
-import { getAccessToken, saveAuthSession } from "@/lib/auth/session";
+import { saveAuthSession } from "@/lib/auth/session";
 import { ApiError, changePassword, getProfile, updateProfile } from "@/lib/api/auth";
 import type { ProfileResponse } from "@/types/auth";
 
@@ -124,11 +124,8 @@ export default function ProfilePage() {
         company_name: companyName.trim() || null,
       });
       setProfile(updated);
-      const token = getAccessToken();
-      if (token) {
-        saveAuthSession(token, updated);
-        refreshSession();
-      }
+      saveAuthSession(updated);
+      refreshSession();
       setSuccessMsg("Данные сохранены");
       setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err) {

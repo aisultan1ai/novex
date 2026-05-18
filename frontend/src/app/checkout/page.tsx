@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { useAuth } from "@/components/providers/auth-provider";
@@ -78,7 +78,7 @@ function InfoRow({ lbl, val }: { lbl: string; val: string | null | undefined }) 
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function CheckoutPage() {
+function CheckoutPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -398,4 +398,8 @@ export default function CheckoutPage() {
       </div>
     </main>
   );
+}
+
+export default function CheckoutPage() {
+  return <Suspense><CheckoutPageInner /></Suspense>;
 }

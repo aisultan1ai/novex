@@ -1,4 +1,3 @@
-import { getAuthHeaders } from "@/lib/auth/session";
 import type {
   AdminCarrier, AdminCarrierDetail, AdminCarrierService,
   AdminCommission, AdminOrderDetail, AdminOrderRow, AdminStats,
@@ -11,7 +10,8 @@ const BASE = (process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") || "/api
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
-    headers: { "Content-Type": "application/json", ...getAuthHeaders(), ...(init?.headers ?? {}) },
+    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    credentials: "include",
     cache: "no-store",
   });
   const data = await res.json().catch(() => null);
@@ -24,7 +24,7 @@ async function upload<T>(path: string, file: File): Promise<T> {
   form.append("file", file);
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
-    headers: getAuthHeaders(),
+    credentials: "include",
     body: form,
     cache: "no-store",
   });

@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { flushSync } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -133,7 +133,7 @@ function formatPrice(price: number, currency: string): string {
   }).format(price)} ${currency}`;
 }
 
-export default function QuoteResultsPage() {
+function QuoteResultsPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -452,4 +452,8 @@ export default function QuoteResultsPage() {
       </div>
     </main>
   );
+}
+
+export default function QuoteResultsPage() {
+  return <Suspense><QuoteResultsPageInner /></Suspense>;
 }
