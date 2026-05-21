@@ -145,6 +145,8 @@ function QuoteResultsPageInner() {
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
   }, [searchParams]);
 
+  const token = searchParams.get("token");
+
   const [data, setData] = useState<ShippingQuoteResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -169,7 +171,7 @@ function QuoteResultsPageInner() {
       setError(null);
 
       try {
-        const response = await getShippingQuote(quoteSessionId);
+        const response = await getShippingQuote(quoteSessionId, token);
         if (isMounted) {
           setData(response);
         }
@@ -195,7 +197,7 @@ function QuoteResultsPageInner() {
     return () => {
       isMounted = false;
     };
-  }, [quoteSessionId]);
+  }, [quoteSessionId, token]);
 
   async function handleSelectQuote(
     e: React.MouseEvent<HTMLButtonElement>,
@@ -214,7 +216,7 @@ function QuoteResultsPageInner() {
     try {
       nextData = await selectShippingQuote(quoteSessionId, {
         rate_quote_id: rateQuote.id,
-      });
+      }, token);
     } catch (err) {
       if (err instanceof ApiError) {
         nextError = err.detail;

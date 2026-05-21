@@ -20,6 +20,7 @@ from app.core.exceptions import (
 )
 from app.core.limiter import limiter
 from app.core.logging import setup_logging
+from app.core.middleware import RequestIdMiddleware, SecurityHeadersMiddleware
 
 settings = get_settings()
 setup_logging(level="DEBUG" if settings.debug else "INFO")
@@ -54,12 +55,14 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RequestIdMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.backend_cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-Request-Id"],
 )
 
 

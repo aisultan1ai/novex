@@ -9,6 +9,7 @@ from app.api.v1.admin_commission_configs import (
 from app.api.v1.admin_commissions import router as admin_commissions_router
 from app.api.v1.admin_customers import router as admin_customers_router
 from app.api.v1.admin_orders import router as admin_orders_router
+from app.api.v1.admin_payments import router as admin_payments_router
 from app.api.v1.admin_settings import router as admin_settings_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.carrier_portal import router as carrier_portal_router
@@ -40,6 +41,7 @@ api_router.include_router(admin_orders_router)
 api_router.include_router(admin_commissions_router)
 api_router.include_router(admin_settings_router)
 api_router.include_router(admin_carrier_webhooks_router)
+api_router.include_router(admin_payments_router)
 api_router.include_router(carrier_tracking_router)
 api_router.include_router(carrier_portal_router)
 api_router.include_router(reviews_router)

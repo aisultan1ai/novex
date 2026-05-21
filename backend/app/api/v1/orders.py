@@ -91,13 +91,18 @@ def proceed_to_checkout(
     "/drafts/{draft_id}/pay/mock",
     response_model=OrderDraftResponse,
     status_code=200,
-    summary="Подтвердить оплату (заглушка — заменить реальным шлюзом)",
+    summary="Подтвердить оплату (заглушка — только dev/test)",
+    include_in_schema=False,
 )
 def mock_pay_order_draft(
     draft_id: int,
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> OrderDraftResponse:
+    from app.core.config import get_settings
+    if get_settings().is_production:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Mock payment is disabled in production")
     return orders_service.confirm_payment_mock(
         db, user_id=current_user_id, draft_id=draft_id
     )

@@ -22,7 +22,7 @@ from app.modules.reviews.schemas import (
 
 logger = logging.getLogger(__name__)
 
-_REVIEWABLE_STATUSES = {"delivered", "return", "returned"}
+_REVIEWABLE_STATUSES = {"delivered", "returned"}
 
 
 class ReviewsService:

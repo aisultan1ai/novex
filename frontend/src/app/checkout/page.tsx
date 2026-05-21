@@ -8,7 +8,6 @@ import { useAuth } from "@/components/providers/auth-provider";
 import {
   ApiError,
   getOrderDraft,
-  mockPayOrderDraft,
   proceedToCheckout,
 } from "@/lib/api/orders";
 import type { OrderDraftResponse } from "@/types/order";
@@ -93,7 +92,7 @@ function CheckoutPageInner() {
   const [draft, setDraft] = useState<OrderDraftResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isPaying, setIsPaying] = useState(false);
+  const [isPaying] = useState(false);
 
   // Auth guard
   useEffect(() => {
@@ -135,19 +134,9 @@ function CheckoutPageInner() {
     void load();
   }, [isAuthenticated, draftId, router]);
 
-  async function handlePay() {
+  function handlePay() {
     if (!draftId || !draft) return;
-    setIsPaying(true);
-    setError(null);
-    try {
-      await mockPayOrderDraft(draftId);
-      router.push("/dashboard/orders?paid=1");
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.detail : "Ошибка при оплате. Попробуйте снова.",
-      );
-      setIsPaying(false);
-    }
+    router.push(`/checkout/payment?orderId=${draftId}`);
   }
 
   if (authLoading || (!isAuthenticated && !authLoading)) return null;
@@ -295,54 +284,19 @@ function CheckoutPageInner() {
             <div style={{ ...card, padding: "20px 24px" }}>
               <p style={sectionTitle}>Способ оплаты</p>
 
-              {/* Kaspi Pay placeholder */}
-              <div
-                style={{
-                  border: "2px solid #e5e7eb",
-                  borderRadius: 12,
-                  padding: "20px 24px",
-                  marginBottom: 16,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 16,
-                  cursor: "default",
-                }}
-              >
-                <div
-                  style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: 10,
-                    background: "#f00",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                  }}
-                >
-                  <span style={{ color: "#fff", fontWeight: 900, fontSize: 18 }}>K</span>
-                </div>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 15 }}>Kaspi Pay</div>
-                  <div style={{ fontSize: 13, color: "#94a3b8", marginTop: 2 }}>
-                    Оплата через Kaspi.kz - подключается в следующем этапе
-                  </div>
-                </div>
-              </div>
-
-              {/* Dev note */}
+              {/* Bank transfer note */}
               <div
                 style={{
                   padding: "12px 16px",
-                  background: "#fefce8",
-                  border: "1px solid #fde68a",
+                  background: "#eff6ff",
+                  border: "1px solid #bfdbfe",
                   borderRadius: 10,
                   fontSize: 13,
-                  color: "#92400e",
+                  color: "#1e40af",
                   marginBottom: 20,
                 }}
               >
-                <strong>Тестовый режим.</strong> Реальная оплата через Kaspi Pay будет подключена после заключения договора с платёжным шлюзом. Сейчас кнопка симулирует успешную оплату.
+                <strong>Банковский перевод.</strong> После нажатия кнопки вы получите реквизиты и сможете загрузить подтверждение оплаты.
               </div>
 
               {/* Error */}

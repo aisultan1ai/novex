@@ -45,6 +45,7 @@ class RateQuoteItem(BaseModel):
 
 class ShippingQuoteResponse(BaseModel):
     quote_session_id: int
+    public_token: str | None = None
     quotes: list[RateQuoteItem]
 
 

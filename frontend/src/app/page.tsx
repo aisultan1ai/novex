@@ -141,13 +141,20 @@ export default function HomePage() {
   }
 
   async function handleSelectRate(rate: RateQuoteItem) {
-    setSelectedRate(rate);
     if (!results || rate.id === null) return;
+    setIsSelectingRate(true);
+    setError(null);
     try {
-      setIsSelectingRate(true);
-      await selectShippingQuote(results.quote_session_id, { rate_quote_id: rate.id as number });
-    } catch {
-      // selection is best-effort; navigation carries session id
+      await selectShippingQuote(
+        results.quote_session_id,
+        { rate_quote_id: rate.id as number },
+        results.public_token,
+      );
+      setSelectedRate(rate);
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.detail : "Не удалось выбрать тариф.",
+      );
     } finally {
       setIsSelectingRate(false);
     }

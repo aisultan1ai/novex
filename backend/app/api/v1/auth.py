@@ -41,7 +41,9 @@ def _set_auth_cookie(response: Response, token: str) -> None:
     response_model=ProfileResponse,
     status_code=201,
 )
+@limiter.limit("5/minute")
 def register_user(
+    request: Request,
     payload: RegisterRequest,
     db: Session = Depends(get_db),
 ) -> ProfileResponse:

@@ -69,8 +69,10 @@ export async function calculateShippingQuote(
 
 export async function getShippingQuote(
   quoteSessionId: number,
+  token?: string | null,
 ): Promise<ShippingQuoteResponse> {
-  return request<ShippingQuoteResponse>(`/shipping/quote/${quoteSessionId}`, {
+  const qs = token ? `?token=${encodeURIComponent(token)}` : "";
+  return request<ShippingQuoteResponse>(`/shipping/quote/${quoteSessionId}${qs}`, {
     method: "GET",
   });
 }
@@ -78,9 +80,11 @@ export async function getShippingQuote(
 export async function selectShippingQuote(
   quoteSessionId: number,
   payload: QuoteSelectionRequest,
+  token?: string | null,
 ): Promise<ShippingQuoteResponse> {
+  const qs = token ? `?token=${encodeURIComponent(token)}` : "";
   return request<ShippingQuoteResponse>(
-    `/shipping/quote/${quoteSessionId}/select`,
+    `/shipping/quote/${quoteSessionId}/select${qs}`,
     {
       method: "POST",
       body: JSON.stringify(payload),

@@ -27,6 +27,13 @@ class QuoteSession(Base):
     height_cm: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     depth_cm: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
 
+    # Section 13: quote session security
+    public_token: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True, index=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), nullable=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True, index=True
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=False),
         server_default=func.now(),

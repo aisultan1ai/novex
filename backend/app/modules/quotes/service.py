@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import secrets
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import select, update
@@ -15,6 +17,8 @@ from app.modules.quotes.schemas import (
     ShippingQuoteRequest,
     ShippingQuoteResponse,
 )
+
+_TOKEN_TTL_HOURS = 24
 
 logger = logging.getLogger(__name__)
 
@@ -47,20 +51,22 @@ class QuotesService:
             height_cm=Decimal(str(payload.height_cm)),
             depth_cm=Decimal(str(payload.depth_cm)),
             shipment_type=payload.shipment_type,
+            public_token=secrets.token_urlsafe(32),
+            expires_at=datetime.utcnow() + timedelta(hours=_TOKEN_TTL_HOURS),
         )
         db.add(quote_session)
         db.flush()
 
         cheapest = min(quotes, key=lambda q: q.price, default=None)
-        fastest = min(quotes, key=lambda q: q.eta_days_min, default=None)
+        fastest_quote = min(quotes, key=lambda q: q.eta_days_min, default=None)
 
         rate_rows: list[RateQuote] = []
         for q in quotes:
             badge = None
             if cheapest and q.tariff_code == cheapest.tariff_code:
-                badge = "Выгоднее всего"
-            elif fastest and q.tariff_code == fastest.tariff_code:
-                badge = "Быстрее всего"
+                badge = "best_value"
+            elif fastest_quote and q.tariff_code == fastest_quote.tariff_code:
+                badge = "fastest"
 
             rq = RateQuote(
                 quote_session_id=quote_session.id,
@@ -90,6 +96,7 @@ class QuotesService:
         )
         return ShippingQuoteResponse(
             quote_session_id=quote_session.id,
+            public_token=quote_session.public_token,
             quotes=[self._to_item(rq) for rq in rate_rows],
         )
 

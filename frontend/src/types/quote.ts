@@ -28,6 +28,7 @@ export interface RateQuoteItem {
 
 export interface ShippingQuoteResponse {
   quote_session_id: number;
+  public_token: string | null;
   quotes: RateQuoteItem[];
 }
 
