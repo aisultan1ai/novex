@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 _STATUS_TITLES: dict[str, str] = {
     "paid": "Оплата подтверждена",
     "awaiting_payment": "Ожидание оплаты",
+    "payment_under_review": "Чек на проверке",
+    "payment_rejected": "Чек отклонён — требуется повторная оплата",
     "ready_for_checkout": "Готов к оформлению",
     "sent_to_carrier": "Передан перевозчику",
     "picked_up": "Забран перевозчиком",
@@ -23,9 +25,14 @@ _STATUS_TITLES: dict[str, str] = {
     "delivered": "Доставлен",
     "cancelled": "Отменён",
     "return": "Возврат",
+    "return_requested": "Запрошен возврат",
+    "return_in_progress": "Возврат в пути",
+    "returned": "Возвращён",
     "dispatched": "Заказ передан перевозчику",
+    "dispatch_queued": "Заказ поставлен в очередь на отправку",
     "dispatch_failed": "Заказ оформлен, уточняем детали доставки",
     "pending_manual": "Заказ оформлен, передаётся перевозчику",
+    "pending_manual_dispatch": "Ожидает ручной отправки",
 }
 
 

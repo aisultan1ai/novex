@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 interface BankDetails {
@@ -56,6 +56,14 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export default function PaymentPage() {
+  return (
+    <Suspense fallback={<div style={styles.container}><p style={styles.muted}>Загрузка...</p></div>}>
+      <PaymentPageContent />
+    </Suspense>
+  );
+}
+
+function PaymentPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const orderId = searchParams.get("orderId") ?? "";
@@ -150,6 +158,9 @@ export default function PaymentPage() {
 
   return (
     <div style={styles.container}>
+      <button onClick={() => router.push("/dashboard/orders")} style={styles.backBtn}>
+        ← Назад к заказам
+      </button>
       <h1 style={styles.title}>Оплата заказа</h1>
       <p style={styles.ref}>Заказ: {paymentData!.order_reference}</p>
 
@@ -261,6 +272,21 @@ function statusBadgeStyle(status: string): React.CSSProperties {
 
 const styles: Record<string, React.CSSProperties> = {
   container: { maxWidth: 620, margin: "40px auto", padding: "0 16px" },
+  backBtn: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 20,
+    padding: "6px 14px",
+    borderRadius: 8,
+    border: "1px solid #e5e7eb",
+    background: "#f8fafc",
+    fontSize: 13,
+    fontWeight: 500,
+    color: "#374151",
+    cursor: "pointer",
+    fontFamily: "inherit",
+  },
   title: { fontSize: 24, fontWeight: 700, marginBottom: 4 },
   ref: { color: "#6b7280", marginBottom: 16, fontSize: 14 },
   badge: {

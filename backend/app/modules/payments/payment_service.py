@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.common.status_machine import transition_order
 from app.core.config import get_settings
 from app.modules.dispatch.models import OrderStatusHistory
+from app.modules.platform_settings.repository import PlatformSettingsRepository
 from app.modules.dispatch.service import create_dispatch_job
 from app.modules.notifications.service import NotificationsService
 from app.modules.orders.models import OrderDraft
@@ -29,14 +30,17 @@ logger = logging.getLogger(__name__)
 _notifications_svc = NotificationsService()
 
 
-def _get_manual_provider() -> ManualBankTransferProvider:
+_settings_repo = PlatformSettingsRepository()
+
+
+def _get_manual_provider(db: Session) -> ManualBankTransferProvider:
     s = get_settings()
     return ManualBankTransferProvider(
-        recipient_name=getattr(s, "bank_transfer_recipient_name", "ТОО Novex"),
-        bank_name=getattr(s, "bank_transfer_bank_name", "Halyk Bank"),
-        iban=getattr(s, "bank_transfer_iban", ""),
-        bin_number=getattr(s, "bank_transfer_bin", ""),
-        knp=getattr(s, "bank_transfer_knp", "710"),
+        recipient_name=_settings_repo.get(db, "bank_recipient_name", default=getattr(s, "bank_transfer_recipient_name", "ТОО Novex")),
+        bank_name=_settings_repo.get(db, "bank_name", default=getattr(s, "bank_transfer_bank_name", "Halyk Bank")),
+        iban=_settings_repo.get(db, "bank_iban", default=getattr(s, "bank_transfer_iban", "")),
+        bin_number=_settings_repo.get(db, "bank_bin", default=getattr(s, "bank_transfer_bin", "")),
+        knp=_settings_repo.get(db, "bank_knp", default=getattr(s, "bank_transfer_knp", "710")),
     )
 
 
@@ -61,7 +65,7 @@ class PaymentService:
         if existing:
             return existing
 
-        provider = _get_manual_provider()
+        provider = _get_manual_provider(db)
         result = provider.initiate_payment(
             order_id=order.id,
             amount=Decimal(str(order.price_snapshot)),

@@ -14,36 +14,59 @@ const STATUS_LABELS: Record<string, string> = {
   shipment_details_completed: "Детали заполнены",
   ready_for_checkout: "Готов к оплате",
   awaiting_payment: "Ожидает оплаты",
+  payment_under_review: "Чек на проверке",
+  payment_rejected: "Чек отклонён",
   paid: "Оплачен",
+  dispatch_queued: "Ожидает отправки",
+  dispatch_failed: "Уточняем детали",
+  pending_manual: "Передаётся перевозчику",
+  pending_manual_dispatch: "Ожидает ручной отправки",
   sent_to_carrier: "Передан курьеру",
   picked_up: "Забран",
   in_transit: "В пути",
   arrived: "Прибыл",
   delivered: "Доставлен",
+  return_requested: "Запрос возврата",
+  return_in_progress: "Возврат в пути",
+  returned: "Возвращён",
   cancelled: "Отменён",
   return: "Возврат",
 };
 
 const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
-  draft: { bg: "#f1f5f9", color: "#475569" },
+  draft:                      { bg: "#f1f5f9", color: "#475569" },
   shipment_details_completed: { bg: "#dbeafe", color: "#1e40af" },
-  ready_for_checkout: { bg: "#ede9fe", color: "#5b21b6" },
-  awaiting_payment: { bg: "#fef3c7", color: "#92400e" },
-  paid: { bg: "#dcfce7", color: "#166534" },
-  sent_to_carrier: { bg: "#dbeafe", color: "#1e40af" },
-  picked_up: { bg: "#dbeafe", color: "#1e40af" },
-  in_transit: { bg: "#ede9fe", color: "#5b21b6" },
-  arrived: { bg: "#ede9fe", color: "#5b21b6" },
-  delivered: { bg: "#dcfce7", color: "#166534" },
-  cancelled: { bg: "#fee2e2", color: "#991b1b" },
-  return: { bg: "#fee2e2", color: "#991b1b" },
+  ready_for_checkout:         { bg: "#ede9fe", color: "#5b21b6" },
+  awaiting_payment:           { bg: "#fef3c7", color: "#92400e" },
+  payment_under_review:       { bg: "#dbeafe", color: "#1e40af" },
+  payment_rejected:           { bg: "#fee2e2", color: "#991b1b" },
+  paid:                       { bg: "#dcfce7", color: "#166534" },
+  dispatch_queued:            { bg: "#fef3c7", color: "#92400e" },
+  dispatch_failed:            { bg: "#fef3c7", color: "#92400e" },
+  pending_manual:             { bg: "#fef3c7", color: "#92400e" },
+  pending_manual_dispatch:    { bg: "#fef3c7", color: "#92400e" },
+  sent_to_carrier:            { bg: "#dbeafe", color: "#1e40af" },
+  picked_up:                  { bg: "#dbeafe", color: "#1e40af" },
+  in_transit:                 { bg: "#ede9fe", color: "#5b21b6" },
+  arrived:                    { bg: "#ede9fe", color: "#5b21b6" },
+  delivered:                  { bg: "#dcfce7", color: "#166534" },
+  return_requested:           { bg: "#fee2e2", color: "#991b1b" },
+  return_in_progress:         { bg: "#fee2e2", color: "#991b1b" },
+  returned:                   { bg: "#f1f5f9", color: "#475569" },
+  cancelled:                  { bg: "#fee2e2", color: "#991b1b" },
+  return:                     { bg: "#fee2e2", color: "#991b1b" },
 };
 
 const FILTER_GROUPS: Record<string, string[]> = {
   all: [],
-  active: ["draft", "shipment_details_completed", "ready_for_checkout", "awaiting_payment", "sent_to_carrier", "picked_up", "in_transit", "arrived"],
+  active: [
+    "draft", "shipment_details_completed", "ready_for_checkout",
+    "awaiting_payment", "payment_under_review", "payment_rejected",
+    "dispatch_queued", "dispatch_failed", "pending_manual", "pending_manual_dispatch",
+    "sent_to_carrier", "picked_up", "in_transit", "arrived",
+  ],
   completed: ["delivered", "paid"],
-  cancelled: ["cancelled", "return"],
+  cancelled: ["cancelled", "return", "return_requested", "return_in_progress", "returned"],
 };
 
 const FILTER_LABELS: Record<string, string> = {
@@ -73,8 +96,13 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+function parseUTC(iso: string): Date {
+  // Backend returns naive UTC without 'Z' — append it so browser parses as UTC, not local
+  return new Date(/[Z+]/.test(iso) ? iso : iso + "Z");
+}
+
 function formatDate(isoString: string): string {
-  return new Date(isoString).toLocaleDateString("ru-RU", { day: "2-digit", month: "short", year: "numeric" });
+  return parseUTC(isoString).toLocaleDateString("ru-RU", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 function formatPrice(price: number, currency: string): string {

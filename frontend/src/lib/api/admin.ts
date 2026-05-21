@@ -2,7 +2,7 @@ import type {
   AdminCarrier, AdminCarrierDetail, AdminCarrierService,
   AdminCommission, AdminOrderDetail, AdminOrderRow, AdminStats,
   AdminTariffRate, AdminUser, AdminUserDetail, AdminZoneCity,
-  CommissionSummary, PaginatedResponse, PlatformSettings,
+  BankTransferSettings, CommissionSummary, PaginatedResponse, PlatformSettings,
 } from "@/types/admin";
 
 const BASE = (process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") || "/api/v1");
@@ -127,5 +127,47 @@ export const getCommissionsSummary = (): Promise<CommissionSummary> =>
 export const getAdminSettings = (): Promise<PlatformSettings> =>
   req("/admin/settings");
 
-export const updateAdminSettings = (body: Partial<PlatformSettings>): Promise<PlatformSettings> =>
+export const updateAdminSettings = (body: { commission_rate?: string; bank_transfer?: Partial<BankTransferSettings> }): Promise<PlatformSettings> =>
   req("/admin/settings", { method: "PATCH", body: JSON.stringify(body) });
+
+// ── Payments (admin) ──────────────────────────────────────────────────────────
+export interface AdminPaymentItem {
+  id: number;
+  order_id: number;
+  provider: string;
+  method: string;
+  status: string;
+  amount: number;
+  currency: string;
+  payment_reference: string | null;
+  created_at: string;
+}
+
+export interface AdminPaymentProof {
+  id: number;
+  file_url: string;
+  file_name: string;
+  file_mime_type: string;
+  file_size: number | null;
+  review_status: string;
+  reject_reason: string | null;
+  created_at: string;
+}
+
+export interface AdminPaymentDetail {
+  payment: AdminPaymentItem;
+  proofs: AdminPaymentProof[];
+  history: { old_status: string; new_status: string; comment: string | null; created_at: string }[];
+}
+
+export const getAdminOrderPayments = (orderId: number): Promise<{ items: AdminPaymentItem[]; total: number }> =>
+  req(`/admin/payments?order_id=${orderId}`);
+
+export const getAdminPayment = (paymentId: number): Promise<AdminPaymentDetail> =>
+  req(`/admin/payments/${paymentId}`);
+
+export const approveAdminPayment = (paymentId: number): Promise<{ message: string }> =>
+  req(`/admin/payments/${paymentId}/approve`, { method: "POST" });
+
+export const rejectAdminPayment = (paymentId: number, reason: string): Promise<{ message: string }> =>
+  req(`/admin/payments/${paymentId}/reject`, { method: "POST", body: JSON.stringify({ reject_reason: reason }) });

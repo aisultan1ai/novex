@@ -12,7 +12,8 @@ import {
 import type { Notification } from "@/types/notifications";
 
 function formatDateTime(iso: string) {
-  const d = new Date(iso);
+  // Backend returns naive UTC without 'Z' — append it so browser parses as UTC, not local
+  const d = new Date(/[Z+]/.test(iso) ? iso : iso + "Z");
   const now = new Date();
   const diffMs = now.getTime() - d.getTime();
   const diffMin = Math.floor(diffMs / 60000);
@@ -20,6 +21,8 @@ function formatDateTime(iso: string) {
   if (diffMin < 60) return `${diffMin} мин. назад`;
   const diffH = Math.floor(diffMin / 60);
   if (diffH < 24) return `${diffH} ч. назад`;
+  const diffD = Math.floor(diffH / 24);
+  if (diffD < 7) return `${diffD} дн. назад`;
   return d.toLocaleDateString("ru-RU", { day: "2-digit", month: "short" });
 }
 

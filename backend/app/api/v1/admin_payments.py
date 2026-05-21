@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
@@ -38,7 +38,7 @@ class PaymentListResponse(BaseModel):
 
 
 class RejectPaymentRequest(BaseModel):
-    reject_reason: str
+    reject_reason: str = Field(min_length=1, max_length=500)
 
 
 def _to_item(tx: PaymentTransaction) -> PaymentListItem:

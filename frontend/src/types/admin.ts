@@ -114,6 +114,44 @@ export interface CommissionSummary {
   count: number;
 }
 
+export interface BankTransferSettings {
+  recipient_name: string;
+  bank_name: string;
+  iban: string;
+  bin: string;
+  knp: string;
+}
+
 export interface PlatformSettings {
   commission_rate: string;
+  bank_transfer: BankTransferSettings;
+}
+
+export interface AdminPaymentItem {
+  id: number;
+  order_id: number;
+  provider: string;
+  method: string;
+  status: string;
+  amount: number;
+  currency: string;
+  payment_reference: string | null;
+  created_at: string;
+}
+
+export interface AdminPaymentProof {
+  id: number;
+  file_url: string;
+  file_name: string;
+  file_mime_type: string;
+  file_size: number | null;
+  review_status: string;
+  reject_reason: string | null;
+  created_at: string;
+}
+
+export interface AdminPaymentDetail {
+  payment: AdminPaymentItem;
+  proofs: AdminPaymentProof[];
+  history: { old_status: string; new_status: string; comment: string | null; created_at: string }[];
 }
