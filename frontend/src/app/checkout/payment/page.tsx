@@ -53,7 +53,12 @@ const STATUS_LABELS: Record<string, string> = {
   paid: "Оплачено",
   payment_rejected: "Оплата отклонена",
   cancelled: "Отменён",
+  poll_timeout: "Ожидание подтверждения",
 };
+
+const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+const POLL_INTERVAL_MS = 5000;
+const POLL_MAX_ATTEMPTS = 360; // 30 minutes at 5 s intervals
 
 export default function PaymentPage() {
   return (
@@ -74,9 +79,11 @@ function PaymentPageContent() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [pollTimedOut, setPollTimedOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollAttemptsRef = useRef(0);
 
   useEffect(() => {
     if (!orderId) {
@@ -93,17 +100,28 @@ function PaymentPageContent() {
       .finally(() => setLoading(false));
   }, [orderId]);
 
-  // Poll payment status after proof upload
+  // Poll payment status after proof upload (BUG #1 / #6: stops after 30 min)
   useEffect(() => {
     if (!uploadSuccess) return;
+    pollAttemptsRef.current = 0;
+
     pollingRef.current = setInterval(async () => {
+      pollAttemptsRef.current += 1;
+
+      if (pollAttemptsRef.current >= POLL_MAX_ATTEMPTS) {
+        clearInterval(pollingRef.current!);
+        setPollTimedOut(true);
+        return;
+      }
+
       const s = await getPaymentStatus(orderId);
       setStatus(s.status);
       if (s.status === "paid" || s.status === "cancelled") {
         clearInterval(pollingRef.current!);
         if (s.status === "paid") router.push(`/dashboard/orders`);
       }
-    }, 5000);
+    }, POLL_INTERVAL_MS);
+
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
@@ -111,8 +129,14 @@ function PaymentPageContent() {
 
   const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!fileInputRef.current?.files?.[0] || !paymentData) return;
-    const file = fileInputRef.current.files[0];
+    const file = fileInputRef.current?.files?.[0];
+    if (!file || !paymentData) return;
+
+    // Client-side file size guard (BUG #7)
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      setUploadError("Файл слишком большой. Максимальный размер: 5 МБ.");
+      return;
+    }
 
     setUploading(true);
     setUploadError(null);
@@ -176,7 +200,9 @@ function PaymentPageContent() {
           </p>
           <p style={styles.muted}>
             Обычно подтверждение занимает до 24 часов в рабочие дни.
-            Статус обновляется автоматически.
+            {pollTimedOut
+              ? " Автоматическая проверка завершена. Обновите страницу или обратитесь в поддержку, если оплата не подтверждается."
+              : " Статус обновляется автоматически."}
           </p>
         </div>
       ) : (
@@ -202,9 +228,14 @@ function PaymentPageContent() {
           {status !== "paid" && (
             <div style={styles.card}>
               <h2 style={styles.cardTitle}>Подтверждение оплаты</h2>
-              <p style={styles.muted}>
-                После оплаты загрузите скриншот или PDF квитанции.
-                Форматы: JPEG, PNG, PDF. Макс. размер: 5 МБ.
+              <ol style={{ ...styles.muted, paddingLeft: 18, margin: "0 0 12px", lineHeight: 1.8 }}>
+                <li>Переведите точную сумму по реквизитам выше.</li>
+                <li>В назначении платежа укажите номер заказа (скопируйте поле «Назначение платежа»).</li>
+                <li>Сохраните скриншот или PDF-квитанцию из вашего банка.</li>
+                <li>Загрузите файл ниже — оператор проверит оплату в течение 24 ч.</li>
+              </ol>
+              <p style={{ ...styles.muted, fontSize: 12, color: "#94a3b8" }}>
+                Принимаются: JPEG, PNG, PDF. Максимальный размер: 5 МБ.
               </p>
               <form onSubmit={handleUpload} style={styles.form}>
                 <input

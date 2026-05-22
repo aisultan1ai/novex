@@ -1,3 +1,4 @@
+import { apiRequest, ApiError } from "./client";
 import type {
   AdminCarrier, AdminCarrierDetail, AdminCarrierService,
   AdminCommission, AdminOrderDetail, AdminOrderRow, AdminStats,
@@ -5,20 +6,13 @@ import type {
   BankTransferSettings, CommissionSummary, PaginatedResponse, PlatformSettings,
 } from "@/types/admin";
 
-const BASE = (process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") || "/api/v1");
+export { ApiError };
 
-async function req<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
-    credentials: "include",
-    cache: "no-store",
-  });
-  const data = await res.json().catch(() => null);
-  if (!res.ok) throw new Error((data as { detail?: string })?.detail ?? `HTTP ${res.status}`);
-  return data as T;
-}
+const BASE = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") ?? "/api/v1";
 
+const req = apiRequest;
+
+// FormData uploads cannot use the JSON client (no Content-Type: application/json)
 async function upload<T>(path: string, file: File): Promise<T> {
   const form = new FormData();
   form.append("file", file);
@@ -29,7 +23,7 @@ async function upload<T>(path: string, file: File): Promise<T> {
     cache: "no-store",
   });
   const data = await res.json().catch(() => null);
-  if (!res.ok) throw new Error((data as { detail?: string })?.detail ?? `HTTP ${res.status}`);
+  if (!res.ok) throw new ApiError(res.status, (data as { detail?: string })?.detail ?? `HTTP ${res.status}`);
   return data as T;
 }
 

@@ -466,14 +466,37 @@ function ShipmentPageInner() {
 
   const createDraftRequestedRef = useRef(false);
 
-  const [form, setForm] = useState<ShipmentFormState>({
-    sender: emptyParty(),
-    recipient: emptyParty(),
-    packageItem: emptyPackage(),
-    call_before_delivery: false,
-    insurance: false,
-    fragile: false,
-  });
+  // Session-storage key scoped to the quote session so we don't mix stale data
+  const storageKey = quoteSessionId ? `novex_shipment_form_${quoteSessionId}` : null;
+
+  function loadSavedForm(): ShipmentFormState | null {
+    if (!storageKey) return null;
+    try {
+      const raw = sessionStorage.getItem(storageKey);
+      return raw ? (JSON.parse(raw) as ShipmentFormState) : null;
+    } catch { return null; }
+  }
+
+  function saveForm(f: ShipmentFormState) {
+    if (!storageKey) return;
+    try { sessionStorage.setItem(storageKey, JSON.stringify(f)); } catch { /* ignore */ }
+  }
+
+  function clearSavedForm() {
+    if (!storageKey) return;
+    try { sessionStorage.removeItem(storageKey); } catch { /* ignore */ }
+  }
+
+  const [form, setForm] = useState<ShipmentFormState>(
+    () => loadSavedForm() ?? {
+      sender: emptyParty(),
+      recipient: emptyParty(),
+      packageItem: emptyPackage(),
+      call_before_delivery: false,
+      insurance: false,
+      fragile: false,
+    },
+  );
 
   const [draft, setDraft] = useState<OrderDraftResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -546,20 +569,28 @@ function ShipmentPageInner() {
     };
   }, [currentUser, fullNextUrl, isAuthenticated, isLoading, logout, quoteSessionId]);
 
+  function updateForm(updater: (prev: ShipmentFormState) => ShipmentFormState) {
+    setForm((prev) => {
+      const next = updater(prev);
+      saveForm(next);
+      return next;
+    });
+  }
+
   function updatePartyField(role: "sender" | "recipient", key: keyof PartyFormState, value: string) {
-    setForm((prev) => ({ ...prev, [role]: { ...prev[role], [key]: value } }));
+    updateForm((prev) => ({ ...prev, [role]: { ...prev[role], [key]: value } }));
   }
 
   function toggleSaveAddress(role: "sender" | "recipient", val: boolean) {
-    setForm((prev) => ({ ...prev, [role]: { ...prev[role], save_to_address_book: val } }));
+    updateForm((prev) => ({ ...prev, [role]: { ...prev[role], save_to_address_book: val } }));
   }
 
   function toggleService(key: "call_before_delivery" | "insurance" | "fragile", val: boolean) {
-    setForm((prev) => ({ ...prev, [key]: val }));
+    updateForm((prev) => ({ ...prev, [key]: val }));
   }
 
   function updatePackageField(key: keyof PackageFormState, value: string) {
-    setForm((prev) => ({ ...prev, packageItem: { ...prev.packageItem, [key]: value } }));
+    updateForm((prev) => ({ ...prev, packageItem: { ...prev.packageItem, [key]: value } }));
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -576,7 +607,7 @@ function ShipmentPageInner() {
     try {
       const payload = buildShipmentPayload(form);
       await updateOrderDraftShipment(draft.draft_id, payload);
-      // Navigate to orders list after successful save
+      clearSavedForm();
       router.push("/dashboard/orders");
     } catch (err) {
       if (err instanceof ApiError) {

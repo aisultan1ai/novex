@@ -1,6 +1,6 @@
+import { apiRequest, ApiError } from "./client";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") || "/api/v1";
+export { ApiError };
 
 export type CommissionType = "percentage" | "fixed" | "combined";
 
@@ -20,56 +20,20 @@ export interface CommissionConfigUpsert {
   currency: string;
 }
 
-class ApiError extends Error {
-  status: number;
-  constructor(status: number, detail: string) {
-    super(detail);
-    this.status = status;
-  }
-}
-
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers || {}),
-    },
-    credentials: "include",
-    cache: "no-store",
-  });
-  const contentType = response.headers.get("content-type") || "";
-  const data = contentType.includes("application/json") ? await response.json() : null;
-  if (!response.ok) {
-    const detail =
-      typeof data === "object" && data !== null && "detail" in data
-        ? String((data as { detail: unknown }).detail)
-        : `Request failed with status ${response.status}`;
-    throw new ApiError(response.status, detail);
-  }
-  return data as T;
-}
-
 export async function listCommissionConfigs(): Promise<CommissionConfigResponse[]> {
-  return request<CommissionConfigResponse[]>("/admin/commission-configs");
+  return apiRequest<CommissionConfigResponse[]>("/admin/commission-configs");
 }
 
 export async function upsertCommissionConfig(
   carrierCode: string,
   payload: CommissionConfigUpsert,
 ): Promise<CommissionConfigResponse> {
-  return request<CommissionConfigResponse>(`/admin/commission-configs/${carrierCode}`, {
+  return apiRequest<CommissionConfigResponse>(`/admin/commission-configs/${carrierCode}`, {
     method: "PUT",
     body: JSON.stringify(payload),
   });
 }
 
 export async function deleteCommissionConfig(carrierCode: string): Promise<void> {
-  await fetch(`${API_BASE_URL}/admin/commission-configs/${carrierCode}`, {
-    method: "DELETE",
-    credentials: "include",
-    cache: "no-store",
-  });
+  await apiRequest(`/admin/commission-configs/${carrierCode}`, { method: "DELETE" });
 }
-
-export { ApiError };

@@ -181,8 +181,16 @@ function CheckoutPageInner() {
             Загружаем заказ…
           </div>
         ) : error && !draft ? (
-          <div style={{ ...card, padding: 24, background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c", fontSize: 14 }}>
-            {error}
+          <div style={{ ...card, padding: 24 }}>
+            <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "14px 16px", color: "#b91c1c", fontSize: 14, marginBottom: 16 }}>
+              {error}
+            </div>
+            <button
+              onClick={() => router.push("/")}
+              style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#f8fafc", fontSize: 14, fontWeight: 600, color: "#374151", cursor: "pointer", fontFamily: "inherit" }}
+            >
+              ← Новый расчёт тарифа
+            </button>
           </div>
         ) : draft ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>

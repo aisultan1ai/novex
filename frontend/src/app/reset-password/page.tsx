@@ -15,7 +15,9 @@ const inp: React.CSSProperties = {
 function ResetPasswordPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const token = searchParams.get("token") ?? "";
+  // Capture the token on first render before we clear it from the URL (BUG #4).
+  // useState initialiser runs once, so token is preserved even after router.replace().
+  const [token] = useState(() => searchParams.get("token") ?? "");
 
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -23,9 +25,16 @@ function ResetPasswordPageInner() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Remove the token from the browser URL immediately so it doesn't linger in
+  // history or leak via the Referer header to any third-party resources.
   useEffect(() => {
-    if (!token) setError("Ссылка недействительна. Запросите новую.");
-  }, [token]);
+    if (token) {
+      router.replace("/reset-password");
+    } else {
+      setError("Ссылка недействительна. Запросите новую.");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally run only once on mount
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -35,7 +44,7 @@ function ResetPasswordPageInner() {
     try {
       await resetPassword(token, password);
       setDone(true);
-      setTimeout(() => router.push("/login"), 2500);
+      setTimeout(() => router.push("/login"), 5000);
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : "Ошибка. Ссылка могла устареть.");
     } finally {
@@ -71,7 +80,13 @@ function ResetPasswordPageInner() {
                 ✓
               </div>
               <h1 style={{ margin: "0 0 10px", fontSize: 20, fontWeight: 700, color: "#0f172a" }}>Пароль изменён</h1>
-              <p style={{ margin: 0, fontSize: 14, color: "#64748b" }}>Перенаправляем на страницу входа…</p>
+              <p style={{ margin: "0 0 20px", fontSize: 14, color: "#64748b" }}>Вы будете перенаправлены на страницу входа…</p>
+              <button
+                onClick={() => router.push("/login")}
+                style={{ padding: "10px 24px", borderRadius: 10, border: "none", background: "#0f172a", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+              >
+                Войти сейчас →
+              </button>
             </div>
           ) : (
             <>

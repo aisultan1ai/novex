@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -153,6 +153,8 @@ function MyOrdersPageInner() {
   const [error, setError] = useState<string | null>(null);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ id: number; order: OrderDraftResponse } | null>(null);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [activeFilter, setActiveFilter] = useState<string>("all");
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
@@ -198,18 +200,52 @@ function MyOrdersPageInner() {
     void fetchOrders();
   }, [isAuthenticated]);
 
-  async function handleDelete(draftId: number) {
+  // Commits the pending soft-delete to the server when the undo window expires
+  const commitDelete = useCallback(async (draftId: number) => {
     setDeletingId(draftId);
-    setConfirmingDeleteId(null);
     try {
       await deleteOrderDraft(draftId);
-      setOrders((prev) => prev.filter((o) => o.draft_id !== draftId));
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : "Не удалось удалить черновик.");
+      // Restore the order on failure
+      setPendingDelete((prev) => {
+        if (prev?.id === draftId) {
+          setOrders((orders) => [...orders, prev.order].sort((a, b) => b.draft_id - a.draft_id));
+        }
+        return null;
+      });
     } finally {
       setDeletingId(null);
+      setPendingDelete(null);
     }
+  }, []);
+
+  function handleDelete(draftId: number) {
+    const order = orders.find((o) => o.draft_id === draftId);
+    if (!order) return;
+    setConfirmingDeleteId(null);
+    // Hide immediately from list (soft delete)
+    setOrders((prev) => prev.filter((o) => o.draft_id !== draftId));
+    setPendingDelete({ id: draftId, order });
+    // Give user 5 seconds to undo before committing
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    undoTimerRef.current = setTimeout(() => {
+      void commitDelete(draftId);
+    }, 5000);
   }
+
+  function handleUndoDelete() {
+    if (!pendingDelete) return;
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    // Restore the order
+    setOrders((prev) => [...prev, pendingDelete.order].sort((a, b) => b.draft_id - a.draft_id));
+    setPendingDelete(null);
+  }
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => { if (undoTimerRef.current) clearTimeout(undoTimerRef.current); };
+  }, []);
 
   if (authLoading || (!isAuthenticated && !authLoading)) return null;
 
@@ -222,6 +258,19 @@ function MyOrdersPageInner() {
       {justPaid && (
         <div style={{ marginBottom: 20, padding: "14px 20px", background: "#dcfce7", border: "1px solid #86efac", borderRadius: 12, fontSize: 14, fontWeight: 600, color: "#166534", display: "flex", alignItems: "center", gap: 10 }}>
           ✓ Заказ успешно оплачен! Статус обновлён.
+        </div>
+      )}
+
+      {/* Undo delete toast (UX-5) */}
+      {pendingDelete && (
+        <div style={{ marginBottom: 20, padding: "12px 20px", background: "#1e293b", borderRadius: 12, fontSize: 14, color: "#f1f5f9", display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ flex: 1 }}>Черновик #{pendingDelete.id} удалён</span>
+          <button
+            onClick={handleUndoDelete}
+            style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #475569", background: "transparent", color: "#f1f5f9", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+          >
+            Отменить
+          </button>
         </div>
       )}
 
@@ -277,8 +326,17 @@ function MyOrdersPageInner() {
 
       {/* Content */}
       {isLoading ? (
-        <div style={{ ...cardStyle, padding: 48, textAlign: "center", color: "#64748b", fontSize: 14 }}>
-          Загружаем заказы…
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <style>{`@keyframes skeleton-pulse { 0%,100%{opacity:1} 50%{opacity:.4} }`}</style>
+          {[1, 2, 3].map((i) => (
+            <div key={i} style={{ ...cardStyle, padding: "20px 24px", display: "flex", gap: 16, alignItems: "center", animation: "skeleton-pulse 1.5s ease infinite", animationDelay: `${i * 0.15}s` }}>
+              <div style={{ width: 80, height: 16, borderRadius: 6, background: "#e5e7eb", flexShrink: 0 }} />
+              <div style={{ flex: 1, height: 16, borderRadius: 6, background: "#e5e7eb" }} />
+              <div style={{ width: 120, height: 16, borderRadius: 6, background: "#e5e7eb", flexShrink: 0 }} />
+              <div style={{ width: 90, height: 24, borderRadius: 999, background: "#e5e7eb", flexShrink: 0 }} />
+              <div style={{ width: 70, height: 16, borderRadius: 6, background: "#e5e7eb", flexShrink: 0 }} />
+            </div>
+          ))}
         </div>
       ) : error ? (
         <div style={{ ...cardStyle, border: "1px solid #fecaca", background: "#fef2f2", color: "#b91c1c", padding: "20px 24px", fontSize: 14 }}>

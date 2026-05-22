@@ -85,7 +85,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     if (!isAuthenticated) return;
     listNotifications()
       .then((res) => setUnreadCount(res.unread_count))
-      .catch(() => {/* silent */});
+      .catch((err) => console.error("Failed to load notifications:", err));
   }, [isAuthenticated, pathname]);
 
   const navTabs = [

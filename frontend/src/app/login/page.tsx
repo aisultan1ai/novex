@@ -36,6 +36,7 @@ function LoginPageInner() {
   const { login } = useAuth();
 
   const isRegistered = useMemo(() => searchParams.get("registered") === "1", [searchParams]);
+  const isExpired = useMemo(() => searchParams.get("expired") === "1", [searchParams]);
   const nextPath = useMemo(() => {
     const raw = searchParams.get("next");
     return raw && raw.startsWith("/") ? raw : "/dashboard";
@@ -52,7 +53,7 @@ function LoginPageInner() {
     setIsSubmitting(true);
     try {
       const res = await loginUser({ email: email.trim().toLowerCase(), password });
-      login(res.profile);
+      login(res.profile, res.expires_in);
       const destination =
         res.profile.role === "carrier" ? "/dashboard/carrier" :
         res.profile.role === "admin" ? "/dashboard/admin" :
@@ -121,7 +122,13 @@ function LoginPageInner() {
 
           {isRegistered && (
             <div style={{ marginBottom: 20, padding: "12px 14px", borderRadius: 10, background: "#f0fdf4", border: "1px solid #bbf7d0", color: "#166534", fontSize: 14, fontWeight: 500 }}>
-              Аккаунт создан - теперь войдите.
+              Аккаунт создан — теперь войдите.
+            </div>
+          )}
+
+          {isExpired && (
+            <div style={{ marginBottom: 20, padding: "12px 14px", borderRadius: 10, background: "#fef9c3", border: "1px solid #fef08a", color: "#854d0e", fontSize: 14, fontWeight: 500 }}>
+              Сессия истекла. Пожалуйста, войдите снова.
             </div>
           )}
 

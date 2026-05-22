@@ -1,3 +1,4 @@
+import { apiRequest, ApiError } from "./client";
 import type {
   LoginRequest,
   ProfileResponse,
@@ -5,86 +6,30 @@ import type {
   TokenResponse,
 } from "@/types/auth";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") || "/api/v1";
-
-class ApiError extends Error {
-  status: number;
-  detail: string;
-
-  constructor(status: number, detail: string) {
-    super(detail);
-    this.status = status;
-    this.detail = detail;
-  }
-}
-
-async function parseJsonSafely(response: Response): Promise<unknown> {
-  const contentType = response.headers.get("content-type") || "";
-  if (!contentType.includes("application/json")) {
-    return null;
-  }
-
-  try {
-    return await response.json();
-  } catch {
-    return null;
-  }
-}
-
-async function request<T>(
-  path: string,
-  init?: RequestInit,
-): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers || {}),
-    },
-    credentials: "include",
-    cache: "no-store",
-  });
-
-  const data = await parseJsonSafely(response);
-
-  if (!response.ok) {
-    const detail =
-      typeof data === "object" &&
-      data !== null &&
-      "detail" in data &&
-      typeof (data as { detail?: unknown }).detail === "string"
-        ? (data as { detail: string }).detail
-        : `Request failed with status ${response.status}`;
-
-    throw new ApiError(response.status, detail);
-  }
-
-  return data as T;
-}
+export { ApiError };
 
 export async function registerUser(
   payload: RegisterRequest,
 ): Promise<ProfileResponse> {
-  return request<ProfileResponse>("/auth/register", {
+  return apiRequest<ProfileResponse>("/auth/register", {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
 export async function loginUser(payload: LoginRequest): Promise<TokenResponse> {
-  return request<TokenResponse>("/auth/login", {
+  return apiRequest<TokenResponse>("/auth/login", {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
 export async function logoutUser(): Promise<void> {
-  await request("/auth/logout", { method: "POST" });
+  await apiRequest("/auth/logout", { method: "POST" });
 }
 
 export async function getProfile(): Promise<ProfileResponse> {
-  return request<ProfileResponse>("/auth/profile", { method: "GET" });
+  return apiRequest<ProfileResponse>("/auth/profile", { method: "GET" });
 }
 
 export async function updateProfile(payload: {
@@ -92,21 +37,21 @@ export async function updateProfile(payload: {
   phone?: string | null;
   company_name?: string | null;
 }): Promise<ProfileResponse> {
-  return request<ProfileResponse>("/auth/profile", {
+  return apiRequest<ProfileResponse>("/auth/profile", {
     method: "PATCH",
     body: JSON.stringify(payload),
   });
 }
 
 export async function forgotPassword(email: string): Promise<void> {
-  await request("/auth/forgot-password", {
+  await apiRequest("/auth/forgot-password", {
     method: "POST",
     body: JSON.stringify({ email }),
   });
 }
 
 export async function resetPassword(token: string, new_password: string): Promise<void> {
-  await request("/auth/reset-password", {
+  await apiRequest("/auth/reset-password", {
     method: "POST",
     body: JSON.stringify({ token, new_password }),
   });
@@ -116,10 +61,8 @@ export async function changePassword(payload: {
   current_password: string;
   new_password: string;
 }): Promise<void> {
-  await request("/profile/change-password", {
+  await apiRequest("/profile/change-password", {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
-
-export { ApiError };

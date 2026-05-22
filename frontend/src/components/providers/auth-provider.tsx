@@ -7,12 +7,14 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import {
   clearAuthSession,
+  getSessionExpiresAt,
   getStoredCurrentUser,
   saveAuthSession,
 } from "@/lib/auth/session";
@@ -23,7 +25,7 @@ type AuthContextValue = {
   currentUser: ProfileResponse | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (profile: ProfileResponse) => void;
+  login: (profile: ProfileResponse, expiresIn?: number) => void;
   logout: (redirectTo?: string) => void;
   refreshSession: () => void;
 };
@@ -39,23 +41,73 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const [currentUser, setCurrentUser] = useState<ProfileResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const sessionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearSessionTimer = useCallback(() => {
+    if (sessionTimerRef.current) {
+      clearTimeout(sessionTimerRef.current);
+      sessionTimerRef.current = null;
+    }
+  }, []);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return clearSessionTimer;
+  }, [clearSessionTimer]);
+
+  const scheduleSessionExpiry = useCallback(
+    (expiresAt: number) => {
+      clearSessionTimer();
+      const msLeft = expiresAt - Date.now();
+      if (msLeft <= 0) return;
+      sessionTimerRef.current = setTimeout(() => {
+        clearAuthSession();
+        setCurrentUser(null);
+        router.push("/login?expired=1");
+      }, msLeft);
+    },
+    [clearSessionTimer, router],
+  );
 
   const refreshSession = useCallback(() => {
-    setCurrentUser(getStoredCurrentUser());
+    const stored = getStoredCurrentUser();
+    const expiresAt = getSessionExpiresAt();
+
+    if (stored && expiresAt !== null && expiresAt < Date.now()) {
+      clearAuthSession();
+      setCurrentUser(null);
+      setIsLoading(false);
+      router.replace("/login?expired=1");
+      return;
+    }
+
+    setCurrentUser(stored);
     setIsLoading(false);
-  }, []);
+
+    if (stored && expiresAt !== null) {
+      scheduleSessionExpiry(expiresAt);
+    }
+  }, [router, scheduleSessionExpiry]);
 
   useEffect(() => {
     refreshSession();
   }, [refreshSession]);
 
-  const login = useCallback((profile: ProfileResponse) => {
-    saveAuthSession(profile);
-    setCurrentUser(profile);
-  }, []);
+  const login = useCallback(
+    (profile: ProfileResponse, expiresIn?: number) => {
+      saveAuthSession(profile, expiresIn);
+      setCurrentUser(getStoredCurrentUser());
+      const expiresAt = getSessionExpiresAt();
+      if (expiresAt !== null) {
+        scheduleSessionExpiry(expiresAt);
+      }
+    },
+    [scheduleSessionExpiry],
+  );
 
   const logout = useCallback(
     async (redirectTo = "/login") => {
+      clearSessionTimer();
       try {
         await logoutUser();
       } catch {
@@ -65,7 +117,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setCurrentUser(null);
       router.push(redirectTo);
     },
-    [router],
+    [clearSessionTimer, router],
   );
 
   const value = useMemo<AuthContextValue>(

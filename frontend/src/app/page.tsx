@@ -71,11 +71,36 @@ function SkeletonCard() {
   );
 }
 
+function useIsMobile(breakpoint = 640): boolean {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < breakpoint);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, [breakpoint]);
+  return isMobile;
+}
+
+const QUOTE_FORM_KEY = "novex_quote_form";
+
+function saveQuoteForm(form: FormState) {
+  try { sessionStorage.setItem(QUOTE_FORM_KEY, JSON.stringify(form)); } catch { /* ignore */ }
+}
+
+function loadQuoteForm(): FormState | null {
+  try {
+    const raw = sessionStorage.getItem(QUOTE_FORM_KEY);
+    return raw ? (JSON.parse(raw) as FormState) : null;
+  } catch { return null; }
+}
+
 export default function HomePage() {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading, currentUser } = useAuth();
+  const isMobile = useIsMobile();
 
-  const [form, setForm] = useState<FormState>(initialForm);
+  const [form, setForm] = useState<FormState>(() => loadQuoteForm() ?? initialForm);
   const [results, setResults] = useState<ShippingQuoteResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,7 +110,11 @@ export default function HomePage() {
   const resultsRef = useRef<HTMLDivElement>(null);
 
   function setField<K extends keyof FormState>(key: K, val: FormState[K]) {
-    setForm((prev) => ({ ...prev, [key]: val }));
+    setForm((prev) => {
+      const next = { ...prev, [key]: val };
+      saveQuoteForm(next);
+      return next;
+    });
   }
 
   useEffect(() => {
@@ -114,6 +143,12 @@ export default function HomePage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (form.fromCity.trim() === form.toCity.trim()) {
+      setError("Город отправления и город назначения должны различаться.");
+      return;
+    }
+
     setIsLoading(true);
     setResults(null);
     setSelectedRate(null);
@@ -209,7 +244,7 @@ export default function HomePage() {
           height: 60,
           background: "#ffffff",
           borderBottom: "1px solid #e5e7eb",
-          padding: "0 40px",
+          padding: isMobile ? "0 16px" : "0 40px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -279,11 +314,11 @@ export default function HomePage() {
 
         {/* HERO (only before search) */}
         {!hasResults && (
-          <div style={{ textAlign: "center", paddingTop: 80, paddingBottom: 48 }}>
-            <h1 style={{ fontSize: 48, fontWeight: 800, color: "#0f172a", lineHeight: 1.15, margin: "0 0 16px" }}>
+          <div style={{ textAlign: "center", paddingTop: isMobile ? 40 : 80, paddingBottom: isMobile ? 32 : 48, padding: isMobile ? "40px 16px 32px" : "80px 20px 48px" }}>
+            <h1 style={{ fontSize: isMobile ? 32 : 48, fontWeight: 800, color: "#0f172a", lineHeight: 1.15, margin: "0 0 16px" }}>
               Доставка по Казахстану
             </h1>
-            <p style={{ fontSize: 18, color: "#64748b", maxWidth: 480, margin: "0 auto 40px", lineHeight: 1.6 }}>
+            <p style={{ fontSize: isMobile ? 15 : 18, color: "#64748b", maxWidth: 480, margin: "0 auto 40px", lineHeight: 1.6 }}>
               Сравните тарифы курьерских служб и оформите отправление онлайн за несколько минут
             </p>
           </div>
@@ -332,7 +367,7 @@ export default function HomePage() {
               background: "#ffffff",
               borderRadius: 16,
               boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04)",
-              padding: "32px",
+              padding: isMobile ? "20px 16px" : "32px",
             }}
           >
             <div style={{ marginBottom: 24 }}>
@@ -349,7 +384,7 @@ export default function HomePage() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "1fr 40px 1fr",
+                  gridTemplateColumns: isMobile ? "1fr" : "1fr 40px 1fr",
                   gap: 12,
                   alignItems: "end",
                   marginBottom: 20,
@@ -363,12 +398,14 @@ export default function HomePage() {
                     placeholder="Город отправки"
                   />
                 </div>
-                <div style={{ display: "flex", justifyContent: "center", paddingBottom: 12 }}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                    <polyline points="12 5 19 12 12 19" />
-                  </svg>
-                </div>
+                {!isMobile && (
+                  <div style={{ display: "flex", justifyContent: "center", paddingBottom: 12 }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                      <polyline points="12 5 19 12 12 19" />
+                    </svg>
+                  </div>
+                )}
                 <div>
                   <label style={lbl}>Куда</label>
                   <CitySelect
@@ -410,7 +447,7 @@ export default function HomePage() {
               </div>
 
               {/* Parameters */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginBottom: 24 }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(5, 1fr)", gap: 12, marginBottom: 24 }}>
                 {(
                   [
                     { key: "weightKg", label: "Вес, кг", placeholder: "2.5" },
