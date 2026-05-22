@@ -87,42 +87,22 @@ const infoStyle: CSSProperties = {
 function getBadgeStyle(badge: string | null): CSSProperties {
   switch (badge) {
     case "fastest":
-      return {
-        ...badgeBaseStyle,
-        background: "#ede9fe",
-        color: "#6d28d9",
-      };
+      return { ...badgeBaseStyle, background: "#ede9fe", color: "#6d28d9" };
     case "recommended":
-      return {
-        ...badgeBaseStyle,
-        background: "#dcfce7",
-        color: "#166534",
-      };
+      return { ...badgeBaseStyle, background: "#dcfce7", color: "#166534" };
     case "best_value":
-      return {
-        ...badgeBaseStyle,
-        background: "#fef3c7",
-        color: "#92400e",
-      };
+      return { ...badgeBaseStyle, background: "#fef3c7", color: "#92400e" };
     default:
-      return {
-        ...badgeBaseStyle,
-        background: "#e2e8f0",
-        color: "#334155",
-      };
+      return { ...badgeBaseStyle, background: "#e2e8f0", color: "#334155" };
   }
 }
 
 function formatBadgeLabel(badge: string | null): string {
   switch (badge) {
-    case "fastest":
-      return "Fastest";
-    case "recommended":
-      return "Recommended";
-    case "best_value":
-      return "Best value";
-    default:
-      return "Option";
+    case "fastest":    return "Быстрее всего";
+    case "recommended": return "Рекомендуем";
+    case "best_value": return "Лучшая цена";
+    default:           return "Вариант";
   }
 }
 
@@ -267,7 +247,7 @@ function QuoteResultsPageInner() {
                 color: "#1d4ed8",
               }}
             >
-              Quote results
+              Результаты расчёта
             </div>
             <h1 style={{ margin: "14px 0 8px", fontSize: 34, lineHeight: 1.1 }}>
               Доступные тарифы
@@ -306,15 +286,12 @@ function QuoteResultsPageInner() {
                 ...cardStyle,
                 marginBottom: 20,
                 display: "flex",
-                justifyContent: "space-between",
+                justifyContent: "flex-end",
                 gap: 16,
                 flexWrap: "wrap",
                 alignItems: "center",
               }}
             >
-              <div>
-                <strong>Quote session ID:</strong> {data.quote_session_id}
-              </div>
               <div style={{ color: "#475569" }}>
                 Найдено тарифов: <strong>{data.quotes.length}</strong>
               </div>
@@ -387,7 +364,7 @@ function QuoteResultsPageInner() {
                               color: "#166534",
                             }}
                           >
-                            Selected
+                            Выбран ✓
                           </span>
                         ) : null}
                       </div>
@@ -396,9 +373,7 @@ function QuoteResultsPageInner() {
                         {quote.carrier_name} - {quote.tariff_name}
                       </h2>
 
-                      <p style={{ margin: "0 0 6px", color: "#475569" }}>
-                        Код перевозчика: <strong>{quote.carrier_code}</strong>
-                      </p>
+
 
                       <p style={{ margin: 0, color: "#475569" }}>
                         Срок доставки:{" "}
