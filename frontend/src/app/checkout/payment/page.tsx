@@ -51,6 +51,7 @@ const STATUS_LABELS: Record<string, string> = {
   awaiting_payment: "Ожидает оплаты",
   payment_under_review: "Оплата на проверке",
   paid: "Оплачено",
+  dispatch_queued: "Оплачено",
   payment_rejected: "Оплата отклонена",
   cancelled: "Отменён",
   poll_timeout: "Ожидание подтверждения",
@@ -116,9 +117,9 @@ function PaymentPageContent() {
 
       const s = await getPaymentStatus(orderId);
       setStatus(s.status);
-      if (s.status === "paid" || s.status === "cancelled") {
+      if (s.status === "paid" || s.status === "dispatch_queued" || s.status === "cancelled") {
         clearInterval(pollingRef.current!);
-        if (s.status === "paid") router.push(`/dashboard/orders`);
+        if (s.status !== "cancelled") router.push(`/dashboard/orders`);
       }
     }, POLL_INTERVAL_MS);
 

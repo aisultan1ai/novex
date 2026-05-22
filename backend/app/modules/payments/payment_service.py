@@ -229,14 +229,18 @@ class PaymentService:
                 )
             )
 
+        db.commit()  # persist "paid" status before dispatching
+        db.refresh(tx)
+
+        if order:
             create_dispatch_job(db, order=order, changed_by_user_id=admin_id)
 
             _notifications_svc.notify_order_status(
                 db, user_id=order.user_id, order_id=order.id, status="paid"
             )
 
-        db.commit()
-        db.refresh(tx)
+            db.commit()
+
         return tx
 
     def admin_reject(
