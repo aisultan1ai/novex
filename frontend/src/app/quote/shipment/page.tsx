@@ -459,9 +459,11 @@ function ShipmentPageInner() {
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
   }, [searchParams]);
 
+  const quoteToken = searchParams.get("token");
+
   const fullNextUrl = useMemo(
-    () => (quoteSessionId ? `/quote/shipment?quoteSessionId=${quoteSessionId}` : "/quote/shipment"),
-    [quoteSessionId],
+    () => (quoteSessionId ? `/quote/shipment?quoteSessionId=${quoteSessionId}${quoteToken ? `&token=${quoteToken}` : ""}` : "/quote/shipment"),
+    [quoteSessionId, quoteToken],
   );
 
   const createDraftRequestedRef = useRef(false);
@@ -662,11 +664,11 @@ function ShipmentPageInner() {
 
           <button
             style={buttonSecondary}
-            onClick={() =>
-              router.push(
-                quoteSessionId ? `/quote/results?quoteSessionId=${quoteSessionId}` : "/",
-              )
-            }
+            onClick={() => {
+              if (!quoteSessionId) { router.push("/"); return; }
+              const url = `/quote/results?quoteSessionId=${quoteSessionId}${quoteToken ? `&token=${quoteToken}` : ""}`;
+              router.push(url);
+            }}
           >
             Назад к тарифам
           </button>

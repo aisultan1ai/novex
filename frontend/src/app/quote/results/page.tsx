@@ -243,7 +243,7 @@ function QuoteResultsPageInner() {
       return;
     }
 
-    router.push(`/quote/shipment?quoteSessionId=${quoteSessionId}`);
+    router.push(`/quote/shipment?quoteSessionId=${quoteSessionId}${token ? `&token=${token}` : ""}`);
   }
 
   return (

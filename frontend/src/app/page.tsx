@@ -197,7 +197,8 @@ export default function HomePage() {
 
   function handleProceed() {
     if (!selectedRate || !results) return;
-    router.push(`/quote/shipment?quoteSessionId=${results.quote_session_id}`);
+    const token = results.public_token;
+    router.push(`/quote/shipment?quoteSessionId=${results.quote_session_id}${token ? `&token=${token}` : ""}`);
   }
 
   const hasResults = results !== null;
