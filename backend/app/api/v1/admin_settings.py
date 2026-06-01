@@ -42,14 +42,12 @@ class PlatformSettingsUpdate(BaseModel):
 
 
 def _load_bank(db: Session) -> BankTransferSettings:
-    from app.core.config import get_settings as get_env
-    env = get_env()
     return BankTransferSettings(
-        recipient_name=_repo.get(db, "bank_recipient_name", default=getattr(env, "bank_transfer_recipient_name", "ТОО Novex")),
-        bank_name=_repo.get(db, "bank_name", default=getattr(env, "bank_transfer_bank_name", "Halyk Bank")),
-        iban=_repo.get(db, "bank_iban", default=getattr(env, "bank_transfer_iban", "")),
-        bin=_repo.get(db, "bank_bin", default=getattr(env, "bank_transfer_bin", "")),
-        knp=_repo.get(db, "bank_knp", default=getattr(env, "bank_transfer_knp", "710")),
+        recipient_name=_repo.get(db, "bank_recipient_name", default="ТОО Novex"),
+        bank_name=_repo.get(db, "bank_name", default="Halyk Bank"),
+        iban=_repo.get(db, "bank_iban", default=""),
+        bin=_repo.get(db, "bank_bin", default=""),
+        knp=_repo.get(db, "bank_knp", default="710"),
     )
 
 

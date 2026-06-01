@@ -9,7 +9,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.common.status_machine import transition_order
-from app.core.config import get_settings
 from app.modules.dispatch.models import OrderStatusHistory
 from app.modules.platform_settings.repository import PlatformSettingsRepository
 from app.modules.dispatch.service import create_dispatch_job
@@ -34,13 +33,12 @@ _settings_repo = PlatformSettingsRepository()
 
 
 def _get_manual_provider(db: Session) -> ManualBankTransferProvider:
-    s = get_settings()
     return ManualBankTransferProvider(
-        recipient_name=_settings_repo.get(db, "bank_recipient_name", default=getattr(s, "bank_transfer_recipient_name", "ТОО Novex")),
-        bank_name=_settings_repo.get(db, "bank_name", default=getattr(s, "bank_transfer_bank_name", "Halyk Bank")),
-        iban=_settings_repo.get(db, "bank_iban", default=getattr(s, "bank_transfer_iban", "")),
-        bin_number=_settings_repo.get(db, "bank_bin", default=getattr(s, "bank_transfer_bin", "")),
-        knp=_settings_repo.get(db, "bank_knp", default=getattr(s, "bank_transfer_knp", "710")),
+        recipient_name=_settings_repo.get(db, "bank_recipient_name", default="ТОО Novex"),
+        bank_name=_settings_repo.get(db, "bank_name", default="Halyk Bank"),
+        iban=_settings_repo.get(db, "bank_iban", default=""),
+        bin_number=_settings_repo.get(db, "bank_bin", default=""),
+        knp=_settings_repo.get(db, "bank_knp", default="710"),
     )
 
 

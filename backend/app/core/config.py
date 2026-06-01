@@ -92,13 +92,6 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:3000"
     backend_url: str = "http://localhost:8000"
 
-    # Manual bank transfer (active payment method for MVP)
-    bank_transfer_recipient_name: str = "ТОО Novex"
-    bank_transfer_bank_name: str = "Halyk Bank"
-    bank_transfer_iban: str = ""
-    bank_transfer_bin: str = ""
-    bank_transfer_knp: str = "710"
-
     backend_cors_origins: list[str] = Field(
         default_factory=lambda: [
             "http://localhost",
