@@ -3,16 +3,23 @@ export type OrderDraftStatus =
   | "shipment_details_completed"
   | "ready_for_checkout"
   | "awaiting_payment"
+  | "payment_under_review"
+  | "payment_rejected"
   | "paid"
+  | "dispatch_queued"
   | "sent_to_carrier"
   | "picked_up"
   | "in_transit"
   | "arrived"
   | "delivered"
   | "cancelled"
-  | "return"
+  | "return_requested"
+  | "return_in_progress"
+  | "returned"
   | "dispatch_failed"
-  | "pending_manual";
+  | "pending_manual"
+  | "pending_manual_dispatch"
+  | "dispatched";
 
 export type ShipmentPartyRole = "sender" | "recipient";
 

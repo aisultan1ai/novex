@@ -101,7 +101,7 @@ function PaymentPageContent() {
       .finally(() => setLoading(false));
   }, [orderId]);
 
-  // Poll payment status after proof upload (BUG #1 / #6: stops after 30 min)
+  // Poll payment status after proof upload
   useEffect(() => {
     if (!uploadSuccess) return;
     pollAttemptsRef.current = 0;
@@ -117,9 +117,15 @@ function PaymentPageContent() {
 
       const s = await getPaymentStatus(orderId);
       setStatus(s.status);
-      if (s.status === "paid" || s.status === "dispatch_queued" || s.status === "cancelled") {
+      if (s.status === "paid" || s.status === "dispatch_queued") {
         clearInterval(pollingRef.current!);
-        if (s.status !== "cancelled") router.push(`/dashboard/orders`);
+        router.push(`/dashboard/orders`);
+      } else if (s.status === "cancelled") {
+        clearInterval(pollingRef.current!);
+      } else if (s.status === "payment_rejected") {
+        clearInterval(pollingRef.current!);
+        setUploadSuccess(false);
+        setUploadError("Ваш чек отклонён оператором. Загрузите корректный документ об оплате.");
       }
     }, POLL_INTERVAL_MS);
 
@@ -133,7 +139,6 @@ function PaymentPageContent() {
     const file = fileInputRef.current?.files?.[0];
     if (!file || !paymentData) return;
 
-    // Client-side file size guard (BUG #7)
     if (file.size > MAX_FILE_SIZE_BYTES) {
       setUploadError("Файл слишком большой. Максимальный размер: 5 МБ.");
       return;
@@ -146,21 +151,25 @@ function PaymentPageContent() {
     form.append("payment_id", String(paymentData.payment_id));
     form.append("file", file);
 
-    const res = await fetch(
-      `${API_BASE}/api/v1/payments/orders/${orderId}/upload-proof`,
-      { method: "POST", credentials: "include", body: form }
-    );
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/v1/payments/orders/${orderId}/upload-proof`,
+        { method: "POST", credentials: "include", body: form }
+      );
 
-    setUploading(false);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setUploadError((err as { detail?: string }).detail ?? "Ошибка загрузки файла");
+        return;
+      }
 
-    if (!res.ok) {
-      const err = await res.json();
-      setUploadError(err.detail ?? "Ошибка загрузки");
-      return;
+      setUploadSuccess(true);
+      setStatus("payment_under_review");
+    } catch {
+      setUploadError("Ошибка соединения. Проверьте интернет и попробуйте снова.");
+    } finally {
+      setUploading(false);
     }
-
-    setUploadSuccess(true);
-    setStatus("payment_under_review");
   };
 
   if (loading) {

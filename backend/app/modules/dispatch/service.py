@@ -181,10 +181,36 @@ class DispatchWorker:
         db.commit()
 
     def _dispatch_to_carrier(self, db: Session, order: OrderDraft) -> str | None:
+        from app.modules.carriers.api_clients.registry import get_client
+        from app.modules.carriers.api_credentials import CarrierAPICredentialsRepository
+
+        # ── Priority 1: direct carrier API ──────────────────────────────────
+        client = get_client(order.carrier_code_snapshot)
+        creds = CarrierAPICredentialsRepository().get_by_carrier_code(db, order.carrier_code_snapshot)
+
+        if client and creds and creds.is_active:
+            logger.info(
+                "dispatch_worker: using API client for carrier %s, order %s",
+                order.carrier_code_snapshot, order.id,
+            )
+            order_data = _build_api_order_data(order)
+            api_creds = {
+                "api_url": creds.api_url,
+                "api_token": creds.api_token,
+                **(creds.extra_config or {}),
+            }
+            result = client.create_invoice(order_data, api_creds)
+
+            if result.waybill_pdf_bytes:
+                _save_waybill_document(db, order, result.waybill_number, result.waybill_pdf_bytes)
+
+            return result.waybill_number
+
+        # ── Priority 2: webhook push (existing) ─────────────────────────────
         cfg = _webhook_repo.get_by_carrier_code(db, order.carrier_code_snapshot)
         if not cfg or not cfg.is_active or not cfg.push_url:
             raise RuntimeError(
-                f"Carrier {order.carrier_code_snapshot} has no active webhook config"
+                f"Carrier '{order.carrier_code_snapshot}' has no active API credentials or webhook config"
             )
 
         payload = _build_dispatch_payload(order)
@@ -212,6 +238,72 @@ class DispatchWorker:
         )
         resp.raise_for_status()
         return resp.json().get("tracking_number")
+
+
+def _build_api_order_data(order: OrderDraft) -> dict:
+    """Нормализованные данные заказа для передачи в CarrierAPIClient."""
+    sender = next((p for p in order.parties if p.role == "sender"), None)
+    recipient = next((p for p in order.parties if p.role == "recipient"), None)
+    return {
+        "order_id": order.id,
+        "order_reference": f"NOVEX-{order.id:06d}",
+        "sender": {
+            "full_name": sender.full_name if sender else "",
+            "phone": sender.phone if sender else "",
+            "city": sender.city if sender else order.from_city_snapshot,
+            "address": sender.address_line1 if sender else "",
+        },
+        "recipient": {
+            "full_name": recipient.full_name if recipient else "",
+            "phone": recipient.phone if recipient else "",
+            "city": recipient.city if recipient else order.to_city_snapshot,
+            "address": recipient.address_line1 if recipient else "",
+        },
+        "packages": [
+            {
+                "weight_kg": float(p.weight_kg),
+                "quantity": p.quantity,
+                "description": p.description or "",
+            }
+            for p in order.packages
+        ],
+        "declared_value": float(order.price_snapshot),
+        "currency": order.currency_snapshot,
+        "fragile": order.fragile,
+    }
+
+
+def _save_waybill_document(
+    db: "Session",
+    order: OrderDraft,
+    waybill_number: str,
+    pdf_bytes: bytes,
+) -> None:
+    """Сохранить PDF-накладную перевозчика в хранилище и БД."""
+    try:
+        from app.core.storage import get_storage
+        from app.modules.documents.models import Document, DocumentType
+
+        storage = get_storage()
+        filename = f"waybill_{waybill_number}.pdf"
+        uploaded = storage.upload_file(
+            file_data=pdf_bytes,
+            original_name=filename,
+            mime_type="application/pdf",
+            folder=f"waybills/{order.id}",
+        )
+        doc = Document(
+            order_id=order.id,
+            document_type=DocumentType.LABEL,
+            file_url=uploaded.object_name,
+            file_name=filename,
+            mime_type="application/pdf",
+        )
+        db.add(doc)
+        db.flush()
+        logger.info("Waybill PDF saved: order_id=%s waybill=%s", order.id, waybill_number)
+    except Exception as exc:
+        logger.warning("Failed to save waybill PDF (non-fatal): %s", exc)
 
 
 def _build_dispatch_payload(order: OrderDraft) -> dict:

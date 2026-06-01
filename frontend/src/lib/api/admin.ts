@@ -165,3 +165,42 @@ export const approveAdminPayment = (paymentId: number): Promise<{ message: strin
 
 export const rejectAdminPayment = (paymentId: number, reason: string): Promise<{ message: string }> =>
   req(`/admin/payments/${paymentId}/reject`, { method: "POST", body: JSON.stringify({ reject_reason: reason }) });
+
+// ── Carrier API credentials ────────────────────────────────────────────────
+
+export interface CarrierAPICredentials {
+  id: number;
+  carrier_code: string;
+  api_url: string;
+  api_token_masked: string;
+  is_active: boolean;
+  extra_config: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CarrierAPICredentialsPayload {
+  carrier_code: string;
+  api_url: string;
+  api_token: string;
+  is_active?: boolean;
+  extra_config?: Record<string, unknown> | null;
+}
+
+export const getCarrierAPICredentials = (carrierCode: string): Promise<CarrierAPICredentials> =>
+  req(`/admin/carrier-api/${carrierCode}`);
+
+export const upsertCarrierAPICredentials = (carrierCode: string, body: CarrierAPICredentialsPayload): Promise<CarrierAPICredentials> =>
+  req(`/admin/carrier-api/${carrierCode}`, { method: "POST", body: JSON.stringify(body) });
+
+export const updateCarrierAPICredentials = (carrierCode: string, body: Partial<CarrierAPICredentialsPayload>): Promise<CarrierAPICredentials> =>
+  req(`/admin/carrier-api/${carrierCode}`, { method: "PATCH", body: JSON.stringify(body) });
+
+export const deleteCarrierAPICredentials = (carrierCode: string): Promise<void> =>
+  req(`/admin/carrier-api/${carrierCode}`, { method: "DELETE" });
+
+export const testCarrierAPIConnection = (carrierCode: string): Promise<{ ok: boolean; message: string }> =>
+  req(`/admin/carrier-api/${carrierCode}/test`, { method: "POST" });
+
+export const listSupportedCarrierAPIs = (): Promise<{ carrier_codes: string[] }> =>
+  req("/admin/carrier-api/supported");

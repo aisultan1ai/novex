@@ -172,6 +172,14 @@ class PaymentService:
                 )
             )
 
+        if order:
+            _notifications_svc.notify_order_status(
+                db,
+                user_id=user_id,
+                order_id=order_id,
+                status="payment_under_review",
+            )
+
         db.commit()
         db.refresh(proof)
         return proof
@@ -296,7 +304,11 @@ class PaymentService:
                 )
             )
             _notifications_svc.notify_order_status(
-                db, user_id=order.user_id, order_id=order.id, status="payment_rejected"
+                db,
+                user_id=order.user_id,
+                order_id=order.id,
+                status="payment_rejected",
+                reject_reason=reject_reason,
             )
 
         db.commit()

@@ -109,12 +109,16 @@ services:
       KASPI_API_URL: "${KASPI_API_URL:-https://api.kaspi.kz/merchant}"
       FRONTEND_URL: "http://localhost:3000"
       BACKEND_URL: "http://localhost:8000"
+      ADMIN_EMAIL: "${ADMIN_EMAIL:-admin@novex.kz}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-admin1234}"
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
       - ../../backend:/app
     command: >
-      sh -c "uvicorn app.main:app
+      sh -c "alembic upgrade head &&
+      python -m scripts.seed &&
+      uvicorn app.main:app
       --host 0.0.0.0
       --port 8000
       --reload"

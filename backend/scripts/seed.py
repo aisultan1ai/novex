@@ -18,9 +18,47 @@ from __future__ import annotations
 
 import logging
 import sys
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 log = logging.getLogger("seed")
+
+
+def _ensure_admin(db: "Session") -> None:
+    """Создаёт admin-пользователя если его нет. Идемпотентен."""
+    import os
+
+    from sqlalchemy import select
+
+    from app.core.security import get_password_hash
+    from app.modules.identity.models import Role, RoleCode, User
+
+    admin_email = os.getenv("ADMIN_EMAIL", "admin@novex.kz")
+    admin_password = os.getenv("ADMIN_PASSWORD", "admin1234")
+
+    existing = db.scalar(select(User).where(User.email == admin_email))
+    if existing:
+        log.info("Admin already exists: %s", admin_email)
+        return
+
+    role = db.scalar(select(Role).where(Role.code == RoleCode.ADMIN))
+    if role is None:
+        log.warning("Admin role not found — skipping admin creation")
+        return
+
+    user = User(
+        email=admin_email,
+        password_hash=get_password_hash(admin_password),
+        full_name="Admin",
+        is_active=True,
+        role_id=role.id,
+    )
+    db.add(user)
+    db.flush()
+    log.info("Admin created: email=%s password=%s", admin_email, admin_password)
 
 
 def main() -> None:
@@ -291,6 +329,9 @@ def main() -> None:
 
             db.flush()
             log.info("Zone cities added: %d", cities_added)
+
+        # ── 5. Admin user ─────────────────────────────────────────────────────
+        _ensure_admin(db)
 
         db.commit()
         log.info("Seed complete.")

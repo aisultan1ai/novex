@@ -4,6 +4,8 @@ import logging
 
 from sqlalchemy.orm import Session
 
+from app.core.email import send_email
+from app.core.email_templates import order_status_email
 from app.modules.notifications.repository import NotificationsRepository
 from app.modules.notifications.schemas import (
     NotificationListResponse,
@@ -47,6 +49,7 @@ class NotificationsService:
         user_id: int,
         order_id: int,
         status: str,
+        reject_reason: str | None = None,
     ) -> None:
         title = _STATUS_TITLES.get(status, f"Статус обновлён: {status}")
         body = f"Заказ #{order_id}: {title.lower()}"
@@ -59,6 +62,51 @@ class NotificationsService:
             order_id,
             status,
         )
+
+        self._send_order_email(
+            db,
+            user_id=user_id,
+            order_id=order_id,
+            status=status,
+            reject_reason=reject_reason,
+        )
+
+    def _send_order_email(
+        self,
+        db: Session,
+        *,
+        user_id: int,
+        order_id: int,
+        status: str,
+        reject_reason: str | None = None,
+    ) -> None:
+        result = order_status_email(
+            status, order_id, reject_reason=reject_reason
+        )
+        if result is None:
+            return
+
+        from app.modules.identity.models import User  # local import avoids circular dep
+        user = db.get(User, user_id)
+        if not user or not user.email:
+            return
+
+        subject, html_body = order_status_email(
+            status, order_id,
+            user_name=user.full_name,
+            reject_reason=reject_reason,
+        )
+        try:
+            send_email(to=user.email, subject=subject, html=html_body)
+            logger.info(
+                "Order email sent: user_id=%s order_id=%s status=%s",
+                user_id, order_id, status,
+            )
+        except Exception:
+            logger.exception(
+                "Order email failed (non-fatal): user_id=%s order_id=%s status=%s",
+                user_id, order_id, status,
+            )
 
     def list_notifications(
         self, db: Session, *, user_id: int
