@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getAdminSettings, updateAdminSettings } from "@/lib/api/admin";
-import type { BankTransferSettings, PlatformSettings } from "@/types/admin";
+import type { BankTransferSettings } from "@/types/admin";
 
 const EMPTY_BANK: BankTransferSettings = {
   recipient_name: "",
@@ -13,7 +13,6 @@ const EMPTY_BANK: BankTransferSettings = {
 };
 
 export default function AdminSettingsPage() {
-  const [settings, setSettings] = useState<PlatformSettings | null>(null);
   const [commissionRate, setCommissionRate] = useState("");
   const [bank, setBank] = useState<BankTransferSettings>(EMPTY_BANK);
   const [loading, setLoading] = useState(true);
@@ -23,7 +22,6 @@ export default function AdminSettingsPage() {
   useEffect(() => {
     getAdminSettings()
       .then((s) => {
-        setSettings(s);
         setCommissionRate(s.commission_rate);
         setBank(s.bank_transfer ?? EMPTY_BANK);
       })
@@ -39,7 +37,6 @@ export default function AdminSettingsPage() {
         commission_rate: commissionRate,
         bank_transfer: bank,
       });
-      setSettings(updated);
       setBank(updated.bank_transfer ?? EMPTY_BANK);
       setMsg({ text: "Настройки сохранены", ok: true });
     } catch (e: unknown) {

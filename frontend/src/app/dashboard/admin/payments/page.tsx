@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 interface PaymentItem {
   id: number;
@@ -60,7 +60,7 @@ export default function AdminPaymentsPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
 
-  const fetchPayments = async () => {
+  const fetchPayments = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams({ page: String(page), size: "20" });
     if (statusFilter) params.set("status", statusFilter);
@@ -73,11 +73,11 @@ export default function AdminPaymentsPage() {
       setTotal(data.total);
     }
     setLoading(false);
-  };
+  }, [statusFilter, page]);
 
   useEffect(() => {
     fetchPayments();
-  }, [statusFilter, page]);
+  }, [fetchPayments]);
 
   const handleApprove = async (id: number) => {
     setActionLoading(true);
