@@ -25,6 +25,7 @@ export type ShipmentPartyRole = "sender" | "recipient";
 
 export interface CreateDraftFromQuoteRequest {
   quote_session_id: number;
+  public_token?: string | null;
 }
 
 export interface ShipmentPartyInput {

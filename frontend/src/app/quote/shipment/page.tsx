@@ -541,7 +541,7 @@ function ShipmentPageInner() {
       setIsBootstrapping(true);
 
       try {
-        const createdDraft = await createDraftFromQuote({ quote_session_id: quoteSessionId! });
+        const createdDraft = await createDraftFromQuote({ quote_session_id: quoteSessionId!, public_token: quoteToken });
         if (cancelled) return;
         setDraft(createdDraft);
         setForm(mapDraftToForm(createdDraft, currentUser));
