@@ -242,10 +242,10 @@ export default function OrderTrackingPage() {
     <>
       <div style={{ marginBottom: 24 }}>
         <Link
-          href="/dashboard/orders"
+          href={`/dashboard/orders/${draftId}`}
           style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, color: "#64748b", textDecoration: "none", fontWeight: 500 }}
         >
-          <IconArrowLeft /> Назад к заказам
+          <IconArrowLeft /> Назад к заказу
         </Link>
       </div>
 

@@ -1,0 +1,356 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+
+import { useAuth } from "@/components/providers/auth-provider";
+import { ApiError, deleteOrderDraft, downloadOrderLabel, getOrderDraft } from "@/lib/api/orders";
+import type { OrderDraftResponse } from "@/types/order";
+
+const STATUS_LABELS: Record<string, string> = {
+  draft:                      "Черновик",
+  shipment_details_completed: "Детали заполнены",
+  ready_for_checkout:         "Готов к оплате",
+  awaiting_payment:           "Ожидает оплаты",
+  payment_under_review:       "Чек на проверке",
+  payment_rejected:           "Чек отклонён",
+  paid:                       "Оплачен",
+  dispatch_queued:            "Ожидает отправки",
+  dispatch_failed:            "Уточняем детали",
+  pending_manual:             "Передаётся перевозчику",
+  pending_manual_dispatch:    "Ожидает ручной отправки",
+  sent_to_carrier:            "Передан курьеру",
+  picked_up:                  "Забран",
+  in_transit:                 "В пути",
+  arrived:                    "Прибыл",
+  delivered:                  "Доставлен",
+  return_requested:           "Запрос возврата",
+  return_in_progress:         "Возврат в пути",
+  returned:                   "Возвращён",
+  cancelled:                  "Отменён",
+  return:                     "Возврат",
+};
+
+const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
+  draft:                      { bg: "#f1f5f9", color: "#475569" },
+  shipment_details_completed: { bg: "#dbeafe", color: "#1e40af" },
+  ready_for_checkout:         { bg: "#ede9fe", color: "#5b21b6" },
+  awaiting_payment:           { bg: "#fef3c7", color: "#92400e" },
+  payment_under_review:       { bg: "#dbeafe", color: "#1e40af" },
+  payment_rejected:           { bg: "#fee2e2", color: "#991b1b" },
+  paid:                       { bg: "#dcfce7", color: "#166534" },
+  dispatch_queued:            { bg: "#fef3c7", color: "#92400e" },
+  dispatch_failed:            { bg: "#fef3c7", color: "#92400e" },
+  pending_manual:             { bg: "#fef3c7", color: "#92400e" },
+  pending_manual_dispatch:    { bg: "#fef3c7", color: "#92400e" },
+  sent_to_carrier:            { bg: "#dbeafe", color: "#1e40af" },
+  picked_up:                  { bg: "#dbeafe", color: "#1e40af" },
+  in_transit:                 { bg: "#ede9fe", color: "#5b21b6" },
+  arrived:                    { bg: "#ede9fe", color: "#5b21b6" },
+  delivered:                  { bg: "#dcfce7", color: "#166534" },
+  return_requested:           { bg: "#fee2e2", color: "#991b1b" },
+  return_in_progress:         { bg: "#fee2e2", color: "#991b1b" },
+  returned:                   { bg: "#f1f5f9", color: "#475569" },
+  cancelled:                  { bg: "#fee2e2", color: "#991b1b" },
+  return:                     { bg: "#fee2e2", color: "#991b1b" },
+};
+
+const PAYABLE_STATUSES = new Set(["shipment_details_completed", "ready_for_checkout"]);
+const TRACKABLE_STATUSES = new Set(["paid", "sent_to_carrier", "picked_up", "in_transit", "arrived", "delivered"]);
+
+function parseUTC(iso: string): Date {
+  return new Date(/[Z+]/.test(iso) ? iso : iso + "Z");
+}
+
+function formatDate(iso: string): string {
+  return parseUTC(iso).toLocaleDateString("ru-RU", { day: "2-digit", month: "long", year: "numeric" });
+}
+
+function formatPrice(price: number, currency: string): string {
+  return `${new Intl.NumberFormat("ru-RU").format(price)} ${currency}`;
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const colors = STATUS_COLORS[status] ?? { bg: "#f1f5f9", color: "#475569" };
+  return (
+    <span style={{ display: "inline-block", padding: "5px 14px", borderRadius: 999, fontSize: 13, fontWeight: 600, background: colors.bg, color: colors.color }}>
+      {STATUS_LABELS[status] ?? status}
+    </span>
+  );
+}
+
+function IconArrowLeft() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  );
+}
+
+const card = { background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, padding: "20px 24px" };
+
+export default function OrderDetailPage() {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const router = useRouter();
+  const params = useParams();
+  const draftId = Number(params.id);
+
+  const [order, setOrder] = useState<OrderDraftResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) router.push("/login");
+  }, [isAuthenticated, authLoading, router]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !draftId) return;
+    getOrderDraft(draftId)
+      .then(setOrder)
+      .catch((e: unknown) => setError(e instanceof ApiError ? e.detail : "Не удалось загрузить заказ."))
+      .finally(() => setIsLoading(false));
+  }, [isAuthenticated, draftId]);
+
+  useEffect(() => {
+    return () => { if (undoTimerRef.current) clearTimeout(undoTimerRef.current); };
+  }, []);
+
+  const commitDelete = useCallback(async () => {
+    setIsDeleting(true);
+    try {
+      await deleteOrderDraft(draftId);
+      router.push("/dashboard/orders");
+    } catch {
+      setPendingDelete(false);
+      setIsDeleting(false);
+      setError("Не удалось удалить черновик.");
+    }
+  }, [draftId, router]);
+
+  function handleDelete() {
+    setPendingDelete(true);
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    undoTimerRef.current = setTimeout(() => void commitDelete(), 5000);
+  }
+
+  function handleUndoDelete() {
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    setPendingDelete(false);
+  }
+
+  async function handleDownloadLabel() {
+    setIsDownloading(true);
+    try {
+      const blob = await downloadOrderLabel(draftId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `novex_label_${draftId}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError("Не удалось скачать накладную.");
+    } finally {
+      setIsDownloading(false);
+    }
+  }
+
+  if (authLoading || (!isAuthenticated && !authLoading)) return null;
+
+  return (
+    <>
+      <div style={{ marginBottom: 24 }}>
+        <Link href="/dashboard/orders" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, color: "#64748b", textDecoration: "none", fontWeight: 500 }}>
+          <IconArrowLeft /> Мои заказы
+        </Link>
+      </div>
+
+      {pendingDelete && (
+        <div style={{ marginBottom: 20, padding: "12px 20px", background: "#1e293b", borderRadius: 12, fontSize: 14, color: "#f1f5f9", display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ flex: 1 }}>Черновик #{draftId} будет удалён через 5 секунд…</span>
+          <button onClick={handleUndoDelete} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #475569", background: "transparent", color: "#f1f5f9", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+            Отменить
+          </button>
+        </div>
+      )}
+
+      {error && (
+        <div style={{ marginBottom: 20, background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: "14px 20px", color: "#b91c1c", fontSize: 14 }}>
+          {error}
+        </div>
+      )}
+
+      {isLoading ? (
+        <>
+          <style>{`@keyframes skeleton-pulse { 0%,100%{opacity:1} 50%{opacity:.4} }`}</style>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {[120, 100, 180, 120].map((h, i) => (
+              <div key={i} style={{ height: h, borderRadius: 16, background: "#e5e7eb", animation: "skeleton-pulse 1.5s ease infinite", animationDelay: `${i * 0.15}s` }} />
+            ))}
+          </div>
+        </>
+      ) : order ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          {/* Header */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
+                <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "#0f172a" }}>Заказ #{order.draft_id}</h1>
+                <StatusBadge status={order.status} />
+              </div>
+              <div style={{ fontSize: 13, color: "#94a3b8" }}>Создан {formatDate(order.created_at)}</div>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {PAYABLE_STATUSES.has(order.status) && (
+                <Link href={`/checkout?draftId=${order.draft_id}`} style={{ padding: "10px 20px", borderRadius: 10, background: "#0f172a", color: "#fff", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
+                  Оплатить
+                </Link>
+              )}
+              {TRACKABLE_STATUSES.has(order.status) && (
+                <Link href={`/dashboard/orders/${order.draft_id}/tracking`} style={{ padding: "10px 20px", borderRadius: 10, background: "#ede9fe", color: "#5b21b6", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
+                  Отследить
+                </Link>
+              )}
+              {TRACKABLE_STATUSES.has(order.status) && (
+                <button
+                  onClick={() => void handleDownloadLabel()}
+                  disabled={isDownloading}
+                  style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", color: "#0f172a", fontSize: 14, fontWeight: 600, cursor: isDownloading ? "not-allowed" : "pointer", opacity: isDownloading ? 0.6 : 1, fontFamily: "inherit" }}
+                >
+                  {isDownloading ? "Скачиваем…" : "Скачать накладную"}
+                </button>
+              )}
+              {order.status === "draft" && !pendingDelete && (
+                <button
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid #fecaca", background: "#fff", color: "#ef4444", fontSize: 14, fontWeight: 600, cursor: isDeleting ? "not-allowed" : "pointer", opacity: isDeleting ? 0.5 : 1, fontFamily: "inherit" }}
+                >
+                  Удалить черновик
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Route + carrier */}
+          <div style={{ ...card }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 14 }}>Маршрут и тариф</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
+              <span style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>{order.from_city_snapshot}</span>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
+              </svg>
+              <span style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>{order.to_city_snapshot}</span>
+            </div>
+            <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
+              <div>
+                <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Перевозчик</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{order.carrier_name_snapshot}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Тариф</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{order.tariff_name_snapshot}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Срок доставки</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{order.eta_days_min_snapshot}–{order.eta_days_max_snapshot} дн.</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Стоимость</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: "#0f172a" }}>{formatPrice(order.price_snapshot, order.currency_snapshot)}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Sender + Recipient */}
+          {(order.sender ?? order.recipient) && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              {order.sender && (
+                <div style={{ ...card }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>Отправитель</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 4 }}>{order.sender.full_name}</div>
+                  {order.sender.company_name && <div style={{ fontSize: 13, color: "#64748b", marginBottom: 2 }}>{order.sender.company_name}</div>}
+                  <div style={{ fontSize: 13, color: "#64748b", marginBottom: 2 }}>{order.sender.phone}</div>
+                  {order.sender.email && <div style={{ fontSize: 13, color: "#64748b", marginBottom: 8 }}>{order.sender.email}</div>}
+                  <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 10, marginTop: 8 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: "#475569" }}>{order.sender.city}, {order.sender.country}</div>
+                    <div style={{ fontSize: 13, color: "#94a3b8", marginTop: 2 }}>{order.sender.address_line1}</div>
+                    {order.sender.address_line2 && <div style={{ fontSize: 13, color: "#94a3b8" }}>{order.sender.address_line2}</div>}
+                    {order.sender.postal_code && <div style={{ fontSize: 13, color: "#94a3b8" }}>{order.sender.postal_code}</div>}
+                    {order.sender.comment && <div style={{ fontSize: 12, color: "#94a3b8", fontStyle: "italic", marginTop: 4 }}>{order.sender.comment}</div>}
+                  </div>
+                </div>
+              )}
+              {order.recipient && (
+                <div style={{ ...card }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>Получатель</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 4 }}>{order.recipient.full_name}</div>
+                  {order.recipient.company_name && <div style={{ fontSize: 13, color: "#64748b", marginBottom: 2 }}>{order.recipient.company_name}</div>}
+                  <div style={{ fontSize: 13, color: "#64748b", marginBottom: 2 }}>{order.recipient.phone}</div>
+                  {order.recipient.email && <div style={{ fontSize: 13, color: "#64748b", marginBottom: 8 }}>{order.recipient.email}</div>}
+                  <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 10, marginTop: 8 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: "#475569" }}>{order.recipient.city}, {order.recipient.country}</div>
+                    <div style={{ fontSize: 13, color: "#94a3b8", marginTop: 2 }}>{order.recipient.address_line1}</div>
+                    {order.recipient.address_line2 && <div style={{ fontSize: 13, color: "#94a3b8" }}>{order.recipient.address_line2}</div>}
+                    {order.recipient.postal_code && <div style={{ fontSize: 13, color: "#94a3b8" }}>{order.recipient.postal_code}</div>}
+                    {order.recipient.comment && <div style={{ fontSize: 12, color: "#94a3b8", fontStyle: "italic", marginTop: 4 }}>{order.recipient.comment}</div>}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Packages */}
+          {order.packages.length > 0 && (
+            <div style={{ ...card }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>
+                Посылки · {order.packages.length} шт.
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {order.packages.map((pkg) => (
+                  <div key={pkg.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "#f8fafc", borderRadius: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a", marginBottom: 2 }}>{pkg.description}</div>
+                      <div style={{ fontSize: 12, color: "#94a3b8" }}>
+                        {pkg.quantity} шт. · {pkg.weight_kg} кг · {pkg.width_cm}×{pkg.height_cm}×{pkg.depth_cm} см
+                      </div>
+                    </div>
+                    {pkg.declared_value != null && (
+                      <div style={{ fontSize: 13, color: "#64748b", fontWeight: 500 }}>
+                        {formatPrice(pkg.declared_value, pkg.declared_value_currency ?? "")}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Additional services */}
+          {(order.call_before_delivery || order.insurance || order.fragile) && (
+            <div style={{ ...card }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>Дополнительные услуги</div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {order.call_before_delivery && (
+                  <span style={{ fontSize: 13, fontWeight: 600, background: "#dbeafe", color: "#1e40af", borderRadius: 999, padding: "5px 14px" }}>Звонок перед доставкой</span>
+                )}
+                {order.insurance && (
+                  <span style={{ fontSize: 13, fontWeight: 600, background: "#dbeafe", color: "#1e40af", borderRadius: 999, padding: "5px 14px" }}>Страховка</span>
+                )}
+                {order.fragile && (
+                  <span style={{ fontSize: 13, fontWeight: 600, background: "#fef3c7", color: "#92400e", borderRadius: 999, padding: "5px 14px" }}>Хрупкий груз</span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : null}
+    </>
+  );
+}
