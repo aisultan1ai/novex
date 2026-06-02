@@ -12,11 +12,13 @@ from sqlalchemy.orm import Session, joinedload
 from app.core.db import get_db
 from app.core.dependencies import require_admin
 from app.core.security import get_password_hash
+from app.modules.audit.service import AuditService
 from app.modules.identity.models import CustomerProfile, Role, RoleCode, User
 from app.modules.orders.models import OrderDraft
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin/users", tags=["admin:users"])
+_audit_svc = AuditService()
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
@@ -44,7 +46,7 @@ class AdminUserCreate(BaseModel):
 def create_user(
     payload: AdminUserCreate,
     db: Session = Depends(get_db),
-    _=Depends(require_admin),
+    admin: User = Depends(require_admin),
 ) -> dict:
     if db.scalar(select(User).where(User.email == payload.email)):
         raise HTTPException(409, "Пользователь с таким email уже существует")
@@ -72,6 +74,15 @@ def create_user(
 
     db.commit()
     db.refresh(user)
+    _audit_svc.log(
+        db,
+        actor=admin,
+        action="user.create",
+        resource_type="user",
+        resource_id=user.id,
+        new_value={"email": user.email, "role": payload.role},
+    )
+    db.commit()
     return {
         "id": user.id,
         "email": user.email,
@@ -229,12 +240,22 @@ def update_user(
     user_id: int,
     payload: UserUpdate,
     db: Session = Depends(get_db),
-    _=Depends(require_admin),
+    admin: User = Depends(require_admin),
 ) -> dict:
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(404, "Пользователь не найден")
+    old_active = user.is_active
     if payload.is_active is not None:
         user.is_active = payload.is_active
+    _audit_svc.log(
+        db,
+        actor=admin,
+        action="user.update",
+        resource_type="user",
+        resource_id=user.id,
+        old_value={"is_active": old_active},
+        new_value={"is_active": user.is_active},
+    )
     db.commit()
     return {"id": user.id, "is_active": user.is_active}

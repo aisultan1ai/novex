@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.core.db import get_db
 from app.core.dependencies import require_admin
+from app.modules.audit.service import AuditService
 from app.modules.carriers.dispatch_service import CarrierDispatchService
 from app.modules.identity.models import User
 from app.modules.notifications.service import NotificationsService
@@ -24,6 +25,7 @@ _notifications_svc = NotificationsService()
 _tracking_repo = TrackingRepository()
 _shipments_repo = ShipmentsRepository()
 _dispatch_svc = CarrierDispatchService()
+_audit_svc = AuditService()
 
 VALID_STATUSES = {
     "draft",
@@ -188,7 +190,7 @@ def update_order_status(
     order_id: int,
     payload: OrderStatusUpdate,
     db: Session = Depends(get_db),
-    _=Depends(require_admin),
+    admin: User = Depends(require_admin),
 ) -> dict:
     if payload.status not in VALID_STATUSES:
         raise HTTPException(
@@ -198,6 +200,7 @@ def update_order_status(
     order = db.get(OrderDraft, order_id)
     if not order:
         raise HTTPException(404, "Заказ не найден")
+    old_status = order.status
     order.status = payload.status
     _tracking_repo.add_event(
         db,
@@ -211,6 +214,15 @@ def update_order_status(
         order_id=order.id,
         status=payload.status,
     )
+    _audit_svc.log(
+        db,
+        actor=admin,
+        action="order.status_change",
+        resource_type="order",
+        resource_id=order.id,
+        old_value={"status": old_status},
+        new_value={"status": payload.status},
+    )
     db.commit()
     return {"id": order.id, "status": order.status}
 
@@ -219,7 +231,7 @@ def update_order_status(
 def retry_dispatch(
     draft_id: int,
     db: Session = Depends(get_db),
-    _=Depends(require_admin),
+    admin: User = Depends(require_admin),
 ) -> dict:
     order = db.get(OrderDraft, draft_id)
     if not order:
@@ -231,6 +243,14 @@ def retry_dispatch(
             shipment.carrier_tracking_number = tracking_number
             shipment.status = "dispatched"
         order.status = "dispatched"
+    _audit_svc.log(
+        db,
+        actor=admin,
+        action="order.retry_dispatch",
+        resource_type="order",
+        resource_id=order.id,
+        new_value={"tracking_number": tracking_number, "status": order.status},
+    )
     db.commit()
     return {"ok": True, "tracking_number": tracking_number}
 
@@ -240,7 +260,7 @@ def mark_dispatched(
     draft_id: int,
     payload: MarkDispatchedPayload,
     db: Session = Depends(get_db),
-    _=Depends(require_admin),
+    admin: User = Depends(require_admin),
 ) -> dict:
     order = db.get(OrderDraft, draft_id)
     if not order:
@@ -256,6 +276,14 @@ def mark_dispatched(
         order_draft_id=order.id,
         status="picked_up",
         description="Передан перевозчику вручную",
+    )
+    _audit_svc.log(
+        db,
+        actor=admin,
+        action="order.mark_dispatched",
+        resource_type="order",
+        resource_id=order.id,
+        new_value={"tracking_number": payload.tracking_number, "status": "dispatched"},
     )
     db.commit()
     return {

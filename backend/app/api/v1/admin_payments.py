@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.dependencies import require_admin
+from app.modules.audit.service import AuditService
 from app.modules.identity.models import User
 from app.modules.payments.payment_service import PaymentService
 from app.modules.payments.transaction_models import PaymentTransaction
@@ -16,6 +17,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin/payments", tags=["admin-payments"])
 
 _payment_svc = PaymentService()
+_audit_svc = AuditService()
 
 
 class PaymentListItem(BaseModel):
@@ -139,6 +141,15 @@ def approve_payment(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
+    _audit_svc.log(
+        db,
+        actor=admin,
+        action="payment.approve",
+        resource_type="payment",
+        resource_id=tx.id,
+        new_value={"order_id": tx.order_id, "status": tx.status},
+    )
+    db.commit()
     return {
         "payment_id": tx.id,
         "status": tx.status,
@@ -163,6 +174,15 @@ def reject_payment(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
+    _audit_svc.log(
+        db,
+        actor=admin,
+        action="payment.reject",
+        resource_type="payment",
+        resource_id=tx.id,
+        new_value={"order_id": tx.order_id, "status": tx.status, "reason": payload.reject_reason},
+    )
+    db.commit()
     return {
         "payment_id": tx.id,
         "status": tx.status,

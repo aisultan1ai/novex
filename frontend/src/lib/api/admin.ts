@@ -204,3 +204,33 @@ export const testCarrierAPIConnection = (carrierCode: string): Promise<{ ok: boo
 
 export const listSupportedCarrierAPIs = (): Promise<{ carrier_codes: string[] }> =>
   req("/admin/carrier-api/supported");
+
+// ── Audit logs ────────────────────────────────────────────────────────────────
+
+export interface AuditLogItem {
+  id: number;
+  actor_id: number | null;
+  actor_email: string;
+  action: string;
+  resource_type: string;
+  resource_id: number | null;
+  old_value: string | null;
+  new_value: string | null;
+  created_at: string;
+}
+
+export const listAuditLogs = (params: {
+  page?: number;
+  size?: number;
+  actor_id?: number;
+  action?: string;
+  resource_type?: string;
+} = {}): Promise<{ items: AuditLogItem[]; total: number; page: number; size: number; pages: number }> => {
+  const q = new URLSearchParams();
+  if (params.page) q.set("page", String(params.page));
+  if (params.size) q.set("size", String(params.size));
+  if (params.actor_id) q.set("actor_id", String(params.actor_id));
+  if (params.action) q.set("action", params.action);
+  if (params.resource_type) q.set("resource_type", params.resource_type);
+  return req(`/admin/audit-logs?${q}`);
+};

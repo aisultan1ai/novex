@@ -8,10 +8,13 @@ from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.dependencies import require_admin
+from app.modules.audit.service import AuditService
+from app.modules.identity.models import User
 from app.modules.platform_settings.repository import PlatformSettingsRepository
 
 router = APIRouter(prefix="/admin/settings", tags=["admin:settings"])
 _repo = PlatformSettingsRepository()
+_audit_svc = AuditService()
 
 COMMISSION_RATE_KEY = "commission_rate"
 BANK_KEYS = [
@@ -64,7 +67,7 @@ def get_settings(
 def update_settings(
     payload: PlatformSettingsUpdate,
     db: Session = Depends(get_db),
-    _=Depends(require_admin),
+    admin: User = Depends(require_admin),
 ) -> PlatformSettingsResponse:
     if payload.commission_rate is not None:
         try:
@@ -83,6 +86,14 @@ def update_settings(
         _repo.set(db, "bank_bin", bt.bin.strip())
         _repo.set(db, "bank_knp", bt.knp.strip())
 
+    db.commit()
+    _audit_svc.log(
+        db,
+        actor=admin,
+        action="settings.update",
+        resource_type="settings",
+        new_value=payload.model_dump(exclude_none=True),
+    )
     db.commit()
     rate = _repo.get(db, COMMISSION_RATE_KEY, default="0.00")
     return PlatformSettingsResponse(commission_rate=rate, bank_transfer=_load_bank(db))
