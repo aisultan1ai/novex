@@ -52,3 +52,30 @@ export async function apiRequest<T>(
 
   return data as T;
 }
+
+export async function apiFormDataRequest<T>(
+  path: string,
+  body: FormData,
+): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: "POST",
+    body,
+    credentials: "include",
+    cache: "no-store",
+  });
+
+  const data = await parseJsonSafely(response);
+
+  if (!response.ok) {
+    const detail =
+      typeof data === "object" &&
+      data !== null &&
+      "detail" in data &&
+      typeof (data as { detail?: unknown }).detail === "string"
+        ? (data as { detail: string }).detail
+        : `Request failed with status ${response.status}`;
+    throw new ApiError(response.status, detail);
+  }
+
+  return data as T;
+}

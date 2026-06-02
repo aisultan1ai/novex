@@ -1,5 +1,20 @@
 import { NextResponse } from "next/server";
 
+/**
+ * Returns true only if `raw` is a same-origin relative path.
+ * Rejects: external URLs, protocol-relative //foo, backslash tricks, control chars.
+ */
+function isSafeNext(raw, base) {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return false;
+  if (/[\\\x00-\x1f]/.test(raw)) return false;
+  try {
+    const resolved = new URL(raw, base);
+    return resolved.origin === new URL(base).origin;
+  } catch {
+    return false;
+  }
+}
+
 const PUBLIC_PATHS = [
   "/login",
   "/register",
@@ -14,11 +29,11 @@ const PUBLIC_PATHS = [
 export function middleware(request) {
   const { pathname } = request.nextUrl;
 
-  // Sanitize ?next= on the login page to prevent open-redirect attacks (BUG #2).
-  // Only relative paths (starting with "/") are allowed.
+  // Sanitize ?next= on the login page to prevent open-redirect attacks.
+  // Rejects external URLs, protocol-relative (//), backslash tricks, control chars.
   if (pathname === "/login") {
     const next = request.nextUrl.searchParams.get("next");
-    if (next && !next.startsWith("/")) {
+    if (next && !isSafeNext(next, request.url)) {
       const cleanUrl = new URL("/login", request.url);
       // Preserve other params (e.g. ?registered=1, ?expired=1) but drop the bad next
       request.nextUrl.searchParams.forEach((value, key) => {

@@ -32,6 +32,34 @@ const initialForm: FormState = {
   depthCm: "10",
 };
 
+function validateQuoteForm(form: FormState): string | null {
+  const weight = Number(form.weightKg);
+  const qty = Number(form.quantity);
+  const width = Number(form.widthCm);
+  const height = Number(form.heightCm);
+  const depth = Number(form.depthCm);
+
+  if (!form.weightKg.trim() || isNaN(weight) || weight <= 0)
+    return "Введите корректный вес (> 0).";
+  if (weight > 1000) return "Вес не может превышать 1000 кг.";
+
+  if (!form.quantity.trim() || isNaN(qty) || qty <= 0)
+    return "Введите корректное количество (> 0).";
+  if (!Number.isInteger(qty)) return "Количество должно быть целым числом.";
+  if (qty > 999) return "Количество не может превышать 999.";
+
+  if (!form.widthCm.trim() || isNaN(width) || width <= 0)
+    return "Введите корректную ширину (> 0).";
+  if (!form.heightCm.trim() || isNaN(height) || height <= 0)
+    return "Введите корректную высоту (> 0).";
+  if (!form.depthCm.trim() || isNaN(depth) || depth <= 0)
+    return "Введите корректную глубину (> 0).";
+  if (width > 500 || height > 500 || depth > 500)
+    return "Размеры не могут превышать 500 см.";
+
+  return null;
+}
+
 const BADGE_LABELS: Record<string, string> = {
   fastest: "Быстрее всего",
   recommended: "Рекомендуем",
@@ -146,6 +174,12 @@ export default function HomePage() {
 
     if (form.fromCity.trim() === form.toCity.trim()) {
       setError("Город отправления и город назначения должны различаться.");
+      return;
+    }
+
+    const numericError = validateQuoteForm(form);
+    if (numericError) {
+      setError(numericError);
       return;
     }
 

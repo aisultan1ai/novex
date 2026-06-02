@@ -610,7 +610,7 @@ function ShipmentPageInner() {
       const payload = buildShipmentPayload(form);
       await updateOrderDraftShipment(draft.draft_id, payload);
       clearSavedForm();
-      router.push("/dashboard/orders");
+      router.push(`/checkout?draftId=${draft.draft_id}`);
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.status === 401) {

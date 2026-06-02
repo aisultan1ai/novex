@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.common.status_machine import transition_order
+from app.core.exceptions import NotFoundError, ValidationError
 from app.modules.dispatch.models import OrderStatusHistory
 from app.modules.platform_settings.repository import PlatformSettingsRepository
 from app.modules.dispatch.service import create_dispatch_job
@@ -109,6 +110,22 @@ class PaymentService:
 
         db.commit()
         db.refresh(tx)
+        return tx
+
+    def assert_payment_accepts_proof(
+        self,
+        db: Session,
+        *,
+        payment_id: int,
+        order_id: int,
+    ) -> PaymentTransaction:
+        tx = db.get(PaymentTransaction, payment_id)
+        if not tx or tx.order_id != order_id:
+            raise NotFoundError("Payment transaction not found")
+        if tx.status not in (TxStatus.AWAITING_PAYMENT, TxStatus.PAYMENT_REJECTED):
+            raise ValidationError(
+                f"Cannot upload proof for payment in status '{tx.status}'"
+            )
         return tx
 
     def submit_proof(

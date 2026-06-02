@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 
 from sqlalchemy.orm import Session
 
@@ -55,6 +56,22 @@ class OrdersService:
                 user_id,
             )
             raise NotFoundError("Quote session not found")
+
+        if quote_session.public_token and payload.public_token != quote_session.public_token:
+            logger.warning(
+                "Invalid quote token: quote_session_id=%s user_id=%s",
+                payload.quote_session_id,
+                user_id,
+            )
+            raise ForbiddenError("Invalid or missing quote token")
+
+        if quote_session.expires_at and quote_session.expires_at < datetime.utcnow():
+            logger.warning(
+                "Expired quote session: quote_session_id=%s user_id=%s",
+                payload.quote_session_id,
+                user_id,
+            )
+            raise ValidationError("Quote session has expired")
 
         selected_rate_quote = self.repository.get_selected_rate_quote_for_session(
             db,

@@ -2,50 +2,12 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-
-interface BankDetails {
-  recipient_name: string;
-  bank_name: string;
-  iban: string;
-  bin: string;
-  knp: string;
-  purpose: string;
-  amount: string;
-  currency: string;
-}
-
-interface PaymentData {
-  payment_id: number;
-  order_reference: string;
-  status: string;
-  bank_details: BankDetails;
-}
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
-
-async function initiatePayment(orderId: string): Promise<PaymentData> {
-  const res = await fetch(
-    `${API_BASE}/api/v1/payments/orders/${orderId}/initiate-bank-transfer`,
-    {
-      method: "POST",
-      credentials: "include",
-    }
-  );
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.detail ?? "Ошибка инициализации платежа");
-  }
-  return res.json();
-}
-
-async function getPaymentStatus(orderId: string): Promise<{ status: string }> {
-  const res = await fetch(
-    `${API_BASE}/api/v1/payments/orders/${orderId}/payment-status`,
-    { credentials: "include" }
-  );
-  if (!res.ok) return { status: "unknown" };
-  return res.json();
-}
+import {
+  initiatePayment,
+  getPaymentStatus,
+  uploadPaymentProof,
+  type PaymentData,
+} from "@/lib/api/payments";
 
 const STATUS_LABELS: Record<string, string> = {
   awaiting_payment: "Ожидает оплаты",
@@ -147,26 +109,13 @@ function PaymentPageContent() {
     setUploading(true);
     setUploadError(null);
 
-    const form = new FormData();
-    form.append("payment_id", String(paymentData.payment_id));
-    form.append("file", file);
-
     try {
-      const res = await fetch(
-        `${API_BASE}/api/v1/payments/orders/${orderId}/upload-proof`,
-        { method: "POST", credentials: "include", body: form }
-      );
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        setUploadError((err as { detail?: string }).detail ?? "Ошибка загрузки файла");
-        return;
-      }
-
+      await uploadPaymentProof(orderId, paymentData.payment_id, file);
       setUploadSuccess(true);
       setStatus("payment_under_review");
-    } catch {
-      setUploadError("Ошибка соединения. Проверьте интернет и попробуйте снова.");
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : "Ошибка загрузки файла";
+      setUploadError(detail);
     } finally {
       setUploading(false);
     }

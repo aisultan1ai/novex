@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.dependencies import get_current_user_id
+from app.core.exceptions import NotFoundError, ValidationError
 from app.core.limiter import limiter
 from app.core.storage import get_storage, validate_upload
 from app.modules.orders.repository import OrdersRepository
@@ -124,6 +125,15 @@ def upload_payment_proof(
     if not order or order.user_id != current_user_id:
         raise HTTPException(status_code=404, detail="Заказ не найден")
 
+    try:
+        payment_svc.assert_payment_accepts_proof(
+            db, payment_id=payment_id, order_id=draft_id
+        )
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
     file_data = file.file.read()
     mime_type = file.content_type or "application/octet-stream"
 
@@ -144,17 +154,27 @@ def upload_payment_proof(
         logger.error("File upload failed: %s", exc)
         raise HTTPException(status_code=500, detail="File upload failed")
 
-    proof = payment_svc.submit_proof(
-        db,
-        payment_id=payment_id,
-        order_id=draft_id,
-        user_id=current_user_id,
-        file_url=uploaded.file_url,
-        file_name=uploaded.file_name,
-        file_mime_type=uploaded.file_mime_type,
-        file_size=uploaded.file_size,
-        comment=comment,
-    )
+    try:
+        proof = payment_svc.submit_proof(
+            db,
+            payment_id=payment_id,
+            order_id=draft_id,
+            user_id=current_user_id,
+            file_url=uploaded.file_url,
+            file_name=uploaded.file_name,
+            file_mime_type=uploaded.file_mime_type,
+            file_size=uploaded.file_size,
+            comment=comment,
+        )
+    except ValueError as exc:
+        logger.error(
+            "submit_proof failed after upload: payment_id=%s draft_id=%s file=%s error=%s",
+            payment_id,
+            draft_id,
+            uploaded.file_name,
+            exc,
+        )
+        raise HTTPException(status_code=400, detail=str(exc))
 
     return {
         "proof_id": proof.id,

@@ -39,7 +39,15 @@ function LoginPageInner() {
   const isExpired = useMemo(() => searchParams.get("expired") === "1", [searchParams]);
   const nextPath = useMemo(() => {
     const raw = searchParams.get("next");
-    return raw && raw.startsWith("/") ? raw : "/dashboard";
+    if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/dashboard";
+    if (/[\\\x00-\x1f]/.test(raw)) return "/dashboard";
+    try {
+      const resolved = new URL(raw, window.location.origin);
+      if (resolved.origin !== window.location.origin) return "/dashboard";
+    } catch {
+      return "/dashboard";
+    }
+    return raw;
   }, [searchParams]);
 
   const [email, setEmail] = useState("");

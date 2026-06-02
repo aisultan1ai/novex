@@ -34,6 +34,7 @@ ShipmentPartyRole = Literal["sender", "recipient"]
 
 class CreateDraftFromQuoteRequest(BaseModel):
     quote_session_id: int = Field(gt=0)
+    public_token: str | None = None
 
 
 class ShipmentPartyInput(BaseModel):
