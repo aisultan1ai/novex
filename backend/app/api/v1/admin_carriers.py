@@ -11,16 +11,28 @@ from sqlalchemy import func, select
 from sqlalchemy import update as sa_update
 from sqlalchemy.orm import Session, selectinload
 
+import hashlib
+import hmac
+import time
+import uuid
+
+import httpx
+
 from app.core.config import get_settings
 from app.core.db import get_db
 from app.core.dependencies import require_admin
+from app.modules.carriers.integration_log import IntegrationLogRepository
 from app.modules.carriers.models import (
     Carrier,
     CarrierService,
     CarrierTariffRate,
     CarrierZoneCity,
 )
+from app.modules.carriers.webhook_config import CarrierWebhookRepository, CarrierWebhookUpdate
 from app.modules.identity.service import CreateCarrierAccountRequest, IdentityService
+
+_webhook_repo = CarrierWebhookRepository()
+_integration_log = IntegrationLogRepository()
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin/carriers", tags=["admin:carriers"])
@@ -437,4 +449,201 @@ def create_carrier_account(
         "user_id": profile.user_id,
         "email": profile.email,
         "carrier_id": carrier_id,
+    }
+
+
+# ── Integration settings ───────────────────────────────────────────────────────
+
+
+def _mask_secret(secret: str | None) -> str | None:
+    if not secret:
+        return None
+    prefix = "nvx_live_"
+    raw = secret[len(prefix):] if secret.startswith(prefix) else secret
+    if len(raw) <= 8:
+        return prefix + "*" * len(raw)
+    return prefix + "*" * (len(raw) - 4) + raw[-4:]
+
+
+class IntegrationUpdate(BaseModel):
+    push_url: str | None = None
+    is_active: bool | None = None
+    retry_count: int | None = None
+    timeout_seconds: int | None = None
+    dispatch_mode: str | None = None
+    tracking_mode: str | None = None
+
+
+def _cfg_to_dict(cfg) -> dict:
+    return {
+        "carrier_code": cfg.carrier_code,
+        "push_url": cfg.push_url,
+        "webhook_secret_masked": _mask_secret(cfg.webhook_secret),
+        "is_active": cfg.is_active,
+        "retry_count": cfg.retry_count,
+        "timeout_seconds": cfg.timeout_seconds,
+        "dispatch_mode": cfg.dispatch_mode,
+        "tracking_mode": cfg.tracking_mode,
+        "last_success_at": cfg.last_success_at.isoformat() if cfg.last_success_at else None,
+        "last_error": cfg.last_error,
+        "updated_at": cfg.updated_at.isoformat(),
+    }
+
+
+@router.get("/{carrier_id}/integration", summary="Настройки интеграции перевозчика")
+def get_integration(
+    carrier_id: int,
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+) -> dict:
+    carrier = db.get(Carrier, carrier_id)
+    if not carrier:
+        raise HTTPException(404, "Перевозчик не найден")
+    cfg = _webhook_repo.get_by_carrier_code(db, carrier.code)
+    if not cfg:
+        return {
+            "carrier_code": carrier.code,
+            "push_url": None,
+            "webhook_secret_masked": None,
+            "is_active": False,
+            "retry_count": 3,
+            "timeout_seconds": 10,
+            "dispatch_mode": "auto",
+            "tracking_mode": "webhook",
+            "last_success_at": None,
+            "last_error": None,
+            "updated_at": None,
+        }
+    return _cfg_to_dict(cfg)
+
+
+@router.put("/{carrier_id}/integration", summary="Обновить настройки интеграции")
+def update_integration(
+    carrier_id: int,
+    payload: IntegrationUpdate,
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+) -> dict:
+    carrier = db.get(Carrier, carrier_id)
+    if not carrier:
+        raise HTTPException(404, "Перевозчик не найден")
+    cfg = _webhook_repo.update(db, carrier.code, CarrierWebhookUpdate(**payload.model_dump()))
+    db.commit()
+    return _cfg_to_dict(cfg)
+
+
+@router.post("/{carrier_id}/integration/regenerate-secret", summary="Сгенерировать новый webhook secret")
+def regenerate_integration_secret(
+    carrier_id: int,
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+) -> dict:
+    carrier = db.get(Carrier, carrier_id)
+    if not carrier:
+        raise HTTPException(404, "Перевозчик не найден")
+    new_secret = _webhook_repo.regenerate_secret(db, carrier.code)
+    db.commit()
+    return {
+        "webhook_secret": new_secret,
+        "warning": "Store this secret securely — it will not be shown again in full.",
+    }
+
+
+@router.post("/{carrier_id}/integration/test-webhook", summary="Отправить тестовый заказ на push_url")
+def test_integration_webhook(
+    carrier_id: int,
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+) -> dict:
+    carrier = db.get(Carrier, carrier_id)
+    if not carrier:
+        raise HTTPException(404, "Перевозчик не найден")
+    cfg = _webhook_repo.get_by_carrier_code(db, carrier.code)
+    if not cfg or not cfg.push_url:
+        raise HTTPException(400, "push_url не настроен")
+
+    test_payload = {
+        "novex_order_id": 0,
+        "order_reference": "NOVEX-TEST-000000",
+        "tariff_code": "test",
+        "test": True,
+        "sender": {"full_name": "Тест Отправитель", "phone": "+70000000000", "city": "Almaty", "address": "Test St 1"},
+        "recipient": {"full_name": "Тест Получатель", "phone": "+70000000001", "city": "Astana", "address": "Test Ave 2"},
+        "packages": [{"weight_kg": 1.0, "width_cm": 20, "height_cm": 15, "depth_cm": 10, "quantity": 1}],
+        "declared_value": 1000.0,
+        "currency": "KZT",
+        "additional_services": {"call_before_delivery": False, "insurance": False, "fragile": False},
+    }
+    json_body = json.dumps(test_payload, ensure_ascii=False, sort_keys=True)
+    timestamp = str(int(time.time()))
+    event_id = str(uuid.uuid4())
+
+    headers: dict[str, str] = {
+        "Content-Type": "application/json",
+        "X-Novex-Platform": "novex-logistics",
+        "X-Novex-Timestamp": timestamp,
+        "X-Novex-Event-Id": event_id,
+    }
+    if cfg.webhook_secret:
+        sig_input = (timestamp + json_body).encode()
+        headers["X-Novex-Signature"] = hmac.new(
+            cfg.webhook_secret.encode(), sig_input, hashlib.sha256
+        ).hexdigest()
+
+    t0 = time.monotonic()
+    try:
+        resp = httpx.post(cfg.push_url, content=json_body.encode(), headers=headers, timeout=cfg.timeout_seconds)
+        duration_ms = int((time.monotonic() - t0) * 1000)
+        ok = resp.is_success
+        response_text = resp.text[:1000]
+        _integration_log.create(
+            db, carrier_code=carrier.code, direction="outbound", event_type="test_webhook",
+            payload=json_body, response=response_text, http_status=resp.status_code,
+            duration_ms=duration_ms, status="success" if ok else "error",
+            error_message=None if ok else f"HTTP {resp.status_code}: {response_text}",
+        )
+        db.commit()
+        return {
+            "ok": ok,
+            "http_status": resp.status_code,
+            "duration_ms": duration_ms,
+            "response": response_text,
+        }
+    except Exception as exc:
+        duration_ms = int((time.monotonic() - t0) * 1000)
+        _integration_log.create(
+            db, carrier_code=carrier.code, direction="outbound", event_type="test_webhook",
+            payload=json_body, duration_ms=duration_ms, status="error", error_message=str(exc),
+        )
+        db.commit()
+        return {"ok": False, "duration_ms": duration_ms, "error": str(exc)}
+
+
+@router.get("/{carrier_id}/integration/logs", summary="Журнал интеграционных событий")
+def get_integration_logs(
+    carrier_id: int,
+    limit: int = Query(default=50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+) -> dict:
+    carrier = db.get(Carrier, carrier_id)
+    if not carrier:
+        raise HTTPException(404, "Перевозчик не найден")
+    logs = _integration_log.list_recent(db, carrier.code, limit=limit)
+    return {
+        "items": [
+            {
+                "id": log.id,
+                "direction": log.direction,
+                "event_type": log.event_type,
+                "order_id": log.order_id,
+                "http_status": log.http_status,
+                "duration_ms": log.duration_ms,
+                "status": log.status,
+                "error_message": log.error_message,
+                "created_at": log.created_at.isoformat(),
+            }
+            for log in logs
+        ],
+        "total": len(logs),
     }

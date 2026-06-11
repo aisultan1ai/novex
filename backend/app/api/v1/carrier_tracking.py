@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.db import get_db
+from app.modules.carriers.integration_log import IntegrationLogRepository
 from app.modules.carriers.webhook_config import CarrierWebhookRepository
 from app.modules.notifications.service import NotificationsService
 from app.modules.orders.models import OrderDraft
@@ -23,6 +24,7 @@ router = APIRouter(tags=["carrier-tracking"])
 
 _webhook_repo = CarrierWebhookRepository()
 _tracking_repo = TrackingRepository()
+_integration_log = IntegrationLogRepository()
 _notifications_svc = NotificationsService()
 
 _REPLAY_WINDOW_SECONDS = 300
@@ -185,6 +187,17 @@ async def carrier_tracking_webhook(
             ),
             {"carrier_code": carrier_code, "event_id": external_event_id},
         )
+
+    # Log to carrier_integration_logs
+    _integration_log.create(
+        db,
+        carrier_code=carrier_code,
+        direction="inbound",
+        event_type="tracking_webhook",
+        order_id=int(novex_order_id) if novex_order_id else None,
+        payload=json.dumps(body),
+        status="success",
+    )
 
     db.commit()
     return {"ok": True}

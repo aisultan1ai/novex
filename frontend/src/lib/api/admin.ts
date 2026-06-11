@@ -208,6 +208,49 @@ export const testCarrierAPIConnection = (carrierCode: string): Promise<{ ok: boo
 export const listSupportedCarrierAPIs = (): Promise<{ carrier_codes: string[] }> =>
   req("/admin/carrier-api/supported");
 
+// ── Carrier integration settings ──────────────────────────────────────────────
+
+export interface CarrierIntegrationConfig {
+  carrier_code: string;
+  push_url: string | null;
+  webhook_secret_masked: string | null;
+  is_active: boolean;
+  retry_count: number;
+  timeout_seconds: number;
+  dispatch_mode: string;
+  tracking_mode: string;
+  last_success_at: string | null;
+  last_error: string | null;
+  updated_at: string | null;
+}
+
+export interface CarrierIntegrationLogItem {
+  id: number;
+  direction: string;
+  event_type: string;
+  order_id: number | null;
+  http_status: number | null;
+  duration_ms: number | null;
+  status: string;
+  error_message: string | null;
+  created_at: string;
+}
+
+export const getCarrierIntegration = (carrierId: number): Promise<CarrierIntegrationConfig> =>
+  req(`/admin/carriers/${carrierId}/integration`);
+
+export const updateCarrierIntegration = (carrierId: number, body: Partial<CarrierIntegrationConfig>): Promise<CarrierIntegrationConfig> =>
+  req(`/admin/carriers/${carrierId}/integration`, { method: "PUT", body: JSON.stringify(body) });
+
+export const regenerateCarrierIntegrationSecret = (carrierId: number): Promise<{ webhook_secret: string; warning: string }> =>
+  req(`/admin/carriers/${carrierId}/integration/regenerate-secret`, { method: "POST" });
+
+export const testCarrierWebhook = (carrierId: number): Promise<{ ok: boolean; http_status?: number; duration_ms: number; response?: string; error?: string }> =>
+  req(`/admin/carriers/${carrierId}/integration/test-webhook`, { method: "POST" });
+
+export const getCarrierIntegrationLogs = (carrierId: number, limit = 50): Promise<{ items: CarrierIntegrationLogItem[]; total: number }> =>
+  req(`/admin/carriers/${carrierId}/integration/logs?limit=${limit}`);
+
 // ── Audit logs ────────────────────────────────────────────────────────────────
 
 export interface AuditLogItem {

@@ -138,12 +138,20 @@ export default function AdminCarrierDetailPage() {
     <>
       <div style={{ marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <Link href="/dashboard/admin/carriers" style={{ color: "#64748b", fontSize: 14, textDecoration: "none" }}>← Перевозчики</Link>
-        <Link
-          href={`/dashboard/admin/carriers/${carrierId}/api`}
-          style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", color: "#0f172a", fontSize: 13, fontWeight: 600, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}
-        >
-          API-интеграция
-        </Link>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Link
+            href={`/dashboard/admin/carriers/${carrierId}/integration`}
+            style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", color: "#0f172a", fontSize: 13, fontWeight: 600, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}
+          >
+            Интеграция
+          </Link>
+          <Link
+            href={`/dashboard/admin/carriers/${carrierId}/api`}
+            style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", color: "#0f172a", fontSize: 13, fontWeight: 600, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}
+          >
+            API (Azimuth)
+          </Link>
+        </div>
       </div>
 
       <div style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, padding: "24px 28px", marginBottom: 24 }}>

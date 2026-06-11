@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.common.status_machine import InvalidTransitionError, transition_order
+from app.modules.carriers.integration_log import IntegrationLogRepository
 from app.modules.carriers.webhook_config import CarrierWebhookRepository
 from app.modules.dispatch.models import DispatchJob, DispatchJobStatus, OrderStatusHistory
 from app.modules.orders.models import OrderDraft
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 _webhook_repo = CarrierWebhookRepository()
 _shipments_svc = ShipmentsService()
 _shipments_repo = ShipmentsRepository()
+_integration_log = IntegrationLogRepository()
 
 RETRY_DELAYS_SECONDS = [60, 300, 900]
 
@@ -184,33 +186,53 @@ class DispatchWorker:
         from app.modules.carriers.api_clients.registry import get_client
         from app.modules.carriers.api_credentials import CarrierAPICredentialsRepository
 
+        carrier_code = order.carrier_code_snapshot
+
         # ── Priority 1: direct carrier API ──────────────────────────────────
-        client = get_client(order.carrier_code_snapshot)
-        creds = CarrierAPICredentialsRepository().get_by_carrier_code(db, order.carrier_code_snapshot)
+        client = get_client(carrier_code)
+        creds = CarrierAPICredentialsRepository().get_by_carrier_code(db, carrier_code)
 
         if client and creds and creds.is_active:
-            logger.info(
-                "dispatch_worker: using API client for carrier %s, order %s",
-                order.carrier_code_snapshot, order.id,
-            )
+            logger.info("dispatch_worker: using API client for carrier %s, order %s", carrier_code, order.id)
             order_data = _build_api_order_data(order)
-            api_creds = {
-                "api_url": creds.api_url,
-                "api_token": creds.api_token,
-                **(creds.extra_config or {}),
-            }
-            result = client.create_invoice(order_data, api_creds)
+            api_creds = {"api_url": creds.api_url, "api_token": creds.api_token, **(creds.extra_config or {})}
+            t0 = time.monotonic()
+            try:
+                result = client.create_invoice(order_data, api_creds)
+                duration_ms = int((time.monotonic() - t0) * 1000)
+                cfg = _webhook_repo.get_by_carrier_code(db, carrier_code)
+                if cfg:
+                    cfg.last_success_at = datetime.utcnow()
+                    cfg.last_error = None
+                _integration_log.create(
+                    db, carrier_code=carrier_code, direction="outbound",
+                    event_type="dispatch", order_id=order.id,
+                    payload=json.dumps(order_data),
+                    response=json.dumps({"waybill_number": result.waybill_number}),
+                    duration_ms=duration_ms, status="success",
+                )
+            except Exception as exc:
+                duration_ms = int((time.monotonic() - t0) * 1000)
+                cfg = _webhook_repo.get_by_carrier_code(db, carrier_code)
+                if cfg:
+                    cfg.last_error = str(exc)
+                _integration_log.create(
+                    db, carrier_code=carrier_code, direction="outbound",
+                    event_type="dispatch", order_id=order.id,
+                    payload=json.dumps(order_data),
+                    duration_ms=duration_ms, status="error", error_message=str(exc),
+                )
+                raise
 
             if result.waybill_pdf_bytes:
                 _save_waybill_document(db, order, result.waybill_number, result.waybill_pdf_bytes)
-
             return result.waybill_number
 
-        # ── Priority 2: webhook push (existing) ─────────────────────────────
-        cfg = _webhook_repo.get_by_carrier_code(db, order.carrier_code_snapshot)
+        # ── Priority 2: webhook push (Generic Webhook Dispatcher) ───────────
+        cfg = _webhook_repo.get_by_carrier_code(db, carrier_code)
         if not cfg or not cfg.is_active or not cfg.push_url:
             raise RuntimeError(
-                f"Carrier '{order.carrier_code_snapshot}' has no active API credentials or webhook config"
+                f"Carrier '{carrier_code}' has no active API credentials or webhook config"
             )
 
         payload = _build_dispatch_payload(order)
@@ -230,14 +252,39 @@ class DispatchWorker:
                 cfg.webhook_secret.encode(), sig_input, hashlib.sha256
             ).hexdigest()
 
-        resp = httpx.post(
-            cfg.push_url,
-            content=json_body.encode(),
-            headers=headers,
-            timeout=cfg.timeout_seconds,
-        )
-        resp.raise_for_status()
-        return resp.json().get("tracking_number")
+        t0 = time.monotonic()
+        try:
+            resp = httpx.post(
+                cfg.push_url,
+                content=json_body.encode(),
+                headers=headers,
+                timeout=cfg.timeout_seconds,
+            )
+            resp.raise_for_status()
+            duration_ms = int((time.monotonic() - t0) * 1000)
+            cfg.last_success_at = datetime.utcnow()
+            cfg.last_error = None
+            _integration_log.create(
+                db, carrier_code=carrier_code, direction="outbound",
+                event_type="dispatch", order_id=order.id,
+                payload=json_body,
+                response=resp.text[:2000],
+                http_status=resp.status_code,
+                duration_ms=duration_ms, status="success",
+            )
+            return resp.json().get("tracking_number")
+        except Exception as exc:
+            duration_ms = int((time.monotonic() - t0) * 1000)
+            http_status = getattr(getattr(exc, "response", None), "status_code", None)
+            cfg.last_error = str(exc)
+            _integration_log.create(
+                db, carrier_code=carrier_code, direction="outbound",
+                event_type="dispatch", order_id=order.id,
+                payload=json_body,
+                http_status=http_status,
+                duration_ms=duration_ms, status="error", error_message=str(exc),
+            )
+            raise
 
 
 def _build_api_order_data(order: OrderDraft) -> dict:
