@@ -26,6 +26,7 @@ const STATUS_LABELS: Record<string, string> = {
   payment_under_review: "На проверке",
   paid: "Оплачено",
   payment_rejected: "Отклонено",
+  refunded: "Возврат",
   cancelled: "Отменён",
   expired: "Истёк",
 };
@@ -36,6 +37,7 @@ function statusStyle(status: string): React.CSSProperties {
     payment_under_review: { background: "#dbeafe", color: "#1e40af" },
     paid: { background: "#dcfce7", color: "#166534" },
     payment_rejected: { background: "#fee2e2", color: "#991b1b" },
+    refunded: { background: "#ede9fe", color: "#5b21b6" },
     cancelled: { background: "#f1f5f9", color: "#475569" },
   };
   return { ...badgeBase, ...(map[status] ?? { background: "#f1f5f9" }) };
@@ -57,6 +59,8 @@ export default function AdminPaymentsPage() {
   const [loading, setLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [refundId, setRefundId] = useState<number | null>(null);
+  const [refundReason, setRefundReason] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
 
@@ -90,6 +94,29 @@ export default function AdminPaymentsPage() {
     setActionMsg(res.ok ? data.message : data.detail);
     setActionLoading(false);
     if (res.ok) fetchPayments();
+  };
+
+  const handleRefund = async (id: number) => {
+    if (!refundReason.trim()) {
+      setActionMsg("Укажите причину возврата");
+      return;
+    }
+    setActionLoading(true);
+    setActionMsg(null);
+    const res = await fetch(`${API_BASE}/api/v1/admin/payments/${id}/refund`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: refundReason }),
+    });
+    const data = await res.json();
+    setActionMsg(res.ok ? data.message : data.detail);
+    setActionLoading(false);
+    if (res.ok) {
+      setRefundId(null);
+      setRefundReason("");
+      fetchPayments();
+    }
   };
 
   const handleReject = async (id: number) => {
@@ -211,6 +238,34 @@ export default function AdminPaymentsPage() {
                       )}
                     </div>
                   )}
+                  {p.status === "paid" && (
+                    <div style={{ display: "flex", gap: 6, flexDirection: "column" }}>
+                      <button
+                        onClick={() => setRefundId(refundId === p.id ? null : p.id)}
+                        disabled={actionLoading}
+                        style={styles.btnRefund}
+                      >
+                        Возврат
+                      </button>
+                      {refundId === p.id && (
+                        <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                          <input
+                            placeholder="Причина возврата..."
+                            value={refundReason}
+                            onChange={(e) => setRefundReason(e.target.value)}
+                            style={styles.input}
+                          />
+                          <button
+                            onClick={() => handleRefund(p.id)}
+                            disabled={actionLoading}
+                            style={styles.btnRefund}
+                          >
+                            OK
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}
@@ -304,6 +359,16 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 13,
     marginBottom: 12,
     color: "#166534",
+  },
+  btnRefund: {
+    background: "#5b21b6",
+    color: "#fff",
+    border: "none",
+    borderRadius: 6,
+    padding: "5px 10px",
+    fontSize: 12,
+    cursor: "pointer",
+    fontWeight: 600,
   },
   pageBtn: {
     border: "1px solid #e5e7eb",

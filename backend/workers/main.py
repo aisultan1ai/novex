@@ -6,7 +6,14 @@ from threading import Event
 
 from app.core.config import get_settings
 from app.core.db import check_database_connection
-from workers.jobs import dispatch_orders, sync_tracking
+from workers.jobs import (
+    cleanup_expired_files,
+    dispatch_orders,
+    refresh_quote_cache,
+    retry_failed_callbacks,
+    send_email_notifications,
+    sync_tracking,
+)
 from workers.scheduler import WorkerScheduler
 
 settings = get_settings()
@@ -44,6 +51,10 @@ def run() -> None:
     scheduler = WorkerScheduler()
     scheduler.register(dispatch_orders.run, 60)
     scheduler.register(sync_tracking.run, 120)
+    scheduler.register(send_email_notifications.run, 60)
+    scheduler.register(cleanup_expired_files.run, 3600)
+    scheduler.register(retry_failed_callbacks.run, 300)
+    scheduler.register(refresh_quote_cache.run, 1800)
     logger.info("WorkerScheduler ready. Starting main loop.")
 
     while not stop_event.is_set():

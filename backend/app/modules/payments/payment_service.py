@@ -339,6 +339,70 @@ class PaymentService:
             .order_by(PaymentTransaction.created_at.desc())
         )
 
+    def admin_refund(
+        self,
+        db: Session,
+        *,
+        payment_id: int,
+        admin_id: int,
+        reason: str,
+    ) -> PaymentTransaction:
+        tx = db.get(PaymentTransaction, payment_id)
+        if not tx:
+            raise ValueError("Платёж не найден")
+        if tx.status != TxStatus.PAID:
+            raise ValueError(
+                f"Возврат возможен только для оплаченных заказов. "
+                f"Текущий статус: '{tx.status}'"
+            )
+
+        # For Kaspi: log that operator must process refund manually via Kaspi Business portal
+        if tx.provider == TxProvider.KASPI:
+            logger.warning(
+                "Kaspi refund recorded in system but must be processed manually "
+                "via Kaspi Business portal: payment_id=%s external_payment_id=%s amount=%s",
+                tx.id,
+                tx.external_payment_id,
+                tx.amount,
+            )
+
+        old_tx_status = tx.status
+        tx.status = TxStatus.REFUNDED
+        db.add(
+            PaymentStatusHistory(
+                payment_id=tx.id,
+                old_status=old_tx_status,
+                new_status=TxStatus.REFUNDED,
+                changed_by_user_id=admin_id,
+                comment=f"Возврат оформлен администратором. Причина: {reason}",
+            )
+        )
+
+        order = db.get(OrderDraft, tx.order_id)
+        if order:
+            old_order_status = order.status
+            order.status = "cancelled"
+            db.add(
+                OrderStatusHistory(
+                    order_id=order.id,
+                    old_status=old_order_status,
+                    new_status="cancelled",
+                    changed_by_user_id=admin_id,
+                    source="admin",
+                    comment=f"Заказ отменён в связи с возвратом средств. Причина: {reason}",
+                )
+            )
+            _notifications_svc.notify_order_status(
+                db,
+                user_id=order.user_id,
+                order_id=order.id,
+                status="refunded",
+            )
+
+        db.commit()
+        db.refresh(tx)
+        return tx
+
     def list_for_admin(
         self,
         db: Session,

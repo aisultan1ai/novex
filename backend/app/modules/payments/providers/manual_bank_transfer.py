@@ -61,8 +61,9 @@ class ManualBankTransferProvider(PaymentProvider):
         raise NotImplementedError("Manual bank transfer does not support inbound webhooks")
 
     def refund_payment(self, *, external_payment_id: str, amount: Decimal) -> bool:
-        # Refunds are handled manually by the operator
-        raise NotImplementedError("Manual refunds must be processed by an operator")
+        # Bank transfer refunds are manual: operator sends money back via bank.
+        # Returning True acknowledges the refund is recorded; actual transfer is offline.
+        return True
 
     def get_bank_details(self) -> dict:
         return {

@@ -215,6 +215,20 @@ def get_payment_status(
 
 # ─── Kaspi webhook (kept for future, disabled in production until onboarding) ─
 
+def _build_kaspi_provider():
+    from app.core.config import get_settings
+    from app.modules.payments.providers.kaspi import KaspiProvider
+    s = get_settings()
+    return KaspiProvider(
+        merchant_id=s.kaspi_merchant_id,
+        api_key=s.kaspi_api_key,
+        api_url=s.kaspi_api_url,
+        webhook_secret=s.kaspi_webhook_secret,
+        frontend_url=s.frontend_url,
+        backend_url=s.backend_url,
+    )
+
+
 @router.post(
     "/kaspi/webhook",
     status_code=200,
@@ -222,40 +236,36 @@ def get_payment_status(
 )
 async def kaspi_webhook(request: Request, db: Session = Depends(get_db)) -> dict:
     from app.core.config import get_settings
+    from sqlalchemy import text as _text
     settings = get_settings()
 
     if settings.is_production and not settings.kaspi_merchant_id:
         raise HTTPException(status_code=403, detail="Kaspi integration is not active")
 
     raw_body = await request.body()
+    headers = dict(request.headers)
+    kaspi = _build_kaspi_provider()
 
-    try:
-        body = json.loads(raw_body)
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON")
-
-    from app.modules.payments.kaspi_service import KaspiPayService
-    kaspi = KaspiPayService()
-
-    signature = request.headers.get("X-Kaspi-Signature", "")
-    if settings.kaspi_webhook_secret and not kaspi.verify_webhook(raw_body, signature):
+    if settings.kaspi_webhook_secret and not kaspi.verify_webhook(raw_body, headers):
         logger.warning("Kaspi webhook: invalid signature")
         raise HTTPException(status_code=400, detail="Invalid signature")
 
-    order_id_str, status = kaspi.parse_webhook(body)
-    if not order_id_str or not status:
+    try:
+        event = kaspi.parse_webhook(raw_body, headers)
+    except (json.JSONDecodeError, Exception) as exc:
+        logger.warning("Kaspi webhook: parse failed: %s", exc)
+        raise HTTPException(status_code=400, detail="Invalid payload")
+
+    if not event.order_id or not event.status:
         return {"ok": True}
 
     # Idempotency via provider_webhook_events
-    import hashlib
-    event_id = body.get("PaymentId") or hashlib.sha256(raw_body).hexdigest()
-    from sqlalchemy import text as _text
     existing = db.execute(
         _text(
             "SELECT id FROM provider_webhook_events "
             "WHERE provider = 'kaspi' AND external_event_id = :eid LIMIT 1"
         ),
-        {"eid": event_id},
+        {"eid": event.external_event_id},
     ).fetchone()
     if existing:
         return {"ok": True, "duplicate": True}
@@ -267,46 +277,44 @@ async def kaspi_webhook(request: Request, db: Session = Depends(get_db)) -> dict
             "VALUES ('kaspi', :eid, :oid, :payload, 'received', NOW())"
         ),
         {
-            "eid": event_id,
-            "oid": int(order_id_str) if order_id_str else None,
-            "payload": json.dumps(body),
+            "eid": event.external_event_id,
+            "oid": int(event.order_id),
+            "payload": json.dumps(event.raw),
         },
     )
 
     from app.modules.orders.repository import OrdersRepository
-    order = OrdersRepository().get_order_draft_by_id(db, int(order_id_str))
+    order = OrdersRepository().get_order_draft_by_id(db, int(event.order_id))
     if not order:
         db.commit()
         return {"ok": True}
 
     # Validate amount matches
-    amount_raw = body.get("Amount") or body.get("amount")
-    if amount_raw is not None:
-        paid_amount = Decimal(str(amount_raw)) / 100
+    if event.amount is not None:
         order_amount = Decimal(str(order.price_snapshot))
-        if abs(paid_amount - order_amount) > Decimal("1.00"):
+        if abs(event.amount - order_amount) > Decimal("1.00"):
             logger.warning(
                 "Kaspi webhook: amount mismatch order=%s paid=%s expected=%s",
-                order_id_str, paid_amount, order_amount,
+                event.order_id, event.amount, order_amount,
             )
             db.execute(
                 _text(
                     "UPDATE provider_webhook_events SET status = 'failed' "
                     "WHERE provider = 'kaspi' AND external_event_id = :eid"
                 ),
-                {"eid": event_id},
+                {"eid": event.external_event_id},
             )
             db.commit()
             return {"ok": True}
 
-    if status == "paid":
+    if event.status == "paid":
         tx = payment_svc.get_payment_for_order(db, order_id=order.id)
         if tx:
             payment_svc.admin_approve(db, payment_id=tx.id, admin_id=0)
-            logger.info("Kaspi webhook: order %s paid, tx_id=%s", order_id_str, tx.id)
+            logger.info("Kaspi webhook: order %s paid, tx_id=%s", event.order_id, tx.id)
         else:
-            logger.warning("Kaspi webhook: no payment transaction for order %s", order_id_str)
-    elif status == "cancelled":
+            logger.warning("Kaspi webhook: no payment transaction for order %s", event.order_id)
+    elif event.status == "cancelled":
         old_status = order.status
         order.status = "cancelled"
         from app.modules.dispatch.models import OrderStatusHistory
@@ -323,7 +331,7 @@ async def kaspi_webhook(request: Request, db: Session = Depends(get_db)) -> dict
             "UPDATE provider_webhook_events SET status = 'processed', processed_at = NOW() "
             "WHERE provider = 'kaspi' AND external_event_id = :eid"
         ),
-        {"eid": event_id},
+        {"eid": event.external_event_id},
     )
     db.commit()
     return {"ok": True}

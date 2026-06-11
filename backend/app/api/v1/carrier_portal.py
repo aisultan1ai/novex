@@ -2,16 +2,33 @@ from __future__ import annotations
 
 import secrets
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.core.dependencies import get_current_carrier_id
+from app.core.dependencies import get_current_carrier_id, require_carrier
+from app.core.storage import get_storage
 from app.modules.carriers.models import Carrier
 from app.modules.carriers.webhook_config import CarrierWebhookConfig, CarrierWebhookRepository
+from app.modules.dispatch.models import OrderStatusHistory
+from app.modules.documents.models import Document, DocumentType
+from app.modules.identity.models import User
+from app.modules.notifications.repository import NotificationsRepository
+from app.modules.orders.models import OrderDraft, ShipmentPackage, ShipmentParty
+from app.modules.tracking.models import TrackingEvent
 
 router = APIRouter(prefix="/carrier", tags=["carrier-portal"])
+
+_CARRIER_VISIBLE_STATUSES = {
+    "sent_to_carrier", "pending_manual", "pending_manual_dispatch",
+    "dispatch_failed", "picked_up", "in_transit", "arrived", "delivered",
+}
+_ACCEPT_ALLOWED_STATUSES = {"sent_to_carrier", "pending_manual", "pending_manual_dispatch", "dispatch_failed"}
+_REJECT_ALLOWED_STATUSES = {"sent_to_carrier", "pending_manual", "pending_manual_dispatch"}
+_POD_ALLOWED_STATUSES = {"in_transit", "arrived", "picked_up", "delivered"}
+
+_notif_repo = NotificationsRepository()
 
 _webhook_repo = CarrierWebhookRepository()
 
@@ -148,4 +165,316 @@ def regenerate_secret(
     return {
         "webhook_secret": new_secret,
         "warning": "Store this secret securely — it will not be shown again in full.",
+    }
+
+
+# ── Orders ────────────────────────────────────────────────────────────────────
+
+def _get_carrier_or_404(db: Session, carrier_id: int) -> Carrier:
+    carrier = db.get(Carrier, carrier_id)
+    if not carrier:
+        raise HTTPException(404, "Перевозчик не найден")
+    return carrier
+
+
+def _get_order_for_carrier(db: Session, order_id: int, carrier_code: str) -> OrderDraft:
+    order = db.get(OrderDraft, order_id)
+    if not order or order.carrier_code_snapshot != carrier_code:
+        raise HTTPException(404, "Заказ не найден")
+    return order
+
+
+def _order_to_dict(order: OrderDraft, parties: list, packages: list) -> dict:
+    return {
+        "id": order.id,
+        "status": order.status,
+        "carrier_code": order.carrier_code_snapshot,
+        "tariff_name": order.tariff_name_snapshot,
+        "price": float(order.price_snapshot),
+        "currency": order.currency_snapshot,
+        "from_city": order.from_city_snapshot,
+        "to_city": order.to_city_snapshot,
+        "eta_days_min": order.eta_days_min_snapshot,
+        "eta_days_max": order.eta_days_max_snapshot,
+        "created_at": order.created_at.isoformat(),
+        "parties": [
+            {
+                "role": p.role,
+                "full_name": p.full_name,
+                "phone": p.phone,
+                "city": p.city,
+                "address_line1": p.address_line1,
+                "address_line2": p.address_line2,
+                "postal_code": p.postal_code,
+                "comment": p.comment,
+            }
+            for p in parties
+        ],
+        "packages": [
+            {
+                "description": pkg.description,
+                "quantity": pkg.quantity,
+                "weight_kg": float(pkg.weight_kg),
+                "width_cm": float(pkg.width_cm),
+                "height_cm": float(pkg.height_cm),
+                "depth_cm": float(pkg.depth_cm),
+                "declared_value": float(pkg.declared_value) if pkg.declared_value else None,
+                "declared_value_currency": pkg.declared_value_currency,
+            }
+            for pkg in packages
+        ],
+    }
+
+
+@router.get("/orders", summary="Список заказов перевозчика")
+def list_orders(
+    status: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    carrier_id: int = Depends(get_current_carrier_id),
+) -> dict:
+    carrier = _get_carrier_or_404(db, carrier_id)
+
+    base_where = [
+        OrderDraft.carrier_code_snapshot == carrier.code,
+        OrderDraft.status.in_(_CARRIER_VISIBLE_STATUSES),
+    ]
+    if status:
+        base_where.append(OrderDraft.status == status)
+
+    total = db.scalar(select(func.count(OrderDraft.id)).where(*base_where)) or 0
+
+    orders = db.scalars(
+        select(OrderDraft)
+        .where(*base_where)
+        .order_by(OrderDraft.created_at.desc())
+        .offset((page - 1) * size)
+        .limit(size)
+    ).all()
+
+    items = []
+    for order in orders:
+        parties = db.scalars(select(ShipmentParty).where(ShipmentParty.order_draft_id == order.id)).all()
+        packages = db.scalars(select(ShipmentPackage).where(ShipmentPackage.order_draft_id == order.id)).all()
+        items.append(_order_to_dict(order, list(parties), list(packages)))
+
+    return {"items": items, "total": total or 0, "page": page, "size": size}
+
+
+@router.get("/orders/{order_id}", summary="Детали заказа")
+def get_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    carrier_id: int = Depends(get_current_carrier_id),
+) -> dict:
+    carrier = _get_carrier_or_404(db, carrier_id)
+    order = _get_order_for_carrier(db, order_id, carrier.code)
+
+    if order.status not in _CARRIER_VISIBLE_STATUSES:
+        raise HTTPException(403, "Заказ недоступен")
+
+    parties = db.scalars(select(ShipmentParty).where(ShipmentParty.order_draft_id == order.id)).all()
+    packages = db.scalars(select(ShipmentPackage).where(ShipmentPackage.order_draft_id == order.id)).all()
+
+    pods = db.scalars(
+        select(Document).where(
+            Document.order_id == order.id,
+            Document.document_type == DocumentType.PROOF_OF_DELIVERY,
+        ).order_by(Document.created_at.desc())
+    ).all()
+
+    events = db.scalars(
+        select(TrackingEvent)
+        .where(TrackingEvent.order_draft_id == order.id)
+        .order_by(TrackingEvent.occurred_at.desc())
+    ).all()
+
+    result = _order_to_dict(order, list(parties), list(packages))
+    result["proof_of_delivery"] = [
+        {
+            "id": d.id,
+            "file_url": d.file_url,
+            "file_name": d.file_name,
+            "mime_type": d.mime_type,
+            "created_at": d.created_at.isoformat(),
+        }
+        for d in pods
+    ]
+    result["tracking_events"] = [
+        {
+            "status": e.status,
+            "description": e.description,
+            "location": e.location,
+            "occurred_at": e.occurred_at.isoformat(),
+        }
+        for e in events
+    ]
+    return result
+
+
+@router.post("/orders/{order_id}/accept", summary="Принять заказ")
+def accept_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    carrier_id: int = Depends(get_current_carrier_id),
+    current_user: User = Depends(require_carrier),
+) -> dict:
+    carrier = _get_carrier_or_404(db, carrier_id)
+    order = _get_order_for_carrier(db, order_id, carrier.code)
+
+    if order.status not in _ACCEPT_ALLOWED_STATUSES:
+        raise HTTPException(400, f"Нельзя принять заказ со статусом «{order.status}»")
+
+    old_status = order.status
+    order.status = "picked_up"
+    order.dispatch_error = None
+
+    db.add(OrderStatusHistory(
+        order_id=order.id,
+        old_status=old_status,
+        new_status="picked_up",
+        changed_by_user_id=current_user.id,
+        source="carrier_portal",
+        comment="Перевозчик подтвердил приёмку заказа",
+    ))
+    db.add(TrackingEvent(
+        order_draft_id=order.id,
+        status="picked_up",
+        description="Заказ принят перевозчиком",
+    ))
+
+    _notif_repo.create(
+        db,
+        user_id=order.user_id,
+        type="order_status",
+        title="Заказ принят перевозчиком",
+        body=f"Заказ #{order.id} принят перевозчиком {carrier.name} и готовится к отправке.",
+    )
+
+    db.commit()
+    return {"order_id": order.id, "status": order.status, "message": "Заказ принят"}
+
+
+@router.post("/orders/{order_id}/reject", summary="Отклонить заказ")
+def reject_order(
+    order_id: int,
+    reason: str = Form(..., min_length=1, max_length=500),
+    db: Session = Depends(get_db),
+    carrier_id: int = Depends(get_current_carrier_id),
+    current_user: User = Depends(require_carrier),
+) -> dict:
+    carrier = _get_carrier_or_404(db, carrier_id)
+    order = _get_order_for_carrier(db, order_id, carrier.code)
+
+    if order.status not in _REJECT_ALLOWED_STATUSES:
+        raise HTTPException(400, f"Нельзя отклонить заказ со статусом «{order.status}»")
+
+    old_status = order.status
+    order.status = "dispatch_failed"
+    order.dispatch_error = f"Отклонено перевозчиком: {reason}"
+
+    db.add(OrderStatusHistory(
+        order_id=order.id,
+        old_status=old_status,
+        new_status="dispatch_failed",
+        changed_by_user_id=current_user.id,
+        source="carrier_portal",
+        comment=f"Перевозчик отклонил заказ: {reason}",
+    ))
+    db.add(TrackingEvent(
+        order_draft_id=order.id,
+        status="dispatch_failed",
+        description=f"Перевозчик отклонил заказ: {reason}",
+    ))
+
+    from app.modules.identity.models import Role, RoleCode
+    admins = db.scalars(
+        select(User).join(User.role).where(Role.code == RoleCode.ADMIN, User.is_active.is_(True))
+    ).all()
+    for admin in admins:
+        _notif_repo.create(
+            db,
+            user_id=admin.id,
+            type="carrier_rejection",
+            title=f"Перевозчик отклонил заказ #{order.id}",
+            body=f"Причина: {reason}. Требуется ручная обработка.",
+        )
+
+    db.commit()
+    return {"order_id": order.id, "status": order.status, "message": "Заказ отклонён, администраторы уведомлены"}
+
+
+@router.post("/orders/{order_id}/pod", summary="Загрузить подтверждение доставки (POD)")
+async def upload_pod(
+    order_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    carrier_id: int = Depends(get_current_carrier_id),
+    current_user: User = Depends(require_carrier),
+) -> dict:
+    carrier = _get_carrier_or_404(db, carrier_id)
+    order = _get_order_for_carrier(db, order_id, carrier.code)
+
+    if order.status not in _POD_ALLOWED_STATUSES:
+        raise HTTPException(400, f"Нельзя загрузить POD для заказа со статусом «{order.status}»")
+
+    file_data = await file.read()
+    mime_type = file.content_type or "application/octet-stream"
+    original_name = file.filename or "pod"
+
+    try:
+        uploaded = get_storage().upload_file(
+            file_data=file_data,
+            original_name=original_name,
+            mime_type=mime_type,
+            folder="pod",
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(500, str(exc))
+
+    doc = Document(
+        order_id=order.id,
+        document_type=DocumentType.PROOF_OF_DELIVERY,
+        file_url=uploaded.file_url,
+        file_name=uploaded.file_name,
+        mime_type=uploaded.file_mime_type,
+        created_by_user_id=current_user.id,
+    )
+    db.add(doc)
+
+    if order.status != "delivered":
+        old_status = order.status
+        order.status = "delivered"
+        db.add(OrderStatusHistory(
+            order_id=order.id,
+            old_status=old_status,
+            new_status="delivered",
+            changed_by_user_id=current_user.id,
+            source="carrier_portal",
+            comment="Перевозчик загрузил подтверждение доставки",
+        ))
+        db.add(TrackingEvent(
+            order_draft_id=order.id,
+            status="delivered",
+            description="Заказ доставлен. Подтверждение загружено перевозчиком.",
+        ))
+        _notif_repo.create(
+            db,
+            user_id=order.user_id,
+            type="order_status",
+            title="Заказ доставлен",
+            body=f"Заказ #{order.id} доставлен. Подтверждение доставки прикреплено.",
+        )
+
+    db.commit()
+    db.refresh(doc)
+    return {
+        "document_id": doc.id,
+        "file_url": doc.file_url,
+        "file_name": doc.file_name,
+        "order_status": order.status,
+        "message": "Подтверждение доставки загружено",
     }

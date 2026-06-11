@@ -166,6 +166,9 @@ export const approveAdminPayment = (paymentId: number): Promise<{ message: strin
 export const rejectAdminPayment = (paymentId: number, reason: string): Promise<{ message: string }> =>
   req(`/admin/payments/${paymentId}/reject`, { method: "POST", body: JSON.stringify({ reject_reason: reason }) });
 
+export const refundAdminPayment = (paymentId: number, reason: string): Promise<{ payment_id: number; status: string; message: string }> =>
+  req(`/admin/payments/${paymentId}/refund`, { method: "POST", body: JSON.stringify({ reason }) });
+
 // ── Carrier API credentials ────────────────────────────────────────────────
 
 export interface CarrierAPICredentials {

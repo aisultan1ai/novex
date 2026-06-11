@@ -26,6 +26,7 @@ _STATUS_TITLES: dict[str, str] = {
     "arrived": "Прибыл в пункт выдачи",
     "delivered": "Доставлен",
     "cancelled": "Отменён",
+    "refunded": "Средства возвращены",
     "return": "Возврат",
     "return_requested": "Запрошен возврат",
     "return_in_progress": "Возврат в пути",

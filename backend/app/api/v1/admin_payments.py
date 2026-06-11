@@ -43,6 +43,10 @@ class RejectPaymentRequest(BaseModel):
     reject_reason: str = Field(min_length=1, max_length=500)
 
 
+class RefundPaymentRequest(BaseModel):
+    reason: str = Field(min_length=1, max_length=500)
+
+
 def _to_item(tx: PaymentTransaction) -> PaymentListItem:
     return PaymentListItem(
         id=tx.id,
@@ -154,6 +158,45 @@ def approve_payment(
         "payment_id": tx.id,
         "status": tx.status,
         "message": "Оплата подтверждена. Заказ передан в очередь на отправку.",
+    }
+
+
+@router.post("/{payment_id}/refund", summary="Оформить возврат средств")
+def refund_payment(
+    payment_id: int,
+    payload: RefundPaymentRequest,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+) -> dict:
+    try:
+        tx = _payment_svc.admin_refund(
+            db,
+            payment_id=payment_id,
+            admin_id=admin.id,
+            reason=payload.reason,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    _audit_svc.log(
+        db,
+        actor=admin,
+        action="payment.refund",
+        resource_type="payment",
+        resource_id=tx.id,
+        new_value={"order_id": tx.order_id, "status": tx.status, "reason": payload.reason},
+    )
+    db.commit()
+
+    provider_note = (
+        "Для Kaspi — выполните возврат вручную через Kaspi Business Portal."
+        if tx.provider == "kaspi"
+        else "Выполните банковский перевод клиенту вручную."
+    )
+    return {
+        "payment_id": tx.id,
+        "status": tx.status,
+        "message": f"Возврат оформлен. {provider_note}",
     }
 
 
