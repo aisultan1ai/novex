@@ -7,10 +7,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.core.dependencies import require_carrier
+from app.core.dependencies import get_current_carrier_id
 from app.modules.carriers.models import Carrier
 from app.modules.carriers.webhook_config import CarrierWebhookConfig, CarrierWebhookRepository
-from app.modules.identity.models import CarrierProfile, User
 
 router = APIRouter(prefix="/carrier", tags=["carrier-portal"])
 
@@ -27,20 +26,12 @@ def _mask_secret(secret: str | None) -> str | None:
     return prefix + "*" * (len(raw) - 4) + raw[-4:]
 
 
-def _get_carrier_profile(user: User, db: Session) -> CarrierProfile:
-    profile = db.scalar(select(CarrierProfile).where(CarrierProfile.user_id == user.id))
-    if not profile:
-        raise HTTPException(404, "Профиль перевозчика не найден")
-    return profile
-
-
 @router.get("/me")
 def get_me(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_carrier),
+    carrier_id: int = Depends(get_current_carrier_id),
 ) -> dict:
-    cp = _get_carrier_profile(current_user, db)
-    carrier = db.get(Carrier, cp.carrier_id)
+    carrier = db.get(Carrier, carrier_id)
     if not carrier:
         raise HTTPException(404, "Перевозчик не найден")
 
@@ -71,11 +62,10 @@ def get_me(
 @router.get("/integration-config")
 def get_integration_config(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_carrier),
+    carrier_id: int = Depends(get_current_carrier_id),
 ) -> dict:
     """Returns full integration configuration for both push and pull methods."""
-    cp = _get_carrier_profile(current_user, db)
-    carrier = db.get(Carrier, cp.carrier_id)
+    carrier = db.get(Carrier, carrier_id)
     if not carrier:
         raise HTTPException(404, "Перевозчик не найден")
 
@@ -136,11 +126,10 @@ def get_integration_config(
 @router.post("/integration-config/regenerate-secret")
 def regenerate_secret(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_carrier),
+    carrier_id: int = Depends(get_current_carrier_id),
 ) -> dict:
     """Regenerate webhook secret. Returns the new secret once (store it safely)."""
-    cp = _get_carrier_profile(current_user, db)
-    carrier = db.get(Carrier, cp.carrier_id)
+    carrier = db.get(Carrier, carrier_id)
     if not carrier:
         raise HTTPException(404, "Перевозчик не найден")
 

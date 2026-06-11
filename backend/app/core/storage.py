@@ -6,6 +6,7 @@ import mimetypes
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +129,7 @@ class MinioStorageService(StorageService):
                 content_type=mime_type,
             )
         else:
-            logger.warning("MinIO not available, file not persisted: %s", object_name)
+            raise RuntimeError("MinIO is unavailable — file cannot be persisted")
 
         return UploadedFile(
             file_url=self.get_file_url(object_name),
@@ -158,11 +159,6 @@ class MinioStorageService(StorageService):
             return None
 
 
-_storage: StorageService | None = None
-
-
+@lru_cache(maxsize=1)
 def get_storage() -> StorageService:
-    global _storage
-    if _storage is None:
-        _storage = MinioStorageService()
-    return _storage
+    return MinioStorageService()

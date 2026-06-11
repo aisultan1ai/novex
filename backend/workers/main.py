@@ -6,6 +6,8 @@ from threading import Event
 
 from app.core.config import get_settings
 from app.core.db import check_database_connection
+from workers.jobs import dispatch_orders, sync_tracking
+from workers.scheduler import WorkerScheduler
 
 settings = get_settings()
 stop_event = Event()
@@ -39,10 +41,13 @@ def run() -> None:
     except Exception as exc:  # noqa: BLE001
         logger.warning("Database probe failed: %s", exc)
 
-    logger.info("Worker skeleton is running.")
+    scheduler = WorkerScheduler()
+    scheduler.register(dispatch_orders.run, 60)
+    scheduler.register(sync_tracking.run, 120)
+    logger.info("WorkerScheduler ready. Starting main loop.")
 
     while not stop_event.is_set():
-        logger.info("Worker heartbeat...")
+        scheduler.tick()
         stop_event.wait(timeout=30)
 
     logger.info("Worker stopped cleanly.")

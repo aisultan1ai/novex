@@ -2,7 +2,7 @@ import type { ProfileResponse } from "@/types/auth";
 
 const AUTH_PROFILE_STORAGE_KEY = "novex_auth_profile";
 
-// Only non-sensitive fields are persisted to localStorage (BUG #3)
+// Only non-sensitive fields (id, email, role) — phone, billing, company stay server-side
 interface StoredData {
   user_id: number;
   email: string;

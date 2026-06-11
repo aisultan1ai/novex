@@ -12,7 +12,7 @@ from app.core.db import get_db
 from app.core.dependencies import get_current_user_id
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.limiter import limiter
-from app.core.storage import get_storage, validate_upload
+from app.core.storage import get_storage
 from app.modules.orders.repository import OrdersRepository
 from app.modules.payments.payment_service import PaymentService
 from app.modules.payments.providers.manual_bank_transfer import ManualBankTransferProvider
@@ -137,11 +137,6 @@ def upload_payment_proof(
     file_data = file.file.read()
     mime_type = file.content_type or "application/octet-stream"
 
-    try:
-        validate_upload(file_data, file.filename or "file", mime_type)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-
     storage = get_storage()
     try:
         uploaded = storage.upload_file(
@@ -150,6 +145,11 @@ def upload_payment_proof(
             mime_type=mime_type,
             folder=f"payment_proofs/{draft_id}",
         )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except RuntimeError as exc:
+        logger.error("Storage unavailable: %s", exc)
+        raise HTTPException(status_code=500, detail="File storage unavailable")
     except Exception as exc:
         logger.error("File upload failed: %s", exc)
         raise HTTPException(status_code=500, detail="File upload failed")

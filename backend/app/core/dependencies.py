@@ -101,3 +101,21 @@ def require_carrier(current_user: User = Depends(get_current_user)) -> User:
             detail="Доступ только для перевозчиков",
         )
     return current_user
+
+
+def get_current_carrier_id(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_carrier),
+) -> int:
+    from sqlalchemy import select
+    from app.modules.identity.models import CarrierProfile
+
+    profile = db.scalar(
+        select(CarrierProfile).where(CarrierProfile.user_id == current_user.id)
+    )
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Профиль перевозчика не найден",
+        )
+    return profile.carrier_id
