@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 
 import {
@@ -165,22 +164,8 @@ export default function CarrierAPIPage() {
 
   return (
     <>
-      <div style={{ marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <Link href={`/dashboard/admin/carriers/${carrierId}`} style={{ color: "#64748b", fontSize: 14, textDecoration: "none" }}>
-          ← {carrier.name}
-        </Link>
-      </div>
-
-      {/* Header */}
-      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: "22px 28px", marginBottom: 24, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 20, fontWeight: 800, color: "#0f172a" }}>{carrier.name}</span>
-            <span style={{ fontFamily: "monospace", fontSize: 12, color: "#94a3b8", background: "#f1f5f9", padding: "2px 8px", borderRadius: 6 }}>{carrier.code}</span>
-          </div>
-          <div style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>API-интеграция — создание накладных через API перевозчика</div>
-        </div>
-        <span style={{ padding: "5px 14px", borderRadius: 999, fontSize: 12, fontWeight: 700, background: dispatchBadge.bg, color: dispatchBadge.color }}>
+      <div style={{ marginBottom: 20 }}>
+        <span style={{ padding: "4px 12px", borderRadius: 999, fontSize: 12, fontWeight: 700, background: dispatchBadge.bg, color: dispatchBadge.color }}>
           {dispatchBadge.label}
         </span>
       </div>

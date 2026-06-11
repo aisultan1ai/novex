@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/providers/auth-provider";
-import { downloadOrderLabel, getOrderDraft } from "@/lib/api/orders";
+import { getOrderDraft } from "@/lib/api/orders";
 import { getOrderTracking } from "@/lib/api/tracking";
 import { createReview, getOrderReview, type ReviewResponse } from "@/lib/api/reviews";
 import type { TrackingEvent } from "@/types/tracking";
@@ -195,7 +195,6 @@ export default function OrderTrackingPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [review, setReview] = useState<ReviewResponse | null>(null);
-  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) router.push("/login");
@@ -217,23 +216,6 @@ export default function OrderTrackingPage() {
       .finally(() => setIsLoading(false));
   }, [isAuthenticated, draftId]);
 
-  async function handleDownloadLabel() {
-    setIsDownloading(true);
-    try {
-      const blob = await downloadOrderLabel(draftId);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `novex_label_${draftId}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Не удалось скачать накладную");
-    } finally {
-      setIsDownloading(false);
-    }
-  }
-
   if (authLoading || (!isAuthenticated && !authLoading)) return null;
 
   const canReview = orderStatus !== null && REVIEWABLE_STATUSES.has(orderStatus);
@@ -249,35 +231,13 @@ export default function OrderTrackingPage() {
         </Link>
       </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28, flexWrap: "wrap", gap: 12 }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "#0f172a" }}>
-            Отслеживание заказа
-          </h1>
-          <p style={{ margin: "4px 0 0", fontSize: 14, color: "#64748b" }}>
-            Заказ #{draftId}
-          </p>
-        </div>
-        <button
-          onClick={handleDownloadLabel}
-          disabled={isDownloading}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "10px 20px",
-            borderRadius: 10,
-            border: "1px solid #cbd5e1",
-            background: "#fff",
-            color: "#0f172a",
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: isDownloading ? "not-allowed" : "pointer",
-            opacity: isDownloading ? 0.6 : 1,
-          }}
-        >
-          {isDownloading ? "Скачиваем..." : "⬇ Скачать накладную"}
-        </button>
+      <div style={{ marginBottom: 28 }}>
+        <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "#0f172a" }}>
+          Отслеживание заказа
+        </h1>
+        <p style={{ margin: "4px 0 0", fontSize: 14, color: "#64748b" }}>
+          Заказ #{draftId}
+        </p>
       </div>
 
       {error && (

@@ -1,11 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 
 import {
-  getAdminCarrier,
   getCarrierIntegration,
   getCarrierIntegrationLogs,
   regenerateCarrierIntegrationSecret,
@@ -14,7 +12,6 @@ import {
   type CarrierIntegrationConfig,
   type CarrierIntegrationLogItem,
 } from "@/lib/api/admin";
-import type { AdminCarrierDetail } from "@/types/admin";
 
 const inp: React.CSSProperties = {
   border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 12px",
@@ -42,7 +39,6 @@ export default function CarrierIntegrationPage() {
   const { id } = useParams<{ id: string }>();
   const carrierId = Number(id);
 
-  const [carrier, setCarrier] = useState<AdminCarrierDetail | null>(null);
   const [cfg, setCfg] = useState<CarrierIntegrationConfig | null>(null);
   const [logs, setLogs] = useState<CarrierIntegrationLogItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,11 +63,7 @@ export default function CarrierIntegrationPage() {
   const [logsLoading, setLogsLoading] = useState(false);
 
   useEffect(() => {
-    Promise.all([
-      getAdminCarrier(carrierId),
-      getCarrierIntegration(carrierId),
-    ]).then(([c, integration]) => {
-      setCarrier(c);
+    getCarrierIntegration(carrierId).then((integration) => {
       setCfg(integration);
       setForm({
         push_url: integration.push_url ?? "",
@@ -148,7 +140,7 @@ export default function CarrierIntegrationPage() {
     }
   }
 
-  if (loading || !carrier) return <div style={{ padding: 40, color: "#64748b" }}>Загрузка…</div>;
+  if (loading) return <div style={{ padding: 40, color: "#64748b" }}>Загрузка…</div>;
 
   const dispatchStatus = form.dispatch_mode === "manual"
     ? { label: "Ручной режим", bg: "#fef9c3", color: "#854d0e" }
@@ -158,31 +150,15 @@ export default function CarrierIntegrationPage() {
 
   return (
     <div style={{ maxWidth: 900 }}>
-      {/* Breadcrumb */}
-      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 20, fontSize: 13 }}>
-        <Link href="/dashboard/admin/carriers" style={{ color: "#64748b", textDecoration: "none" }}>Перевозчики</Link>
-        <span style={{ color: "#d1d5db" }}>›</span>
-        <Link href={`/dashboard/admin/carriers/${carrierId}`} style={{ color: "#64748b", textDecoration: "none" }}>{carrier.name}</Link>
-        <span style={{ color: "#d1d5db" }}>›</span>
-        <span style={{ color: "#0f172a", fontWeight: 600 }}>Интеграция</span>
-      </div>
-
-      {/* Header */}
-      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 14, padding: "18px 24px", marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-        <div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: "#0f172a" }}>{carrier.name}</div>
-          <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>Настройки интеграции — Model A (API) + Model B (Generic Webhook)</div>
-        </div>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <span style={{ padding: "4px 12px", borderRadius: 999, fontSize: 12, fontWeight: 700, background: dispatchStatus.bg, color: dispatchStatus.color }}>
-            {dispatchStatus.label}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+        <span style={{ padding: "4px 12px", borderRadius: 999, fontSize: 12, fontWeight: 700, background: dispatchStatus.bg, color: dispatchStatus.color }}>
+          {dispatchStatus.label}
+        </span>
+        {cfg?.last_success_at && (
+          <span style={{ fontSize: 11, color: "#10b981" }}>
+            Последний успех: {new Date(cfg.last_success_at).toLocaleString("ru-KZ")}
           </span>
-          {cfg?.last_success_at && (
-            <span style={{ fontSize: 11, color: "#10b981" }}>
-              Последний успех: {new Date(cfg.last_success_at).toLocaleString("ru-KZ")}
-            </span>
-          )}
-        </div>
+        )}
       </div>
 
       {cfg?.last_error && (
@@ -372,7 +348,7 @@ export default function CarrierIntegrationPage() {
           <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 14, padding: "16px 18px" }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>Endpoint для трекинга</div>
             <div style={{ fontFamily: "monospace", fontSize: 11, background: "#f1f5f9", padding: "8px 10px", borderRadius: 6, wordBreak: "break-all", color: "#334155" }}>
-              POST /api/v1/carriers/{carrier.code}/tracking-webhook
+              POST /api/v1/carriers/{cfg?.carrier_code}/tracking-webhook
             </div>
             <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 6 }}>
               Carrier отправляет статусы сюда. Требуется: X-Carrier-Signature, X-Novex-Timestamp.

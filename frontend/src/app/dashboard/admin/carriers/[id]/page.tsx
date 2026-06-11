@@ -1,306 +1,185 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { createCarrierAccount, getAdminCarrier, updateAdminCarrier } from "@/lib/api/admin";
+import type { AdminCarrierDetail } from "@/types/admin";
 
-import {
-  createAdminService, deleteAdminRate, getAdminCarrier,
-  listAdminRates, updateAdminCarrier, uploadTariffGrid,
-} from "@/lib/api/admin";
-import type { AdminCarrierDetail, AdminCarrierService, AdminTariffRate } from "@/types/admin";
+const inp: React.CSSProperties = {
+  border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 12px",
+  fontSize: 13, width: "100%", boxSizing: "border-box",
+  fontFamily: "inherit", outline: "none", background: "#f8fafc", color: "#0f172a",
+};
+const lbl: React.CSSProperties = {
+  display: "block", fontSize: 12, fontWeight: 600, color: "#64748b",
+  marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.04em",
+};
 
-const TEMPLATE: object[] = [
-  { zone: 0, weight_from_kg: 0, weight_to_kg: 1, base_price: 1200, eta_days_min: 1, eta_days_max: 1, currency: "KZT" },
-  { zone: 1, weight_from_kg: 0, weight_to_kg: 1, base_price: 1500, per_unit_price: 400, per_unit_weight_kg: 0.5, eta_days_min: 2, eta_days_max: 4, currency: "KZT" },
-  { zone: 2, weight_from_kg: 0, weight_to_kg: 1, base_price: 2000, eta_days_min: 3, eta_days_max: 6, currency: "KZT" },
-];
+const EMPTY_ACCOUNT = { email: "", full_name: "", temp_password: "" };
 
-function downloadTemplate() {
-  const blob = new Blob([JSON.stringify(TEMPLATE, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "tariff_template.json";
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-const inp: React.CSSProperties = { border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 12px", fontSize: 13, width: "100%", boxSizing: "border-box", fontFamily: "inherit", outline: "none", background: "#f8fafc", color: "#0f172a" };
-
-export default function AdminCarrierDetailPage() {
-  const params = useParams();
-  const carrierId = Number(params.id);
+export default function AdminCarrierOverviewPage() {
+  const { id } = useParams<{ id: string }>();
+  const carrierId = Number(id);
 
   const [carrier, setCarrier] = useState<AdminCarrierDetail | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [selectedService, setSelectedService] = useState<AdminCarrierService | null>(null);
-  const [rates, setRates] = useState<AdminTariffRate[]>([]);
-  const [ratesLoading, setRatesLoading] = useState(false);
+  const [form, setForm] = useState({ name: "", description: "", is_active: true });
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
-  const [showServiceForm, setShowServiceForm] = useState(false);
-  const [serviceForm, setServiceForm] = useState({ code: "", name: "", shipment_type: "parcel" });
-  const [savingSvc, setSavingSvc] = useState(false);
-
-  const [uploading, setUploading] = useState(false);
-  const [uploadMsg, setUploadMsg] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  const [editingName, setEditingName] = useState(false);
-  const [nameForm, setNameForm] = useState({ name: "", description: "" });
-  const [savingName, setSavingName] = useState(false);
+  const [showAccountForm, setShowAccountForm] = useState(false);
+  const [accountForm, setAccountForm] = useState(EMPTY_ACCOUNT);
+  const [savingAccount, setSavingAccount] = useState(false);
+  const [accountMsg, setAccountMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
   function load() {
-    setIsLoading(true);
+    setLoading(true);
     getAdminCarrier(carrierId)
-      .then((c) => { setCarrier(c); setNameForm({ name: c.name, description: c.description ?? "" }); })
+      .then((c) => {
+        setCarrier(c);
+        setForm({ name: c.name, description: c.description ?? "", is_active: c.is_active });
+      })
       .catch((e: Error) => setError(e.message))
-      .finally(() => setIsLoading(false));
+      .finally(() => setLoading(false));
   }
 
-  useEffect(() => { load(); }, [carrierId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [carrierId]); // eslint-disable-line
 
-  const loadRates = useCallback((svc: AdminCarrierService) => {
-    setRatesLoading(true);
-    listAdminRates(carrierId, svc.id)
-      .then((res) => setRates(res.items))
-      .catch((e: Error) => setError(e.message))
-      .finally(() => setRatesLoading(false));
-  }, [carrierId]);
-
-  useEffect(() => {
-    if (selectedService) loadRates(selectedService);
-  }, [selectedService, loadRates]);
-
-  async function handleCreateService(e: React.FormEvent) {
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    setSavingSvc(true);
+    setSaveMsg(null);
+    setSaving(true);
     try {
-      await createAdminService(carrierId, { code: serviceForm.code.trim(), name: serviceForm.name.trim(), shipment_type: serviceForm.shipment_type || undefined });
-      setServiceForm({ code: "", name: "", shipment_type: "parcel" });
-      setShowServiceForm(false);
+      await updateAdminCarrier(carrierId, {
+        name: form.name,
+        description: form.description || undefined,
+        is_active: form.is_active,
+      });
+      setSaveMsg({ text: "Сохранено", ok: true });
       load();
     } catch (err: unknown) {
-      alert((err as Error).message);
+      setSaveMsg({ text: (err as Error).message, ok: false });
     } finally {
-      setSavingSvc(false);
+      setSaving(false);
     }
   }
 
-  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !selectedService) return;
-    setUploading(true);
-    setUploadMsg(null);
-    try {
-      const res = await uploadTariffGrid(carrierId, selectedService.id, file);
-      setUploadMsg(`✓ Загружено ${res.inserted} строк`);
-      loadRates(selectedService);
-    } catch (err: unknown) {
-      setUploadMsg(`Ошибка: ${(err as Error).message}`);
-    } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
-    }
-  }
-
-  async function handleDeleteRate(rateId: number) {
-    if (!selectedService || !confirm("Удалить строку?")) return;
-    try {
-      await deleteAdminRate(carrierId, selectedService.id, rateId);
-      loadRates(selectedService);
-    } catch (err: unknown) {
-      alert((err as Error).message);
-    }
-  }
-
-  async function handleSaveName(e: React.FormEvent) {
+  async function handleCreateAccount(e: React.FormEvent) {
     e.preventDefault();
-    setSavingName(true);
+    setAccountMsg(null);
+    setSavingAccount(true);
     try {
-      await updateAdminCarrier(carrierId, { name: nameForm.name, description: nameForm.description || undefined });
-      setEditingName(false);
-      load();
+      await createCarrierAccount(carrierId, {
+        email: accountForm.email.trim(),
+        full_name: accountForm.full_name.trim() || undefined,
+        temp_password: accountForm.temp_password,
+      });
+      setAccountMsg({ text: "Аккаунт создан", ok: true });
+      setAccountForm(EMPTY_ACCOUNT);
+      setShowAccountForm(false);
     } catch (err: unknown) {
-      alert((err as Error).message);
+      setAccountMsg({ text: (err as Error).message, ok: false });
     } finally {
-      setSavingName(false);
+      setSavingAccount(false);
     }
   }
 
-  if (isLoading) return <div style={{ padding: 48, textAlign: "center", color: "#64748b" }}>Загружаем…</div>;
-  if (error && !carrier) return <div style={{ padding: "12px 16px", borderRadius: 10, background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c" }}>{error}</div>;
+  if (loading) return <div style={{ padding: 40, color: "#64748b" }}>Загружаем…</div>;
+  if (error) return <div style={{ padding: "12px 16px", borderRadius: 10, background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c" }}>{error}</div>;
   if (!carrier) return null;
 
   return (
-    <>
-      <div style={{ marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <Link href="/dashboard/admin/carriers" style={{ color: "#64748b", fontSize: 14, textDecoration: "none" }}>← Перевозчики</Link>
-        <div style={{ display: "flex", gap: 8 }}>
-          <Link
-            href={`/dashboard/admin/carriers/${carrierId}/integration`}
-            style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", color: "#0f172a", fontSize: 13, fontWeight: 600, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}
-          >
-            Интеграция
-          </Link>
-          <Link
-            href={`/dashboard/admin/carriers/${carrierId}/api`}
-            style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", color: "#0f172a", fontSize: 13, fontWeight: 600, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}
-          >
-            API (Azimuth)
-          </Link>
-        </div>
-      </div>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 20, alignItems: "start" }}>
+      {/* Edit form */}
+      <form onSubmit={handleSave} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 14, padding: "24px" }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 18 }}>Основные данные</div>
 
-      <div style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, padding: "24px 28px", marginBottom: 24 }}>
-        {editingName ? (
-          <form onSubmit={handleSaveName} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 6 }}>Название</label>
-              <input style={inp} value={nameForm.name} onChange={(e) => setNameForm((f) => ({ ...f, name: e.target.value }))} required />
-            </div>
-            <div>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 6 }}>Описание</label>
-              <input style={inp} value={nameForm.description} onChange={(e) => setNameForm((f) => ({ ...f, description: e.target.value }))} />
-            </div>
-            <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8 }}>
-              <button type="submit" disabled={savingName} style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#0f172a", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Сохранить</button>
-              <button type="button" onClick={() => setEditingName(false)} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", color: "#64748b", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Отмена</button>
-            </div>
-          </form>
-        ) : (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>{carrier.name}</span>
-                <span style={{ fontFamily: "monospace", fontSize: 13, color: "#94a3b8", background: "#f1f5f9", padding: "2px 8px", borderRadius: 6 }}>{carrier.code}</span>
-                <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600, background: carrier.is_active ? "#dcfce7" : "#f1f5f9", color: carrier.is_active ? "#166534" : "#94a3b8" }}>
-                  {carrier.is_active ? "Активен" : "Неактивен"}
-                </span>
-              </div>
-              {carrier.description && <div style={{ fontSize: 13, color: "#64748b", marginTop: 6 }}>{carrier.description}</div>}
-            </div>
-            <button onClick={() => setEditingName(true)} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", color: "#0f172a", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-              Редактировать
-            </button>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+          <div>
+            <label style={lbl}>Название</label>
+            <input style={inp} value={form.name} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} required />
+          </div>
+          <div>
+            <label style={lbl}>Код</label>
+            <input style={{ ...inp, background: "#f1f5f9", color: "#94a3b8" }} value={carrier.code} readOnly />
+          </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <label style={lbl}>Описание</label>
+            <input style={inp} value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Необязательно" />
+          </div>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+          <input
+            type="checkbox"
+            id="is_active"
+            checked={form.is_active}
+            onChange={(e) => setForm(f => ({ ...f, is_active: e.target.checked }))}
+            style={{ width: 16, height: 16, cursor: "pointer" }}
+          />
+          <label htmlFor="is_active" style={{ fontSize: 13, cursor: "pointer", color: "#0f172a" }}>
+            Перевозчик активен (доступен для котировок)
+          </label>
+        </div>
+
+        {saveMsg && (
+          <div style={{ padding: "10px 14px", borderRadius: 8, marginBottom: 14, fontSize: 13, background: saveMsg.ok ? "#f0fdf4" : "#fef2f2", color: saveMsg.ok ? "#166534" : "#b91c1c" }}>
+            {saveMsg.text}
           </div>
         )}
-      </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "240px 1fr", gap: 20 }}>
-        <div>
-          <div style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, overflow: "hidden" }}>
-            <div style={{ padding: "14px 16px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>Тарифы</span>
-              <button onClick={() => setShowServiceForm((v) => !v)} style={{ fontSize: 20, lineHeight: 1, background: "none", border: "none", cursor: "pointer", color: "#64748b", padding: 0, fontFamily: "inherit" }}>+</button>
-            </div>
+        <button type="submit" disabled={saving} style={{ padding: "10px 24px", borderRadius: 10, border: "none", background: "#0f172a", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+          {saving ? "Сохраняем…" : "Сохранить"}
+        </button>
+      </form>
 
-            {showServiceForm && (
-              <form onSubmit={handleCreateService} style={{ padding: "12px 16px", borderBottom: "1px solid #f1f5f9", background: "#f8fafc" }}>
-                <input style={{ ...inp, marginBottom: 8 }} value={serviceForm.code} onChange={(e) => setServiceForm((f) => ({ ...f, code: e.target.value }))} placeholder="Код (standard)" required pattern="[a-z0-9_-]+" />
-                <input style={{ ...inp, marginBottom: 8 }} value={serviceForm.name} onChange={(e) => setServiceForm((f) => ({ ...f, name: e.target.value }))} placeholder="Название" required />
-                <select style={{ ...inp, marginBottom: 8 }} value={serviceForm.shipment_type} onChange={(e) => setServiceForm((f) => ({ ...f, shipment_type: e.target.value }))}>
-                  <option value="parcel">Посылка</option>
-                  <option value="document">Документ</option>
-                  <option value="cargo">Груз</option>
-                </select>
-                <button type="submit" disabled={savingSvc} style={{ width: "100%", padding: "8px", borderRadius: 8, border: "none", background: "#0f172a", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                  {savingSvc ? "..." : "Добавить"}
-                </button>
-              </form>
-            )}
+      {/* Account section */}
+      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 14, padding: "22px 24px" }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 6 }}>Аккаунт перевозчика</div>
+        <p style={{ fontSize: 13, color: "#64748b", marginTop: 0, marginBottom: 16 }}>
+          Создайте учётную запись, чтобы перевозчик мог войти в личный кабинет и управлять заказами.
+        </p>
 
-            {carrier.services.length === 0 ? (
-              <div style={{ padding: "24px 16px", textAlign: "center", color: "#94a3b8", fontSize: 13 }}>Нет тарифов</div>
-            ) : (
-              carrier.services.map((svc) => {
-                const active = selectedService?.id === svc.id;
-                return (
-                  <button
-                    key={svc.id}
-                    onClick={() => setSelectedService(svc)}
-                    style={{ display: "block", width: "100%", padding: "12px 16px", textAlign: "left", border: "none", background: active ? "#f1f5f9" : "transparent", cursor: "pointer", borderBottom: "1px solid #f1f5f9", fontFamily: "inherit" }}
-                  >
-                    <div style={{ fontSize: 14, fontWeight: active ? 700 : 500, color: "#0f172a" }}>{svc.name}</div>
-                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>{svc.code} · {svc.shipment_type}</div>
-                  </button>
-                );
-              })
-            )}
+        {accountMsg && (
+          <div style={{ padding: "10px 14px", borderRadius: 8, marginBottom: 14, fontSize: 13, background: accountMsg.ok ? "#f0fdf4" : "#fef2f2", color: accountMsg.ok ? "#166534" : "#b91c1c" }}>
+            {accountMsg.text}
           </div>
-        </div>
+        )}
 
-        <div>
-          {!selectedService ? (
-            <div style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, padding: 48, textAlign: "center", color: "#94a3b8", fontSize: 14 }}>
-              Выберите тариф слева для просмотра/редактирования ставок
+        {!showAccountForm ? (
+          <button
+            onClick={() => setShowAccountForm(true)}
+            style={{ padding: "9px 18px", borderRadius: 10, border: "1px solid #c7d2fe", background: "#eef2ff", color: "#4338ca", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+          >
+            + Создать аккаунт
+          </button>
+        ) : (
+          <form onSubmit={handleCreateAccount} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div>
+              <label style={lbl}>Email</label>
+              <input style={inp} type="email" required value={accountForm.email} onChange={(e) => setAccountForm(f => ({ ...f, email: e.target.value }))} placeholder="carrier@example.com" />
             </div>
-          ) : (
-            <div style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, overflow: "hidden" }}>
-              <div style={{ padding: "16px 20px", borderBottom: "1px solid #e5e7eb", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-                <div>
-                  <span style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>{selectedService.name}</span>
-                  <span style={{ fontSize: 12, color: "#94a3b8", marginLeft: 10 }}>{rates.length} строк</span>
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={downloadTemplate} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", color: "#0f172a", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                    📥 Шаблон JSON
-                  </button>
-                  <label style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: "#0f172a", color: "#ffffff", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
-                    {uploading ? "Загружаем..." : "📤 Загрузить JSON"}
-                    <input ref={fileRef} type="file" accept=".json" style={{ display: "none" }} onChange={handleUpload} disabled={uploading} />
-                  </label>
-                </div>
-              </div>
-
-              {uploadMsg && (
-                <div style={{ padding: "10px 20px", fontSize: 13, background: uploadMsg.startsWith("✓") ? "#f0fdf4" : "#fef2f2", color: uploadMsg.startsWith("✓") ? "#166534" : "#b91c1c", borderBottom: "1px solid #e5e7eb" }}>
-                  {uploadMsg}
-                </div>
-              )}
-
-              {ratesLoading ? (
-                <div style={{ padding: 32, textAlign: "center", color: "#64748b", fontSize: 14 }}>Загружаем…</div>
-              ) : rates.length === 0 ? (
-                <div style={{ padding: 32, textAlign: "center", color: "#94a3b8", fontSize: 14 }}>
-                  Нет ставок. Загрузите JSON-файл для импорта.
-                </div>
-              ) : (
-                <>
-                  <div style={{ display: "grid", gridTemplateColumns: "50px 80px 80px 100px 80px 80px 80px 80px 40px", gap: 8, padding: "10px 20px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                    <span>ID</span>
-                    <span>Зона</span>
-                    <span>От, кг</span>
-                    <span>До, кг</span>
-                    <span>Базовая</span>
-                    <span>Доп/ед</span>
-                    <span>Срок мин</span>
-                    <span>Срок макс</span>
-                    <span></span>
-                  </div>
-                  {rates.map((rate, idx) => (
-                    <div key={rate.id} style={{ display: "grid", gridTemplateColumns: "50px 80px 80px 100px 80px 80px 80px 80px 40px", gap: 8, padding: "11px 20px", borderBottom: idx < rates.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center", fontSize: 13 }}>
-                      <span style={{ fontFamily: "monospace", color: "#94a3b8" }}>#{rate.id}</span>
-                      <span style={{ fontWeight: 700, color: "#0f172a" }}>Зона {rate.zone}</span>
-                      <span style={{ color: "#475569" }}>{rate.weight_from_kg}</span>
-                      <span style={{ color: "#475569" }}>{rate.weight_to_kg ?? "∞"}</span>
-                      <span style={{ fontWeight: 600, color: "#0f172a" }}>{Number(rate.base_price).toLocaleString("ru-RU")}</span>
-                      <span style={{ color: "#64748b" }}>{rate.per_unit_price ? Number(rate.per_unit_price).toLocaleString("ru-RU") : "-"}</span>
-                      <span style={{ color: "#64748b" }}>{rate.eta_days_min ?? "-"}</span>
-                      <span style={{ color: "#64748b" }}>{rate.eta_days_max ?? "-"}</span>
-                      <button onClick={() => void handleDeleteRate(rate.id)} style={{ width: 28, height: 28, borderRadius: 6, border: "1px solid #fecaca", background: "#fff", color: "#ef4444", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, padding: 0 }}>
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </>
-              )}
+            <div>
+              <label style={lbl}>Имя (необязательно)</label>
+              <input style={inp} value={accountForm.full_name} onChange={(e) => setAccountForm(f => ({ ...f, full_name: e.target.value }))} />
             </div>
-          )}
-        </div>
+            <div>
+              <label style={lbl}>Временный пароль</label>
+              <input style={inp} required minLength={8} value={accountForm.temp_password} onChange={(e) => setAccountForm(f => ({ ...f, temp_password: e.target.value }))} placeholder="Минимум 8 символов" />
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button type="submit" disabled={savingAccount} style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: "#0f172a", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                {savingAccount ? "…" : "Создать"}
+              </button>
+              <button type="button" onClick={() => setShowAccountForm(false)} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", color: "#64748b", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                Отмена
+              </button>
+            </div>
+          </form>
+        )}
       </div>
-    </>
+    </div>
   );
 }
