@@ -28,12 +28,6 @@ export default function AdminCarriersPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Account modal for existing carrier
-  const [accountModal, setAccountModal] = useState<AdminCarrier | null>(null);
-  const [modalAccount, setModalAccount] = useState(EMPTY_ACCOUNT);
-  const [modalSaving, setModalSaving] = useState(false);
-  const [modalError, setModalError] = useState<string | null>(null);
-
   const [togglingId, setTogglingId] = useState<number | null>(null);
 
   function load() {
@@ -77,26 +71,6 @@ export default function AdminCarriersPage() {
       setFormError((err as Error).message);
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function handleCreateAccount(e: React.FormEvent) {
-    e.preventDefault();
-    if (!accountModal) return;
-    setModalError(null);
-    setModalSaving(true);
-    try {
-      await createCarrierAccount(accountModal.id, {
-        email: modalAccount.email.trim(),
-        full_name: modalAccount.full_name.trim() || undefined,
-        temp_password: modalAccount.temp_password,
-      });
-      setAccountModal(null);
-      setModalAccount(EMPTY_ACCOUNT);
-    } catch (err: unknown) {
-      setModalError((err as Error).message);
-    } finally {
-      setModalSaving(false);
     }
   }
 
@@ -237,12 +211,6 @@ export default function AdminCarriersPage() {
               </div>
 
               <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
-                <button
-                  onClick={() => { setAccountModal(carrier); setModalAccount(EMPTY_ACCOUNT); setModalError(null); }}
-                  style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid #c7d2fe", background: "#eef2ff", color: "#4338ca", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
-                >
-                  + Аккаунт
-                </button>
                 <Link
                   href={`/dashboard/admin/carriers/${carrier.id}`}
                   style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", color: "#0f172a", fontSize: 13, fontWeight: 600, textDecoration: "none" }}
@@ -262,40 +230,6 @@ export default function AdminCarriersPage() {
         </div>
       )}
 
-      {/* Account modal for existing carrier */}
-      {accountModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: "28px 32px", width: "100%", maxWidth: 460, boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }}>
-            <h3 style={{ margin: "0 0 6px", fontSize: 17, fontWeight: 700, color: "#0f172a" }}>Создать аккаунт</h3>
-            <p style={{ margin: "0 0 20px", fontSize: 13, color: "#64748b" }}>
-              Для перевозчика <b>{accountModal.name}</b>
-            </p>
-            <form onSubmit={(e) => void handleCreateAccount(e)} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              <div>
-                <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#334155", marginBottom: 6 }}>Email</label>
-                <input style={inp} type="email" required value={modalAccount.email} onChange={(e) => setModalAccount((f) => ({ ...f, email: e.target.value }))} placeholder="carrier@example.com" />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#334155", marginBottom: 6 }}>Имя <span style={{ color: "#94a3b8", fontWeight: 400 }}>(необязательно)</span></label>
-                <input style={inp} value={modalAccount.full_name} onChange={(e) => setModalAccount((f) => ({ ...f, full_name: e.target.value }))} placeholder="Иван Иванов" />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#334155", marginBottom: 6 }}>Временный пароль</label>
-                <input style={inp} required minLength={8} value={modalAccount.temp_password} onChange={(e) => setModalAccount((f) => ({ ...f, temp_password: e.target.value }))} placeholder="Минимум 8 символов" />
-              </div>
-              {modalError && <div style={{ fontSize: 13, color: "#b91c1c" }}>{modalError}</div>}
-              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
-                <button type="button" onClick={() => setAccountModal(null)} style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", color: "#64748b", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                  Отмена
-                </button>
-                <button type="submit" disabled={modalSaving} style={{ padding: "10px 24px", borderRadius: 10, border: "none", background: "#0f172a", color: "#fff", fontSize: 14, fontWeight: 600, cursor: modalSaving ? "not-allowed" : "pointer", opacity: modalSaving ? 0.7 : 1, fontFamily: "inherit" }}>
-                  {modalSaving ? "Создаём..." : "Создать"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </>
   );
 }
