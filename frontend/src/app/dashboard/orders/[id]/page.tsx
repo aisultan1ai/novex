@@ -56,7 +56,8 @@ const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
   return:                     { bg: "#fee2e2", color: "#991b1b" },
 };
 
-const PAYABLE_STATUSES = new Set(["shipment_details_completed", "ready_for_checkout"]);
+const CHECKOUT_STATUSES = new Set(["shipment_details_completed", "ready_for_checkout"]);
+const PAYMENT_PENDING_STATUSES = new Set(["awaiting_payment", "payment_rejected"]);
 const TRACKABLE_STATUSES = new Set(["paid", "sent_to_carrier", "picked_up", "in_transit", "arrived", "delivered"]);
 
 function parseUTC(iso: string): Date {
@@ -207,8 +208,13 @@ export default function OrderDetailPage() {
             </div>
 
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {PAYABLE_STATUSES.has(order.status) && (
+              {CHECKOUT_STATUSES.has(order.status) && (
                 <Link href={`/checkout?draftId=${order.draft_id}`} style={{ padding: "10px 20px", borderRadius: 10, background: "#0f172a", color: "#fff", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
+                  Оплатить
+                </Link>
+              )}
+              {PAYMENT_PENDING_STATUSES.has(order.status) && (
+                <Link href={`/checkout/payment?orderId=${order.draft_id}`} style={{ padding: "10px 20px", borderRadius: 10, background: "#0f172a", color: "#fff", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
                   Оплатить
                 </Link>
               )}
