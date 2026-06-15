@@ -203,9 +203,6 @@ services:
       - certbot_certs:/etc/letsencrypt:ro
       - ./nginx-prod.conf:/etc/nginx/templates/default.conf.template:ro
 
-  # Renews Let's Encrypt cert every 12 h.
-  # First-time issuance: docker compose run --rm certbot certonly --webroot ...
-  # Start with: docker compose --profile tls up -d certbot
   certbot:
     image: certbot/certbot:latest
     container_name: novex-certbot
