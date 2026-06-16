@@ -13,12 +13,24 @@ import {
 } from "@/lib/api/admin";
 import type { AdminCarrierDetail } from "@/types/admin";
 
-const AZIMUTH_EXTRA_DEFAULTS = {
-  service_type: 2,
-  payment_type: 2,
-  payer: 1,
-  payer_tin: "",
+const CARRIER_DEFAULTS: Record<string, { api_url: string; extra_config: Record<string, unknown>; hint: string }> = {
+  azimuth: {
+    api_url: "https://api.azimuthcargo.kz",
+    extra_config: { service_type: 2, payment_type: 2, payer: 1, payer_tin: "" },
+    hint: "service_type (1=Авто, 2=Авиа), payment_type, payer (1=Отправитель, 2=Получатель), payer_tin",
+  },
+  exline: {
+    api_url: "https://home.courierexe.ru/api/",
+    extra_config: { extra: "", login: "", password: "" },
+    hint: "extra — идентификатор компании в MeaSoft, login — логин, password — пароль",
+  },
 };
+
+const FALLBACK_DEFAULTS = { api_url: "", extra_config: {}, hint: "Дополнительные параметры в формате JSON" };
+
+function getCarrierDefaults(code: string) {
+  return CARRIER_DEFAULTS[code.toLowerCase()] ?? FALLBACK_DEFAULTS;
+}
 
 const inp: React.CSSProperties = {
   border: "1px solid #e5e7eb",
@@ -52,10 +64,10 @@ export default function CarrierAPIPage() {
   const [loading, setLoading] = useState(true);
 
   const [form, setForm] = useState({
-    api_url: "https://api.azimuthcargo.kz",
+    api_url: "",
     api_token: "",
     is_active: true,
-    extra_config_str: JSON.stringify(AZIMUTH_EXTRA_DEFAULTS, null, 2),
+    extra_config_str: "{}",
   });
   const [configError, setConfigError] = useState<string | null>(null);
 
@@ -66,24 +78,29 @@ export default function CarrierAPIPage() {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    Promise.all([
-      getAdminCarrier(carrierId),
-      getCarrierAPICredentials(String(carrier?.code ?? "")),
-    ])
-      .then(([c]) => {
-        setCarrier(c);
-        return getCarrierAPICredentials(c.code);
-      })
+    getAdminCarrier(carrierId)
       .then((c) => {
-        setCreds(c);
-        setForm({
-          api_url: c.api_url,
-          api_token: "",
-          is_active: c.is_active,
-          extra_config_str: JSON.stringify(c.extra_config ?? AZIMUTH_EXTRA_DEFAULTS, null, 2),
-        });
+        setCarrier(c);
+        const defaults = getCarrierDefaults(c.code);
+        return getCarrierAPICredentials(c.code)
+          .then((saved) => {
+            setCreds(saved);
+            setForm({
+              api_url: saved.api_url,
+              api_token: "",
+              is_active: saved.is_active,
+              extra_config_str: JSON.stringify(saved.extra_config ?? defaults.extra_config, null, 2),
+            });
+          })
+          .catch(() => {
+            setForm({
+              api_url: defaults.api_url,
+              api_token: "",
+              is_active: true,
+              extra_config_str: JSON.stringify(defaults.extra_config, null, 2),
+            });
+          });
       })
-      .catch(() => {/* no creds yet — form stays at defaults */})
       .finally(() => setLoading(false));
   }, [carrierId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -144,7 +161,8 @@ export default function CarrierAPIPage() {
     try {
       await deleteCarrierAPICredentials(carrier.code);
       setCreds(null);
-      setForm({ api_url: "https://api.azimuthcargo.kz", api_token: "", is_active: true, extra_config_str: JSON.stringify(AZIMUTH_EXTRA_DEFAULTS, null, 2) });
+      const defaults = getCarrierDefaults(carrier.code);
+      setForm({ api_url: defaults.api_url, api_token: "", is_active: true, extra_config_str: JSON.stringify(defaults.extra_config, null, 2) });
       setSaveMsg("Учётные данные удалены");
     } catch (err: unknown) {
       setSaveMsg(`Ошибка: ${(err as Error).message}`);
@@ -183,7 +201,7 @@ export default function CarrierAPIPage() {
               style={inp}
               value={form.api_url}
               onChange={(e) => setForm((f) => ({ ...f, api_url: e.target.value }))}
-              placeholder="https://api.azimuthcargo.kz"
+              placeholder={carrier ? getCarrierDefaults(carrier.code).api_url : "https://"}
               required
             />
           </div>
@@ -218,7 +236,7 @@ export default function CarrierAPIPage() {
             />
             {configError && <div style={{ fontSize: 12, color: "#dc2626", marginTop: 4 }}>{configError}</div>}
             <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
-              Azimuth: service_type (1=Авто, 2=Авиа), payment_type, payer (1=Отправитель, 2=Получатель), payer_tin
+              {carrier ? getCarrierDefaults(carrier.code).hint : "Дополнительные параметры в формате JSON"}
             </div>
           </div>
 
@@ -290,8 +308,8 @@ export default function CarrierAPIPage() {
             <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "#475569", lineHeight: 1.7 }}>
               <li>При оплате заказа создаётся DispatchJob</li>
               <li>Если для перевозчика настроен и активен API — вызывается API напрямую</li>
-              <li>Azimuth возвращает номер накладной и PDF</li>
-              <li>PDF сохраняется в хранилище как документ заказа</li>
+              <li>Перевозчик возвращает номер накладной (и PDF, если доступен)</li>
+              <li>Документ сохраняется в хранилище</li>
               <li>Если API не настроен — fallback на webhook</li>
             </ol>
           </div>

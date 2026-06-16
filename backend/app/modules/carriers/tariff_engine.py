@@ -18,9 +18,13 @@ from __future__ import annotations
 
 import logging
 import math
+import os
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import TYPE_CHECKING
+
+import httpx
 
 from app.modules.carriers.zone_mapper import get_zone
 
@@ -28,6 +32,18 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
+
+# Exline service-code → (tariff_code, tariff_name, eta_min, eta_max)
+_EXLINE_SERVICES: dict[str, tuple[str, str, int, int]] = {
+    "1": ("standard", "Стандарт",  3, 10),
+    "2": ("express",  "Экспресс",  1,  3),
+}
+_EXLINE_TIMEOUT = 8  # секунд; не блокируем пользователя дольше
+
+
+def _xml_esc(s: str) -> str:
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+
 
 # Индексы колонок в таблице цен
 _STD_Z0 = 0
@@ -182,6 +198,8 @@ def calculate_quotes(
     fallback_zone = get_zone(from_city, to_city)
     kg = chargeable_weight(weight_kg, quantity, width_cm, height_cm, depth_cm)
 
+    results: list[QuoteResult] = []
+
     if db is not None:
         db_results = _calculate_from_db(db, from_city, to_city, fallback_zone, kg)
         if db_results:
@@ -190,13 +208,22 @@ def calculate_quotes(
                 len(db_results),
                 kg,
             )
-            db_results.sort(key=lambda r: (r.price, r.eta_days_min))
-            return db_results
-        logger.debug(
-            "tariff_engine: DB has no rates, falling back to hardcoded Azimuth table"
-        )
+            results = db_results
+        else:
+            logger.debug(
+                "tariff_engine: DB has no rates, falling back to hardcoded Azimuth table"
+            )
+            results = _calculate_hardcoded(fallback_zone, kg)
+    else:
+        results = _calculate_hardcoded(fallback_zone, kg)
 
-    return _calculate_hardcoded(fallback_zone, kg)
+    # Добавляем live-котировки Exline только если DB не вернула Exline-ставки
+    if not any(r.carrier_code == "exline" for r in results):
+        exline_quotes = _calculate_exline_live(from_city, to_city, kg)
+        results.extend(exline_quotes)
+
+    results.sort(key=lambda r: (r.price, r.eta_days_min))
+    return results
 
 
 def _calculate_hardcoded(zone: int, kg: float) -> list[QuoteResult]:
@@ -412,4 +439,121 @@ def _calculate_from_db(
                 )
             )
 
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Exline live calculator
+# ---------------------------------------------------------------------------
+
+def _call_exline_calculator(
+    from_city: str,
+    to_city: str,
+    kg: float,
+    service_code: str,
+    extra: str,
+    login: str,
+    password: str,
+    api_url: str,
+) -> QuoteResult | None:
+    tariff_code, tariff_name, eta_min, eta_max = _EXLINE_SERVICES[service_code]
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        "<calculator>"
+        f'<auth extra="{_xml_esc(extra)}" login="{_xml_esc(login)}" pass="{_xml_esc(password)}"/>'
+        "<order>"
+        "<pricetype>CUSTOMER</pricetype>"
+        f"<sender><town>{_xml_esc(from_city)}</town></sender>"
+        f"<receiver><town>{_xml_esc(to_city)}</town></receiver>"
+        f"<weight>{kg:.3f}</weight>"
+        f"<service>{_xml_esc(service_code)}</service>"
+        "<paytype>NO</paytype>"
+        "</order>"
+        "</calculator>"
+    )
+    try:
+        resp = httpx.post(
+            api_url,
+            content=xml.encode("utf-8"),
+            headers={"Content-Type": "text/xml; charset=utf-8"},
+            timeout=_EXLINE_TIMEOUT,
+        )
+        resp.raise_for_status()
+        root = ET.fromstring(resp.text)
+    except Exception as exc:
+        logger.warning(
+            "Exline calculator failed (service=%s, %s→%s): %s",
+            service_code, from_city, to_city, exc,
+        )
+        return None
+
+    if root.attrib.get("error") == "1":
+        logger.warning("Exline calculator: auth error (service=%s)", service_code)
+        return None
+
+    calc_el = root.find("calc")
+    if calc_el is None:
+        return None
+
+    price_el = calc_el.find("price")
+    if price_el is None or not (price_el.text or "").strip():
+        return None
+
+    try:
+        price = Decimal((price_el.text or "").strip())
+    except Exception:
+        return None
+
+    min_el = calc_el.find("mindeliverydays")
+    max_el = calc_el.find("maxdeliverydays")
+    zone_el = calc_el.find("zone")
+
+    if min_el is not None and (min_el.text or "").strip().lstrip("-").isdigit():
+        eta_min = int(min_el.text.strip())  # type: ignore[assignment]
+    if max_el is not None and (max_el.text or "").strip().lstrip("-").isdigit():
+        eta_max = int(max_el.text.strip())  # type: ignore[assignment]
+
+    zone = 1
+    if zone_el is not None and (zone_el.text or "").strip().lstrip("-").isdigit():
+        zone = max(0, int(zone_el.text.strip()))
+
+    return QuoteResult(
+        carrier_code="exline",
+        carrier_name="Exline",
+        tariff_code=tariff_code,
+        tariff_name=tariff_name,
+        price=price,
+        currency="KZT",
+        eta_days_min=eta_min,
+        eta_days_max=eta_max,
+        zone=zone,
+        chargeable_kg=kg,
+    )
+
+
+def _calculate_exline_live(
+    from_city: str,
+    to_city: str,
+    kg: float,
+) -> list[QuoteResult]:
+    extra = os.getenv("EXLINE_EXTRA", "")
+    login = os.getenv("EXLINE_LOGIN", "")
+    password = os.getenv("EXLINE_PASSWORD", "")
+    api_url = os.getenv("EXLINE_API_URL", "https://home.courierexe.ru/api/").rstrip("/") + "/"
+
+    if not extra or not login:
+        return []
+
+    results: list[QuoteResult] = []
+    for service_code in _EXLINE_SERVICES:
+        quote = _call_exline_calculator(
+            from_city, to_city, kg, service_code,
+            extra, login, password, api_url,
+        )
+        if quote is not None:
+            results.append(quote)
+
+    logger.debug(
+        "Exline: %d quotes for %s→%s kg=%.2f", len(results), from_city, to_city, kg
+    )
     return results

@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from app.modules.carriers.api_clients.azimuth import AzimuthAPIClient
 from app.modules.carriers.api_clients.base import CarrierAPIClient
+from app.modules.carriers.api_clients.exline import ExlineAPIClient
 
 _REGISTRY: dict[str, CarrierAPIClient] = {
     "azimuth": AzimuthAPIClient(),
+    "exline": ExlineAPIClient(),
 }
 
 

@@ -330,7 +330,22 @@ def main() -> None:
             db.flush()
             log.info("Zone cities added: %d", cities_added)
 
-        # ── 5. Admin user ─────────────────────────────────────────────────────
+        # ── 5. Exline carrier ─────────────────────────────────────────────────
+        exline = db.scalar(select(Carrier).where(Carrier.code == "exline"))
+        if exline is None:
+            exline = Carrier(
+                code="exline",
+                name="Exline",
+                description="MeaSoft Courier — тарифы рассчитываются через live API",
+                is_active=True,
+            )
+            db.add(exline)
+            db.flush()
+            log.info("Carrier created: exline (id=%d)", exline.id)
+        else:
+            log.info("Carrier already exists: exline (id=%d)", exline.id)
+
+        # ── 6. Admin user ─────────────────────────────────────────────────────
         _ensure_admin(db)
 
         db.commit()
