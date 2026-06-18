@@ -64,6 +64,7 @@ class ExlineAPIClient(CarrierAPIClient):
         recipient = order_data.get("recipient", {})
         packages = order_data.get("packages", [])
         order_id = order_data.get("order_id", "")
+        orderno = order_data.get("order_reference") or f"NOVEX-{int(order_id):06d}"
 
         total_weight = sum(
             p.get("weight_kg", 0) * p.get("quantity", 1) for p in packages
@@ -75,7 +76,7 @@ class ExlineAPIClient(CarrierAPIClient):
         xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <neworder>
   {self._auth_tag(creds)}
-  <order orderno="{_esc(str(order_id))}">
+  <order orderno="{_esc(orderno)}">
     <sender>
       <person>{_esc(sender.get("full_name", ""))}</person>
       <phone>{_esc(sender.get("phone", ""))}</phone>
@@ -85,6 +86,7 @@ class ExlineAPIClient(CarrierAPIClient):
     </sender>
     <receiver>
       <person>{_esc(recipient.get("full_name", ""))}</person>
+      <company>{_esc(recipient.get("company") or recipient.get("full_name", ""))}</company>
       <phone>{_esc(recipient.get("phone", ""))}</phone>
       <town>{_esc(recipient.get("city", ""))}</town>
       <address>{_esc(recipient.get("address", "") or recipient.get("address_line1", ""))}</address>
@@ -98,25 +100,32 @@ class ExlineAPIClient(CarrierAPIClient):
 
         root = self._post_xml(xml, self._api_url(creds))
 
-        error = root.attrib.get("error", "1")
-        errormsg = root.attrib.get("errormsg", "Unknown error")
-        if error != "0":
-            raise RuntimeError(f"Exline API error {error}: {errormsg}")
+        # Exline wraps result in <createorder> child, not root attributes
+        # NOTE: must use "is not None" — empty XML elements are falsy in ElementTree
+        found = root.find("createorder")
+        node = found if found is not None else root
 
-        orderno = root.attrib.get("orderno", "")
-        barcode = root.attrib.get("barcode", orderno)
+        error = node.attrib.get("error", "1")
+        errormsg = node.attrib.get("errormsg", node.attrib.get("errormsgru", ""))
+        orderno = node.attrib.get("orderno", "")
+        barcode = node.attrib.get("barcode", orderno)
+
         if not orderno:
             raise RuntimeError(
-                f"Exline did not return orderno. Response: {ET.tostring(root, encoding='unicode')}"
+                f"Exline error {error}: {errormsg or 'no orderno returned'}. "
+                f"Response: {ET.tostring(root, encoding='unicode')}"
             )
+
+        if error != "0":
+            logger.warning("Exline returned orderno=%s with non-zero error=%s: %s", orderno, error, errormsg)
 
         logger.info(
             "Exline invoice created: orderno=%s barcode=%s order_id=%s",
             orderno, barcode, order_id,
         )
         return InvoiceResult(
-            waybill_number=orderno,
-            carrier_invoice_id=barcode or orderno,
+            waybill_number=barcode or orderno,
+            carrier_invoice_id=orderno,
             waybill_pdf_bytes=None,
         )
 

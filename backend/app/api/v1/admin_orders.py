@@ -11,11 +11,12 @@ from sqlalchemy.orm import Session, selectinload
 from app.core.db import get_db
 from app.core.dependencies import require_admin
 from app.modules.audit.service import AuditService
-from app.modules.carriers.dispatch_service import CarrierDispatchService
+from app.modules.dispatch.service import DispatchWorker
 from app.modules.identity.models import User
 from app.modules.notifications.service import NotificationsService
 from app.modules.orders.models import OrderDraft
 from app.modules.shipments.repository import ShipmentsRepository
+from app.modules.shipments.service import ShipmentsService
 from app.modules.tracking.repository import TrackingRepository
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,8 @@ router = APIRouter(prefix="/admin/orders", tags=["admin:orders"])
 _notifications_svc = NotificationsService()
 _tracking_repo = TrackingRepository()
 _shipments_repo = ShipmentsRepository()
-_dispatch_svc = CarrierDispatchService()
+_shipments_svc = ShipmentsService()
+_dispatch_svc = DispatchWorker()
 _audit_svc = AuditService()
 
 VALID_STATUSES = {
@@ -236,13 +238,21 @@ def retry_dispatch(
     order = db.get(OrderDraft, draft_id)
     if not order:
         raise HTTPException(404, "Заказ не найден")
-    tracking_number = _dispatch_svc.dispatch(db, order)
+    tracking_number = _dispatch_svc._dispatch_to_carrier(db, order)
     if tracking_number:
         shipment = _shipments_repo.get_by_order_id(db, order.id)
+        if not shipment:
+            _shipments_svc.create_for_order(
+                db,
+                order_draft_id=order.id,
+                carrier_code=order.carrier_code_snapshot,
+            )
+            shipment = _shipments_repo.get_by_order_id(db, order.id)
         if shipment:
             shipment.carrier_tracking_number = tracking_number
-            shipment.status = "dispatched"
-        order.status = "dispatched"
+            shipment.tracking_number = tracking_number
+            shipment.status = "sent_to_carrier"
+        order.status = "sent_to_carrier"
     _audit_svc.log(
         db,
         actor=admin,
@@ -268,8 +278,8 @@ def mark_dispatched(
     shipment = _shipments_repo.get_by_order_id(db, order.id)
     if shipment:
         shipment.carrier_tracking_number = payload.tracking_number
-        shipment.status = "dispatched"
-    order.status = "dispatched"
+        shipment.status = "sent_to_carrier"
+    order.status = "sent_to_carrier"
     order.dispatch_error = None
     _tracking_repo.add_event(
         db,
@@ -283,7 +293,7 @@ def mark_dispatched(
         action="order.mark_dispatched",
         resource_type="order",
         resource_id=order.id,
-        new_value={"tracking_number": payload.tracking_number, "status": "dispatched"},
+        new_value={"tracking_number": payload.tracking_number, "status": "sent_to_carrier"},
     )
     db.commit()
     return {

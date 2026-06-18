@@ -509,9 +509,13 @@ def _call_exline_calculator(
     zone_el = calc_el.find("zone")
 
     if min_el is not None and (min_el.text or "").strip().lstrip("-").isdigit():
-        eta_min = int(min_el.text.strip())  # type: ignore[assignment]
+        val = int(min_el.text.strip())
+        if val > 0:
+            eta_min = val  # type: ignore[assignment]
     if max_el is not None and (max_el.text or "").strip().lstrip("-").isdigit():
-        eta_max = int(max_el.text.strip())  # type: ignore[assignment]
+        val = int(max_el.text.strip())
+        if val > 0:
+            eta_max = val  # type: ignore[assignment]
 
     zone = 1
     if zone_el is not None and (zone_el.text or "").strip().lstrip("-").isdigit():

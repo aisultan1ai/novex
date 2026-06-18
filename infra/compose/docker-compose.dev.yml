@@ -107,6 +107,12 @@ services:
       KASPI_API_KEY: "${KASPI_API_KEY:-}"
       KASPI_WEBHOOK_SECRET: "${KASPI_WEBHOOK_SECRET:-}"
       KASPI_API_URL: "${KASPI_API_URL:-https://api.kaspi.kz/merchant}"
+
+      # Exline (MeaSoft Courier)
+      EXLINE_EXTRA: "${EXLINE_EXTRA:-}"
+      EXLINE_LOGIN: "${EXLINE_LOGIN:-}"
+      EXLINE_PASSWORD: "${EXLINE_PASSWORD:-}"
+      EXLINE_API_URL: "${EXLINE_API_URL:-https://home.courierexe.ru/api/}"
       FRONTEND_URL: "http://localhost:3000"
       BACKEND_URL: "http://localhost:8000"
       ADMIN_EMAIL: "${ADMIN_EMAIL:-admin@novex.kz}"
@@ -146,10 +152,13 @@ services:
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minio12345}
       MINIO_BUCKET: novex-dev
       MINIO_SECURE: "false"
+      SECRET_KEY: "${SECRET_KEY}"
+      EXLINE_EXTRA: "${EXLINE_EXTRA:-}"
+      EXLINE_LOGIN: "${EXLINE_LOGIN:-}"
+      EXLINE_PASSWORD: "${EXLINE_PASSWORD:-}"
+      EXLINE_API_URL: "${EXLINE_API_URL:-https://home.courierexe.ru/api/}"
     volumes:
       - ../../backend:/app
-    command: >
-      sh -c "python -c 'import time; print(\"Novex worker skeleton is running...\"); time.sleep(10**9)'"
 
   frontend:
     build:

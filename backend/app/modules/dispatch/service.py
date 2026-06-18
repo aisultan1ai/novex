@@ -302,6 +302,7 @@ def _build_api_order_data(order: OrderDraft) -> dict:
         },
         "recipient": {
             "full_name": recipient.full_name if recipient else "",
+            "company": recipient.company_name if recipient else "",
             "phone": recipient.phone if recipient else "",
             "city": recipient.city if recipient else order.to_city_snapshot,
             "address": recipient.address_line1 if recipient else "",

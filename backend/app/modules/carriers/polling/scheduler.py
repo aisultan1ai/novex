@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 _tracking_repo = TrackingRepository()
 _notifications_svc = NotificationsService()
 
-_ACTIVE_STATUSES = {"dispatched", "picked_up", "in_transit", "out_for_delivery"}
+_ACTIVE_STATUSES = {"sent_to_carrier", "dispatched", "picked_up", "in_transit", "out_for_delivery"}
 
 
 def poll_all_active_shipments(db: Session) -> None:

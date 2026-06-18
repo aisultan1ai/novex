@@ -6,6 +6,29 @@ from threading import Event
 
 from app.core.config import get_settings
 from app.core.db import check_database_connection
+
+# Import all ORM models so SQLAlchemy metadata is fully populated before any
+# queries run. Without this, FK constraints (e.g. carrier_webhooks→carriers)
+# raise NoReferencedTableError at flush time.
+import app.modules.address_book.models  # noqa: F401
+import app.modules.audit.models  # noqa: F401
+import app.modules.carriers.models  # noqa: F401
+import app.modules.carriers.webhook_config  # noqa: F401
+import app.modules.carriers.api_credentials  # noqa: F401
+import app.modules.carriers.integration_log  # noqa: F401
+import app.modules.commissions.models  # noqa: F401
+import app.modules.dispatch.models  # noqa: F401
+import app.modules.documents.models  # noqa: F401
+import app.modules.identity.models  # noqa: F401
+import app.modules.notifications.models  # noqa: F401
+import app.modules.orders.models  # noqa: F401
+import app.modules.payments.models  # noqa: F401
+import app.modules.platform_settings.models  # noqa: F401
+import app.modules.quotes.models  # noqa: F401
+import app.modules.reviews.models  # noqa: F401
+import app.modules.shipments.models  # noqa: F401
+import app.modules.tracking.models  # noqa: F401
+
 from workers.jobs import (
     cleanup_expired_files,
     dispatch_orders,
