@@ -2,16 +2,17 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.common.status_machine import transition_order
+from app.common.status_machine import can_transition, transition_order
 from app.core.exceptions import NotFoundError, ValidationError
 from app.modules.dispatch.models import OrderStatusHistory
 from app.modules.platform_settings.repository import PlatformSettingsRepository
+from app.modules.commissions.service import CommissionsService
 from app.modules.dispatch.service import create_dispatch_job
 from app.modules.notifications.service import NotificationsService
 from app.modules.orders.models import OrderDraft
@@ -30,7 +31,12 @@ logger = logging.getLogger(__name__)
 _notifications_svc = NotificationsService()
 
 
+def _utcnow() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
 _settings_repo = PlatformSettingsRepository()
+_commissions_svc = CommissionsService()
 
 
 def _get_manual_provider(db: Session) -> ManualBankTransferProvider:
@@ -143,9 +149,9 @@ class PaymentService:
     ) -> PaymentProof:
         tx = db.get(PaymentTransaction, payment_id)
         if not tx or tx.order_id != order_id:
-            raise ValueError("Payment transaction not found")
+            raise NotFoundError("Payment transaction not found")
         if tx.status not in (TxStatus.AWAITING_PAYMENT, TxStatus.PAYMENT_REJECTED):
-            raise ValueError(f"Cannot upload proof for payment in status '{tx.status}'")
+            raise ValidationError(f"Cannot upload proof for payment in status '{tx.status}'")
 
         proof = PaymentProof(
             payment_id=tx.id,
@@ -175,6 +181,7 @@ class PaymentService:
         order = db.get(OrderDraft, order_id)
         if order and order.status == "awaiting_payment":
             old_order_status = order.status
+            transition_order(old_order_status, "payment_under_review")
             order.status = "payment_under_review"
             db.add(
                 OrderStatusHistory(
@@ -208,9 +215,9 @@ class PaymentService:
     ) -> PaymentTransaction:
         tx = db.get(PaymentTransaction, payment_id)
         if not tx:
-            raise ValueError("Payment transaction not found")
+            raise NotFoundError("Payment transaction not found")
         if tx.status != TxStatus.PAYMENT_UNDER_REVIEW:
-            raise ValueError(f"Cannot approve payment in status '{tx.status}'")
+            raise ValidationError(f"Cannot approve payment in status '{tx.status}'")
 
         # Approve the latest pending proof
         proof = db.scalar(
@@ -222,11 +229,11 @@ class PaymentService:
         if proof:
             proof.review_status = ProofReviewStatus.APPROVED
             proof.reviewed_by_admin_id = admin_id
-            proof.reviewed_at = datetime.utcnow()
+            proof.reviewed_at = _utcnow()
 
         old_tx_status = tx.status
         tx.status = TxStatus.PAID
-        tx.paid_at = datetime.utcnow()
+        tx.paid_at = _utcnow()
         db.add(
             PaymentStatusHistory(
                 payment_id=tx.id,
@@ -240,6 +247,7 @@ class PaymentService:
         order = db.get(OrderDraft, tx.order_id)
         if order:
             old_order_status = order.status
+            transition_order(old_order_status, "paid")
             order.status = "paid"
             db.add(
                 OrderStatusHistory(
@@ -256,6 +264,13 @@ class PaymentService:
         db.refresh(tx)
 
         if order:
+            _commissions_svc.record_commission(
+                db,
+                order_draft_id=order.id,
+                carrier_code=order.carrier_code_snapshot,
+                gross_amount=Decimal(str(tx.amount)),
+                currency=tx.currency,
+            )
             create_dispatch_job(db, order=order, changed_by_user_id=admin_id)
 
             _notifications_svc.notify_order_status(
@@ -276,9 +291,9 @@ class PaymentService:
     ) -> PaymentTransaction:
         tx = db.get(PaymentTransaction, payment_id)
         if not tx:
-            raise ValueError("Payment transaction not found")
+            raise NotFoundError("Payment transaction not found")
         if tx.status != TxStatus.PAYMENT_UNDER_REVIEW:
-            raise ValueError(f"Cannot reject payment in status '{tx.status}'")
+            raise ValidationError(f"Cannot reject payment in status '{tx.status}'")
 
         proof = db.scalar(
             select(PaymentProof).where(
@@ -289,7 +304,7 @@ class PaymentService:
         if proof:
             proof.review_status = ProofReviewStatus.REJECTED
             proof.reviewed_by_admin_id = admin_id
-            proof.reviewed_at = datetime.utcnow()
+            proof.reviewed_at = _utcnow()
             proof.reject_reason = reject_reason
 
         old_tx_status = tx.status
@@ -307,6 +322,7 @@ class PaymentService:
         order = db.get(OrderDraft, tx.order_id)
         if order:
             old_order_status = order.status
+            transition_order(old_order_status, "awaiting_payment")
             order.status = "awaiting_payment"
             db.add(
                 OrderStatusHistory(
@@ -330,6 +346,9 @@ class PaymentService:
         db.refresh(tx)
         return tx
 
+    def get_bank_details(self, db: Session) -> dict:
+        return _get_manual_provider(db).get_bank_details()
+
     def get_payment_for_order(
         self, db: Session, *, order_id: int
     ) -> PaymentTransaction | None:
@@ -338,6 +357,65 @@ class PaymentService:
             .where(PaymentTransaction.order_id == order_id)
             .order_by(PaymentTransaction.created_at.desc())
         )
+
+    def system_confirm_payment(
+        self,
+        db: Session,
+        *,
+        payment_id: int,
+        source: str = "system",
+    ) -> PaymentTransaction:
+        """Автоматическое подтверждение оплаты от платёжного провайдера (Kaspi и др.).
+        Обходит шаг загрузки чека — для провайдеров, которые подтверждают оплату напрямую.
+        """
+        tx = db.get(PaymentTransaction, payment_id)
+        if not tx:
+            raise NotFoundError("Payment transaction not found")
+        if tx.status not in (TxStatus.AWAITING_PAYMENT, TxStatus.PAYMENT_UNDER_REVIEW):
+            raise ValidationError(
+                f"Cannot auto-confirm payment in status '{tx.status}'"
+            )
+
+        old_tx_status = tx.status
+        tx.status = TxStatus.PAID
+        tx.paid_at = _utcnow()
+        db.add(PaymentStatusHistory(
+            payment_id=tx.id,
+            old_status=old_tx_status,
+            new_status=TxStatus.PAID,
+            comment=f"Auto-confirmed by {source}",
+        ))
+
+        order = db.get(OrderDraft, tx.order_id)
+        if order:
+            old_order_status = order.status
+            order.status = "paid"
+            db.add(OrderStatusHistory(
+                order_id=order.id,
+                old_status=old_order_status,
+                new_status="paid",
+                source=source,
+                comment=f"Payment auto-confirmed by {source}",
+            ))
+
+        db.commit()
+        db.refresh(tx)
+
+        if order:
+            _commissions_svc.record_commission(
+                db,
+                order_draft_id=order.id,
+                carrier_code=order.carrier_code_snapshot,
+                gross_amount=Decimal(str(tx.amount)),
+                currency=tx.currency,
+            )
+            create_dispatch_job(db, order=order)
+            _notifications_svc.notify_order_status(
+                db, user_id=order.user_id, order_id=order.id, status="paid"
+            )
+            db.commit()
+
+        return tx
 
     def admin_refund(
         self,
@@ -381,6 +459,14 @@ class PaymentService:
         order = db.get(OrderDraft, tx.order_id)
         if order:
             old_order_status = order.status
+            if not can_transition(old_order_status, "cancelled"):
+                logger.warning(
+                    "admin_refund: forcing order %s to cancelled from '%s' (state machine override)",
+                    order.id,
+                    old_order_status,
+                )
+            else:
+                transition_order(old_order_status, "cancelled")
             order.status = "cancelled"
             db.add(
                 OrderStatusHistory(

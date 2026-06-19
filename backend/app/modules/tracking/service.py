@@ -4,7 +4,9 @@ import logging
 
 from sqlalchemy.orm import Session
 
+from app.common.status_machine import can_transition
 from app.core.exceptions import ForbiddenError, NotFoundError
+from app.modules.dispatch.models import OrderStatusHistory
 from app.modules.orders.repository import OrdersRepository
 from app.modules.tracking.repository import TrackingRepository
 from app.modules.tracking.schemas import (
@@ -21,7 +23,7 @@ _TRACKING_TO_ORDER_STATUS: dict[str, str] = {
     "in_transit": "in_transit",
     "arrived": "arrived",
     "delivered": "delivered",
-    "returned": "return",
+    "returned": "returned",
     "cancelled": "cancelled",
 }
 
@@ -75,12 +77,29 @@ class TrackingService:
         )
         new_order_status = _TRACKING_TO_ORDER_STATUS.get(payload.status)
         if new_order_status is not None:
-            order.status = new_order_status
-            logger.info(
-                "Order status synced via tracking: order_id=%s -> %s",
-                order_draft_id,
-                new_order_status,
-            )
+            if can_transition(order.status, new_order_status):
+                old_order_status = order.status
+                order.status = new_order_status
+                db.add(OrderStatusHistory(
+                    order_id=order_draft_id,
+                    old_status=old_order_status,
+                    new_status=new_order_status,
+                    source="tracking_event",
+                    comment=f"Carrier status: {payload.carrier_status or payload.status}",
+                ))
+                logger.info(
+                    "Order status synced via tracking: order_id=%s %s → %s",
+                    order_draft_id,
+                    old_order_status,
+                    new_order_status,
+                )
+            else:
+                logger.warning(
+                    "Tracking event skipped for order status: order_id=%s cannot transition %s → %s",
+                    order_draft_id,
+                    order.status,
+                    new_order_status,
+                )
 
         db.commit()
         logger.info(

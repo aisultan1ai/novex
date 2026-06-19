@@ -101,8 +101,10 @@ class IdentityRepository:
         full_name: str | None = None,
         phone: str | None = None,
     ) -> User:
-        user.full_name = full_name
-        user.phone = phone
+        if full_name is not None:
+            user.full_name = full_name
+        if phone is not None:
+            user.phone = phone
         db.add(user)
         db.flush()
         return user

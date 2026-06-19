@@ -6,7 +6,11 @@ import json
 import logging
 import time
 import uuid
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
+
+
+def _utcnow() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
 
 import httpx
 from sqlalchemy import select
@@ -14,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.common.status_machine import InvalidTransitionError, transition_order
 from app.modules.carriers.integration_log import IntegrationLogRepository
+from app.modules.carriers.pii_mask import mask_pii
 from app.modules.carriers.webhook_config import CarrierWebhookRepository
 from app.modules.dispatch.models import DispatchJob, DispatchJobStatus, OrderStatusHistory
 from app.modules.orders.models import OrderDraft
@@ -35,6 +40,7 @@ def create_dispatch_job(
     *,
     order: OrderDraft,
     changed_by_user_id: int | None = None,
+    source: str = "system",
 ) -> DispatchJob:
     old_status = order.status
     try:
@@ -58,7 +64,7 @@ def create_dispatch_job(
             old_status=old_status,
             new_status="dispatch_queued",
             changed_by_user_id=changed_by_user_id,
-            source="payment_webhook",
+            source=source,
             comment="Payment confirmed, dispatch job created",
         )
     )
@@ -99,7 +105,7 @@ class DispatchWorker:
             select(DispatchJob).where(
                 DispatchJob.status == DispatchJobStatus.QUEUED,
                 (DispatchJob.next_retry_at.is_(None))
-                | (DispatchJob.next_retry_at <= datetime.utcnow()),
+                | (DispatchJob.next_retry_at <= _utcnow()),
             ).limit(10)
         ).all()
 
@@ -135,20 +141,16 @@ class DispatchWorker:
                 shipment.carrier_tracking_number = tracking_number
                 shipment.status = "dispatched"
 
-            old_status = order.status
-            order.status = "sent_to_carrier"
-            db.add(
-                OrderStatusHistory(
-                    order_id=order.id,
-                    old_status=old_status,
-                    new_status="sent_to_carrier",
-                    source="system_worker",
-                    comment=f"Dispatched via job {job.id}",
-                )
+            record_order_status(
+                db,
+                order=order,
+                new_status="sent_to_carrier",
+                source="system_worker",
+                comment=f"Dispatched via job {job.id}",
             )
 
             job.status = DispatchJobStatus.COMPLETED
-            job.completed_at = datetime.utcnow()
+            job.completed_at = _utcnow()
             logger.info("dispatch_worker: job %s completed, order %s sent_to_carrier", job.id, order.id)
 
         except Exception as exc:
@@ -163,24 +165,80 @@ class DispatchWorker:
 
             if job.attempts < job.max_attempts:
                 delay = RETRY_DELAYS_SECONDS[min(job.attempts - 1, len(RETRY_DELAYS_SECONDS) - 1)]
-                job.next_retry_at = datetime.utcnow() + timedelta(seconds=delay)
+                job.next_retry_at = _utcnow() + timedelta(seconds=delay)
                 job.status = DispatchJobStatus.QUEUED
             else:
                 job.status = DispatchJobStatus.FAILED
-                old_status = order.status
-                order.status = "dispatch_failed"
                 order.dispatch_error = str(exc)
-                db.add(
-                    OrderStatusHistory(
-                        order_id=order.id,
-                        old_status=old_status,
-                        new_status="dispatch_failed",
-                        source="system_worker",
-                        comment=f"Max attempts reached: {exc}",
-                    )
+                record_order_status(
+                    db,
+                    order=order,
+                    new_status="dispatch_failed",
+                    source="system_worker",
+                    comment=f"Max attempts reached: {exc}",
                 )
 
         db.commit()
+
+    def retry_for_order(
+        self,
+        db: Session,
+        order: OrderDraft,
+        *,
+        admin_id: int | None = None,
+    ) -> str | None:
+        """Публичный метод для ручного повтора диспетчеризации администратором.
+        Находит или создаёт DispatchJob, переводит заказ в dispatch_queued,
+        запускает _process_job с полной записью истории.
+        """
+        existing_job = db.scalar(
+            select(DispatchJob).where(
+                DispatchJob.order_id == order.id,
+            ).order_by(DispatchJob.created_at.desc())
+        )
+
+        if existing_job and existing_job.status in (
+            DispatchJobStatus.FAILED, DispatchJobStatus.QUEUED
+        ):
+            job = existing_job
+            job.status = DispatchJobStatus.QUEUED
+            job.next_retry_at = None
+            job.last_error = None
+        else:
+            job = DispatchJob(
+                order_id=order.id,
+                carrier_code=order.carrier_code_snapshot,
+                status=DispatchJobStatus.QUEUED,
+                attempts=0,
+                max_attempts=3,
+            )
+            db.add(job)
+
+        if order.status != "dispatch_queued":
+            from app.common.status_machine import can_transition as _can_transition
+            if not _can_transition(order.status, "dispatch_queued"):
+                raise ValueError(
+                    f"Cannot retry dispatch: invalid transition from '{order.status}' to 'dispatch_queued'"
+                )
+            old_status = order.status
+            order.status = "dispatch_queued"
+            db.add(OrderStatusHistory(
+                order_id=order.id,
+                old_status=old_status,
+                new_status="dispatch_queued",
+                changed_by_user_id=admin_id,
+                source="admin",
+                comment="Manual retry dispatch",
+            ))
+
+        db.flush()
+        self._process_job(db, job)
+
+        db.refresh(job)
+        if job.status == DispatchJobStatus.COMPLETED:
+            shipment = _shipments_repo.get_by_order_id(db, order.id)
+            return shipment.carrier_tracking_number if shipment else None
+        return None
 
     def _dispatch_to_carrier(self, db: Session, order: OrderDraft) -> str | None:
         from app.modules.carriers.api_clients.registry import get_client
@@ -202,12 +260,12 @@ class DispatchWorker:
                 duration_ms = int((time.monotonic() - t0) * 1000)
                 cfg = _webhook_repo.get_by_carrier_code(db, carrier_code)
                 if cfg:
-                    cfg.last_success_at = datetime.utcnow()
+                    cfg.last_success_at = _utcnow()
                     cfg.last_error = None
                 _integration_log.create(
                     db, carrier_code=carrier_code, direction="outbound",
                     event_type="dispatch", order_id=order.id,
-                    payload=json.dumps(order_data),
+                    payload=json.dumps(mask_pii(order_data)),
                     response=json.dumps({"waybill_number": result.waybill_number}),
                     duration_ms=duration_ms, status="success",
                 )
@@ -219,7 +277,7 @@ class DispatchWorker:
                 _integration_log.create(
                     db, carrier_code=carrier_code, direction="outbound",
                     event_type="dispatch", order_id=order.id,
-                    payload=json.dumps(order_data),
+                    payload=json.dumps(mask_pii(order_data)),
                     duration_ms=duration_ms, status="error", error_message=str(exc),
                 )
                 raise
@@ -262,12 +320,13 @@ class DispatchWorker:
             )
             resp.raise_for_status()
             duration_ms = int((time.monotonic() - t0) * 1000)
-            cfg.last_success_at = datetime.utcnow()
+            cfg.last_success_at = _utcnow()
             cfg.last_error = None
+            masked_body = json.dumps(mask_pii(payload), ensure_ascii=False, sort_keys=True)
             _integration_log.create(
                 db, carrier_code=carrier_code, direction="outbound",
                 event_type="dispatch", order_id=order.id,
-                payload=json_body,
+                payload=masked_body,
                 response=resp.text[:2000],
                 http_status=resp.status_code,
                 duration_ms=duration_ms, status="success",
@@ -277,10 +336,11 @@ class DispatchWorker:
             duration_ms = int((time.monotonic() - t0) * 1000)
             http_status = getattr(getattr(exc, "response", None), "status_code", None)
             cfg.last_error = str(exc)
+            masked_body = json.dumps(mask_pii(payload), ensure_ascii=False, sort_keys=True)
             _integration_log.create(
                 db, carrier_code=carrier_code, direction="outbound",
                 event_type="dispatch", order_id=order.id,
-                payload=json_body,
+                payload=masked_body,
                 http_status=http_status,
                 duration_ms=duration_ms, status="error", error_message=str(exc),
             )
@@ -312,10 +372,14 @@ def _build_api_order_data(order: OrderDraft) -> dict:
                 "weight_kg": float(p.weight_kg),
                 "quantity": p.quantity,
                 "description": p.description or "",
+                "declared_value": float(p.declared_value) if p.declared_value else None,
             }
             for p in order.packages
         ],
-        "declared_value": float(order.price_snapshot),
+        "declared_value": (
+            sum(float(p.declared_value or 0) for p in order.packages)
+            or float(order.price_snapshot or 0)
+        ),
         "currency": order.currency_snapshot,
         "fragile": order.fragile,
     }

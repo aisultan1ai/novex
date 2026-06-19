@@ -18,13 +18,16 @@ class TrackingRepository:
         description: str | None = None,
         location: str | None = None,
         carrier_status: str | None = None,
+        occurred_at: "datetime | None" = None,
     ) -> TrackingEvent:
+        from datetime import datetime
         event = TrackingEvent(
             order_draft_id=order_draft_id,
             status=status,
             description=description,
             location=location,
             carrier_status=carrier_status,
+            **({"occurred_at": occurred_at} if occurred_at is not None else {}),
         )
         db.add(event)
         db.flush()

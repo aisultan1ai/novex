@@ -8,14 +8,15 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.common.status_machine import can_transition
 from app.core.db import get_db
 from app.core.dependencies import get_current_user_id
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.limiter import limiter
 from app.core.storage import get_storage
+from app.modules.dispatch.models import OrderStatusHistory
 from app.modules.orders.repository import OrdersRepository
 from app.modules.payments.payment_service import PaymentService
-from app.modules.payments.providers.manual_bank_transfer import ManualBankTransferProvider
 from app.modules.payments.transaction_models import TxStatus
 
 logger = logging.getLogger(__name__)
@@ -75,17 +76,7 @@ def initiate_bank_transfer(
         raise HTTPException(status_code=400, detail="Заказ не готов к оплате")
 
     tx = payment_svc.initiate_bank_transfer(db, order=order, user_id=current_user_id)
-
-    from app.core.config import get_settings
-    s = get_settings()
-    provider = ManualBankTransferProvider(
-        recipient_name=getattr(s, "bank_transfer_recipient_name", "ТОО Novex"),
-        bank_name=getattr(s, "bank_transfer_bank_name", "Halyk Bank"),
-        iban=getattr(s, "bank_transfer_iban", ""),
-        bin_number=getattr(s, "bank_transfer_bin", ""),
-        knp=getattr(s, "bank_transfer_knp", "710"),
-    )
-    details = provider.get_bank_details()
+    details = payment_svc.get_bank_details(db)
 
     return InitiateBankTransferResponse(
         payment_id=tx.id,
@@ -112,7 +103,7 @@ def initiate_bank_transfer(
     summary="Загрузить чек оплаты",
 )
 @limiter.limit("5/minute")
-def upload_payment_proof(
+async def upload_payment_proof(
     request: Request,
     draft_id: int,
     payment_id: int = Form(...),
@@ -134,7 +125,7 @@ def upload_payment_proof(
     except ValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
-    file_data = file.file.read()
+    file_data = await file.read()
     mime_type = file.content_type or "application/octet-stream"
 
     storage = get_storage()
@@ -160,7 +151,7 @@ def upload_payment_proof(
             payment_id=payment_id,
             order_id=draft_id,
             user_id=current_user_id,
-            file_url=uploaded.file_url,
+            file_url=uploaded.object_name,
             file_name=uploaded.file_name,
             file_mime_type=uploaded.file_mime_type,
             file_size=uploaded.file_size,
@@ -310,21 +301,35 @@ async def kaspi_webhook(request: Request, db: Session = Depends(get_db)) -> dict
     if event.status == "paid":
         tx = payment_svc.get_payment_for_order(db, order_id=order.id)
         if tx:
-            payment_svc.admin_approve(db, payment_id=tx.id, admin_id=0)
-            logger.info("Kaspi webhook: order %s paid, tx_id=%s", event.order_id, tx.id)
+            try:
+                payment_svc.system_confirm_payment(
+                    db, payment_id=tx.id, source="kaspi_webhook"
+                )
+                logger.info("Kaspi webhook: order %s paid, tx_id=%s", event.order_id, tx.id)
+            except Exception as exc:
+                logger.error(
+                    "Kaspi webhook: system_confirm_payment failed order=%s tx=%s: %s",
+                    event.order_id, tx.id, exc,
+                )
+                raise HTTPException(status_code=500, detail="Payment confirmation failed")
         else:
             logger.warning("Kaspi webhook: no payment transaction for order %s", event.order_id)
     elif event.status == "cancelled":
-        old_status = order.status
-        order.status = "cancelled"
-        from app.modules.dispatch.models import OrderStatusHistory
-        db.add(OrderStatusHistory(
-            order_id=order.id,
-            old_status=old_status,
-            new_status="cancelled",
-            source="payment_webhook",
-            comment="Cancelled via Kaspi webhook",
-        ))
+        if can_transition(order.status, "cancelled"):
+            old_status = order.status
+            order.status = "cancelled"
+            db.add(OrderStatusHistory(
+                order_id=order.id,
+                old_status=old_status,
+                new_status="cancelled",
+                source="kaspi_webhook",
+                comment="Cancelled via Kaspi webhook",
+            ))
+        else:
+            logger.warning(
+                "Kaspi webhook: cannot cancel order %s from status '%s'",
+                order.id, order.status,
+            )
 
     db.execute(
         _text(

@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import xml.etree.ElementTree as ET
-from datetime import datetime
+from datetime import UTC, datetime
 
 import httpx
 
@@ -32,39 +32,40 @@ _STATUS_MAP: dict[str, str] = {
 class ExlineAdapter(CarrierPollingAdapter):
     """
     Адаптер трекинга для Exline (MeaSoft Courier).
-    Учётные данные читаются из переменных окружения:
-        EXLINE_EXTRA     — идентификатор компании
-        EXLINE_LOGIN     — логин
-        EXLINE_PASSWORD  — пароль
-        EXLINE_API_URL   — (опционально) кастомный URL
+    Учётные данные передаются из CarrierAPICredentials.extra_config:
+        extra    — идентификатор компании
+        login    — логин
+        password — пароль
+    api_url берётся из CarrierAPICredentials.api_url.
+    Если creds пустой — fallback на env vars (для dev-окружения).
     """
 
     carrier_code = "exline"
 
-    def __init__(self) -> None:
-        self._extra = os.getenv("EXLINE_EXTRA", "")
-        self._login = os.getenv("EXLINE_LOGIN", "")
-        self._password = os.getenv("EXLINE_PASSWORD", "")
-        self._api_url = os.getenv("EXLINE_API_URL", _DEFAULT_API_URL).rstrip("/") + "/"
+    def fetch_status(self, tracking_number: str, creds: dict) -> list[TrackingEventData]:
+        extra = creds.get("extra") or os.getenv("EXLINE_EXTRA", "")
+        login = creds.get("login") or os.getenv("EXLINE_LOGIN", "")
+        password = creds.get("password") or os.getenv("EXLINE_PASSWORD", "")
+        api_url = (creds.get("api_url") or os.getenv("EXLINE_API_URL", _DEFAULT_API_URL)).rstrip("/") + "/"
 
-    def fetch_status(self, tracking_number: str) -> list[TrackingEventData]:
-        if not self._extra or not self._login:
+        if not extra or not login:
             logger.warning(
-                "ExlineAdapter: EXLINE_EXTRA / EXLINE_LOGIN не заданы — трекинг пропущен"
+                "ExlineAdapter: no credentials available for tracking (orderno=%s)",
+                tracking_number,
             )
             return []
 
         xml = (
             '<?xml version="1.0" encoding="UTF-8"?>'
             "<statusreq>"
-            f'<auth extra="{_esc(self._extra)}" login="{_esc(self._login)}" pass="{_esc(self._password)}"/>'
+            f'<auth extra="{_esc(extra)}" login="{_esc(login)}" pass="{_esc(password)}"/>'
             f"<orderno>{_esc(tracking_number)}</orderno>"
             "</statusreq>"
         )
 
         try:
             resp = httpx.post(
-                self._api_url,
+                api_url,
                 content=xml.encode("utf-8"),
                 headers={"Content-Type": "text/xml; charset=utf-8"},
                 timeout=_TIMEOUT,
@@ -93,7 +94,7 @@ class ExlineAdapter(CarrierPollingAdapter):
                 try:
                     occurred_at = datetime.fromisoformat(event_time_str)
                 except (ValueError, TypeError):
-                    occurred_at = datetime.utcnow()
+                    occurred_at = datetime.now(UTC).replace(tzinfo=None)
 
                 mapped = _STATUS_MAP.get(carrier_status, "in_transit")
                 events.append(TrackingEventData(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import urllib.parse
 import xml.etree.ElementTree as ET
 from datetime import date
 
@@ -56,6 +57,25 @@ class ExlineAPIClient(CarrierAPIClient):
 
     def _api_url(self, creds: dict) -> str:
         return creds.get("api_url", _DEFAULT_API_URL).rstrip("/") + "/"
+
+    def _print_base_url(self, creds: dict) -> str:
+        """Возвращает корневой URL инсталляции MeaSoft (без /api/).
+        https://home.courierexe.ru/api/ → https://home.courierexe.ru/
+        """
+        api_url = self._api_url(creds)
+        idx = api_url.find("/api")
+        return api_url[:idx] + "/" if idx != -1 else api_url
+
+    def _get_print_url(self, invoice_id: str, creds: dict) -> str:
+        """Внутренний URL страницы печати MeaSoft. Содержит credentials — не возвращать клиентам."""
+        base = self._print_base_url(creds)
+        params = urllib.parse.urlencode({
+            "extra": creds.get("extra", ""),
+            "login": creds.get("login", ""),
+            "pass": creds.get("password", ""),
+            "orderno": invoice_id,
+        })
+        return f"{base}print/?{params}"
 
     # ── public interface ────────────────────────────────────────────────────
 
@@ -130,8 +150,27 @@ class ExlineAPIClient(CarrierAPIClient):
         )
 
     def get_invoice_pdf(self, invoice_id: str, creds: dict) -> bytes:
-        # Exline не предоставляет прямой PDF-endpoint в публичном API.
-        raise NotImplementedError("Exline: PDF-накладная недоступна через API")
+        try:
+            import weasyprint
+        except ImportError as exc:
+            raise RuntimeError(
+                "weasyprint не установлен: pip install weasyprint"
+            ) from exc
+
+        print_url = self._get_print_url(invoice_id, creds)
+        resp = httpx.get(print_url, timeout=_TIMEOUT, follow_redirects=True)
+        resp.raise_for_status()
+
+        pdf_bytes: bytes = weasyprint.HTML(
+            string=resp.text,
+            base_url=print_url,
+        ).write_pdf()
+
+        logger.info(
+            "Exline: PDF сгенерирован для накладной invoice_id=%s size=%d bytes",
+            invoice_id, len(pdf_bytes),
+        )
+        return pdf_bytes
 
     def cancel_invoice(self, invoice_id: str, creds: dict) -> bool:
         xml = f"""<?xml version="1.0" encoding="UTF-8"?>

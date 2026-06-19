@@ -81,22 +81,20 @@ class NotificationsService:
         status: str,
         reject_reason: str | None = None,
     ) -> None:
-        result = order_status_email(
-            status, order_id, reject_reason=reject_reason
-        )
-        if result is None:
-            return
-
         from app.modules.identity.models import User  # local import avoids circular dep
         user = db.get(User, user_id)
         if not user or not user.email:
             return
 
-        subject, html_body = order_status_email(
+        rendered = order_status_email(
             status, order_id,
             user_name=user.full_name,
             reject_reason=reject_reason,
         )
+        if rendered is None:
+            return
+
+        subject, html_body = rendered
         try:
             send_email(to=user.email, subject=subject, html=html_body)
             logger.info(

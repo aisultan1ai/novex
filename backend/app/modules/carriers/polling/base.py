@@ -18,6 +18,8 @@ class CarrierPollingAdapter(ABC):
     carrier_code: str
 
     @abstractmethod
-    def fetch_status(self, tracking_number: str) -> list[TrackingEventData]:
-        """Return list of new tracking events. Raise on error."""
+    def fetch_status(self, tracking_number: str, creds: dict) -> list[TrackingEventData]:
+        """Return list of new tracking events for tracking_number.
+        creds: dict built from CarrierAPICredentials (api_url + extra_config fields).
+        Raise on network/auth errors."""
         ...

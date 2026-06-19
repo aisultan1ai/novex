@@ -9,6 +9,7 @@ WORKDIR /build
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    libffi-dev \
     && rm -rf /var/lib/apt/lists/*
 
 RUN python -m venv /opt/venv
@@ -29,6 +30,8 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     fonts-dejavu \
+    libpangocairo-1.0-0 \
+    libgdk-pixbuf2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /opt/venv /opt/venv

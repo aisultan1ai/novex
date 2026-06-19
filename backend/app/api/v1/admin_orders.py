@@ -8,9 +8,11 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.common.status_machine import can_transition
 from app.core.db import get_db
 from app.core.dependencies import require_admin
 from app.modules.audit.service import AuditService
+from app.modules.dispatch.models import OrderStatusHistory
 from app.modules.dispatch.service import DispatchWorker
 from app.modules.identity.models import User
 from app.modules.notifications.service import NotificationsService
@@ -34,14 +36,22 @@ VALID_STATUSES = {
     "shipment_details_completed",
     "ready_for_checkout",
     "awaiting_payment",
+    "payment_under_review",
+    "payment_rejected",
     "paid",
+    "dispatch_queued",
+    "dispatch_failed",
+    "pending_manual",
+    "pending_manual_dispatch",
     "sent_to_carrier",
     "picked_up",
     "in_transit",
     "arrived",
     "delivered",
+    "return_requested",
+    "return_in_progress",
+    "returned",
     "cancelled",
-    "return",
 }
 
 
@@ -203,7 +213,20 @@ def update_order_status(
     if not order:
         raise HTTPException(404, "Заказ не найден")
     old_status = order.status
+    if not can_transition(old_status, payload.status):
+        logger.warning(
+            "admin status override: order %s transition %s → %s not in state machine",
+            order_id, old_status, payload.status,
+        )
     order.status = payload.status
+    db.add(OrderStatusHistory(
+        order_id=order.id,
+        old_status=old_status,
+        new_status=payload.status,
+        changed_by_user_id=admin.id,
+        source="admin",
+        comment=f"Manual status override by admin",
+    ))
     _tracking_repo.add_event(
         db,
         order_draft_id=order.id,
@@ -238,21 +261,16 @@ def retry_dispatch(
     order = db.get(OrderDraft, draft_id)
     if not order:
         raise HTTPException(404, "Заказ не найден")
-    tracking_number = _dispatch_svc._dispatch_to_carrier(db, order)
-    if tracking_number:
-        shipment = _shipments_repo.get_by_order_id(db, order.id)
-        if not shipment:
-            _shipments_svc.create_for_order(
-                db,
-                order_draft_id=order.id,
-                carrier_code=order.carrier_code_snapshot,
-            )
-            shipment = _shipments_repo.get_by_order_id(db, order.id)
-        if shipment:
-            shipment.carrier_tracking_number = tracking_number
-            shipment.tracking_number = tracking_number
-            shipment.status = "sent_to_carrier"
-        order.status = "sent_to_carrier"
+    if order.status not in (
+        "dispatch_failed", "pending_manual", "pending_manual_dispatch", "dispatch_queued"
+    ):
+        raise HTTPException(
+            400,
+            f"Повтор отправки невозможен для заказа в статусе '{order.status}'",
+        )
+
+    tracking_number = _dispatch_svc.retry_for_order(db, order, admin_id=admin.id)
+
     _audit_svc.log(
         db,
         actor=admin,
@@ -275,16 +293,30 @@ def mark_dispatched(
     order = db.get(OrderDraft, draft_id)
     if not order:
         raise HTTPException(404, "Заказ не найден")
+    if not can_transition(order.status, "sent_to_carrier"):
+        raise HTTPException(
+            400,
+            f"Cannot mark order as dispatched from status '{order.status}'",
+        )
     shipment = _shipments_repo.get_by_order_id(db, order.id)
     if shipment:
         shipment.carrier_tracking_number = payload.tracking_number
         shipment.status = "sent_to_carrier"
+    old_status = order.status
     order.status = "sent_to_carrier"
     order.dispatch_error = None
+    db.add(OrderStatusHistory(
+        order_id=order.id,
+        old_status=old_status,
+        new_status="sent_to_carrier",
+        changed_by_user_id=admin.id,
+        source="admin",
+        comment="Manually marked as dispatched",
+    ))
     _tracking_repo.add_event(
         db,
         order_draft_id=order.id,
-        status="picked_up",
+        status="sent_to_carrier",
         description="Передан перевозчику вручную",
     )
     _audit_svc.log(

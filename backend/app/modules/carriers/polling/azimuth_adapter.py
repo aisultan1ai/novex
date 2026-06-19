@@ -18,7 +18,7 @@ _STATUS_MAP: dict[str, str] = {
     "ARRIVED": "arrived",
     "OUT_FOR_DELIVERY": "in_transit",
     "DELIVERED": "delivered",
-    "RETURNED": "return",
+    "RETURNED": "returned",
     "CANCELLED": "cancelled",
 }
 
@@ -26,7 +26,7 @@ _STATUS_MAP: dict[str, str] = {
 class AzimuthAdapter(CarrierPollingAdapter):
     carrier_code = "azimuth"
 
-    def fetch_status(self, tracking_number: str) -> list[TrackingEventData]:
+    def fetch_status(self, tracking_number: str, creds: dict) -> list[TrackingEventData]:
         # No live API credentials yet — returns empty list until Azimuth merchant
         # onboarding is complete and _TRACKING_URL is confirmed.
         return []

@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
+
+
+def _utcnow() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
 
 from sqlalchemy.orm import Session
 
@@ -65,7 +69,7 @@ class OrdersService:
             )
             raise ForbiddenError("Invalid or missing quote token")
 
-        if quote_session.expires_at and quote_session.expires_at < datetime.utcnow():
+        if quote_session.expires_at and quote_session.expires_at < _utcnow():
             logger.warning(
                 "Expired quote session: quote_session_id=%s user_id=%s",
                 payload.quote_session_id,
@@ -322,13 +326,13 @@ class OrdersService:
             )
             raise ForbiddenError("Order draft does not belong to the current user")
 
-        if order_draft.status != "draft":
+        if order_draft.status not in ("draft", "shipment_details_completed"):
             logger.warning(
                 "Delete rejected — wrong status: draft_id=%s status=%s",
                 draft_id,
                 order_draft.status,
             )
-            raise ValidationError("Only drafts can be deleted")
+            raise ValidationError("Only unpaid orders can be deleted")
 
         self.repository.delete_order_draft_by_id(db, draft_id=draft_id)
         db.commit()
@@ -357,6 +361,17 @@ class OrdersService:
                 user_id,
             )
             raise ForbiddenError("Order draft does not belong to the current user")
+
+        _EDITABLE_STATUSES = {"draft", "shipment_details_completed"}
+        if order_draft.status not in _EDITABLE_STATUSES:
+            logger.warning(
+                "update_shipment_details rejected — wrong status: draft_id=%s status=%s",
+                draft_id,
+                order_draft.status,
+            )
+            raise ValidationError(
+                f"Cannot edit shipment details for order in status '{order_draft.status}'"
+            )
 
         self.repository.delete_shipment_parties(db, order_draft_id=draft_id)
         self.repository.delete_shipment_packages(db, order_draft_id=draft_id)

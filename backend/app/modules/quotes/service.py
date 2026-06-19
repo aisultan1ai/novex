@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import logging
 import secrets
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
+
+
+def _utcnow() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
 from decimal import Decimal
 
 from sqlalchemy import select, update
@@ -52,7 +56,7 @@ class QuotesService:
             depth_cm=Decimal(str(payload.depth_cm)),
             shipment_type=payload.shipment_type,
             public_token=secrets.token_urlsafe(32),
-            expires_at=datetime.utcnow() + timedelta(hours=_TOKEN_TTL_HOURS),
+            expires_at=_utcnow() + timedelta(hours=_TOKEN_TTL_HOURS),
         )
         db.add(quote_session)
         db.flush()
