@@ -16,6 +16,7 @@ tariff_engine.py — движок расчёта тарифов.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import math
 import os
@@ -29,6 +30,7 @@ import httpx
 from app.modules.carriers.zone_mapper import get_zone
 
 if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
     from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -187,6 +189,7 @@ def calculate_quotes(
     height_cm: float,
     depth_cm: float,
     db: Session | None = None,
+    include_live: bool = True,
 ) -> list[QuoteResult]:
     """
     Рассчитать стоимость по всем тарифам.
@@ -194,6 +197,9 @@ def calculate_quotes(
 
     Если передан db= — пробует загрузить тарифы из БД (carrier_tariff_rates).
     Если в БД нет активных ставок — использует встроенную таблицу Azimuth.
+
+    include_live=False — пропустить вызов Exline API (используется когда вызывающий
+    код хочет освободить DB-соединение перед внешним HTTP-запросом).
     """
     fallback_zone = get_zone(from_city, to_city)
     kg = chargeable_weight(weight_kg, quantity, width_cm, height_cm, depth_cm)
@@ -217,10 +223,48 @@ def calculate_quotes(
     else:
         results = _calculate_hardcoded(fallback_zone, kg)
 
-    # Добавляем live-котировки Exline только если DB не вернула Exline-ставки
+    if include_live:
+        # Добавляем live-котировки Exline только если DB не вернула Exline-ставки
+        if not any(r.carrier_code == "exline" for r in results):
+            results.extend(_calculate_exline_live(from_city, to_city, kg))
+        results.sort(key=lambda r: (r.price, r.eta_days_min))
+
+    return results
+
+
+def fetch_exline_quotes(
+    from_city: str,
+    to_city: str,
+    weight_kg: float,
+    quantity: int,
+    width_cm: float,
+    height_cm: float,
+    depth_cm: float,
+) -> list[QuoteResult]:
+    """Только внешний вызов Exline — без DB. Вызывать после закрытия DB-соединения."""
+    kg = chargeable_weight(weight_kg, quantity, width_cm, height_cm, depth_cm)
+    return _calculate_exline_live(from_city, to_city, kg)
+
+
+async def calculate_quotes_async(
+    from_city: str,
+    to_city: str,
+    weight_kg: float,
+    quantity: int,
+    width_cm: float,
+    height_cm: float,
+    depth_cm: float,
+    db: AsyncSession,
+) -> list[QuoteResult]:
+    """Async version для /api/shipping/quote — DB и Exline HTTP не держат соединение одновременно."""
+    fallback_zone = get_zone(from_city, to_city)
+    kg = chargeable_weight(weight_kg, quantity, width_cm, height_cm, depth_cm)
+
+    db_results = await _calculate_from_db_async(db, from_city, to_city, fallback_zone, kg)
+    results: list[QuoteResult] = db_results if db_results else _calculate_hardcoded(fallback_zone, kg)
+
     if not any(r.carrier_code == "exline" for r in results):
-        exline_quotes = _calculate_exline_live(from_city, to_city, kg)
-        results.extend(exline_quotes)
+        results.extend(await _calculate_exline_live_async(from_city, to_city, kg))
 
     results.sort(key=lambda r: (r.price, r.eta_days_min))
     return results
@@ -348,6 +392,69 @@ def _zone_from_carrier_cities(
     return None
 
 
+def _quotes_from_carriers(
+    carriers: list,
+    from_city: str,
+    to_city: str,
+    fallback_zone: int,
+    kg: float,
+) -> list[QuoteResult]:
+    """Pure-Python processing — shared by sync and async DB paths."""
+    results: list[QuoteResult] = []
+    for carrier in carriers:
+        zone = _zone_from_carrier_cities(from_city, to_city, carrier.zone_cities)
+        if zone is None:
+            zone = fallback_zone
+            logger.debug(
+                "tariff_engine: carrier=%s cities not in zone_cities, using fallback zone=%d",
+                carrier.code, zone,
+            )
+        else:
+            logger.debug(
+                "tariff_engine: carrier=%s zone=%d from DB city mapping (%s→%s)",
+                carrier.code, zone, from_city, to_city,
+            )
+
+        for service in carrier.services:
+            if not service.is_active:
+                continue
+
+            zone_rates = sorted(
+                [r for r in service.tariff_rates if r.is_active and r.zone == zone],
+                key=lambda r: float(r.weight_from_kg),
+            )
+            if not zone_rates:
+                continue
+
+            applicable = None
+            for rate in zone_rates:
+                wf = float(rate.weight_from_kg)
+                wt = float(rate.weight_to_kg) if rate.weight_to_kg is not None else None
+                if wf <= kg and (wt is None or kg <= wt):
+                    applicable = rate
+                    break
+            if applicable is None:
+                applicable = zone_rates[-1]
+
+            price = _db_rate_price(applicable, kg)
+            eta_min = applicable.eta_days_min if applicable.eta_days_min is not None else 1
+            eta_max = applicable.eta_days_max if applicable.eta_days_max is not None else 14
+
+            results.append(QuoteResult(
+                carrier_code=carrier.code,
+                carrier_name=carrier.name,
+                tariff_code=service.code,
+                tariff_name=service.name,
+                price=Decimal(str(price)),
+                currency=applicable.currency,
+                eta_days_min=eta_min,
+                eta_days_max=eta_max,
+                zone=zone,
+                chargeable_kg=kg,
+            ))
+    return results
+
+
 def _calculate_from_db(
     db: Session,
     from_city: str,
@@ -359,7 +466,7 @@ def _calculate_from_db(
     from sqlalchemy import select
     from sqlalchemy.orm import selectinload
 
-    from app.modules.carriers.models import Carrier, CarrierService, CarrierTariffRate
+    from app.modules.carriers.models import Carrier, CarrierService
 
     carriers = db.scalars(
         select(Carrier)
@@ -370,75 +477,41 @@ def _calculate_from_db(
         )
     ).all()
 
-    results: list[QuoteResult] = []
+    results = _quotes_from_carriers(carriers, from_city, to_city, fallback_zone, kg)
+    if results:
+        logger.debug("tariff_engine: DB rates used (%d quotes, kg=%.2f)", len(results), kg)
+    else:
+        logger.debug("tariff_engine: DB has no rates, falling back to hardcoded Azimuth table")
+    return results
 
-    for carrier in carriers:
-        # Пробуем определить зону по городам конкретного перевозчика;
-        # если не найдено — используем хардкодный fallback.
-        zone = _zone_from_carrier_cities(from_city, to_city, carrier.zone_cities)
-        if zone is None:
-            zone = fallback_zone
-            logger.debug(
-                "tariff_engine: carrier=%s cities not in zone_cities, "
-                "using fallback zone=%d",
-                carrier.code,
-                zone,
-            )
-        else:
-            logger.debug(
-                "tariff_engine: carrier=%s zone=%d from DB city mapping (%s→%s)",
-                carrier.code,
-                zone,
-                from_city,
-                to_city,
-            )
 
-        for service in carrier.services:
-            if not service.is_active:
-                continue
+async def _calculate_from_db_async(
+    db: AsyncSession,
+    from_city: str,
+    to_city: str,
+    fallback_zone: int,
+    kg: float,
+) -> list[QuoteResult]:
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
 
-            zone_rates: list[CarrierTariffRate] = sorted(
-                [r for r in service.tariff_rates if r.is_active and r.zone == zone],
-                key=lambda r: float(r.weight_from_kg),
-            )
+    from app.modules.carriers.models import Carrier, CarrierService
 
-            if not zone_rates:
-                continue
+    result = await db.execute(
+        select(Carrier)
+        .where(Carrier.is_active.is_(True))
+        .options(
+            selectinload(Carrier.services).selectinload(CarrierService.tariff_rates),
+            selectinload(Carrier.zone_cities),
+        )
+    )
+    carriers = result.scalars().all()
 
-            applicable = None
-            for rate in zone_rates:
-                wf = float(rate.weight_from_kg)
-                wt = float(rate.weight_to_kg) if rate.weight_to_kg is not None else None
-                if wf <= kg and (wt is None or kg <= wt):
-                    applicable = rate
-                    break
-
-            if applicable is None:
-                applicable = zone_rates[-1]
-
-            price = _db_rate_price(applicable, kg)
-            eta_min = (
-                applicable.eta_days_min if applicable.eta_days_min is not None else 1
-            )
-            eta_max = (
-                applicable.eta_days_max if applicable.eta_days_max is not None else 14
-            )
-
-            results.append(
-                QuoteResult(
-                    carrier_code=carrier.code,
-                    carrier_name=carrier.name,
-                    tariff_code=service.code,
-                    tariff_name=service.name,
-                    price=Decimal(str(price)),
-                    currency=applicable.currency,
-                    eta_days_min=eta_min,
-                    eta_days_max=eta_max,
-                    zone=zone,
-                    chargeable_kg=kg,
-                )
-            )
-
+    results = _quotes_from_carriers(carriers, from_city, to_city, fallback_zone, kg)
+    if results:
+        logger.debug("tariff_engine: DB rates used (%d quotes, kg=%.2f)", len(results), kg)
+    else:
+        logger.debug("tariff_engine: DB has no rates, falling back to hardcoded Azimuth table")
     return results
 
 
@@ -559,5 +632,121 @@ def _calculate_exline_live(
 
     logger.debug(
         "Exline: %d quotes for %s→%s kg=%.2f", len(results), from_city, to_city, kg
+    )
+    return results
+
+
+async def _call_exline_calculator_async(
+    from_city: str,
+    to_city: str,
+    kg: float,
+    service_code: str,
+    extra: str,
+    login: str,
+    password: str,
+    api_url: str,
+) -> QuoteResult | None:
+    tariff_code, tariff_name, eta_min, eta_max = _EXLINE_SERVICES[service_code]
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        "<calculator>"
+        f'<auth extra="{_xml_esc(extra)}" login="{_xml_esc(login)}" pass="{_xml_esc(password)}"/>'
+        "<order>"
+        "<pricetype>CUSTOMER</pricetype>"
+        f"<sender><town>{_xml_esc(from_city)}</town></sender>"
+        f"<receiver><town>{_xml_esc(to_city)}</town></receiver>"
+        f"<weight>{kg:.3f}</weight>"
+        f"<service>{_xml_esc(service_code)}</service>"
+        "<paytype>NO</paytype>"
+        "</order>"
+        "</calculator>"
+    )
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                api_url,
+                content=xml.encode("utf-8"),
+                headers={"Content-Type": "text/xml; charset=utf-8"},
+                timeout=_EXLINE_TIMEOUT,
+            )
+        resp.raise_for_status()
+        root = ET.fromstring(resp.text)
+    except Exception as exc:
+        logger.warning(
+            "Exline calculator failed (service=%s, %s→%s): %s",
+            service_code, from_city, to_city, exc,
+        )
+        return None
+
+    if root.attrib.get("error") == "1":
+        logger.warning("Exline calculator: auth error (service=%s)", service_code)
+        return None
+
+    calc_el = root.find("calc")
+    if calc_el is None:
+        return None
+
+    price_el = calc_el.find("price")
+    if price_el is None or not (price_el.text or "").strip():
+        return None
+
+    try:
+        price = Decimal((price_el.text or "").strip())
+    except Exception:
+        return None
+
+    min_el = calc_el.find("mindeliverydays")
+    max_el = calc_el.find("maxdeliverydays")
+    zone_el = calc_el.find("zone")
+
+    if min_el is not None and (min_el.text or "").strip().lstrip("-").isdigit():
+        val = int(min_el.text.strip())
+        if val > 0:
+            eta_min = val  # type: ignore[assignment]
+    if max_el is not None and (max_el.text or "").strip().lstrip("-").isdigit():
+        val = int(max_el.text.strip())
+        if val > 0:
+            eta_max = val  # type: ignore[assignment]
+
+    zone = 1
+    if zone_el is not None and (zone_el.text or "").strip().lstrip("-").isdigit():
+        zone = max(0, int(zone_el.text.strip()))
+
+    return QuoteResult(
+        carrier_code="exline",
+        carrier_name="Exline",
+        tariff_code=tariff_code,
+        tariff_name=tariff_name,
+        price=price,
+        currency="KZT",
+        eta_days_min=eta_min,
+        eta_days_max=eta_max,
+        zone=zone,
+        chargeable_kg=kg,
+    )
+
+
+async def _calculate_exline_live_async(
+    from_city: str,
+    to_city: str,
+    kg: float,
+) -> list[QuoteResult]:
+    extra = os.getenv("EXLINE_EXTRA", "")
+    login = os.getenv("EXLINE_LOGIN", "")
+    password = os.getenv("EXLINE_PASSWORD", "")
+    api_url = os.getenv("EXLINE_API_URL", "https://home.courierexe.ru/api/").rstrip("/") + "/"
+
+    if not extra or not login:
+        return []
+
+    # All Exline service calls run concurrently — no sequential blocking
+    quotes = await asyncio.gather(*[
+        _call_exline_calculator_async(from_city, to_city, kg, service_code, extra, login, password, api_url)
+        for service_code in _EXLINE_SERVICES
+    ])
+    results = [q for q in quotes if q is not None]
+
+    logger.debug(
+        "Exline async: %d quotes for %s→%s kg=%.2f", len(results), from_city, to_city, kg
     )
     return results

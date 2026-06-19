@@ -7,7 +7,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.core.security import decode_access_token
+from app.core.security import decode_access_token, get_token_version
 from app.modules.identity.models import User
 from app.modules.identity.repository import IdentityRepository
 
@@ -63,6 +63,7 @@ def get_current_user_id(
 
 def get_current_user(
     db: Session = Depends(get_db),
+    payload: dict[str, Any] = Depends(get_token_payload),
     current_user_id: int = Depends(get_current_user_id),
 ) -> User:
     user = identity_repository.get_user_by_id(db, current_user_id)
@@ -78,6 +79,14 @@ def get_current_user(
             detail="Current user is inactive",
         )
 
+    # Verify token version — invalidated when admin changes role or calls invalidate_user_tokens()
+    ver_in_token = int(payload.get("ver", 0))
+    if ver_in_token != get_token_version(user.id):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Сессия истекла. Пожалуйста, войдите снова.",
+        )
+
     return user
 
 
@@ -88,6 +97,17 @@ def require_admin(current_user: User = Depends(get_current_user)) -> User:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Доступ только для администраторов",
+        )
+    return current_user
+
+
+def require_admin_or_operator(current_user: User = Depends(get_current_user)) -> User:
+    from app.modules.identity.models import RoleCode
+
+    if current_user.role.code not in (RoleCode.ADMIN, RoleCode.OPERATOR):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Доступ только для администраторов и операторов",
         )
     return current_user
 

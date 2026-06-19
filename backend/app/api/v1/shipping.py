@@ -3,9 +3,10 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
-from app.core.db import get_db
+from app.core.db import get_async_db, get_db
 from app.core.limiter import limiter
 from app.modules.quotes.models import QuoteSession
 from app.modules.quotes.schemas import (
@@ -36,12 +37,12 @@ def _validate_token(db: Session, quote_session_id: int, token: str | None) -> Qu
     status_code=200,
 )
 @limiter.limit("30/minute")
-def calculate_shipping_quote(
+async def calculate_shipping_quote(
     request: Request,
     payload: ShippingQuoteRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
 ) -> ShippingQuoteResponse:
-    return quotes_service.calculate_quotes(db, payload)
+    return await quotes_service.calculate_quotes(db, payload)
 
 
 @router.get(

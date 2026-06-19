@@ -79,3 +79,68 @@ def decode_access_token(token: str) -> dict[str, Any]:
         raise ValueError("Token has expired") from exc
     except InvalidTokenError as exc:
         raise ValueError(f"Invalid token: {exc}") from exc
+
+
+# ---------------------------------------------------------------------------
+# Token versioning — enables immediate revocation without a DB migration.
+# Version is stored in Redis (key: user:tkver:<user_id>).
+# Incrementing the version in Redis invalidates all existing tokens for a user.
+# ---------------------------------------------------------------------------
+
+_TOKEN_VER_PREFIX = "user:tkver:"
+_REFRESH_PREFIX = "refresh:"
+REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 3600  # 7 days
+
+
+def get_token_version(user_id: int) -> int:
+    """Return the current token version for a user. Defaults to 0."""
+    try:
+        from app.core.redis import get_redis
+        val = get_redis().get(f"{_TOKEN_VER_PREFIX}{user_id}")
+        return int(val) if val else 0
+    except Exception:
+        return 0  # fail open — don't lock everyone out if Redis is temporarily down
+
+
+def invalidate_user_tokens(user_id: int) -> None:
+    """Invalidate all active tokens for a user by incrementing the version counter."""
+    from app.core.redis import get_redis
+    get_redis().incr(f"{_TOKEN_VER_PREFIX}{user_id}")
+
+
+# ---------------------------------------------------------------------------
+# Refresh tokens — opaque tokens stored in Redis with 7-day TTL.
+# Each token maps to a user_id. Rotation on every use prevents replay.
+# ---------------------------------------------------------------------------
+
+def create_refresh_token(user_id: int) -> str:
+    token = secrets.token_urlsafe(32)
+    from app.core.redis import get_redis
+    get_redis().setex(f"{_REFRESH_PREFIX}{token}", REFRESH_TOKEN_TTL_SECONDS, str(user_id))
+    return token
+
+
+_CONSUME_SCRIPT = """
+local val = redis.call('GET', KEYS[1])
+if val then redis.call('DEL', KEYS[1]) end
+return val
+"""
+
+
+def consume_refresh_token(token: str) -> int | None:
+    """Validate and atomically delete a refresh token. Returns user_id or None if invalid."""
+    from app.core.redis import get_redis
+    r = get_redis()
+    key = f"{_REFRESH_PREFIX}{token}"
+    val = r.eval(_CONSUME_SCRIPT, 1, key)
+    if val is None:
+        return None
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return None
+
+
+def revoke_refresh_token(token: str) -> None:
+    from app.core.redis import get_redis
+    get_redis().delete(f"{_REFRESH_PREFIX}{token}")

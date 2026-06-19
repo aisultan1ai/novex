@@ -125,6 +125,10 @@ class Settings(BaseSettings):
     def sync_database_url(self) -> str:
         return self.database_url
 
+    @property
+    def async_database_url(self) -> str:
+        return self.database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
 
 @lru_cache
 def get_settings() -> Settings:

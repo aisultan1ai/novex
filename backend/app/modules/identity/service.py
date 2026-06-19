@@ -13,6 +13,7 @@ from app.core.security import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     create_access_token,
     get_password_hash,
+    get_token_version,
     verify_password,
 )
 from app.modules.identity.models import (
@@ -40,10 +41,11 @@ logger = logging.getLogger(__name__)
 class CreateCarrierAccountRequest(BaseModel):
     email: EmailStr
     full_name: str | None = None
-    temp_password: str
+    temp_password: str | None = None  # if omitted, a secure random password is generated
 
 
-_RESET_TTL = 3600  # 1 час
+_RESET_TTL = 3600          # 1 час — forgot-password
+_SETUP_LINK_TTL = 172_800  # 48 часов — первичная активация аккаунта перевозчика
 
 
 class IdentityService:
@@ -114,8 +116,8 @@ class IdentityService:
         token = create_access_token(
             {
                 "sub": str(user.id),
-                "email": user.email,
                 "role": role_code,
+                "ver": get_token_version(user.id),
             }
         )
 
@@ -258,10 +260,13 @@ class IdentityService:
 
         carrier_role = self.repository.ensure_role(db, RoleCode.CARRIER, "Carrier")
 
+        # Use provided temp_password or auto-generate — never transmitted in email
+        initial_password = payload.temp_password or secrets.token_urlsafe(24)
+
         user = self.repository.create_user(
             db,
             email=payload.email,
-            password_hash=get_password_hash(payload.temp_password),
+            password_hash=get_password_hash(initial_password),
             full_name=payload.full_name or carrier_name,
             phone=None,
             role=carrier_role,
@@ -273,24 +278,33 @@ class IdentityService:
 
         db.commit()
 
+        # Generate a one-time setup link so the carrier sets their own password.
+        # Reuses the existing reset-password flow (same Redis key prefix, same endpoint).
+        setup_token = secrets.token_urlsafe(32)
+        get_redis().setex(f"reset:{setup_token}", _SETUP_LINK_TTL, str(user.id))
+        setup_link = f"{frontend_url}/reset-password?token={setup_token}"
+
         send_email(
             to=payload.email,
-            subject=f"Добро пожаловать в Novex — доступ открыт для {carrier_name}",
+            subject=f"Добро пожаловать в Novex — активируйте аккаунт {carrier_name}",
             html=f"""
             <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px">
-              <h2 style="color:#0f172a">Ваш аккаунт перевозчика активирован</h2>
-              <p style="color:#475569">Платформа Novex открыла для вас доступ как перевозчику <b>{carrier_name}</b>.</p>
-              <p style="color:#475569">Войдите в личный кабинет чтобы получить API-ключи и документацию интеграции:</p>
-              <a href="{frontend_url}/login"
-                 style="display:inline-block;margin:20px 0;padding:12px 28px;background:#0f172a;color:#fff;
+              <h2 style="color:#0f172a">Ваш аккаунт перевозчика создан</h2>
+              <p style="color:#475569">
+                Платформа Novex открыла для вас доступ как перевозчику <b>{carrier_name}</b>.
+              </p>
+              <p style="color:#475569">Нажмите кнопку ниже чтобы установить пароль и начать работу:</p>
+              <a href="{setup_link}"
+                 style="display:inline-block;margin:24px 0;padding:12px 28px;background:#0f172a;color:#fff;
                         border-radius:10px;text-decoration:none;font-weight:600">
-                Войти в кабинет
+                Установить пароль
               </a>
-              <table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:14px">
-                <tr><td style="padding:8px 0;color:#64748b;width:120px">Email:</td><td style="color:#0f172a;font-weight:600">{payload.email}</td></tr>
-                <tr><td style="padding:8px 0;color:#64748b">Пароль:</td><td style="color:#0f172a;font-weight:600">{payload.temp_password}</td></tr>
-              </table>
-              <p style="color:#94a3b8;font-size:13px">Рекомендуем сменить пароль после первого входа.</p>
+              <p style="color:#475569;font-size:14px">
+                Email для входа: <b>{payload.email}</b>
+              </p>
+              <p style="color:#94a3b8;font-size:13px">
+                Ссылка активна 48 часов. Если она истекла — воспользуйтесь восстановлением пароля на странице входа.
+              </p>
             </div>
             """,
         )

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from enum import StrEnum
 
 from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
@@ -67,7 +68,7 @@ class PaymentTransaction(Base):
         SqlEnum(TxMethod, name="tx_method_enum"),
         nullable=False,
     )
-    amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="KZT")
     status: Mapped[TxStatus] = mapped_column(
         SqlEnum(TxStatus, name="tx_status_enum"),

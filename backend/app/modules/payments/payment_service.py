@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.common.status_machine import can_transition, transition_order
 from app.core.exceptions import NotFoundError, ValidationError
+from app.core.streams import STREAM_DISPATCH, publish as stream_publish
 from app.modules.dispatch.models import OrderStatusHistory
 from app.modules.platform_settings.repository import PlatformSettingsRepository
 from app.modules.commissions.service import CommissionsService
@@ -58,7 +59,8 @@ class PaymentService:
         user_id: int,
     ) -> PaymentTransaction:
         existing = db.scalar(
-            select(PaymentTransaction).where(
+            select(PaymentTransaction)
+            .where(
                 PaymentTransaction.order_id == order.id,
                 PaymentTransaction.status.in_([
                     TxStatus.AWAITING_PAYMENT,
@@ -66,6 +68,7 @@ class PaymentService:
                     TxStatus.PAID,
                 ]),
             )
+            .with_for_update()
         )
         if existing:
             return existing
@@ -82,7 +85,7 @@ class PaymentService:
             order_id=order.id,
             provider=TxProvider.MANUAL_BANK_TRANSFER,
             method=TxMethod.BANK_TRANSFER,
-            amount=float(order.price_snapshot),
+            amount=Decimal(str(order.price_snapshot)),
             currency=order.currency_snapshot,
             status=TxStatus.AWAITING_PAYMENT,
             payment_reference=result.payment_reference,
@@ -245,6 +248,7 @@ class PaymentService:
         )
 
         order = db.get(OrderDraft, tx.order_id)
+        dispatch_job = None
         if order:
             old_order_status = order.status
             transition_order(old_order_status, "paid")
@@ -259,25 +263,29 @@ class PaymentService:
                     comment="Payment approved by admin",
                 )
             )
-
-        db.commit()  # persist "paid" status before dispatching
-        db.refresh(tx)
-
-        if order:
             _commissions_svc.record_commission(
                 db,
                 order_draft_id=order.id,
                 carrier_code=order.carrier_code_snapshot,
-                gross_amount=Decimal(str(tx.amount)),
+                gross_amount=tx.amount,
                 currency=tx.currency,
             )
-            create_dispatch_job(db, order=order, changed_by_user_id=admin_id)
-
+            dispatch_job = create_dispatch_job(db, order=order, changed_by_user_id=admin_id)
             _notifications_svc.notify_order_status(
                 db, user_id=order.user_id, order_id=order.id, status="paid"
             )
 
-            db.commit()
+        db.commit()
+        db.refresh(tx)
+
+        if order and dispatch_job:
+            try:
+                stream_publish(STREAM_DISPATCH, {
+                    "dispatch_job_id": str(dispatch_job.id),
+                    "order_id": str(order.id),
+                })
+            except Exception:
+                logger.exception("Failed to publish dispatch event to stream (fallback polling will handle it)")
 
         return tx
 
@@ -389,6 +397,7 @@ class PaymentService:
         order = db.get(OrderDraft, tx.order_id)
         if order:
             old_order_status = order.status
+            transition_order(old_order_status, "paid")
             order.status = "paid"
             db.add(OrderStatusHistory(
                 order_id=order.id,
@@ -406,14 +415,21 @@ class PaymentService:
                 db,
                 order_draft_id=order.id,
                 carrier_code=order.carrier_code_snapshot,
-                gross_amount=Decimal(str(tx.amount)),
+                gross_amount=tx.amount,
                 currency=tx.currency,
             )
-            create_dispatch_job(db, order=order)
+            dispatch_job = create_dispatch_job(db, order=order)
             _notifications_svc.notify_order_status(
                 db, user_id=order.user_id, order_id=order.id, status="paid"
             )
             db.commit()
+            try:
+                stream_publish(STREAM_DISPATCH, {
+                    "dispatch_job_id": str(dispatch_job.id),
+                    "order_id": str(order.id),
+                })
+            except Exception:
+                logger.exception("Failed to publish dispatch event to stream (fallback polling will handle it)")
 
         return tx
 

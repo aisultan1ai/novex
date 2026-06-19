@@ -4,8 +4,6 @@ import logging
 
 from sqlalchemy.orm import Session
 
-from app.core.email import send_email
-from app.core.email_templates import order_status_email
 from app.modules.notifications.repository import NotificationsRepository
 from app.modules.notifications.schemas import (
     NotificationListResponse,
@@ -81,29 +79,27 @@ class NotificationsService:
         status: str,
         reject_reason: str | None = None,
     ) -> None:
-        from app.modules.identity.models import User  # local import avoids circular dep
-        user = db.get(User, user_id)
-        if not user or not user.email:
-            return
+        import json
+        from app.core.streams import STREAM_EMAILS, publish
 
-        rendered = order_status_email(
-            status, order_id,
-            user_name=user.full_name,
-            reject_reason=reject_reason,
-        )
-        if rendered is None:
-            return
+        payload: dict[str, str] = {}
+        if reject_reason:
+            payload["reject_reason"] = reject_reason
 
-        subject, html_body = rendered
         try:
-            send_email(to=user.email, subject=subject, html=html_body)
+            publish(STREAM_EMAILS, {
+                "user_id": str(user_id),
+                "order_id": str(order_id),
+                "event_type": status,
+                "payload": json.dumps(payload),
+            })
             logger.info(
-                "Order email sent: user_id=%s order_id=%s status=%s",
+                "Email queued to stream: user_id=%s order_id=%s status=%s",
                 user_id, order_id, status,
             )
         except Exception:
             logger.exception(
-                "Order email failed (non-fatal): user_id=%s order_id=%s status=%s",
+                "Failed to queue email (non-fatal): user_id=%s order_id=%s status=%s",
                 user_id, order_id, status,
             )
 

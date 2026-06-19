@@ -68,6 +68,7 @@ def create_dispatch_job(
             comment="Payment confirmed, dispatch job created",
         )
     )
+    db.flush()  # populate job.id so caller can publish to stream after commit
     return job
 
 
@@ -100,6 +101,10 @@ def record_order_status(
 
 
 class DispatchWorker:
+    def process_job(self, db: Session, job: DispatchJob) -> None:
+        """Public entry point for stream consumer and admin retry."""
+        self._process_job(db, job)
+
     def run_once(self, db: Session) -> int:
         jobs = db.scalars(
             select(DispatchJob).where(

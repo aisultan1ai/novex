@@ -2,10 +2,16 @@ from __future__ import annotations
 
 import logging
 import signal
+import threading
 from threading import Event
 
 from app.core.config import get_settings
 from app.core.db import check_database_connection
+from app.core.redis import get_redis
+from app.core.streams import ensure_consumer_groups
+
+_ALIVE_KEY = "worker:alive"
+_ALIVE_TTL = 90  # seconds — must be > main loop interval (30s)
 
 # Import all ORM models so SQLAlchemy metadata is fully populated before any
 # queries run. Without this, FK constraints (e.g. carrier_webhooks→carriers)
@@ -29,6 +35,7 @@ import app.modules.reviews.models  # noqa: F401
 import app.modules.shipments.models  # noqa: F401
 import app.modules.tracking.models  # noqa: F401
 
+from workers.consumers import dispatch_consumer, email_consumer
 from workers.jobs import (
     cleanup_expired_files,
     dispatch_orders,
@@ -71,6 +78,13 @@ def run() -> None:
     except Exception as exc:  # noqa: BLE001
         logger.warning("Database probe failed: %s", exc)
 
+    ensure_consumer_groups()
+
+    for target in (email_consumer.run, dispatch_consumer.run):
+        t = threading.Thread(target=target, args=(stop_event,), daemon=True, name=target.__module__)
+        t.start()
+        logger.info("Started consumer thread: %s", t.name)
+
     scheduler = WorkerScheduler()
     scheduler.register(dispatch_orders.run, 60)
     scheduler.register(sync_tracking.run, 120)
@@ -82,6 +96,10 @@ def run() -> None:
 
     while not stop_event.is_set():
         scheduler.tick()
+        try:
+            get_redis().setex(_ALIVE_KEY, _ALIVE_TTL, "1")
+        except Exception:
+            logger.warning("Worker heartbeat write failed")
         stop_event.wait(timeout=30)
 
     logger.info("Worker stopped cleanly.")

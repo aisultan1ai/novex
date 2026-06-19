@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 import logging
 import time
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -25,52 +28,97 @@ _creds_repo = CarrierAPICredentialsRepository()
 _integration_log = IntegrationLogRepository()
 
 _ACTIVE_STATUSES = {"sent_to_carrier", "dispatched", "picked_up", "in_transit", "out_for_delivery", "customs_hold", "delivery_failed"}
+_MAX_WORKERS = 10
+
+
+@dataclass
+class _PollWork:
+    shipment: Any
+    order: Any
+    adapter: Any
+    creds: dict
+
+
+@dataclass
+class _PollResult:
+    shipment: Any
+    order: Any
+    events: list
+    error: Exception | None
+    duration_ms: int
+
+
+def _fetch(work: _PollWork) -> _PollResult:
+    t0 = time.monotonic()
+    try:
+        events = work.adapter.fetch_status(work.shipment.carrier_tracking_number, work.creds)
+        return _PollResult(
+            shipment=work.shipment,
+            order=work.order,
+            events=events,
+            error=None,
+            duration_ms=int((time.monotonic() - t0) * 1000),
+        )
+    except Exception as exc:
+        return _PollResult(
+            shipment=work.shipment,
+            order=work.order,
+            events=[],
+            error=exc,
+            duration_ms=int((time.monotonic() - t0) * 1000),
+        )
 
 
 def poll_all_active_shipments(db: Session) -> None:
     from app.modules.orders.models import OrderDraft
 
-    shipments = db.scalars(
-        select(Shipment)
+    rows = db.execute(
+        select(Shipment, OrderDraft)
         .join(OrderDraft, OrderDraft.id == Shipment.order_draft_id)
         .where(OrderDraft.status.in_(_ACTIVE_STATUSES))
         .limit(200)
     ).all()
 
-    for shipment in shipments:
+    # Cache credentials per carrier_code
+    creds_cache: dict[str, dict] = {}
+    work_items: list[_PollWork] = []
+
+    for shipment, order in rows:
         if not shipment.carrier_tracking_number:
             continue
-
-        order = db.get(OrderDraft, shipment.order_draft_id)
-        if order is None:
-            continue
-
         adapter = get_adapter(order.carrier_code_snapshot)
         if adapter is None:
             continue
-
-        db_creds = _creds_repo.get_by_carrier_code(db, order.carrier_code_snapshot)
-        creds: dict = {}
-        if db_creds and db_creds.is_active:
-            creds = {"api_url": db_creds.api_url, **(db_creds.extra_config or {})}
-
-        t0 = time.monotonic()
-        try:
-            events = adapter.fetch_status(shipment.carrier_tracking_number, creds)
-            duration_ms = int((time.monotonic() - t0) * 1000)
-            _integration_log.create(
-                db,
-                carrier_code=order.carrier_code_snapshot,
-                direction="outbound",
-                event_type="polling",
-                order_id=order.id,
-                payload=json.dumps({"tracking_number": shipment.carrier_tracking_number}),
-                response=json.dumps({"events_count": len(events)}),
-                duration_ms=duration_ms,
-                status="success",
+        if order.carrier_code_snapshot not in creds_cache:
+            db_creds = _creds_repo.get_by_carrier_code(db, order.carrier_code_snapshot)
+            creds_cache[order.carrier_code_snapshot] = (
+                {"api_url": db_creds.api_url, **(db_creds.extra_config or {})}
+                if db_creds and db_creds.is_active
+                else {}
             )
-        except Exception as exc:
-            duration_ms = int((time.monotonic() - t0) * 1000)
+        work_items.append(_PollWork(
+            shipment=shipment,
+            order=order,
+            adapter=adapter,
+            creds=creds_cache[order.carrier_code_snapshot],
+        ))
+
+    if not work_items:
+        return
+
+    # Fan out HTTP calls in parallel; DB session never crosses thread boundary
+    results: list[_PollResult] = []
+    with ThreadPoolExecutor(max_workers=min(_MAX_WORKERS, len(work_items))) as pool:
+        futures: dict[Future, _PollWork] = {pool.submit(_fetch, w): w for w in work_items}
+        for fut in as_completed(futures):
+            results.append(fut.result())
+
+    # Process results sequentially — DB session is not thread-safe
+    for result in results:
+        shipment = result.shipment
+        order = result.order
+
+        if result.error is not None:
             _integration_log.create(
                 db,
                 carrier_code=order.carrier_code_snapshot,
@@ -78,19 +126,31 @@ def poll_all_active_shipments(db: Session) -> None:
                 event_type="polling",
                 order_id=order.id,
                 payload=json.dumps({"tracking_number": shipment.carrier_tracking_number}),
-                duration_ms=duration_ms,
+                duration_ms=result.duration_ms,
                 status="error",
-                error_message=str(exc),
+                error_message=str(result.error),
             )
             logger.warning(
                 "polling failed for shipment %s (%s): %s",
                 shipment.id,
                 shipment.carrier_tracking_number,
-                exc,
+                result.error,
             )
             continue
 
-        for ev in events:
+        _integration_log.create(
+            db,
+            carrier_code=order.carrier_code_snapshot,
+            direction="outbound",
+            event_type="polling",
+            order_id=order.id,
+            payload=json.dumps({"tracking_number": shipment.carrier_tracking_number}),
+            response=json.dumps({"events_count": len(result.events)}),
+            duration_ms=result.duration_ms,
+            status="success",
+        )
+
+        for ev in result.events:
             duplicate = db.scalar(
                 select(TrackingEvent).where(
                     TrackingEvent.order_draft_id == order.id,
@@ -137,7 +197,5 @@ def poll_all_active_shipments(db: Session) -> None:
         try:
             db.commit()
         except Exception as exc:
-            logger.error(
-                "commit failed after polling shipment %s: %s", shipment.id, exc
-            )
+            logger.error("commit failed after polling shipment %s: %s", shipment.id, exc)
             db.rollback()

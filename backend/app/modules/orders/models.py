@@ -60,7 +60,7 @@ class OrderDraft(Base, TimestampMixin):
         index=True,
     )
 
-    status: Mapped[str] = mapped_column(String(50), nullable=False, default="draft")
+    status: Mapped[str] = mapped_column(String(50), nullable=False, default="draft", index=True)
     dispatch_error: Mapped[str | None] = mapped_column(String, nullable=True)
 
     call_before_delivery: Mapped[bool] = mapped_column(

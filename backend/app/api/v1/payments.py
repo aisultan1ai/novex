@@ -13,6 +13,7 @@ from app.core.db import get_db
 from app.core.dependencies import get_current_user_id
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.limiter import limiter
+from app.core.storage import MAX_FILE_SIZE
 from app.core.storage import get_storage
 from app.modules.dispatch.models import OrderStatusHistory
 from app.modules.orders.repository import OrdersRepository
@@ -125,7 +126,11 @@ async def upload_payment_proof(
     except ValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
+    if file.size is not None and file.size > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail=f"Файл слишком большой (максимум {MAX_FILE_SIZE // (1024 * 1024)} МБ)")
     file_data = await file.read()
+    if len(file_data) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail=f"Файл слишком большой (максимум {MAX_FILE_SIZE // (1024 * 1024)} МБ)")
     mime_type = file.content_type or "application/octet-stream"
 
     storage = get_storage()

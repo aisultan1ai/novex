@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.dependencies import get_current_carrier_id, require_carrier
-from app.core.storage import get_storage
+from app.core.storage import MAX_FILE_SIZE, get_storage
 from app.modules.carriers.models import Carrier
 from app.modules.carriers.webhook_config import CarrierWebhookConfig, CarrierWebhookRepository
 from app.modules.dispatch.models import OrderStatusHistory
@@ -419,7 +419,11 @@ async def upload_pod(
     if order.status not in _POD_ALLOWED_STATUSES:
         raise HTTPException(400, f"Нельзя загрузить POD для заказа со статусом «{order.status}»")
 
+    if file.size is not None and file.size > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail=f"Файл слишком большой (максимум {MAX_FILE_SIZE // (1024 * 1024)} МБ)")
     file_data = await file.read()
+    if len(file_data) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail=f"Файл слишком большой (максимум {MAX_FILE_SIZE // (1024 * 1024)} МБ)")
     mime_type = file.content_type or "application/octet-stream"
     original_name = file.filename or "pod"
 

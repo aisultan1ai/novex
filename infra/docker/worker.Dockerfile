@@ -39,7 +39,4 @@ COPY backend/migrations   ./migrations
 COPY backend/alembic.ini  .
 COPY backend/pyproject.toml .
 
-EXPOSE 8001
-
-# Update to actual worker entrypoint once workers module is implemented
 CMD ["python", "-m", "workers.main"]

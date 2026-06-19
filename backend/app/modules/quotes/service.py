@@ -3,17 +3,14 @@ from __future__ import annotations
 import logging
 import secrets
 from datetime import UTC, datetime, timedelta
-
-
-def _utcnow() -> datetime:
-    return datetime.now(UTC).replace(tzinfo=None)
 from decimal import Decimal
 
 from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.exceptions import NotFoundError
-from app.modules.carriers.tariff_engine import calculate_quotes as _engine_quotes
+from app.modules.carriers.tariff_engine import calculate_quotes_async as _engine_quotes_async
 from app.modules.quotes.models import QuoteSession, RateQuote
 from app.modules.quotes.schemas import (
     QuoteSelectionRequest,
@@ -22,18 +19,22 @@ from app.modules.quotes.schemas import (
     ShippingQuoteResponse,
 )
 
+
+def _utcnow() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
+
 _TOKEN_TTL_HOURS = 24
 
 logger = logging.getLogger(__name__)
 
 
 class QuotesService:
-    def calculate_quotes(
+    async def calculate_quotes(
         self,
-        db: Session,
+        db: AsyncSession,
         payload: ShippingQuoteRequest,
     ) -> ShippingQuoteResponse:
-        quotes = _engine_quotes(
+        quotes = await _engine_quotes_async(
             from_city=payload.from_city,
             to_city=payload.to_city,
             weight_kg=float(payload.weight_kg),
@@ -59,7 +60,7 @@ class QuotesService:
             expires_at=_utcnow() + timedelta(hours=_TOKEN_TTL_HOURS),
         )
         db.add(quote_session)
-        db.flush()
+        await db.flush()
 
         cheapest = min(quotes, key=lambda q: q.price, default=None)
         fastest_quote = min(quotes, key=lambda q: q.eta_days_min, default=None)
@@ -86,8 +87,8 @@ class QuotesService:
             rate_rows.append(rq)
 
         db.add_all(rate_rows)
-        db.commit()
-        db.refresh(quote_session)
+        await db.commit()
+        await db.refresh(quote_session)
 
         logger.info(
             "Quotes calculated: session_id=%s from=%s/%s to=%s/%s quotes=%s",

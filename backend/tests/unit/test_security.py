@@ -4,8 +4,10 @@ import os
 
 import pytest
 
-os.environ.setdefault("SECRET_KEY", "test-secret-key-for-unit-tests-only")
-os.environ.setdefault("DATABASE_URL", "postgresql://x:x@localhost/x")
+if not os.environ.get("SECRET_KEY"):
+    os.environ["SECRET_KEY"] = "test-secret-key-for-unit-tests-only"
+if not os.environ.get("DATABASE_URL"):
+    os.environ["DATABASE_URL"] = "postgresql://x:x@localhost/x"
 
 
 from app.core.security import (

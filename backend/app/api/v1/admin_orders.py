@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import math
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.common.status_machine import can_transition
 from app.core.db import get_db
 from app.core.dependencies import require_admin
+from app.core.limiter import limiter
 from app.modules.audit.service import AuditService
 from app.modules.dispatch.models import OrderStatusHistory
 from app.modules.dispatch.service import DispatchWorker
@@ -90,7 +91,9 @@ def get_dispatch_queue(
 
 
 @router.get("")
+@limiter.limit("120/minute")
 def list_all_orders(
+    request: Request,
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
     status: str | None = Query(default=None),
@@ -198,7 +201,9 @@ def get_order(
 
 
 @router.patch("/{order_id}/status")
+@limiter.limit("60/minute")
 def update_order_status(
+    request: Request,
     order_id: int,
     payload: OrderStatusUpdate,
     db: Session = Depends(get_db),

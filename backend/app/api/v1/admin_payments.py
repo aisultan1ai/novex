@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.core.dependencies import require_admin
+from app.core.dependencies import require_admin, require_admin_or_operator
+from app.core.limiter import limiter
 from app.modules.audit.service import AuditService
 from app.modules.identity.models import User
 from app.modules.payments.payment_service import PaymentService
@@ -62,13 +63,15 @@ def _to_item(tx: PaymentTransaction) -> PaymentListItem:
 
 
 @router.get("", response_model=PaymentListResponse, summary="Список оплат")
+@limiter.limit("120/minute")
 def list_payments(
+    request: Request,
     status: str | None = Query(default=None),
     order_id: int | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
-    admin: User = Depends(require_admin),
+    admin: User = Depends(require_admin_or_operator),
 ) -> PaymentListResponse:
     offset = (page - 1) * size
     items, total = _payment_svc.list_for_admin(
@@ -81,12 +84,15 @@ def list_payments(
 
 
 @router.get("/{payment_id}", summary="Детали оплаты")
+@limiter.limit("120/minute")
 def get_payment(
+    request: Request,
     payment_id: int,
     db: Session = Depends(get_db),
-    admin: User = Depends(require_admin),
+    admin: User = Depends(require_admin_or_operator),
 ) -> dict:
     from sqlalchemy import select
+    from app.core.storage import get_storage
     from app.modules.payments.transaction_models import PaymentProof, PaymentStatusHistory
 
     tx = db.get(PaymentTransaction, payment_id)
@@ -105,12 +111,13 @@ def get_payment(
         .order_by(PaymentStatusHistory.created_at.asc())
     ).all()
 
+    storage = get_storage()
     return {
         "payment": _to_item(tx).model_dump(),
         "proofs": [
             {
                 "id": p.id,
-                "file_url": p.file_url,
+                "file_url": storage.get_file_url(p.file_url),
                 "file_name": p.file_name,
                 "file_mime_type": p.file_mime_type,
                 "file_size": p.file_size,
@@ -135,10 +142,12 @@ def get_payment(
 
 
 @router.post("/{payment_id}/approve", summary="Подтвердить оплату")
+@limiter.limit("60/minute")
 def approve_payment(
+    request: Request,
     payment_id: int,
     db: Session = Depends(get_db),
-    admin: User = Depends(require_admin),
+    admin: User = Depends(require_admin_or_operator),
 ) -> dict:
     try:
         tx = _payment_svc.admin_approve(db, payment_id=payment_id, admin_id=admin.id)
@@ -162,7 +171,9 @@ def approve_payment(
 
 
 @router.post("/{payment_id}/refund", summary="Оформить возврат средств")
+@limiter.limit("20/minute")
 def refund_payment(
+    request: Request,
     payment_id: int,
     payload: RefundPaymentRequest,
     db: Session = Depends(get_db),
@@ -201,11 +212,13 @@ def refund_payment(
 
 
 @router.post("/{payment_id}/reject", summary="Отклонить оплату")
+@limiter.limit("60/minute")
 def reject_payment(
+    request: Request,
     payment_id: int,
     payload: RejectPaymentRequest,
     db: Session = Depends(get_db),
-    admin: User = Depends(require_admin),
+    admin: User = Depends(require_admin_or_operator),
 ) -> dict:
     try:
         tx = _payment_svc.admin_reject(

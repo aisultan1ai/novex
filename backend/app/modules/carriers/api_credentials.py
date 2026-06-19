@@ -4,10 +4,11 @@ from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from app.core.db import Base
+from app.core.encryption import EncryptedText
 
 
 class CarrierAPICredentials(Base):
@@ -21,8 +22,8 @@ class CarrierAPICredentials(Base):
         unique=True,
         index=True,
     )
-    api_url: Mapped[str] = mapped_column(Text, nullable=False)
-    api_token: Mapped[str] = mapped_column(Text, nullable=False)
+    api_url: Mapped[str] = mapped_column(EncryptedText, nullable=False)
+    api_token: Mapped[str] = mapped_column(EncryptedText, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     extra_config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(

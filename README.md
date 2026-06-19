@@ -1,92 +1,81 @@
 # Novex
 
-Novex - MVP веб-платформы-агрегатора курьерских служб.  
-Система позволяет клиенту оформить доставку через единый интерфейс: рассчитать тарифы разных служб, выбрать подходящий вариант, заполнить данные отправления, оплатить заказ, получить трек-номер и отслеживать доставку.
+Агрегатор курьерских служб. Клиент рассчитывает тарифы нескольких перевозчиков, оформляет и оплачивает отправление, получает трек-номер и отслеживает доставку — всё в одном интерфейсе.
 
----
+## Stack
 
-## Цель проекта
+| Layer | Tech |
+|---|---|
+| Frontend | Next.js · React · TypeScript |
+| Backend | FastAPI · Python 3.12 · SQLAlchemy · Alembic |
+| Workers | Background Python workers (Redis queue) |
+| Storage | PostgreSQL · Redis · MinIO |
+| Infra | Docker Compose · Nginx · Certbot (Let's Encrypt) |
+| Payments | Kaspi Pay |
+| Carriers | Azimuth · Exline |
 
-Собрать рабочий MVP агрегатора доставки, который позволит:
+## Project structure
 
-- рассчитывать тарифы разных курьерских служб
-- оформлять отправления через единый интерфейс
-- выполнять онлайн-оплату
-- получать трек-номер и накладную
-- отслеживать статусы доставки
-- собирать рейтинг и отзывы по службам
-
----
-
-## Что входит в MVP
-
-Основной пользовательский сценарий:
-
-1. Клиент открывает сайт Novex
-2. Заполняет короткую форму отправления на главной странице
-3. Получает предложения от курьерских служб
-4. Выбирает и подтверждает тариф
-5. Заполняет полные данные отправителя и получателя
-6. Оплачивает заказ
-7. Получает трек-номер и накладную
-8. Отслеживает доставку
-9. После завершения оставляет отзыв
-
-Также в MVP предусмотрены:
-
-- личный кабинет клиента
-- раздел "Мои заказы"
-- профиль пользователя
-- админ-панель
-- адаптерный слой интеграций с курьерскими службами
-- базовые уведомления
-- подготовка архитектуры к дальнейшему масштабированию
-
----
-
-## Архитектурный подход
-
-Проект строится модульно.
-
-Ключевые принципы:
-
-- бизнес-логика не должна напрямую обращаться к API курьерских служб
-- каждая внешняя интеграция должна идти через отдельный adapter layer
-- backend делится на явные доменные модули
-- фоновые процессы выносятся в workers
-- документы и накладные должны храниться в отдельном файловом хранилище
-- инфраструктура сразу готовится под дальнейшее масштабирование
-
----
-
-## Технологический стек
-Frontend
-- Next.js
-- React
-- TypeScript
-
-Backend
-- FastAPI
-- Python 3.12+
-
-Infrastructure
-- PostgreSQL
-- Redis
-- MinIO
-- Nginx
-- Docker Compose
-
-## Структура проекта
-
-```text
+```
 novex/
-├── README.md
-├── .gitignore
-├── .editorconfig
-├── .env
-├── Makefile
-├── docs/
-├── frontend/
 ├── backend/
+│   ├── app/
+│   │   ├── api/          # FastAPI routers
+│   │   ├── modules/      # domain modules (orders, shipments, quotes, payments, …)
+│   │   └── core/         # config, auth, db session
+│   ├── integrations/
+│   │   └── couriers/     # carrier adapter layer (Azimuth, Exline)
+│   ├── workers/          # async background tasks
+│   └── migrations/       # Alembic migrations
+├── frontend/             # Next.js app
 ├── infra/
+│   ├── compose/          # docker-compose.yml / docker-compose.dev.yml
+│   ├── docker/           # Dockerfiles
+│   └── nginx/            # nginx config templates
 └── scripts/
+```
+
+## Local dev
+
+**Prerequisites:** Docker, Docker Compose
+
+```bash
+# 1. Copy env files and fill in the values
+cp infra/env/backend.env.example infra/env/backend.env
+
+# 2. Start all services (postgres, redis, minio, backend, worker, frontend, nginx)
+docker compose -f infra/compose/docker-compose.dev.yml up --build
+```
+
+| Service | URL |
+|---|---|
+| Frontend | http://localhost:3000 |
+| Backend API | http://localhost:8000/api/v1 |
+| API Docs | http://localhost:8000/docs |
+| MinIO Console | http://localhost:9001 |
+
+Migrations run automatically on startup via a one-shot `migrate` container.
+
+## Production
+
+```bash
+docker compose -f infra/compose/docker-compose.yml up -d
+```
+
+TLS is handled by Certbot (enable `--profile tls` to activate the renewal container).
+
+## Domain modules
+
+| Module | Responsibility |
+|---|---|
+| `identity` | Auth, JWT, registration |
+| `customers` | Customer profiles |
+| `quotes` | Tariff calculation across carriers |
+| `orders` | Order lifecycle |
+| `shipments` | Shipment creation & dispatch |
+| `tracking` | Status polling & webhooks |
+| `payments` | Kaspi Pay integration |
+| `documents` | Labels & invoices (PDF via fpdf2/WeasyPrint) |
+| `notifications` | Email notifications |
+| `reviews` | Ratings after delivery |
+| `carriers` | Carrier registry & credentials |

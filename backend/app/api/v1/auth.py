@@ -7,7 +7,15 @@ from app.core.config import get_settings
 from app.core.db import get_db
 from app.core.dependencies import get_current_user_id
 from app.core.limiter import limiter
-from app.core.security import ACCESS_TOKEN_EXPIRE_MINUTES
+from app.core.security import (
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    REFRESH_TOKEN_TTL_SECONDS,
+    consume_refresh_token,
+    create_access_token,
+    create_refresh_token,
+    get_token_version,
+    revoke_refresh_token,
+)
 from app.modules.identity.schemas import (
     ForgotPasswordRequest,
     LoginRequest,
@@ -22,6 +30,8 @@ from app.modules.identity.service import IdentityService
 router = APIRouter(prefix="/auth", tags=["auth"])
 identity_service = IdentityService()
 
+_REFRESH_COOKIE = "refresh_token"
+
 
 def _set_auth_cookie(response: Response, token: str) -> None:
     settings = get_settings()
@@ -33,6 +43,19 @@ def _set_auth_cookie(response: Response, token: str) -> None:
         samesite="lax",
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         path="/",
+    )
+
+
+def _set_refresh_cookie(response: Response, token: str) -> None:
+    settings = get_settings()
+    response.set_cookie(
+        key=_REFRESH_COOKIE,
+        value=token,
+        httponly=True,
+        secure=settings.environment == "production",
+        samesite="lax",
+        max_age=REFRESH_TOKEN_TTL_SECONDS,
+        path="/api/v1/auth",  # scope to auth endpoints only
     )
 
 
@@ -64,7 +87,54 @@ def login_user(
 ) -> TokenResponse:
     result = identity_service.authenticate_user(db, payload)
     _set_auth_cookie(response, result.access_token)
+    user_id = int(result.profile.user_id)
+    _set_refresh_cookie(response, create_refresh_token(user_id))
     return result
+
+
+@router.post(
+    "/refresh",
+    response_model=TokenResponse,
+    status_code=200,
+    summary="Обновить access token по refresh token из cookie",
+)
+@limiter.limit("20/minute")
+def refresh_access_token(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+) -> TokenResponse:
+    from fastapi import HTTPException
+    token = request.cookies.get(_REFRESH_COOKIE)
+    if not token:
+        raise HTTPException(status_code=401, detail="Refresh token отсутствует")
+
+    user_id = consume_refresh_token(token)
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="Refresh token недействителен или истёк")
+
+    from app.modules.identity.repository import IdentityRepository
+    user = IdentityRepository().get_user_by_id(db, user_id)
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=401, detail="Пользователь не найден или неактивен")
+
+    role_code = user.role.code.value if user.role else "customer"
+    new_access = create_access_token({
+        "sub": str(user.id),
+        "role": role_code,
+        "ver": get_token_version(user.id),
+    })
+    new_refresh = create_refresh_token(user.id)
+
+    _set_auth_cookie(response, new_access)
+    _set_refresh_cookie(response, new_refresh)
+
+    profile = identity_service.get_profile(db, user_id)
+    return TokenResponse(
+        access_token=new_access,
+        expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        profile=profile,
+    )
 
 
 @router.post(
@@ -72,8 +142,15 @@ def login_user(
     status_code=200,
     summary="Завершить сессию — удаляет HttpOnly-cookie",
 )
-def logout_user(response: Response) -> dict:
+def logout_user(
+    request: Request,
+    response: Response,
+) -> dict:
+    token = request.cookies.get(_REFRESH_COOKIE)
+    if token:
+        revoke_refresh_token(token)
     response.delete_cookie(key="access_token", path="/")
+    response.delete_cookie(key=_REFRESH_COOKIE, path="/api/v1/auth")
     return {"detail": "Вышли из системы"}
 
 
