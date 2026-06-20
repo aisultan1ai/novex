@@ -89,13 +89,6 @@ export interface PaginatedResponse<T> {
   pages?: number;
 }
 
-export interface AdminZoneCity {
-  id: number;
-  city_name: string;
-  zone: number;
-  city_type: string | null;
-}
-
 export interface AdminCommission {
   id: number;
   order_draft_id: number;

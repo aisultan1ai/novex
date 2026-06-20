@@ -62,10 +62,24 @@ function LoginPageInner() {
     try {
       const res = await loginUser({ email: email.trim().toLowerCase(), password });
       login(res.profile, res.expires_in);
-      const destination =
-        res.profile.role === "carrier" ? "/dashboard/carrier" :
-        res.profile.role === "admin" ? "/dashboard/admin" :
-        nextPath;
+
+      const role = res.profile.role;
+      const isAdminRole = role === "admin" || role === "operator";
+
+      if (isAdminRole) {
+        const hostname = typeof window !== "undefined" ? window.location.hostname : "";
+        const isLocal = hostname === "localhost" || hostname === "127.0.0.1";
+        if (!isLocal) {
+          // Production: redirect to admin subdomain
+          window.location.href = `https://admin.${hostname}/admin/dashboard`;
+          return;
+        }
+        // Local dev: same origin
+        router.push("/admin/dashboard");
+        return;
+      }
+
+      const destination = role === "carrier" ? "/dashboard/carrier" : nextPath;
       router.push(destination);
     } catch (err) {
       setError(

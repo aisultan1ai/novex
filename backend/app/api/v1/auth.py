@@ -33,6 +33,17 @@ identity_service = IdentityService()
 _REFRESH_COOKIE = "refresh_token"
 
 
+def _access_cookie_domain() -> str | None:
+    """Return '.novex.kz' in production so the cookie is shared across all
+    subdomains (novex.kz and admin.novex.kz). Returns None in dev/test."""
+    from urllib.parse import urlparse
+    settings = get_settings()
+    if settings.environment != "production":
+        return None
+    hostname = urlparse(settings.frontend_url).hostname or ""
+    return f".{hostname}" if hostname and hostname != "localhost" else None
+
+
 def _set_auth_cookie(response: Response, token: str) -> None:
     settings = get_settings()
     response.set_cookie(
@@ -43,6 +54,7 @@ def _set_auth_cookie(response: Response, token: str) -> None:
         samesite="lax",
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         path="/",
+        domain=_access_cookie_domain(),
     )
 
 
@@ -149,7 +161,7 @@ def logout_user(
     token = request.cookies.get(_REFRESH_COOKIE)
     if token:
         revoke_refresh_token(token)
-    response.delete_cookie(key="access_token", path="/")
+    response.delete_cookie(key="access_token", path="/", domain=_access_cookie_domain())
     response.delete_cookie(key=_REFRESH_COOKIE, path="/api/v1/auth")
     return {"detail": "Вышли из системы"}
 

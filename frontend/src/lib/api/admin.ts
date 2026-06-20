@@ -2,7 +2,7 @@ import { apiRequest, ApiError } from "./client";
 import type {
   AdminCarrier, AdminCarrierDetail, AdminCarrierService,
   AdminCommission, AdminOrderDetail, AdminOrderRow, AdminStats,
-  AdminTariffRate, AdminUser, AdminUserDetail, AdminZoneCity,
+  AdminTariffRate, AdminUser, AdminUserDetail,
   BankTransferSettings, CommissionSummary, PaginatedResponse, PlatformSettings,
 } from "@/types/admin";
 
@@ -93,9 +93,6 @@ export const createAdminService = (carrierId: number, body: { code: string; name
 // Rates
 export const listAdminRates = (carrierId: number, serviceId: number, page = 1, size = 50): Promise<PaginatedResponse<AdminTariffRate>> =>
   req(`/admin/carriers/${carrierId}/services/${serviceId}/rates?page=${page}&size=${size}`);
-
-export const listAdminZoneCities = (carrierId: number, page = 1, size = 50): Promise<PaginatedResponse<AdminZoneCity>> =>
-  req(`/admin/carriers/${carrierId}/cities?page=${page}&size=${size}`);
 
 export const deleteAdminRate = (carrierId: number, serviceId: number, rateId: number): Promise<void> =>
   req(`/admin/carriers/${carrierId}/services/${serviceId}/rates/${rateId}`, { method: "DELETE" });
