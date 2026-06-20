@@ -5,9 +5,10 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.core.carrier_gateway_client import get_gateway_client
 from app.core.db import get_db
 from app.core.dependencies import require_admin
-from app.modules.carriers.api_clients.registry import get_client, list_supported_codes
+from app.modules.carriers.api_clients.registry import list_supported_codes
 from app.modules.carriers.api_credentials import (
     CarrierAPICredentialsCreate,
     CarrierAPICredentialsRepository,
@@ -99,18 +100,19 @@ def test_connection(
     if not creds:
         raise HTTPException(404, f"API credentials not found for carrier '{carrier_code}'")
 
-    client = get_client(carrier_code)
-    if not client:
-        raise HTTPException(422, f"No API client implemented for carrier '{carrier_code}'")
-
+    test_creds = {
+        "api_url": creds.api_url,
+        "api_token": creds.api_token,
+        **(creds.extra_config or {}),
+    }
     try:
-        client.test_connection({
-            "api_url": creds.api_url,
-            "api_token": creds.api_token,
-            **(creds.extra_config or {}),
-        })
-        logger.info("API connection test success: carrier_code=%s", carrier_code)
-        return {"ok": True, "message": "Подключение успешно"}
+        result = get_gateway_client().test_connection(carrier_code, test_creds)
+        if result.get("ok"):
+            logger.info("API connection test success: carrier_code=%s", carrier_code)
+            return {"ok": True, "message": "Подключение успешно"}
+        else:
+            logger.warning("API connection test failed: carrier_code=%s error=%s", carrier_code, result.get("error"))
+            return {"ok": False, "message": result.get("error", "Ошибка подключения")}
     except Exception as exc:
-        logger.warning("API connection test failed: carrier_code=%s error=%s", carrier_code, exc)
-        return {"ok": False, "message": str(exc)}
+        logger.warning("Gateway unreachable during test: carrier_code=%s error=%s", carrier_code, exc)
+        return {"ok": False, "message": f"Gateway error: {exc}"}

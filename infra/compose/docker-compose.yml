@@ -85,6 +85,8 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+      carrier-gateway:
+        condition: service_healthy
     working_dir: /app
     env_file:
       - path: ../env/backend.env
@@ -126,6 +128,8 @@ services:
       KASPI_API_URL: ${KASPI_API_URL:-https://api.kaspi.kz/merchant}
       FRONTEND_URL: https://${DOMAIN}
       BACKEND_URL: https://${DOMAIN}
+      CARRIER_GATEWAY_URL: http://carrier-gateway:8100
+      GATEWAY_SECRET: ${GATEWAY_SECRET}
     # CMD is defined in Dockerfile: uvicorn --workers 4 (no --reload)
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
@@ -162,6 +166,8 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
       MINIO_BUCKET: novex-prod
       MINIO_SECURE: "false"
+      CARRIER_GATEWAY_URL: http://carrier-gateway:8100
+      GATEWAY_SECRET: ${GATEWAY_SECRET}
     healthcheck:
       test: ["CMD", "python", "-c", "import os,redis; redis.from_url(os.environ['REDIS_URL']).get('worker:alive') or exit(1)"]
       interval: 60s
@@ -169,6 +175,58 @@ services:
       retries: 3
       start_period: 45s
     # CMD is defined in Dockerfile: python -m workers.main
+
+  carrier-gateway:
+    build:
+      context: ../..
+      dockerfile: infra/docker/gateway.Dockerfile
+    container_name: novex-carrier-gateway
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: production
+      GATEWAY_SECRET: ${GATEWAY_SECRET}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8100/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    # No ports exposed — internal Docker network only
+
+  tracking-poller:
+    build:
+      context: ../..
+      dockerfile: infra/docker/worker.Dockerfile
+    container_name: novex-tracking-poller
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      carrier-gateway:
+        condition: service_healthy
+    working_dir: /app
+    env_file:
+      - path: ../env/worker.env
+        required: false
+    environment:
+      ENVIRONMENT: production
+      SECRET_KEY: ${SECRET_KEY}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      CARRIER_GATEWAY_URL: http://carrier-gateway:8100
+      GATEWAY_SECRET: ${GATEWAY_SECRET}
+    command: ["python", "-m", "workers.tracking_poller"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os,redis; redis.from_url(os.environ['REDIS_URL']).get('tracking_poller:alive') or exit(1)"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   frontend:
     build:

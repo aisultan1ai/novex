@@ -17,6 +17,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.common.status_machine import InvalidTransitionError, transition_order
+from app.core.carrier_gateway_client import get_gateway_client
+from app.modules.carriers.api_credentials import CarrierAPICredentialsRepository
 from app.modules.carriers.integration_log import IntegrationLogRepository
 from app.modules.carriers.pii_mask import mask_pii
 from app.modules.carriers.webhook_config import CarrierWebhookRepository
@@ -246,22 +248,22 @@ class DispatchWorker:
         return None
 
     def _dispatch_to_carrier(self, db: Session, order: OrderDraft) -> str | None:
-        from app.modules.carriers.api_clients.registry import get_client
-        from app.modules.carriers.api_credentials import CarrierAPICredentialsRepository
-
         carrier_code = order.carrier_code_snapshot
 
-        # ── Priority 1: direct carrier API ──────────────────────────────────
-        client = get_client(carrier_code)
+        # ── Priority 1: carrier API via carrier-gateway ──────────────────────
         creds = CarrierAPICredentialsRepository().get_by_carrier_code(db, carrier_code)
 
-        if client and creds and creds.is_active:
-            logger.info("dispatch_worker: using API client for carrier %s, order %s", carrier_code, order.id)
+        if creds and creds.is_active:
+            logger.info("dispatch_worker: calling carrier-gateway for carrier=%s order=%s", carrier_code, order.id)
             order_data = _build_api_order_data(order)
-            api_creds = {"api_url": creds.api_url, "api_token": creds.api_token, **(creds.extra_config or {})}
+            api_creds = {
+                "api_url": creds.api_url,
+                "api_token": creds.api_token,
+                **(creds.extra_config or {}),
+            }
             t0 = time.monotonic()
             try:
-                result = client.create_invoice(order_data, api_creds)
+                result = get_gateway_client().create_invoice(carrier_code, order_data, api_creds)
                 duration_ms = int((time.monotonic() - t0) * 1000)
                 cfg = _webhook_repo.get_by_carrier_code(db, carrier_code)
                 if cfg:

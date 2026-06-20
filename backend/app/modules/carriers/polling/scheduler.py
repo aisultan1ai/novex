@@ -11,9 +11,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.common.status_machine import can_transition
+from app.core.carrier_gateway_client import CarrierGatewayClient, GatewayTrackingEvent, get_gateway_client
 from app.modules.carriers.api_credentials import CarrierAPICredentialsRepository
 from app.modules.carriers.integration_log import IntegrationLogRepository
-from app.modules.carriers.polling.registry import get_adapter
 from app.modules.dispatch.models import OrderStatusHistory
 from app.modules.notifications.service import NotificationsService
 from app.modules.shipments.models import Shipment
@@ -27,7 +27,10 @@ _notifications_svc = NotificationsService()
 _creds_repo = CarrierAPICredentialsRepository()
 _integration_log = IntegrationLogRepository()
 
-_ACTIVE_STATUSES = {"sent_to_carrier", "dispatched", "picked_up", "in_transit", "out_for_delivery", "customs_hold", "delivery_failed"}
+_ACTIVE_STATUSES = {
+    "sent_to_carrier", "dispatched", "picked_up", "in_transit",
+    "out_for_delivery", "customs_hold", "delivery_failed",
+}
 _MAX_WORKERS = 10
 
 
@@ -35,23 +38,26 @@ _MAX_WORKERS = 10
 class _PollWork:
     shipment: Any
     order: Any
-    adapter: Any
-    creds: dict
+    creds: dict           # carrier creds fetched from DB and passed to gateway
 
 
 @dataclass
 class _PollResult:
     shipment: Any
     order: Any
-    events: list
+    events: list[GatewayTrackingEvent]
     error: Exception | None
     duration_ms: int
 
 
-def _fetch(work: _PollWork) -> _PollResult:
+def _fetch(work: _PollWork, gateway: CarrierGatewayClient) -> _PollResult:
     t0 = time.monotonic()
     try:
-        events = work.adapter.fetch_status(work.shipment.carrier_tracking_number, work.creds)
+        events = gateway.fetch_tracking(
+            work.order.carrier_code_snapshot,
+            work.shipment.carrier_tracking_number,
+            work.creds,
+        )
         return _PollResult(
             shipment=work.shipment,
             order=work.order,
@@ -79,19 +85,16 @@ def poll_all_active_shipments(db: Session) -> None:
         .limit(200)
     ).all()
 
-    # Cache credentials per carrier_code
     creds_cache: dict[str, dict] = {}
     work_items: list[_PollWork] = []
 
     for shipment, order in rows:
         if not shipment.carrier_tracking_number:
             continue
-        adapter = get_adapter(order.carrier_code_snapshot)
-        if adapter is None:
-            continue
-        if order.carrier_code_snapshot not in creds_cache:
-            db_creds = _creds_repo.get_by_carrier_code(db, order.carrier_code_snapshot)
-            creds_cache[order.carrier_code_snapshot] = (
+        carrier_code = order.carrier_code_snapshot
+        if carrier_code not in creds_cache:
+            db_creds = _creds_repo.get_by_carrier_code(db, carrier_code)
+            creds_cache[carrier_code] = (
                 {"api_url": db_creds.api_url, **(db_creds.extra_config or {})}
                 if db_creds and db_creds.is_active
                 else {}
@@ -99,21 +102,22 @@ def poll_all_active_shipments(db: Session) -> None:
         work_items.append(_PollWork(
             shipment=shipment,
             order=order,
-            adapter=adapter,
-            creds=creds_cache[order.carrier_code_snapshot],
+            creds=creds_cache[carrier_code],
         ))
 
     if not work_items:
         return
 
-    # Fan out HTTP calls in parallel; DB session never crosses thread boundary
+    gateway = get_gateway_client()
+
     results: list[_PollResult] = []
     with ThreadPoolExecutor(max_workers=min(_MAX_WORKERS, len(work_items))) as pool:
-        futures: dict[Future, _PollWork] = {pool.submit(_fetch, w): w for w in work_items}
+        futures: dict[Future, _PollWork] = {
+            pool.submit(_fetch, w, gateway): w for w in work_items
+        }
         for fut in as_completed(futures):
             results.append(fut.result())
 
-    # Process results sequentially — DB session is not thread-safe
     for result in results:
         shipment = result.shipment
         order = result.order
@@ -132,9 +136,7 @@ def poll_all_active_shipments(db: Session) -> None:
             )
             logger.warning(
                 "polling failed for shipment %s (%s): %s",
-                shipment.id,
-                shipment.carrier_tracking_number,
-                result.error,
+                shipment.id, shipment.carrier_tracking_number, result.error,
             )
             continue
 

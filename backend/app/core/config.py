@@ -92,6 +92,10 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:3000"
     backend_url: str = "http://localhost:8000"
 
+    # Internal carrier gateway service
+    carrier_gateway_url: str = "http://carrier-gateway:8100"
+    gateway_secret: str = ""
+
     backend_cors_origins: list[str] = Field(
         default_factory=lambda: [
             "http://localhost",
