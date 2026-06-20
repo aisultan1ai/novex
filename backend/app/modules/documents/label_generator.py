@@ -73,16 +73,18 @@ def _find_party(order: OrderDraft, role: str) -> ShipmentParty | None:
     return None
 
 
+# Resolved once at import time — filesystem scan is expensive per-request
+_FONT_REGULAR: str | None = _find_unicode_font()
+_FONT_BOLD: str | None = _find_unicode_font_bold()
+
+
 def generate_label_pdf(order: OrderDraft) -> bytes:
     if not _FPDF_AVAILABLE:
         raise RuntimeError(
             "Для генерации накладных установите пакет: pip install fpdf2"
         )
 
-    font_regular = _find_unicode_font()
-    font_bold = _find_unicode_font_bold()
-
-    if font_regular is None:
+    if _FONT_REGULAR is None:
         raise RuntimeError(
             "Не найден Unicode-шрифт для генерации PDF. "
             "Убедитесь, что на сервере установлен Arial или DejaVuSans."
@@ -92,11 +94,8 @@ def generate_label_pdf(order: OrderDraft) -> bytes:
     pdf.add_page()
     pdf.set_auto_page_break(auto=False)
 
-    pdf.add_font("UniFont", style="", fname=font_regular)
-    if font_bold:
-        pdf.add_font("UniFont", style="B", fname=font_bold)
-    else:
-        pdf.add_font("UniFont", style="B", fname=font_regular)
+    pdf.add_font("UniFont", style="", fname=_FONT_REGULAR)
+    pdf.add_font("UniFont", style="B", fname=_FONT_BOLD or _FONT_REGULAR)
 
     def regular(size: int = 10) -> None:
         pdf.set_font("UniFont", style="", size=size)

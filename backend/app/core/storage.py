@@ -6,7 +6,9 @@ import mimetypes
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from datetime import timedelta
 from functools import lru_cache
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +48,11 @@ class StorageService(ABC):
 
     @abstractmethod
     def get_file_bytes(self, object_name: str) -> bytes | None:
+        ...
+
+    @abstractmethod
+    def get_presigned_internal_path(self, object_name: str) -> str:
+        """Returns path for nginx X-Accel-Redirect (e.g. /internal-storage/bucket/object?sig)."""
         ...
 
 
@@ -157,6 +164,16 @@ class MinioStorageService(StorageService):
         except Exception as exc:
             logger.warning("Storage get_file_bytes failed for %s: %s", object_name, exc)
             return None
+
+    def get_presigned_internal_path(self, object_name: str) -> str:
+        if not self._client:
+            raise RuntimeError("MinIO unavailable — cannot generate presigned path")
+        presigned = self._client.presigned_get_object(
+            self._bucket, object_name, expires=timedelta(hours=1)
+        )
+        parsed = urlparse(presigned)
+        qs = f"?{parsed.query}" if parsed.query else ""
+        return f"/internal-storage{parsed.path}{qs}"
 
 
 @lru_cache(maxsize=1)
