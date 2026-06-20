@@ -204,7 +204,7 @@ function CheckoutPageInner() {
                     {draft.from_city_snapshot} → {draft.to_city_snapshot}
                   </div>
                   <div style={{ fontSize: 13, color: "#64748b" }}>
-                    {draft.shipment_type_snapshot} · {draft.eta_days_min_snapshot}–{draft.eta_days_max_snapshot} дн.
+                    {draft.shipment_type_snapshot} · {draft.eta_days_min_snapshot}-{draft.eta_days_max_snapshot} дн.
                   </div>
                   <div style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>
                     {draft.carrier_name_snapshot} - {draft.tariff_name_snapshot}

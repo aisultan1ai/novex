@@ -12,7 +12,7 @@ import {
 import type { Notification } from "@/types/notifications";
 
 function formatDateTime(iso: string) {
-  // Backend returns naive UTC without 'Z' — append it so browser parses as UTC, not local
+  // Backend returns naive UTC without 'Z' - append it so browser parses as UTC, not local
   const d = new Date(/[Z+]/.test(iso) ? iso : iso + "Z");
   const now = new Date();
   const diffMs = now.getTime() - d.getTime();

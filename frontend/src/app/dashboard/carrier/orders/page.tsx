@@ -104,7 +104,7 @@ export default function CarrierOrdersPage() {
                     {recipient && <div style={{ fontSize: 11, color: "#6b7280" }}>Кому: {recipient.full_name}</div>}
                   </td>
                   <td style={styles.td}>
-                    <div>{pkg ? `${pkg.weight_kg} кг` : "—"}</div>
+                    <div>{pkg ? `${pkg.weight_kg} кг` : "-"}</div>
                     <div style={{ fontSize: 11, color: "#6b7280" }}>{o.tariff_name}</div>
                   </td>
                   <td style={styles.td}>

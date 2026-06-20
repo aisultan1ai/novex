@@ -41,7 +41,7 @@ function ValueDiff({ old_value, new_value }: { old_value: string | null; new_val
   const oldObj = parseJson(old_value);
   const newObj = parseJson(new_value);
 
-  if (!oldObj && !newObj) return <span style={{ color: "#94a3b8", fontSize: 12 }}>—</span>;
+  if (!oldObj && !newObj) return <span style={{ color: "#94a3b8", fontSize: 12 }}>-</span>;
 
   const keys = Array.from(new Set([...Object.keys(oldObj ?? {}), ...Object.keys(newObj ?? {})]));
 
@@ -265,7 +265,7 @@ export default function AdminAuditLogsPage() {
               </div>
 
               <div style={{ fontSize: 12, fontFamily: "monospace", color: "#94a3b8" }}>
-                {log.resource_id != null ? `#${log.resource_id}` : "—"}
+                {log.resource_id != null ? `#${log.resource_id}` : "-"}
               </div>
 
               <div>

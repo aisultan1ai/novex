@@ -189,7 +189,7 @@ export default function CarrierOrderDetailPage() {
           </div>
           <div style={styles.col}>
             <div style={styles.label}>ETA</div>
-            <div style={styles.value}>{order.eta_days_min}–{order.eta_days_max} дн.</div>
+            <div style={styles.value}>{order.eta_days_min}-{order.eta_days_max} дн.</div>
           </div>
         </div>
       </div>
@@ -216,7 +216,7 @@ export default function CarrierOrderDetailPage() {
         <div style={styles.cardTitle}>Посылки ({order.packages.length})</div>
         {order.packages.map((pkg, i) => (
           <div key={i} style={{ paddingBottom: 8, marginBottom: 8, borderBottom: i < order.packages.length - 1 ? "1px solid #f3f4f6" : "none" }}>
-            <div style={{ fontWeight: 600, marginBottom: 4 }}>#{i + 1} — {pkg.description}</div>
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>#{i + 1} - {pkg.description}</div>
             <div style={{ fontSize: 12, color: "#6b7280", display: "flex", gap: 16, flexWrap: "wrap" }}>
               <span>Кол-во: {pkg.quantity}</span>
               <span>Вес: {pkg.weight_kg} кг</span>

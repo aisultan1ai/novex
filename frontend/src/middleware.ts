@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// Decodes JWT payload without signature verification — routing only, real auth
+// Decodes JWT payload without signature verification - routing only, real auth
 // is enforced by the backend on every API call.
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
@@ -53,7 +53,7 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // ── novex.kz — block direct /admin/* access ───────────────────────────────
+  // ── novex.kz - block direct /admin/* access ───────────────────────────────
   if (pathname.startsWith("/admin")) {
     return NextResponse.redirect(new URL("/", req.url));
   }

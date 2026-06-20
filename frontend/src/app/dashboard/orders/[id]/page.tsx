@@ -265,7 +265,7 @@ export default function OrderDetailPage() {
               </div>
               <div>
                 <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Срок доставки</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{order.eta_days_min_snapshot}–{order.eta_days_max_snapshot} дн.</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{order.eta_days_min_snapshot}-{order.eta_days_max_snapshot} дн.</div>
               </div>
               <div>
                 <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Стоимость</div>

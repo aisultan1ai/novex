@@ -22,7 +22,7 @@ const CARRIER_DEFAULTS: Record<string, { api_url: string; extra_config: Record<s
   exline: {
     api_url: "https://home.courierexe.ru/api/",
     extra_config: { extra: "", login: "", password: "" },
-    hint: "extra — идентификатор компании в MeaSoft, login — логин, password — пароль",
+    hint: "extra - идентификатор компании в MeaSoft, login - логин, password - пароль",
   },
 };
 
@@ -208,7 +208,7 @@ export default function CarrierAPIPage() {
 
           <div style={{ marginBottom: 16 }}>
             <label style={label}>
-              API Токен (Bearer){creds ? " — оставьте пустым, чтобы не менять" : ""}
+              API Токен (Bearer){creds ? " - оставьте пустым, чтобы не менять" : ""}
             </label>
             <input
               style={inp}
@@ -249,7 +249,7 @@ export default function CarrierAPIPage() {
               style={{ width: 16, height: 16, cursor: "pointer" }}
             />
             <label htmlFor="is_active" style={{ fontSize: 13, color: "#0f172a", cursor: "pointer", fontWeight: 500 }}>
-              API-интеграция активна (если выключено — используется webhook)
+              API-интеграция активна (если выключено - используется webhook)
             </label>
           </div>
 
@@ -307,10 +307,10 @@ export default function CarrierAPIPage() {
             <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>Как работает диспетчеризация</div>
             <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "#475569", lineHeight: 1.7 }}>
               <li>При оплате заказа создаётся DispatchJob</li>
-              <li>Если для перевозчика настроен и активен API — вызывается API напрямую</li>
+              <li>Если для перевозчика настроен и активен API - вызывается API напрямую</li>
               <li>Перевозчик возвращает номер накладной (и PDF, если доступен)</li>
               <li>Документ сохраняется в хранилище</li>
-              <li>Если API не настроен — fallback на webhook</li>
+              <li>Если API не настроен - fallback на webhook</li>
             </ol>
           </div>
 

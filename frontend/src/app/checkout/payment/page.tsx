@@ -191,7 +191,7 @@ function PaymentPageContent() {
                 <li>Переведите точную сумму по реквизитам выше.</li>
                 <li>В назначении платежа укажите номер заказа (скопируйте поле «Назначение платежа»).</li>
                 <li>Сохраните скриншот или PDF-квитанцию из вашего банка.</li>
-                <li>Загрузите файл ниже — оператор проверит оплату в течение 24 ч.</li>
+                <li>Загрузите файл ниже - оператор проверит оплату в течение 24 ч.</li>
               </ol>
               <p style={{ ...styles.muted, fontSize: 12, color: "#94a3b8" }}>
                 Принимаются: JPEG, PNG, PDF. Максимальный размер: 5 МБ.
@@ -208,7 +208,7 @@ function PaymentPageContent() {
                   <p style={{ color: "#dc2626", fontSize: 14 }}>{uploadError}</p>
                 )}
                 <button type="submit" disabled={uploading} style={styles.btn}>
-                  {uploading ? "Загрузка..." : "Я оплатил — загрузить чек"}
+                  {uploading ? "Загрузка..." : "Я оплатил - загрузить чек"}
                 </button>
               </form>
             </div>

@@ -661,7 +661,7 @@ export default function HomePage() {
                           </div>
                         </div>
                         <div style={{ fontSize: 13, color: "#64748b", display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap" }}>
-                          <span>📅 Срок: {rate.eta_days_min}–{rate.eta_days_max} дн.</span>
+                          <span>📅 Срок: {rate.eta_days_min}-{rate.eta_days_max} дн.</span>
                           <span>🕐 Сбор: по будням</span>
                           <span>🛡 Страховка: нет</span>
                         </div>
@@ -800,7 +800,7 @@ export default function HomePage() {
 
             <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
               <DetailRow label="Тариф" value={selectedRate.tariff_name} />
-              <DetailRow label="Срок доставки" value={`${selectedRate.eta_days_min}–${selectedRate.eta_days_max} рабочих дней`} />
+              <DetailRow label="Срок доставки" value={`${selectedRate.eta_days_min}-${selectedRate.eta_days_max} рабочих дней`} />
               <DetailRow label="Ограничения" value="Макс. 30 кг · 150×150×150 см" muted />
               <DetailRow label="Страховка" value="Нет" />
             </div>

@@ -144,7 +144,7 @@ function LoginPageInner() {
 
           {isRegistered && (
             <div style={{ marginBottom: 20, padding: "12px 14px", borderRadius: 10, background: "#f0fdf4", border: "1px solid #bbf7d0", color: "#166534", fontSize: 14, fontWeight: 500 }}>
-              Аккаунт создан — теперь войдите.
+              Аккаунт создан - теперь войдите.
             </div>
           )}
 

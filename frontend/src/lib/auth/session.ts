@@ -2,7 +2,7 @@ import type { ProfileResponse } from "@/types/auth";
 
 const AUTH_PROFILE_STORAGE_KEY = "novex_auth_profile";
 
-// Only non-sensitive fields (id, email, role) — phone, billing, company stay server-side
+// Only non-sensitive fields (id, email, role) - phone, billing, company stay server-side
 interface StoredData {
   user_id: number;
   email: string;
@@ -38,7 +38,7 @@ export function getStoredCurrentUser(): ProfileResponse | null {
   try {
     const stored = JSON.parse(raw) as StoredData;
     if (!stored.user_id || !stored.email || !stored.role) return null;
-    // Reconstruct ProfileResponse — sensitive fields (phone, company, billing) are
+    // Reconstruct ProfileResponse - sensitive fields (phone, company, billing) are
     // not stored locally and must be fetched from the API when needed
     return {
       user_id: stored.user_id,

@@ -236,7 +236,7 @@ export default function AdminUsersPage() {
               >×</button>
             </div>
 
-            {/* Role selector — at the top so it's prominent */}
+            {/* Role selector - at the top so it's prominent */}
             <div style={{ marginBottom: 18 }}>
               <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
                 Роль

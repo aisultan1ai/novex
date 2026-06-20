@@ -267,7 +267,7 @@ export default function AdminCommissionConfigsPage() {
           <div style={{ padding: 48, textAlign: "center", color: "#64748b", fontSize: 14 }}>Загружаем…</div>
         ) : configs.length === 0 ? (
           <div style={{ padding: "48px 24px", textAlign: "center", color: "#64748b", fontSize: 14 }}>
-            Нет настроек — используется глобальная ставка из настроек платформы
+            Нет настроек - используется глобальная ставка из настроек платформы
           </div>
         ) : (
           configs.map((cfg, idx) => (
@@ -284,12 +284,12 @@ export default function AdminCommissionConfigsPage() {
               <span style={{ fontSize: 13, color: "#0f172a", fontWeight: 600 }}>
                 {cfg.commission_rate != null
                   ? `${(Number(cfg.commission_rate) * 100).toFixed(2)}%`
-                  : "—"}
+                  : "-"}
               </span>
               <span style={{ fontSize: 13, color: "#0f172a", fontWeight: 600 }}>
                 {cfg.fixed_amount != null
                   ? `${Number(cfg.fixed_amount).toLocaleString("ru-RU")} ${cfg.currency}`
-                  : "—"}
+                  : "-"}
               </span>
               <span style={{ fontSize: 13, color: "#64748b" }}>{cfg.currency}</span>
               <div style={{ display: "flex", gap: 8 }}>
@@ -315,7 +315,7 @@ export default function AdminCommissionConfigsPage() {
       {/* Info note */}
       <div style={{ marginTop: 20, padding: "14px 18px", background: "#f8fafc", border: "1px solid #e5e7eb", borderRadius: 12, fontSize: 13, color: "#64748b" }}>
         <strong style={{ color: "#475569" }}>Как работает:</strong>{" "}
-        Если для перевозчика задана конфигурация, она используется при расчёте комиссии вместо глобальной ставки. Ставка задаётся в процентах от суммы заказа, фиксированная — в абсолютной сумме.
+        Если для перевозчика задана конфигурация, она используется при расчёте комиссии вместо глобальной ставки. Ставка задаётся в процентах от суммы заказа, фиксированная - в абсолютной сумме.
       </div>
     </>
   );

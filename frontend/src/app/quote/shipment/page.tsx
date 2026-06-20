@@ -315,7 +315,7 @@ function TariffCard({
             {formatPrice(draft.price_snapshot, draft.currency_snapshot)}
           </div>
           <div style={{ fontSize: 13, color: "#6366f1", fontWeight: 600, marginBottom: 12 }}>
-            {draft.eta_days_min_snapshot}–{draft.eta_days_max_snapshot} дн.
+            {draft.eta_days_min_snapshot}-{draft.eta_days_max_snapshot} дн.
           </div>
           <button style={{ ...buttonSecondary, fontSize: 13, padding: "8px 14px" }} onClick={onChangeTariff}>
             Изменить тариф

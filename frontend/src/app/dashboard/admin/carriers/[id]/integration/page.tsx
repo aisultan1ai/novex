@@ -194,7 +194,7 @@ export default function CarrierIntegrationPage() {
 
             {/* push_url */}
             <div style={{ marginBottom: 16 }}>
-              <label style={lbl}>Push URL (Model B — Generic Webhook)</label>
+              <label style={lbl}>Push URL (Model B - Generic Webhook)</label>
               <input
                 style={inp}
                 value={form.push_url}
@@ -222,7 +222,7 @@ export default function CarrierIntegrationPage() {
               </div>
               {regenSecret && (
                 <div style={{ marginTop: 8, background: "#fefce8", border: "1px solid #fde68a", borderRadius: 8, padding: "10px 12px", fontSize: 12 }}>
-                  <strong>Новый секрет (сохраните — показывается один раз):</strong>
+                  <strong>Новый секрет (сохраните - показывается один раз):</strong>
                   <div style={{ fontFamily: "monospace", marginTop: 4, wordBreak: "break-all", color: "#0f172a" }}>{regenSecret}</div>
                 </div>
               )}
@@ -286,9 +286,9 @@ export default function CarrierIntegrationPage() {
                         </span>
                       </td>
                       <td style={{ padding: "7px 10px", color: "#374151" }}>{log.event_type}</td>
-                      <td style={{ padding: "7px 10px", color: "#6b7280" }}>{log.order_id ? `#${log.order_id}` : "—"}</td>
-                      <td style={{ padding: "7px 10px", color: "#6b7280" }}>{log.http_status ?? "—"}</td>
-                      <td style={{ padding: "7px 10px", color: "#6b7280" }}>{log.duration_ms ?? "—"}</td>
+                      <td style={{ padding: "7px 10px", color: "#6b7280" }}>{log.order_id ? `#${log.order_id}` : "-"}</td>
+                      <td style={{ padding: "7px 10px", color: "#6b7280" }}>{log.http_status ?? "-"}</td>
+                      <td style={{ padding: "7px 10px", color: "#6b7280" }}>{log.duration_ms ?? "-"}</td>
                       <td style={{ padding: "7px 10px" }}>
                         <span style={{ padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 600, background: log.status === "success" ? "#dcfce7" : "#fee2e2", color: log.status === "success" ? "#166534" : "#991b1b" }}>
                           {log.status}
@@ -321,8 +321,8 @@ export default function CarrierIntegrationPage() {
             {testResult && (
               <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: 8, fontSize: 12, background: testResult.ok ? "#f0fdf4" : "#fef2f2", color: testResult.ok ? "#166534" : "#b91c1c" }}>
                 {testResult.ok ? "✓ Успех" : "✗ Ошибка"}
-                {testResult.http_status && <span> — HTTP {testResult.http_status}</span>}
-                {testResult.duration_ms && <span> — {testResult.duration_ms}ms</span>}
+                {testResult.http_status && <span> - HTTP {testResult.http_status}</span>}
+                {testResult.duration_ms && <span> - {testResult.duration_ms}ms</span>}
                 {testResult.error && <div style={{ marginTop: 4 }}>{testResult.error}</div>}
                 {testResult.response && <div style={{ marginTop: 4, fontFamily: "monospace", wordBreak: "break-all" }}>{testResult.response.slice(0, 200)}</div>}
               </div>
@@ -339,7 +339,7 @@ export default function CarrierIntegrationPage() {
               </div>
               <div>
                 <span style={{ fontWeight: 600 }}>Model B (Generic Webhook)</span><br />
-                Carrier принимает POST на свой URL. Novex подписывает запрос HMAC-SHA256. Не нужен Python-код — достаточно настроить push_url и secret.
+                Carrier принимает POST на свой URL. Novex подписывает запрос HMAC-SHA256. Не нужен Python-код - достаточно настроить push_url и secret.
               </div>
             </div>
           </div>

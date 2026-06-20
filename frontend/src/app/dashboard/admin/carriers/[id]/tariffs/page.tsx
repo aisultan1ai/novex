@@ -219,9 +219,9 @@ export default function AdminCarrierTariffsPage() {
                     <span style={{ color: "#475569" }}>{rate.weight_from_kg}</span>
                     <span style={{ color: "#475569" }}>{rate.weight_to_kg ?? "∞"}</span>
                     <span style={{ fontWeight: 600, color: "#0f172a" }}>{Number(rate.base_price).toLocaleString("ru-RU")}</span>
-                    <span style={{ color: "#64748b" }}>{rate.per_unit_price ? Number(rate.per_unit_price).toLocaleString("ru-RU") : "—"}</span>
-                    <span style={{ color: "#64748b" }}>{rate.eta_days_min ?? "—"}</span>
-                    <span style={{ color: "#64748b" }}>{rate.eta_days_max ?? "—"}</span>
+                    <span style={{ color: "#64748b" }}>{rate.per_unit_price ? Number(rate.per_unit_price).toLocaleString("ru-RU") : "-"}</span>
+                    <span style={{ color: "#64748b" }}>{rate.eta_days_min ?? "-"}</span>
+                    <span style={{ color: "#64748b" }}>{rate.eta_days_max ?? "-"}</span>
                     <button onClick={() => void handleDeleteRate(rate.id)} style={{ width: 28, height: 28, borderRadius: 6, border: "1px solid #fecaca", background: "#fff", color: "#ef4444", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, padding: 0 }}>
                       ×
                     </button>
