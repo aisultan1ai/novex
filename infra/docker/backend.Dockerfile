@@ -31,13 +31,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     fonts-dejavu \
     libpangocairo-1.0-0 \
-    libgdk-pixbuf2.0-0 \
+    libgdk-pixbuf-xlib-2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /opt/venv /opt/venv
 
 COPY backend/app          ./app
-COPY backend/integrations ./integrations
 COPY backend/migrations   ./migrations
 COPY backend/alembic.ini  .
 COPY backend/pyproject.toml .

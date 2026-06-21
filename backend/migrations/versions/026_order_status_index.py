@@ -9,7 +9,7 @@ from __future__ import annotations
 from alembic import op
 
 revision = "026"
-down_revision = "025"
+down_revision = "025_encrypt_carrier_creds"
 branch_labels = None
 depends_on = None
 
@@ -20,7 +20,6 @@ def upgrade() -> None:
         "order_drafts",
         ["status"],
         unique=False,
-        postgresql_concurrently=True,
     )
 
 
