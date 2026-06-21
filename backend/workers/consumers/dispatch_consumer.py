@@ -51,10 +51,9 @@ def _recover_pending(r) -> None:
         for msg_id, data in messages:
             try:
                 _process(data)
-            except Exception:
-                logger.exception("Dispatch consumer: pending msg %s failed, skipping", msg_id)
-            finally:
                 r.xack(STREAM_DISPATCH, GROUP_DISPATCH, msg_id)
+            except Exception:
+                logger.exception("Dispatch consumer: pending msg %s failed, left in PEL for recovery", msg_id)
 
 
 def _process(data: dict) -> None:

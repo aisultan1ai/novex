@@ -13,7 +13,7 @@ def _utcnow() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
 
 import httpx
-from sqlalchemy import select
+from sqlalchemy import select, update as sa_update
 from sqlalchemy.orm import Session
 
 from app.common.status_machine import InvalidTransitionError, transition_order
@@ -109,11 +109,14 @@ class DispatchWorker:
 
     def run_once(self, db: Session) -> int:
         jobs = db.scalars(
-            select(DispatchJob).where(
+            select(DispatchJob)
+            .where(
                 DispatchJob.status == DispatchJobStatus.QUEUED,
                 (DispatchJob.next_retry_at.is_(None))
                 | (DispatchJob.next_retry_at <= _utcnow()),
-            ).limit(10)
+            )
+            .with_for_update(skip_locked=True)
+            .limit(10)
         ).all()
 
         processed = 0
@@ -123,9 +126,20 @@ class DispatchWorker:
         return processed
 
     def _process_job(self, db: Session, job: DispatchJob) -> None:
-        job.status = DispatchJobStatus.PROCESSING
-        job.attempts += 1
+        # Atomically transition QUEUED → PROCESSING. Only one concurrent caller
+        # wins this UPDATE; the other sees scalar() == None and bails out.
+        # This closes the race between the stream consumer and the scheduler.
+        claimed = db.execute(
+            sa_update(DispatchJob)
+            .where(DispatchJob.id == job.id, DispatchJob.status == DispatchJobStatus.QUEUED)
+            .values(status=DispatchJobStatus.PROCESSING, attempts=DispatchJob.attempts + 1)
+            .returning(DispatchJob.id)
+        ).scalar()
         db.flush()
+        if claimed is None:
+            logger.info("dispatch_worker: job %s already claimed by another worker, skipping", job.id)
+            return
+        db.refresh(job)
 
         order = db.get(OrderDraft, job.order_id)
         if not order:
