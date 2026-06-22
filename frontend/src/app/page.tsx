@@ -665,6 +665,11 @@ export default function HomePage() {
                             {formatPrice(rate.price, rate.currency)}
                           </div>
                           <div style={{ fontSize: 12, color: "#94a3b8", textAlign: "right" }}>с НДС</div>
+                          {/эконом|econom/i.test(rate.tariff_name) && (
+                            <div style={{ fontSize: 11, color: "#f59e0b", textAlign: "right", marginTop: 2 }}>
+                              мин. 10 кг — выгодно от 10 кг
+                            </div>
+                          )}
                         </div>
                         <button
                           onClick={(e) => { e.stopPropagation(); void handleSelectRate(rate); }}

@@ -384,14 +384,20 @@ function QuoteResultsPageInner() {
                     </div>
 
                     <div style={{ textAlign: "right", minWidth: 180 }}>
-                      <div
-                        style={{
-                          fontSize: 28,
-                          fontWeight: 800,
-                          marginBottom: 12,
-                        }}
-                      >
-                        {formatPrice(quote.price, quote.currency)}
+                      <div style={{ marginBottom: 12 }}>
+                        <div
+                          style={{
+                            fontSize: 28,
+                            fontWeight: 800,
+                          }}
+                        >
+                          {formatPrice(quote.price, quote.currency)}
+                        </div>
+                        {/эконом|econom/i.test(quote.tariff_name) && (
+                          <div style={{ fontSize: 12, color: "#f59e0b", marginTop: 4 }}>
+                            мин. 10 кг — выгодно от 10 кг
+                          </div>
+                        )}
                       </div>
 
                       <button
