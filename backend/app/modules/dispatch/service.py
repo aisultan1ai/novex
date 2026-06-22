@@ -8,10 +8,6 @@ import time
 import uuid
 from datetime import UTC, datetime, timedelta
 
-
-def _utcnow() -> datetime:
-    return datetime.now(UTC).replace(tzinfo=None)
-
 import httpx
 from sqlalchemy import select, update as sa_update
 from sqlalchemy.orm import Session
@@ -28,6 +24,10 @@ from app.modules.shipments.repository import ShipmentsRepository
 from app.modules.shipments.service import ShipmentsService
 
 logger = logging.getLogger(__name__)
+
+
+def _utcnow() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
 
 _webhook_repo = CarrierWebhookRepository()
 _shipments_svc = ShipmentsService()
@@ -468,7 +468,7 @@ def _build_dispatch_payload(order: OrderDraft) -> dict:
             }
             for p in order.packages
         ],
-        "declared_value": float(order.price_snapshot),
+        "declared_value": float(order.price_snapshot or 0),
         "currency": order.currency_snapshot,
         "additional_services": {
             "call_before_delivery": order.call_before_delivery,

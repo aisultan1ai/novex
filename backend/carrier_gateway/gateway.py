@@ -28,6 +28,13 @@ logging.basicConfig(
 )
 
 _GATEWAY_SECRET = os.environ.get("GATEWAY_SECRET", "")
+_ENVIRONMENT = os.environ.get("ENVIRONMENT", "development")
+
+if _ENVIRONMENT == "production" and not _GATEWAY_SECRET:
+    raise RuntimeError(
+        "GATEWAY_SECRET must be set in production — "
+        "generate with: python -c \"import secrets; print(secrets.token_hex(32))\""
+    )
 
 app = FastAPI(
     title="Carrier Gateway",
