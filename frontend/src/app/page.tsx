@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/providers/auth-provider";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import CitySelect from "@/components/ui/CitySelect";
 import { ApiError, calculateShippingQuote } from "@/lib/api/shipping";
 import { selectShippingQuote } from "@/lib/api/shipping";
@@ -99,16 +100,6 @@ function SkeletonCard() {
   );
 }
 
-function useIsMobile(breakpoint = 640): boolean {
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < breakpoint);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, [breakpoint]);
-  return isMobile;
-}
 
 const QUOTE_FORM_KEY = "novex_quote_form";
 

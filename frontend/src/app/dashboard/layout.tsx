@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/providers/auth-provider";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import { listNotifications } from "@/lib/api/notifications";
 
 function IconLogout() {
@@ -35,6 +36,7 @@ function BellButton({ unread, onClick }: { unread: number; onClick: () => void }
         alignItems: "center",
         justifyContent: "center",
         color: unread > 0 ? "#0f172a" : "#94a3b8",
+        flexShrink: 0,
       }}
     >
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -69,7 +71,7 @@ function BellButton({ unread, onClick }: { unread: number; onClick: () => void }
 }
 
 const BASE_TABS = [
-  { label: "Мои заказы",      href: "/dashboard/orders",        admin: false },
+  { label: "Заказы",          href: "/dashboard/orders",        admin: false },
   { label: "Адресная книга",  href: "/dashboard/address-book",  admin: false },
   { label: "Уведомления",     href: "/dashboard/notifications", admin: false },
   { label: "Профиль",         href: "/dashboard/profile",       admin: false },
@@ -80,6 +82,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { logout, currentUser, isAuthenticated } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -91,7 +94,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const navTabs = [
     ...BASE_TABS,
     ...(currentUser?.role === "admin"
-      ? [{ label: "Администрирование", href: "/dashboard/admin", admin: true }]
+      ? [{ label: "Админ", href: "/dashboard/admin", admin: true }]
       : []),
   ];
 
@@ -101,6 +104,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   const displayName = currentUser?.full_name || currentUser?.email || "Пользователь";
+  const hPad = isMobile ? "0 16px" : "0 40px";
 
   return (
     <div style={{ minHeight: "100vh", background: "#f1f5f9" }}>
@@ -108,29 +112,34 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       {/* HEADER */}
       <header
         style={{
-          height: 60,
+          height: 56,
           background: "#ffffff",
           borderBottom: "1px solid #e5e7eb",
-          padding: "0 40px",
+          padding: hPad,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           position: "sticky",
           top: 0,
           zIndex: 50,
+          gap: 8,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Link href="/" style={{ fontSize: 20, fontWeight: 800, color: "#0f172a", textDecoration: "none" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, overflow: "hidden" }}>
+          <Link href="/" style={{ fontSize: 18, fontWeight: 800, color: "#0f172a", textDecoration: "none", flexShrink: 0 }}>
             Novex
           </Link>
-          <span style={{ color: "#e5e7eb", fontSize: 18 }}>|</span>
-          <span style={{ fontSize: 14, color: "#64748b", fontWeight: 500 }}>
-            {displayName}
-          </span>
+          {!isMobile && (
+            <>
+              <span style={{ color: "#e5e7eb", fontSize: 18 }}>|</span>
+              <span style={{ fontSize: 14, color: "#64748b", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {displayName}
+              </span>
+            </>
+          )}
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
           <BellButton
             unread={unreadCount}
             onClick={() => router.push("/dashboard/notifications")}
@@ -140,8 +149,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 6,
-              padding: "8px 14px",
+              gap: isMobile ? 0 : 6,
+              padding: isMobile ? "8px 10px" : "8px 14px",
               borderRadius: 10,
               border: "1px solid #e5e7eb",
               background: "#ffffff",
@@ -153,20 +162,23 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             }}
           >
             <IconLogout />
-            Выйти
+            {!isMobile && "Выйти"}
           </button>
         </div>
       </header>
 
-      {/* NAV TABS */}
+      {/* NAV TABS — горизонтальный скролл на мобилке */}
       <nav
         style={{
           background: "#ffffff",
           borderBottom: "1px solid #e5e7eb",
-          padding: "0 40px",
+          padding: hPad,
           display: "flex",
           gap: 0,
-        }}
+          overflowX: "auto",
+          scrollbarWidth: "none",
+          WebkitOverflowScrolling: "touch",
+        } as React.CSSProperties}
       >
         {navTabs.map(({ label, href, admin }) => {
           const active = pathname.startsWith(href);
@@ -179,8 +191,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               key={href}
               href={href}
               style={{
-                padding: "14px 20px",
-                fontSize: 14,
+                padding: isMobile ? "12px 14px" : "14px 20px",
+                fontSize: isMobile ? 13 : 14,
                 fontWeight: active ? 600 : 500,
                 textDecoration: "none",
                 color: active ? activeColor : idleColor,
@@ -191,13 +203,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 display: "flex",
                 alignItems: "center",
                 gap: 6,
-                position: "relative",
-              }}
-              onMouseEnter={(e) => {
-                if (!active) (e.currentTarget as HTMLAnchorElement).style.color = activeColor;
-              }}
-              onMouseLeave={(e) => {
-                if (!active) (e.currentTarget as HTMLAnchorElement).style.color = idleColor;
+                flexShrink: 0,
               }}
             >
               {label}
@@ -212,9 +218,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       {/* CONTENT */}
       <div
         style={{
-          padding: "32px 40px",
+          padding: isMobile ? "20px 16px" : "32px 40px",
           background: "#f1f5f9",
-          minHeight: "calc(100vh - 120px)",
+          minHeight: "calc(100vh - 112px)",
           fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, sans-serif",
         }}
       >

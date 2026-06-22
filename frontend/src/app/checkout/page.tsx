@@ -5,6 +5,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { useAuth } from "@/components/providers/auth-provider";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import {
   ApiError,
   getOrderDraft,
@@ -81,6 +82,7 @@ function CheckoutPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const isMobile = useIsMobile();
 
   const draftId = useMemo(() => {
     const raw = searchParams.get("draftId");
@@ -222,7 +224,7 @@ function CheckoutPageInner() {
             </div>
 
             {/* Sender + Recipient */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
               <div style={{ ...card, padding: "20px 24px" }}>
                 <p style={sectionTitle}>Отправитель</p>
                 <InfoRow lbl="ФИО" val={sender?.full_name} />
@@ -325,7 +327,7 @@ function CheckoutPageInner() {
               )}
 
               {/* Pay button */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+              <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", alignItems: isMobile ? "stretch" : "center", gap: 12 }}>
                 <div>
                   <div style={{ fontSize: 13, color: "#64748b" }}>Итого к оплате</div>
                   <div style={{ fontSize: 24, fontWeight: 800, color: "#0f172a" }}>
@@ -345,7 +347,8 @@ function CheckoutPageInner() {
                     fontWeight: 700,
                     cursor: isPaying ? "not-allowed" : "pointer",
                     fontFamily: "inherit",
-                    minWidth: 200,
+                    width: isMobile ? "100%" : "auto",
+                    minWidth: isMobile ? "auto" : 200,
                   }}
                 >
                   {isPaying

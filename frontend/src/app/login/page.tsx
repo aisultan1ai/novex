@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { useAuth } from "@/components/providers/auth-provider";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import { ApiError, loginUser } from "@/lib/api/auth";
 
 const inp: React.CSSProperties = {
@@ -34,6 +35,7 @@ function LoginPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuth();
+  const isMobile = useIsMobile();
 
   const isRegistered = useMemo(() => searchParams.get("registered") === "1", [searchParams]);
   const isExpired = useMemo(() => searchParams.get("expired") === "1", [searchParams]);
@@ -131,7 +133,7 @@ function LoginPageInner() {
             background: "#ffffff",
             border: "1px solid #e5e7eb",
             borderRadius: 16,
-            padding: 40,
+            padding: isMobile ? "24px 20px" : 40,
             boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04)",
           }}
         >
