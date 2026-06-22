@@ -3,13 +3,13 @@ from __future__ import annotations
 import os
 
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 # ---------------------------------------------------------------------------
 # Integration tests require a real PostgreSQL instance.
 # Set TEST_DATABASE_URL before running:
-#   export TEST_DATABASE_URL=postgresql://novex:novex@localhost/novex_test
+#   export TEST_DATABASE_URL=postgresql://novex:novex@localhost:5433/novex_test
 #   pytest tests/integration/
 # ---------------------------------------------------------------------------
 

@@ -92,6 +92,9 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:3000"
     backend_url: str = "http://localhost:8000"
 
+    secret_key: str = ""
+    access_token_expire_minutes: int = 60
+
     # Internal carrier gateway service
     carrier_gateway_url: str = "http://carrier-gateway:8100"
     gateway_secret: str = ""

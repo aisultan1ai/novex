@@ -11,18 +11,26 @@ import jwt
 from jwt import ExpiredSignatureError, InvalidTokenError
 
 JWT_ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 PASSWORD_HASH_ITERATIONS = 100_000
 
 
 def _secret_key() -> str:
-    key = os.getenv("SECRET_KEY", "")
+    from app.core.config import get_settings
+    key = get_settings().secret_key or os.getenv("SECRET_KEY", "")
     if not key:
         raise RuntimeError(
-            "SECRET_KEY environment variable is not set. "
-            'Generate one with: python -c "import secrets; print(secrets.token_hex(32))"'  # noqa: E501
+            "SECRET_KEY is not set. "
+            'Generate one with: python -c "import secrets; print(secrets.token_hex(32))"'
         )
     return key
+
+
+def _token_expire_minutes() -> int:
+    from app.core.config import get_settings
+    return get_settings().access_token_expire_minutes
+
+
+ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
 
 def get_password_hash(password: str) -> str:
@@ -67,7 +75,7 @@ def create_access_token(
     expires_minutes: int | None = None,
 ) -> str:
     now = datetime.now(UTC)
-    expire = now + timedelta(minutes=expires_minutes or ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = now + timedelta(minutes=expires_minutes or _token_expire_minutes())
     payload = {**subject, "iat": now, "exp": expire}
     return jwt.encode(payload, _secret_key(), algorithm=JWT_ALGORITHM)
 
