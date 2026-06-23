@@ -12,7 +12,7 @@ _CACHE_TTL = 300  # 5 minutes — settings change rarely
 def _cache_get(key: str) -> str | None:
     try:
         from app.core.redis import get_redis
-        return get_redis().get(f"{_CACHE_PREFIX}{key}")
+        return get_redis().get(f"{_CACHE_PREFIX}{key}")  # type: ignore[return-value]
     except Exception:
         return None
 

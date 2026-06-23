@@ -28,7 +28,7 @@ def _delete_expired_quote_sessions(db: Session, now: datetime) -> None:
             QuoteSession.expires_at < now,
         )
     )
-    deleted = result.rowcount
+    deleted = result.rowcount  # type: ignore[attr-defined]
     if deleted:
         logger.info("cleanup_expired_files: removed %d expired quote sessions", deleted)
 
@@ -41,6 +41,6 @@ def _delete_old_notification_jobs(db: Session, now: datetime) -> None:
             NotificationJob.created_at < cutoff,
         )
     )
-    deleted = result.rowcount
+    deleted = result.rowcount  # type: ignore[attr-defined]
     if deleted:
         logger.info("cleanup_expired_files: removed %d old notification jobs", deleted)

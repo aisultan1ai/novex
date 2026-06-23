@@ -176,9 +176,9 @@ def get_city_guid(city: str, creds: dict) -> str | None:
     # 1. Try Redis cache
     try:
         from app.core.redis import get_redis
-        cached = get_redis().get(cache_key)
+        cached = get_redis().get(cache_key)  # type: ignore[union-attr]
         if cached:
-            return cached
+            return cached  # type: ignore[return-value]
     except Exception as exc:
         logger.debug("CSE geo cache read failed: %s", exc)
 

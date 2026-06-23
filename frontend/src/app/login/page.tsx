@@ -124,21 +124,14 @@ function LoginPageInner() {
       login(res.profile, res.expires_in);
 
       const role = res.profile.role;
-      const isAdminRole = role === "admin" || role === "operator";
 
-      if (isAdminRole) {
-        const hostname = typeof window !== "undefined" ? window.location.hostname : "";
-        const isLocal = hostname === "localhost" || hostname === "127.0.0.1";
-        if (!isLocal) {
-          window.location.href = `https://admin.${hostname}/admin/dashboard`;
-          return;
-        }
-        router.push("/admin/dashboard");
-        return;
+      if (role === "carrier") {
+        router.push("/dashboard/carrier");
+      } else if (role === "admin" || role === "operator") {
+        router.push("/dashboard/admin");
+      } else {
+        router.push(nextPath);
       }
-
-      const destination = role === "carrier" ? "/dashboard/carrier" : nextPath;
-      router.push(destination);
     } catch (err) {
       setError(
         err instanceof ApiError

@@ -88,6 +88,8 @@ def test_carrier_webhook(
     cfg = _repo.get_by_carrier_code(db, carrier_code)
     if cfg is None:
         raise HTTPException(404, "Конфиг не найден")
+    if not cfg.push_url:
+        raise HTTPException(422, "push_url не настроен")
 
     body = json.dumps({"test": True, "novex_order_id": 0})
     start = time.monotonic()

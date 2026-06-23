@@ -39,10 +39,10 @@ class DocumentsService:
         cache_key = f"pdf:label:{order_draft_id}"
 
         r = get_redis()
-        cached_object_name = r.get(cache_key)
+        cached_object_name = r.get(cache_key)  # type: ignore[union-attr]
         if cached_object_name:
             logger.info("Label served from Redis cache: order_id=%s", order_draft_id)
-            return cached_object_name, filename
+            return cached_object_name, filename  # type: ignore[return-value]
 
         existing = db.scalar(
             select(Document).where(

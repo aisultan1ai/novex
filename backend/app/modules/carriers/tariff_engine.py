@@ -490,7 +490,7 @@ def _calculate_from_db(
         )
     ).all()
 
-    results = _quotes_from_carriers(carriers, from_city, to_city, fallback_zone, kg)
+    results = _quotes_from_carriers(list(carriers), from_city, to_city, fallback_zone, kg)
     if results:
         logger.debug("tariff_engine: DB rates used (%d quotes, kg=%.2f)", len(results), kg)
     else:
@@ -520,7 +520,7 @@ async def _calculate_from_db_async(
     )
     carriers = result.scalars().all()
 
-    results = _quotes_from_carriers(carriers, from_city, to_city, fallback_zone, kg)
+    results = _quotes_from_carriers(list(carriers), from_city, to_city, fallback_zone, kg)
     if results:
         logger.debug("tariff_engine: DB rates used (%d quotes, kg=%.2f)", len(results), kg)
     else:

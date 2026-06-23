@@ -104,8 +104,8 @@ def get_token_version(user_id: int) -> int:
     """Return the current token version for a user. Defaults to 0."""
     try:
         from app.core.redis import get_redis
-        val = get_redis().get(f"{_TOKEN_VER_PREFIX}{user_id}")
-        return int(val) if val else 0
+        val = get_redis().get(f"{_TOKEN_VER_PREFIX}{user_id}")  # type: ignore[union-attr]
+        return int(val) if val else 0  # type: ignore[arg-type]
     except Exception:
         return 0  # fail open — don't lock everyone out if Redis is temporarily down
 
@@ -144,7 +144,7 @@ def consume_refresh_token(token: str) -> int | None:
     if val is None:
         return None
     try:
-        return int(val)
+        return int(val)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return None
 

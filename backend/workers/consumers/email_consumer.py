@@ -35,7 +35,7 @@ def run(stop_event: Event) -> None:
         if not entries:
             continue
 
-        for _, messages in entries:
+        for _, messages in entries:  # type: ignore[union-attr]
             for msg_id, data in messages:
                 try:
                     _process(data)

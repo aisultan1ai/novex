@@ -17,7 +17,7 @@ _GROUPS: dict[str, str] = {
 
 
 def publish(stream: str, data: dict[str, str]) -> None:
-    get_redis().xadd(stream, data)
+    get_redis().xadd(stream, data)  # type: ignore[arg-type]
 
 
 def ensure_consumer_groups() -> None:

@@ -69,6 +69,8 @@ def _deliver(db: Session, job: NotificationJob, payload: dict) -> None:
         logger.warning("send_email_notifications: no email for user_id=%d, skipping", job.user_id)
         return
 
+    if job.order_id is None:
+        return
     result = order_status_email(
         job.event_type,
         job.order_id,

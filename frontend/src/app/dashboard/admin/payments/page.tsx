@@ -19,6 +19,25 @@ interface PaymentListResponse {
   total: number;
 }
 
+interface ProofItem {
+  id: number;
+  file_url: string;
+  file_name: string;
+  file_mime_type: string;
+  file_size: number;
+  comment: string | null;
+  review_status: string;
+  reject_reason: string | null;
+  created_at: string;
+  reviewed_at: string | null;
+}
+
+interface PaymentDetail {
+  payment: PaymentItem;
+  proofs: ProofItem[];
+  history: { old_status: string; new_status: string; comment: string | null; created_at: string }[];
+}
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -51,6 +70,131 @@ const badgeBase: React.CSSProperties = {
   display: "inline-block",
 };
 
+function ProofModal({ paymentId, onClose }: { paymentId: number; onClose: () => void }) {
+  const [detail, setDetail] = useState<PaymentDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/v1/admin/payments/${paymentId}`, { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => setDetail(d))
+      .finally(() => setLoading(false));
+  }, [paymentId]);
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000,
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "#fff", borderRadius: 14, padding: 28, width: "90%", maxWidth: 560,
+          maxHeight: "85vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Чек оплаты #{paymentId}</h2>
+          <button
+            onClick={onClose}
+            style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#6b7280", lineHeight: 1 }}
+          >
+            ×
+          </button>
+        </div>
+
+        {loading && <p style={{ color: "#6b7280", textAlign: "center" }}>Загрузка...</p>}
+
+        {!loading && detail && (
+          <>
+            {/* Payment info */}
+            <div style={{ background: "#f9fafb", borderRadius: 10, padding: "12px 16px", marginBottom: 20, fontSize: 13 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 16px" }}>
+                <div><span style={{ color: "#6b7280" }}>Заказ:</span> <strong>#{detail.payment.order_id}</strong></div>
+                <div><span style={{ color: "#6b7280" }}>Провайдер:</span> <strong>{detail.payment.provider}</strong></div>
+                <div><span style={{ color: "#6b7280" }}>Сумма:</span> <strong>{detail.payment.amount.toLocaleString()} {detail.payment.currency}</strong></div>
+                <div>
+                  <span style={{ color: "#6b7280" }}>Статус:</span>{" "}
+                  <span style={statusStyle(detail.payment.status)}>{STATUS_LABELS[detail.payment.status] ?? detail.payment.status}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Proofs */}
+            <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
+              Приложенные чеки ({detail.proofs.length})
+            </h3>
+            {detail.proofs.length === 0 ? (
+              <p style={{ color: "#9ca3af", fontSize: 13 }}>Чеки не приложены</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {detail.proofs.map((proof) => (
+                  <div
+                    key={proof.id}
+                    style={{
+                      border: "1px solid #e5e7eb", borderRadius: 10, padding: "12px 14px",
+                      display: "flex", alignItems: "center", gap: 12,
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {proof.file_name}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>
+                        {(proof.file_size / 1024).toFixed(1)} KB · {new Date(proof.created_at).toLocaleString("ru-KZ")}
+                      </div>
+                      {proof.comment && (
+                        <div style={{ fontSize: 12, color: "#374151", marginTop: 4 }}>{proof.comment}</div>
+                      )}
+                      {proof.review_status === "rejected" && proof.reject_reason && (
+                        <div style={{ fontSize: 12, color: "#991b1b", marginTop: 4 }}>Причина отклонения: {proof.reject_reason}</div>
+                      )}
+                    </div>
+                    <a
+                      href={proof.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        background: "#2563eb", color: "#fff", borderRadius: 8, padding: "6px 14px",
+                        fontSize: 12, fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap", flexShrink: 0,
+                      }}
+                    >
+                      Открыть
+                    </a>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* History */}
+            {detail.history.length > 0 && (
+              <>
+                <h3 style={{ fontSize: 14, fontWeight: 700, marginTop: 20, marginBottom: 10 }}>История статусов</h3>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {detail.history.map((h, i) => (
+                    <div key={i} style={{ fontSize: 12, color: "#6b7280", display: "flex", gap: 8 }}>
+                      <span>{new Date(h.created_at).toLocaleString("ru-KZ")}</span>
+                      <span>
+                        <span style={statusStyle(h.old_status)}>{STATUS_LABELS[h.old_status] ?? h.old_status}</span>
+                        {" → "}
+                        <span style={statusStyle(h.new_status)}>{STATUS_LABELS[h.new_status] ?? h.new_status}</span>
+                      </span>
+                      {h.comment && <span>· {h.comment}</span>}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPaymentsPage() {
   const [payments, setPayments] = useState<PaymentItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -63,6 +207,7 @@ export default function AdminPaymentsPage() {
   const [refundReason, setRefundReason] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
+  const [proofPaymentId, setProofPaymentId] = useState<number | null>(null);
 
   const fetchPayments = useCallback(async () => {
     setLoading(true);
@@ -93,7 +238,10 @@ export default function AdminPaymentsPage() {
     const data = await res.json();
     setActionMsg(res.ok ? data.message : data.detail);
     setActionLoading(false);
-    if (res.ok) fetchPayments();
+    if (res.ok) {
+      setStatusFilter("");
+      setPage(1);
+    }
   };
 
   const handleRefund = async (id: number) => {
@@ -115,7 +263,8 @@ export default function AdminPaymentsPage() {
     if (res.ok) {
       setRefundId(null);
       setRefundReason("");
-      fetchPayments();
+      setStatusFilter("");
+      setPage(1);
     }
   };
 
@@ -138,7 +287,8 @@ export default function AdminPaymentsPage() {
     if (res.ok) {
       setSelectedId(null);
       setRejectReason("");
-      fetchPayments();
+      setStatusFilter("");
+      setPage(1);
     }
   };
 
@@ -201,71 +351,82 @@ export default function AdminPaymentsPage() {
                   {new Date(p.created_at).toLocaleDateString("ru-KZ")}
                 </td>
                 <td style={styles.td}>
-                  {p.status === "payment_under_review" && (
-                    <div style={{ display: "flex", gap: 6, flexDirection: "column" }}>
-                      <div style={{ display: "flex", gap: 6 }}>
-                        <button
-                          onClick={() => handleApprove(p.id)}
-                          disabled={actionLoading}
-                          style={styles.btnApprove}
-                        >
-                          Подтвердить
-                        </button>
-                        <button
-                          onClick={() => setSelectedId(selectedId === p.id ? null : p.id)}
-                          disabled={actionLoading}
-                          style={styles.btnReject}
-                        >
-                          Отклонить
-                        </button>
-                      </div>
-                      {selectedId === p.id && (
-                        <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
-                          <input
-                            placeholder="Причина отклонения..."
-                            value={rejectReason}
-                            onChange={(e) => setRejectReason(e.target.value)}
-                            style={styles.input}
-                          />
+                  <div style={{ display: "flex", gap: 6, flexDirection: "column" }}>
+                    {/* View proof button — always visible */}
+                    <button
+                      onClick={() => setProofPaymentId(p.id)}
+                      style={styles.btnProof}
+                    >
+                      Чек
+                    </button>
+
+                    {p.status === "payment_under_review" && (
+                      <>
+                        <div style={{ display: "flex", gap: 6 }}>
                           <button
-                            onClick={() => handleReject(p.id)}
+                            onClick={() => handleApprove(p.id)}
+                            disabled={actionLoading}
+                            style={styles.btnApprove}
+                          >
+                            Подтвердить
+                          </button>
+                          <button
+                            onClick={() => setSelectedId(selectedId === p.id ? null : p.id)}
                             disabled={actionLoading}
                             style={styles.btnReject}
                           >
-                            OK
+                            Отклонить
                           </button>
                         </div>
-                      )}
-                    </div>
-                  )}
-                  {p.status === "paid" && (
-                    <div style={{ display: "flex", gap: 6, flexDirection: "column" }}>
-                      <button
-                        onClick={() => setRefundId(refundId === p.id ? null : p.id)}
-                        disabled={actionLoading}
-                        style={styles.btnRefund}
-                      >
-                        Возврат
-                      </button>
-                      {refundId === p.id && (
-                        <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
-                          <input
-                            placeholder="Причина возврата..."
-                            value={refundReason}
-                            onChange={(e) => setRefundReason(e.target.value)}
-                            style={styles.input}
-                          />
-                          <button
-                            onClick={() => handleRefund(p.id)}
-                            disabled={actionLoading}
-                            style={styles.btnRefund}
-                          >
-                            OK
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                        {selectedId === p.id && (
+                          <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                            <input
+                              placeholder="Причина отклонения..."
+                              value={rejectReason}
+                              onChange={(e) => setRejectReason(e.target.value)}
+                              style={styles.input}
+                            />
+                            <button
+                              onClick={() => handleReject(p.id)}
+                              disabled={actionLoading}
+                              style={styles.btnReject}
+                            >
+                              OK
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {p.status === "paid" && (
+                      <>
+                        <button
+                          onClick={() => setRefundId(refundId === p.id ? null : p.id)}
+                          disabled={actionLoading}
+                          style={styles.btnRefund}
+                        >
+                          Возврат
+                        </button>
+                        {refundId === p.id && (
+                          <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                            <input
+                              placeholder="Причина возврата..."
+                              value={refundReason}
+                              onChange={(e) => setRefundReason(e.target.value)}
+                              style={styles.input}
+                            />
+                            <button
+                              onClick={() => handleRefund(p.id)}
+                              disabled={actionLoading}
+                              style={styles.btnRefund}
+                            >
+                              OK
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -300,6 +461,11 @@ export default function AdminPaymentsPage() {
           Вперёд →
         </button>
       </div>
+
+      {/* Proof modal */}
+      {proofPaymentId !== null && (
+        <ProofModal paymentId={proofPaymentId} onClose={() => setProofPaymentId(null)} />
+      )}
     </div>
   );
 }
@@ -337,6 +503,16 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#991b1b",
     color: "#fff",
     border: "none",
+    borderRadius: 6,
+    padding: "5px 10px",
+    fontSize: 12,
+    cursor: "pointer",
+    fontWeight: 600,
+  },
+  btnProof: {
+    background: "#f3f4f6",
+    color: "#374151",
+    border: "1px solid #e5e7eb",
     borderRadius: 6,
     padding: "5px 10px",
     fontSize: 12,

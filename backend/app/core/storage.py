@@ -107,7 +107,7 @@ class MinioStorageService(StorageService):
             self._ensure_bucket()
         except Exception as exc:
             logger.warning("MinIO not available: %s", exc)
-            self._client = None
+            self._client = None  # type: ignore[assignment]
             self._bucket = settings.minio_bucket
 
     def _ensure_bucket(self) -> None:

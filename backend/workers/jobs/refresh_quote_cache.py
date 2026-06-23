@@ -29,7 +29,7 @@ def _delete_stale_sessions(db: Session) -> None:
             QuoteSession.created_at < cutoff,
         )
     )
-    deleted = result.rowcount
+    deleted = result.rowcount  # type: ignore[attr-defined]
     if deleted:
         logger.info("refresh_quote_cache: removed %d stale quote sessions (no expires_at)", deleted)
 
