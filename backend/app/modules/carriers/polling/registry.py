@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.modules.carriers.polling.azimuth_adapter import AzimuthAdapter
 from app.modules.carriers.polling.base import CarrierPollingAdapter
+from app.modules.carriers.polling.cse_adapter import CSEPollingAdapter
 from app.modules.carriers.polling.exline_adapter import ExlineAdapter
 
 POLLING_ADAPTERS: dict[str, CarrierPollingAdapter] = {}
@@ -18,3 +19,4 @@ def get_adapter(carrier_code: str) -> CarrierPollingAdapter | None:
 # Register all available adapters at import time
 register_adapter(AzimuthAdapter())
 register_adapter(ExlineAdapter())
+register_adapter(CSEPollingAdapter())

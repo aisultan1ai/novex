@@ -36,3 +36,8 @@ class Shipment(Base):
         onupdate=func.now(),
         nullable=False,
     )
+    last_polled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=False),
+        nullable=True,
+        index=True,
+    )

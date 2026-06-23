@@ -113,6 +113,12 @@ services:
       EXLINE_LOGIN: "${EXLINE_LOGIN:-}"
       EXLINE_PASSWORD: "${EXLINE_PASSWORD:-}"
       EXLINE_API_URL: "${EXLINE_API_URL:-https://home.courierexe.ru/api/}"
+
+      # CSE (Courier Service Express)
+      CSE_LOGIN: "${CSE_LOGIN:-}"
+      CSE_PASSWORD: "${CSE_PASSWORD:-}"
+      CSE_API_URL: "${CSE_API_URL:-http://web.cse.ru/1c/ws/Web1C.1cws}"
+
       FRONTEND_URL: "http://localhost:3000"
       BACKEND_URL: "http://localhost:8000"
       ADMIN_EMAIL: "${ADMIN_EMAIL:-admin@novex.kz}"
@@ -157,6 +163,11 @@ services:
       EXLINE_LOGIN: "${EXLINE_LOGIN:-}"
       EXLINE_PASSWORD: "${EXLINE_PASSWORD:-}"
       EXLINE_API_URL: "${EXLINE_API_URL:-https://home.courierexe.ru/api/}"
+
+      # CSE (Courier Service Express)
+      CSE_LOGIN: "${CSE_LOGIN:-}"
+      CSE_PASSWORD: "${CSE_PASSWORD:-}"
+      CSE_API_URL: "${CSE_API_URL:-http://web.cse.ru/1c/ws/Web1C.1cws}"
     volumes:
       - ../../backend:/app
 

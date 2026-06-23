@@ -345,7 +345,22 @@ def main() -> None:
         else:
             log.info("Carrier already exists: exline (id=%d)", exline.id)
 
-        # ── 6. Admin user ─────────────────────────────────────────────────────
+        # ── 6. CSE carrier ────────────────────────────────────────────────────
+        cse = db.scalar(select(Carrier).where(Carrier.code == "cse"))
+        if cse is None:
+            cse = Carrier(
+                code="cse",
+                name="CSE",
+                description="Courier Service Express — тарифы через SOAP API",
+                is_active=True,
+            )
+            db.add(cse)
+            db.flush()
+            log.info("Carrier created: cse (id=%d)", cse.id)
+        else:
+            log.info("Carrier already exists: cse (id=%d)", cse.id)
+
+        # ── 7. Admin user ─────────────────────────────────────────────────────
         _ensure_admin(db)
 
         db.commit()

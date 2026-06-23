@@ -18,12 +18,13 @@ class Base(DeclarativeBase):
 
 
 # Sync engine — used by all endpoints except the async quotes path.
-# pool_size=5, max_overflow=5 → 10 connections per process.
-# 4 API workers × 10 + 1 worker process × 10 = 50 total. Under Postgres default 100.
+# pool_size=15, max_overflow=5 → 20 connections per process.
+# 4 API workers × 20 + 1 worker process × 20 + async × 6 = ~106 — fits default PG max_connections=100
+# when worker count stays at 4; raise PG max_connections if adding replicas.
 engine: Engine = create_engine(
     settings.sync_database_url,
     pool_pre_ping=True,
-    pool_size=5,
+    pool_size=15,
     max_overflow=5,
     pool_recycle=1800,
     future=True,

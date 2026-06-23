@@ -5,9 +5,10 @@ import logging
 import time
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.common.status_machine import can_transition
@@ -33,12 +34,35 @@ _ACTIVE_STATUSES = {
 }
 _MAX_WORKERS = 10
 
+# Only re-poll a shipment after this cooldown to avoid redundant carrier API calls.
+_POLL_COOLDOWN_SECONDS = 100
+
+# Module-level TTL cache for carrier credentials — avoids a DB query every 120s
+# per carrier. Invalidates automatically after 5 minutes.
+_creds_ttl: dict[str, tuple[dict, float]] = {}
+_CREDS_TTL_SECS = 300
+
+
+def _get_creds(db: Session, carrier_code: str) -> dict:
+    """Return carrier creds from cache or DB. Cache TTL = 5 minutes."""
+    entry = _creds_ttl.get(carrier_code)
+    if entry and time.monotonic() - entry[1] < _CREDS_TTL_SECS:
+        return entry[0]
+    db_creds = _creds_repo.get_by_carrier_code(db, carrier_code)
+    creds = (
+        {"api_url": db_creds.api_url, **(db_creds.extra_config or {})}
+        if db_creds and db_creds.is_active
+        else {}
+    )
+    _creds_ttl[carrier_code] = (creds, time.monotonic())
+    return creds
+
 
 @dataclass
 class _PollWork:
     shipment: Any
     order: Any
-    creds: dict           # carrier creds fetched from DB and passed to gateway
+    creds: dict
 
 
 @dataclass
@@ -78,31 +102,31 @@ def _fetch(work: _PollWork, gateway: CarrierGatewayClient) -> _PollResult:
 def poll_all_active_shipments(db: Session) -> None:
     from app.modules.orders.models import OrderDraft
 
+    cooldown_threshold = datetime.utcnow() - timedelta(seconds=_POLL_COOLDOWN_SECONDS)
+
     rows = db.execute(
         select(Shipment, OrderDraft)
         .join(OrderDraft, OrderDraft.id == Shipment.order_draft_id)
-        .where(OrderDraft.status.in_(_ACTIVE_STATUSES))
+        .where(
+            OrderDraft.status.in_(_ACTIVE_STATUSES),
+            # Skip shipments polled recently — prevents hammering carrier APIs.
+            or_(
+                Shipment.last_polled_at.is_(None),
+                Shipment.last_polled_at < cooldown_threshold,
+            ),
+        )
         .limit(200)
     ).all()
 
-    creds_cache: dict[str, dict] = {}
     work_items: list[_PollWork] = []
 
     for shipment, order in rows:
         if not shipment.carrier_tracking_number:
             continue
-        carrier_code = order.carrier_code_snapshot
-        if carrier_code not in creds_cache:
-            db_creds = _creds_repo.get_by_carrier_code(db, carrier_code)
-            creds_cache[carrier_code] = (
-                {"api_url": db_creds.api_url, **(db_creds.extra_config or {})}
-                if db_creds and db_creds.is_active
-                else {}
-            )
         work_items.append(_PollWork(
             shipment=shipment,
             order=order,
-            creds=creds_cache[carrier_code],
+            creds=_get_creds(db, order.carrier_code_snapshot),
         ))
 
     if not work_items:
@@ -122,6 +146,9 @@ def poll_all_active_shipments(db: Session) -> None:
         shipment = result.shipment
         order = result.order
 
+        # Mark as polled regardless of outcome — prevents retry storms on broken carriers.
+        shipment.last_polled_at = datetime.utcnow()
+
         if result.error is not None:
             _integration_log.create(
                 db,
@@ -138,6 +165,11 @@ def poll_all_active_shipments(db: Session) -> None:
                 "polling failed for shipment %s (%s): %s",
                 shipment.id, shipment.carrier_tracking_number, result.error,
             )
+            try:
+                db.commit()
+            except Exception as exc:
+                logger.error("commit failed (error branch) shipment %s: %s", shipment.id, exc)
+                db.rollback()
             continue
 
         _integration_log.create(
@@ -185,7 +217,7 @@ def poll_all_active_shipments(db: Session) -> None:
                 ))
             elif ev.status != order.status:
                 logger.warning(
-                    "polling: invalid transition order_id=%s %s → %s (carrier=%s)",
+                    "polling: invalid transition order_id=%s %s -> %s (carrier=%s)",
                     order.id, order.status, ev.status, ev.carrier_status,
                 )
 

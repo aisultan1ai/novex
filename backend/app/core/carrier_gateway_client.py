@@ -24,6 +24,10 @@ _DISPATCH_TIMEOUT = 60  # carrier invoice creation can be slow
 _TRACKING_TIMEOUT = 30
 _TEST_TIMEOUT = 20
 
+# Shared connection pool: keeps TCP connections alive between requests,
+# avoiding per-request handshake overhead under polling/dispatch load.
+_HTTP_LIMITS = httpx.Limits(max_keepalive_connections=10, max_connections=20)
+
 
 @dataclass
 class GatewayInvoiceResult:
@@ -46,6 +50,9 @@ class CarrierGatewayClient:
         settings = get_settings()
         self._base_url = settings.carrier_gateway_url.rstrip("/")
         self._secret = settings.gateway_secret
+        # Persistent client with connection pooling — reuses TCP sockets across
+        # repeated dispatch/tracking calls instead of opening a new connection each time.
+        self._client = httpx.Client(limits=_HTTP_LIMITS)
 
     def _headers(self) -> dict[str, str]:
         return {"X-Gateway-Secret": self._secret}
@@ -53,7 +60,7 @@ class CarrierGatewayClient:
     def create_invoice(
         self, carrier_code: str, order_data: dict, creds: dict
     ) -> GatewayInvoiceResult:
-        resp = httpx.post(
+        resp = self._client.post(
             f"{self._base_url}/invoke/create-invoice",
             json={"carrier_code": carrier_code, "order_data": order_data, "creds": creds},
             headers=self._headers(),
@@ -71,7 +78,7 @@ class CarrierGatewayClient:
     def fetch_tracking(
         self, carrier_code: str, tracking_number: str, creds: dict
     ) -> list[GatewayTrackingEvent]:
-        resp = httpx.post(
+        resp = self._client.post(
             f"{self._base_url}/invoke/fetch-tracking",
             json={"carrier_code": carrier_code, "tracking_number": tracking_number, "creds": creds},
             headers=self._headers(),
@@ -90,7 +97,7 @@ class CarrierGatewayClient:
         ]
 
     def test_connection(self, carrier_code: str, creds: dict) -> dict:
-        resp = httpx.post(
+        resp = self._client.post(
             f"{self._base_url}/invoke/test-connection",
             json={"carrier_code": carrier_code, "creds": creds},
             headers=self._headers(),
@@ -100,7 +107,7 @@ class CarrierGatewayClient:
         return resp.json()
 
     def cancel_invoice(self, carrier_code: str, invoice_id: str, creds: dict) -> bool:
-        resp = httpx.post(
+        resp = self._client.post(
             f"{self._base_url}/invoke/cancel-invoice",
             json={"carrier_code": carrier_code, "invoice_id": invoice_id, "creds": creds},
             headers=self._headers(),

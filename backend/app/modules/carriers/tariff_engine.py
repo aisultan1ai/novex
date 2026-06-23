@@ -28,6 +28,7 @@ from typing import TYPE_CHECKING
 import httpx
 
 from app.modules.carriers.zone_mapper import get_zone
+from app.modules.carriers.cse_geography import city_to_postcode_geo
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -263,8 +264,20 @@ async def calculate_quotes_async(
     db_results = await _calculate_from_db_async(db, from_city, to_city, fallback_zone, kg)
     results: list[QuoteResult] = db_results if db_results else _calculate_hardcoded(fallback_zone, kg)
 
+    # Run Exline and CSE live calls concurrently
+    live_tasks = []
     if not any(r.carrier_code == "exline" for r in results):
-        results.extend(await _calculate_exline_live_async(from_city, to_city, kg))
+        live_tasks.append(_calculate_exline_live_async(from_city, to_city, kg))
+    if not any(r.carrier_code == "cse" for r in results):
+        live_tasks.append(_calculate_cse_live_async(from_city, to_city, kg))
+
+    if live_tasks:
+        live_lists = await asyncio.gather(*live_tasks, return_exceptions=True)
+        for live in live_lists:
+            if isinstance(live, list):
+                results.extend(live)
+            elif isinstance(live, Exception):
+                logger.debug("Live carrier task failed: %s", live)
 
     results.sort(key=lambda r: (r.price, r.eta_days_min))
     return results
@@ -750,3 +763,88 @@ async def _calculate_exline_live_async(
         "Exline async: %d quotes for %s→%s kg=%.2f", len(results), from_city, to_city, kg
     )
     return results
+
+
+# ---------------------------------------------------------------------------
+# CSE live calculator (async)
+# ---------------------------------------------------------------------------
+
+_CSE_TIMEOUT = 10  # seconds
+
+
+async def _call_cse_calc_async(
+    from_geo: str,
+    to_geo: str,
+    kg: float,
+    login: str,
+    password: str,
+    api_url: str,
+) -> list[QuoteResult]:
+    from app.modules.carriers.api_clients.cse import (
+        build_envelope,
+        extract_return,
+        parse_calc_response,
+        _build_calc_inner,
+    )
+
+    inner = _build_calc_inner(login, password, from_geo, to_geo, kg, 1, "")
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                api_url,
+                content=build_envelope("Calc", inner),
+                headers={
+                    "Content-Type": "text/xml; charset=utf-8",
+                    "SOAPAction": f'"http://web.cse.ru/WS/Web1CWS/Calc"',
+                },
+                timeout=_CSE_TIMEOUT,
+            )
+        resp.raise_for_status()
+        ret = extract_return(resp.text, "Calc")
+        tariffs = parse_calc_response(ret)
+    except Exception as exc:
+        logger.warning("CSE calc failed (%s→%s): %s", from_geo, to_geo, exc)
+        return []
+
+    zone = get_zone(from_geo, to_geo)
+    results: list[QuoteResult] = []
+    for t in tariffs:
+        results.append(QuoteResult(
+            carrier_code="cse",
+            carrier_name="CSE",
+            tariff_code=t.get("tariff_guid", "cse_tariff"),
+            tariff_name=t["service_name"],
+            price=Decimal(str(round(t["price"], 2))),
+            currency=t.get("currency", "RUB"),
+            eta_days_min=t["min_days"],
+            eta_days_max=t["max_days"],
+            zone=zone,
+            chargeable_kg=kg,
+        ))
+
+    logger.debug("CSE async: %d quotes for %s→%s kg=%.2f", len(results), from_geo, to_geo, kg)
+    return results
+
+
+async def _calculate_cse_live_async(
+    from_city: str,
+    to_city: str,
+    kg: float,
+) -> list[QuoteResult]:
+    login = os.getenv("CSE_LOGIN", "")
+    password = os.getenv("CSE_PASSWORD", "")
+    api_url = os.getenv("CSE_API_URL", "http://web.cse.ru/1c/ws/Web1C.1cws")
+
+    if not login:
+        return []
+
+    from_geo = city_to_postcode_geo(from_city)
+    to_geo = city_to_postcode_geo(to_city)
+
+    if not from_geo or not to_geo:
+        logger.debug(
+            "CSE: skipping %s→%s — no postcode mapping available", from_city, to_city
+        )
+        return []
+
+    return await _call_cse_calc_async(from_geo, to_geo, kg, login, password, api_url)
