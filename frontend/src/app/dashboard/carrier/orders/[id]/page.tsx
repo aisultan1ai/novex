@@ -128,7 +128,7 @@ export default function CarrierOrderDetailPage() {
           ← Все заказы
         </Link>
         <span style={{ color: "#d1d5db" }}>|</span>
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#0f172a" }}>
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#111827" }}>
           Заказ #{order.id}
         </h2>
         <span style={{ ...styles.badge, ...(statusStyle(order.status)) }}>
@@ -301,11 +301,11 @@ function statusStyle(status: string): React.CSSProperties {
 const styles: Record<string, React.CSSProperties> = {
   badge: { padding: "2px 10px", borderRadius: 12, fontSize: 12, fontWeight: 600, display: "inline-block" },
   card: { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 16, marginBottom: 12 },
-  cardTitle: { fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 10 },
+  cardTitle: { fontSize: 14, fontWeight: 700, color: "#111827", marginBottom: 10 },
   row: { display: "flex", gap: 20, flexWrap: "wrap" },
   col: { minWidth: 100 },
   label: { fontSize: 11, color: "#9ca3af", marginBottom: 2, marginTop: 6 },
-  value: { fontSize: 14, color: "#0f172a" },
+  value: { fontSize: 14, color: "#111827" },
   successBox: { background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "8px 14px", fontSize: 13, color: "#166534", marginBottom: 12 },
   errorBox: { background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 8, padding: "8px 14px", fontSize: 13, color: "#991b1b", marginBottom: 12 },
   btnAccept: { background: "#166534", color: "#fff", border: "none", borderRadius: 6, padding: "8px 18px", fontSize: 13, cursor: "pointer", fontWeight: 600 },

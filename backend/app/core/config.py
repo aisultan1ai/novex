@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     postgres_password: str = "novex"
 
     minio_endpoint: str = "minio:9000"
+    minio_public_endpoint: str = ""  # public hostname for presigned URLs; defaults to minio_endpoint
     minio_access_key: str = "minio"
     minio_secret_key: str = "minio12345"
     minio_bucket: str = "novex-dev"

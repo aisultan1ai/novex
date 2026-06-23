@@ -122,11 +122,21 @@ def create_invoice(req: CreateInvoiceRequest) -> CreateInvoiceResponse:
         logger.warning("create_invoice failed: carrier=%s error=%s", req.carrier_code, exc)
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-    waybill_pdf_b64 = (
-        base64.b64encode(result.waybill_pdf_bytes).decode()
-        if result.waybill_pdf_bytes
-        else None
-    )
+    pdf_bytes = result.waybill_pdf_bytes
+    if pdf_bytes is None and result.carrier_invoice_id:
+        try:
+            pdf_bytes = client.get_invoice_pdf(result.carrier_invoice_id, req.creds)
+            logger.info(
+                "Fetched carrier PDF: carrier=%s invoice=%s size=%d",
+                req.carrier_code, result.carrier_invoice_id, len(pdf_bytes),
+            )
+        except Exception as exc:
+            logger.warning(
+                "Could not fetch carrier PDF (non-fatal): carrier=%s invoice=%s error=%s",
+                req.carrier_code, result.carrier_invoice_id, exc,
+            )
+
+    waybill_pdf_b64 = base64.b64encode(pdf_bytes).decode() if pdf_bytes else None
     return CreateInvoiceResponse(
         waybill_number=result.waybill_number,
         carrier_invoice_id=result.carrier_invoice_id,

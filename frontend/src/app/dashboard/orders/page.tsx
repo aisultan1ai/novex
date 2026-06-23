@@ -163,10 +163,10 @@ function MyOrdersPageInner() {
       )}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
-        <h1 style={{ margin: 0, fontSize: isMobile ? 22 : 28, fontWeight: 800, color: "#0f172a" }}>Мои заказы</h1>
+        <h1 style={{ margin: 0, fontSize: isMobile ? 22 : 28, fontWeight: 800, color: "#111827" }}>Мои заказы</h1>
         <Link
           href="/"
-          style={{ background: "#0f172a", color: "#ffffff", borderRadius: 10, padding: "10px 20px", fontSize: 14, fontWeight: 600, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}
+          style={{ background: "#2563EB", color: "#ffffff", borderRadius: 10, padding: "10px 20px", fontSize: 14, fontWeight: 600, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}
         >
           + Новая доставка
         </Link>
@@ -179,7 +179,7 @@ function MyOrdersPageInner() {
             <button
               key={key}
               onClick={() => setActiveFilter(key)}
-              style={{ padding: "6px 16px", borderRadius: 999, border: active ? "none" : "1px solid #e5e7eb", background: active ? "#0f172a" : "#ffffff", color: active ? "#ffffff" : "#64748b", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+              style={{ padding: "6px 16px", borderRadius: 999, border: active ? "none" : "1px solid #e5e7eb", background: active ? "#2563EB" : "#ffffff", color: active ? "#ffffff" : "#6B7280", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
             >
               {label}
             </button>
@@ -207,11 +207,11 @@ function MyOrdersPageInner() {
       ) : filteredOrders.length === 0 ? (
         <div style={{ ...cardStyle, padding: "64px 24px", textAlign: "center" }}>
           <IconTruck />
-          <p style={{ fontSize: 16, fontWeight: 700, margin: "0 0 8px", color: "#0f172a" }}>
+          <p style={{ fontSize: 16, fontWeight: 700, margin: "0 0 8px", color: "#111827" }}>
             {activeFilter === "all" ? "Заказов пока нет" : "Заказов в этой категории нет"}
           </p>
           <p style={{ margin: "0 0 24px", fontSize: 14, color: "#64748b" }}>Оформите первую доставку прямо сейчас</p>
-          <Link href="/" style={{ background: "#0f172a", color: "#ffffff", borderRadius: 10, padding: "10px 20px", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
+          <Link href="/" style={{ background: "#2563EB", color: "#ffffff", borderRadius: 10, padding: "10px 20px", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
             Рассчитать тариф
           </Link>
         </div>
@@ -226,7 +226,7 @@ function MyOrdersPageInner() {
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 2 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#111827", marginBottom: 2 }}>
                     {order.from_city_snapshot} → {order.to_city_snapshot}
                   </div>
                   <div style={{ fontSize: 12, color: "#94a3b8" }}>
@@ -240,7 +240,7 @@ function MyOrdersPageInner() {
 
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
                 <StatusBadge status={order.status} />
-                <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>
                   {formatPrice(order.price_snapshot, order.currency_snapshot)}
                 </div>
               </div>
@@ -278,7 +278,7 @@ function MyOrdersPageInner() {
                 </span>
 
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a", marginBottom: 3 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#111827", marginBottom: 3 }}>
                     {order.to_city_snapshot || "-"}
                   </div>
                   <div style={{ fontSize: 12, color: "#94a3b8" }}>
@@ -287,7 +287,7 @@ function MyOrdersPageInner() {
                 </div>
 
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: "#0f172a", marginBottom: 3 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: "#111827", marginBottom: 3 }}>
                     {order.carrier_name_snapshot}
                   </div>
                   <div style={{ fontSize: 12, color: "#94a3b8" }}>
@@ -297,7 +297,7 @@ function MyOrdersPageInner() {
 
                 <StatusBadge status={order.status} />
 
-                <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>
                   {formatPrice(order.price_snapshot, order.currency_snapshot)}
                 </div>
 

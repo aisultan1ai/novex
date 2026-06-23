@@ -83,7 +83,7 @@ export default function NotificationsPage() {
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "#0f172a" }}>
+          <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "#111827" }}>
             Уведомления
           </h1>
           {unread > 0 && (
@@ -127,7 +127,7 @@ export default function NotificationsPage() {
       ) : items.length === 0 ? (
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: "64px 24px", textAlign: "center" }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>🔔</div>
-          <p style={{ fontSize: 16, fontWeight: 700, margin: "0 0 6px", color: "#0f172a" }}>
+          <p style={{ fontSize: 16, fontWeight: 700, margin: "0 0 6px", color: "#111827" }}>
             Уведомлений пока нет
           </p>
           <p style={{ margin: 0, fontSize: 14, color: "#64748b" }}>
@@ -158,7 +158,7 @@ export default function NotificationsPage() {
 
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 4 }}>
-                    <div style={{ fontSize: 14, fontWeight: n.is_read ? 500 : 700, color: "#0f172a" }}>
+                    <div style={{ fontSize: 14, fontWeight: n.is_read ? 500 : 700, color: "#111827" }}>
                       {n.title}
                     </div>
                     <div style={{ fontSize: 12, color: "#94a3b8", whiteSpace: "nowrap", flexShrink: 0 }}>

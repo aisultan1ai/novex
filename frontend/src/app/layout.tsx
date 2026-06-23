@@ -13,13 +13,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="ru">
-      <body
-        style={{
-          margin: 0,
-          fontFamily: "var(--font-inter)",
-          WebkitFontSmoothing: "antialiased",
-        }}
-      >
+      <body>
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

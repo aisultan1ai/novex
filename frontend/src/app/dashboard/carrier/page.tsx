@@ -49,7 +49,7 @@ export default function CarrierOverviewPage() {
               {carrier.name[0]}
             </div>
             <div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>{carrier.name}</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "#111827" }}>{carrier.name}</div>
               <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
                 <span style={{ fontFamily: "monospace", fontSize: 12, color: "#94a3b8", background: "#f1f5f9", padding: "2px 8px", borderRadius: 6 }}>{carrier.code}</span>
                 <span style={{ fontSize: 12, padding: "2px 8px", borderRadius: 999, background: carrier.is_active ? "#dcfce7" : "#f1f5f9", color: carrier.is_active ? "#166534" : "#94a3b8", fontWeight: 600 }}>
@@ -89,7 +89,7 @@ export default function CarrierOverviewPage() {
             <div style={{ width: 36, height: 36, borderRadius: 8, background: `${color}18`, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
               <div style={{ width: 10, height: 10, borderRadius: "50%", background: color }} />
             </div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 4 }}>{title}</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#111827", marginBottom: 4 }}>{title}</div>
             <div style={{ fontSize: 13, color: "#64748b" }}>{desc}</div>
           </Link>
         ))}
@@ -102,7 +102,7 @@ function Row({ label, value, mono, missing }: { label: string; value: string; mo
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
       <span style={{ fontSize: 13, color: "#64748b", flexShrink: 0 }}>{label}</span>
-      <span style={{ fontSize: 13, fontFamily: mono ? "monospace" : "inherit", color: missing ? "#f97316" : "#0f172a", fontWeight: 500, wordBreak: "break-all", textAlign: "right" }}>
+      <span style={{ fontSize: 13, fontFamily: mono ? "monospace" : "inherit", color: missing ? "#f97316" : "#111827", fontWeight: 500, wordBreak: "break-all", textAlign: "right" }}>
         {value}
       </span>
     </div>

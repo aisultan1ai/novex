@@ -35,29 +35,29 @@ export default function CitySelect({ value, onChange, placeholder = "Выбер�
 
   return (
     <div style={{ position: "relative" }}>
-      <div
-        style={{ position: "relative", cursor: "pointer" }}
+      <button
+        type="button"
         onClick={() => setOpen((o) => !o)}
+        style={{
+          position: "relative",
+          width: "100%",
+          border: `1px solid ${open ? "#0f172a" : "#e5e7eb"}`,
+          borderRadius: 12,
+          padding: "12px 40px 12px 14px",
+          background: open ? "#ffffff" : "#f8fafc",
+          fontSize: 15,
+          cursor: "pointer",
+          outline: "none",
+          color: value ? "#0f172a" : "#94a3b8",
+          fontFamily: "inherit",
+          textAlign: "left",
+          transition: "border-color 0.15s, background 0.15s",
+          boxSizing: "border-box",
+        }}
       >
-        <input
-          readOnly
-          value={value}
-          placeholder={placeholder}
-          style={{
-            border: `1px solid ${open ? "#0f172a" : "#e5e7eb"}`,
-            borderRadius: 12,
-            padding: "12px 40px 12px 14px",
-            background: open ? "#ffffff" : "#f8fafc",
-            fontSize: 15,
-            width: "100%",
-            boxSizing: "border-box",
-            cursor: "pointer",
-            outline: "none",
-            color: value ? "#0f172a" : "#94a3b8",
-            fontFamily: "inherit",
-            transition: "border-color 0.15s, background 0.15s",
-          }}
-        />
+        <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {value || placeholder}
+        </span>
         <span
           style={{
             position: "absolute",
@@ -73,7 +73,7 @@ export default function CitySelect({ value, onChange, placeholder = "Выбер�
         >
           ▾
         </span>
-      </div>
+      </button>
 
       {open && (
         <>

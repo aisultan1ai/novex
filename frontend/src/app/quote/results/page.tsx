@@ -1,110 +1,14 @@
 "use client";
 
-import type { CSSProperties } from "react";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { flushSync } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import {
-  ApiError,
-  getShippingQuote,
-  selectShippingQuote,
-} from "@/lib/api/shipping";
+import Navbar from "@/components/layout/Navbar";
+import { ApiError, getShippingQuote, selectShippingQuote } from "@/lib/api/shipping";
 import type { RateQuoteItem, ShippingQuoteResponse } from "@/types/quote";
 
-const pageStyle: CSSProperties = {
-  minHeight: "100vh",
-  background: "linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%)",
-  padding: "32px 20px 64px",
-  color: "#0f172a",
-  fontFamily:
-    "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-};
-
-const containerStyle: CSSProperties = {
-  maxWidth: 1100,
-  margin: "0 auto",
-};
-
-const cardStyle: CSSProperties = {
-  border: "1px solid #e5e7eb",
-  borderRadius: 16,
-  padding: 20,
-  background: "#ffffff",
-  boxShadow: "0 8px 24px rgba(15, 23, 42, 0.06)",
-};
-
-const badgeBaseStyle: CSSProperties = {
-  display: "inline-block",
-  padding: "6px 10px",
-  borderRadius: 999,
-  fontSize: 12,
-  fontWeight: 700,
-};
-
-const buttonPrimary: CSSProperties = {
-  background: "#0f172a",
-  color: "#ffffff",
-  border: "none",
-  borderRadius: 12,
-  padding: "12px 16px",
-  fontSize: 14,
-  fontWeight: 600,
-  cursor: "pointer",
-};
-
-const buttonSecondary: CSSProperties = {
-  background: "#ffffff",
-  color: "#0f172a",
-  border: "1px solid #cbd5e1",
-  borderRadius: 12,
-  padding: "12px 16px",
-  fontSize: 14,
-  fontWeight: 600,
-  cursor: "pointer",
-};
-
-const loadingStyle: CSSProperties = {
-  ...cardStyle,
-  textAlign: "center",
-  color: "#475569",
-};
-
-const errorStyle: CSSProperties = {
-  ...cardStyle,
-  border: "1px solid #fecaca",
-  background: "#fef2f2",
-  color: "#b91c1c",
-};
-
-const infoStyle: CSSProperties = {
-  ...cardStyle,
-  border: "1px solid #bfdbfe",
-  background: "#eff6ff",
-  color: "#1e3a8a",
-};
-
-function getBadgeStyle(badge: string | null): CSSProperties {
-  switch (badge) {
-    case "fastest":
-      return { ...badgeBaseStyle, background: "#ede9fe", color: "#6d28d9" };
-    case "recommended":
-      return { ...badgeBaseStyle, background: "#dcfce7", color: "#166534" };
-    case "best_value":
-      return { ...badgeBaseStyle, background: "#fef3c7", color: "#92400e" };
-    default:
-      return { ...badgeBaseStyle, background: "#e2e8f0", color: "#334155" };
-  }
-}
-
-function formatBadgeLabel(badge: string | null): string {
-  switch (badge) {
-    case "fastest":    return "Быстрее всего";
-    case "recommended": return "Рекомендуем";
-    case "best_value": return "Лучшая цена";
-    default:           return "Вариант";
-  }
-}
+/* ─── Helpers ────────────────────────────────────────────────────────────── */
 
 function formatPrice(price: number, currency: string): string {
   return `${new Intl.NumberFormat("ru-RU", {
@@ -113,6 +17,35 @@ function formatPrice(price: number, currency: string): string {
   }).format(price)} ${currency}`;
 }
 
+const BADGE_LABELS: Record<string, string> = {
+  fastest: "Быстрее всего",
+  recommended: "Рекомендуем",
+  best_value: "Лучшая цена",
+};
+
+function TariffBadge({ name }: { name: string }) {
+  const lower = name.toLowerCase();
+  let bg: string, color: string;
+  if (lower.includes("экспресс") || lower.includes("express")) {
+    bg = "#FEF3C7"; color = "#92400E";
+  } else if (lower.includes("эконом") || lower.includes("econom")) {
+    bg = "#D1FAE5"; color = "#065F46";
+  } else {
+    bg = "#F3F4F6"; color = "#374151";
+  }
+  return (
+    <span style={{ background: bg, color, padding: "3px 10px", borderRadius: 999, font: "600 12px/1 Inter Variable, sans-serif" }}>
+      {name}
+    </span>
+  );
+}
+
+function SkeletonCard() {
+  return <div className="skeleton" style={{ height: 100, borderRadius: 16 }} />;
+}
+
+/* ─── Page inner ─────────────────────────────────────────────────────────── */
+
 function QuoteResultsPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -120,7 +53,6 @@ function QuoteResultsPageInner() {
   const quoteSessionId = useMemo(() => {
     const raw = searchParams.get("quoteSessionId");
     if (!raw) return null;
-
     const parsed = Number(raw);
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
   }, [searchParams]);
@@ -133,82 +65,50 @@ function QuoteResultsPageInner() {
   const [selectingId, setSelectingId] = useState<number | null>(null);
 
   const selectedQuote = useMemo(
-    () => data?.quotes.find((quote) => quote.is_selected) ?? null,
+    () => data?.quotes.find((q) => q.is_selected) ?? null,
     [data],
   );
+  const minPrice = data ? Math.min(...data.quotes.map((q) => q.price)) : null;
 
   useEffect(() => {
     let isMounted = true;
-
-    async function loadQuoteSession() {
+    async function load() {
       if (!quoteSessionId) {
         setError("Не найден quoteSessionId в URL.");
         setIsLoading(false);
         return;
       }
-
       setIsLoading(true);
       setError(null);
-
       try {
-        const response = await getShippingQuote(quoteSessionId, token);
-        if (isMounted) {
-          setData(response);
-        }
+        const res = await getShippingQuote(quoteSessionId, token);
+        if (isMounted) setData(res);
       } catch (err) {
         if (!isMounted) return;
-
-        if (err instanceof ApiError) {
-          setError(err.detail);
-        } else if (err instanceof Error) {
-          setError(err.message);
-        } else {
-          setError("Не удалось загрузить результаты расчёта.");
-        }
+        setError(err instanceof ApiError ? err.detail : err instanceof Error ? err.message : "Не удалось загрузить результаты.");
       } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+        if (isMounted) setIsLoading(false);
       }
     }
-
-    void loadQuoteSession();
-
-    return () => {
-      isMounted = false;
-    };
+    void load();
+    return () => { isMounted = false; };
   }, [quoteSessionId, token]);
 
-  async function handleSelectQuote(
-    e: React.MouseEvent<HTMLButtonElement>,
-    rateQuote: RateQuoteItem,
-  ) {
-    if (!quoteSessionId || rateQuote.id == null) return;
-
+  async function handleSelectQuote(e: React.MouseEvent<HTMLButtonElement>, rate: RateQuoteItem) {
+    if (!quoteSessionId || rate.id == null) return;
     e.currentTarget.blur();
     const savedScrollY = window.scrollY;
-    setSelectingId(rateQuote.id);
+    setSelectingId(rate.id);
     setError(null);
 
     let nextData: typeof data | null = null;
     let nextError: string | null = null;
-
     try {
-      nextData = await selectShippingQuote(quoteSessionId, {
-        rate_quote_id: rateQuote.id,
-      }, token);
+      nextData = await selectShippingQuote(quoteSessionId, { rate_quote_id: rate.id }, token);
     } catch (err) {
-      if (err instanceof ApiError) {
-        nextError = err.detail;
-      } else if (err instanceof Error) {
-        nextError = err.message;
-      } else {
-        nextError = "Не удалось выбрать тариф.";
-      }
+      nextError = err instanceof ApiError ? err.detail : err instanceof Error ? err.message : "Не удалось выбрать тариф.";
     }
 
-    // flushSync commits all state changes to the DOM synchronously so that
-    // the scrollTo below runs after layout is stable, not before.
     flushSync(() => {
       setSelectingId(null);
       if (nextData) setData(nextData);
@@ -218,225 +118,341 @@ function QuoteResultsPageInner() {
     window.scrollTo({ top: savedScrollY, behavior: "instant" });
   }
 
-  function handleContinueToShipment() {
-    if (!quoteSessionId || !selectedQuote) {
-      return;
-    }
-
+  function handleContinue() {
+    if (!quoteSessionId || !selectedQuote) return;
     router.push(`/quote/shipment?quoteSessionId=${quoteSessionId}${token ? `&token=${token}` : ""}`);
   }
 
   return (
-    <main style={pageStyle}>
-      <div style={containerStyle}>
-        <header
+    <div style={{ minHeight: "100vh", background: "#FAFAFA" }}>
+      <Navbar />
+
+      <main style={{ maxWidth: 900, margin: "0 auto", padding: "40px 20px 80px" }}>
+        {/* Header */}
+        <div
           style={{
             display: "flex",
             justifyContent: "space-between",
-            gap: 16,
             alignItems: "center",
-            marginBottom: 28,
             flexWrap: "wrap",
+            gap: 16,
+            marginBottom: 32,
           }}
         >
           <div>
             <div
               style={{
-                ...badgeBaseStyle,
-                background: "#eff6ff",
-                color: "#1d4ed8",
+                font: "500 13px/1 Inter Variable, sans-serif",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                color: "#2563EB",
+                marginBottom: 10,
               }}
             >
-              Результаты расчёта
+              Шаг 2 из 4 - Выбор тарифа
             </div>
-            <h1 style={{ margin: "14px 0 8px", fontSize: 34, lineHeight: 1.1 }}>
+            <h1
+              style={{
+                font: "700 28px/1.2 Inter Variable, sans-serif",
+                letterSpacing: "-0.02em",
+                color: "#111827",
+                margin: 0,
+              }}
+            >
               Доступные тарифы
             </h1>
           </div>
+          <button
+            onClick={() => router.push("/")}
+            style={{
+              border: "1.5px solid #E5E7EB",
+              background: "#ffffff",
+              color: "#111827",
+              borderRadius: 10,
+              padding: "10px 18px",
+              font: "600 14px/1 Inter Variable, sans-serif",
+              cursor: "pointer",
+              fontFamily: "inherit",
+              transition: "background 0.15s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "#F9FAFB")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "#ffffff")}
+          >
+            ← Назад к форме
+          </button>
+        </div>
 
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <button style={buttonSecondary} onClick={() => router.push("/")}>
-              Назад к форме
-            </button>
-
-            <button
-              style={{
-                ...buttonPrimary,
-                opacity: selectedQuote ? 1 : 0.6,
-                cursor: selectedQuote ? "pointer" : "not-allowed",
-              }}
-              onClick={handleContinueToShipment}
-              disabled={!selectedQuote}
-            >
-              Продолжить оформление
-            </button>
+        {/* Error */}
+        {error && (
+          <div
+            style={{
+              padding: "12px 16px",
+              borderRadius: 10,
+              background: "#FEF2F2",
+              border: "1px solid #FECACA",
+              color: "#B91C1C",
+              font: "400 14px/1.4 Inter Variable, sans-serif",
+              marginBottom: 20,
+            }}
+          >
+            {error}
           </div>
-        </header>
+        )}
 
+        {/* Loading */}
         {isLoading ? (
-          <div style={loadingStyle}>Загружаем результаты расчёта...</div>
-        ) : error ? (
-          <div style={errorStyle}>{error}</div>
-        ) : !data ? (
-          <div style={errorStyle}>Нет данных для отображения.</div>
-        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <SkeletonCard /><SkeletonCard /><SkeletonCard />
+          </div>
+        ) : !data ? null : (
           <>
+            {/* Summary bar */}
             <div
               style={{
-                ...cardStyle,
-                marginBottom: 20,
+                background: "#ffffff",
+                border: "1px solid #E5E7EB",
+                borderRadius: 12,
+                padding: "14px 20px",
                 display: "flex",
-                justifyContent: "flex-end",
-                gap: 16,
-                flexWrap: "wrap",
+                justifyContent: "space-between",
                 alignItems: "center",
+                flexWrap: "wrap",
+                gap: 12,
+                marginBottom: 20,
+                boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
               }}
             >
-              <div style={{ color: "#475569" }}>
-                Найдено тарифов: <strong>{data.quotes.length}</strong>
-              </div>
+              <span style={{ font: "500 14px/1 Inter Variable, sans-serif", color: "#6B7280" }}>
+                Найдено тарифов:{" "}
+                <b style={{ color: "#111827" }}>{data.quotes.length}</b>
+              </span>
+              {selectedQuote && (
+                <span
+                  style={{
+                    background: "#D1FAE5",
+                    color: "#065F46",
+                    padding: "4px 12px",
+                    borderRadius: 999,
+                    font: "600 13px/1 Inter Variable, sans-serif",
+                  }}
+                >
+                  Выбран: {selectedQuote.carrier_name} · {formatPrice(selectedQuote.price, selectedQuote.currency)}
+                </span>
+              )}
             </div>
 
-            {selectedQuote ? (
-              <div style={{ ...infoStyle, marginBottom: 20 }}>
-                <div style={{ marginBottom: 8 }}>
-                  <strong>Выбранный тариф:</strong>{" "}
-                  {selectedQuote.carrier_name} - {selectedQuote.tariff_name}
-                </div>
-                <div>
-                  Стоимость:{" "}
-                  <strong>
-                    {formatPrice(selectedQuote.price, selectedQuote.currency)}
-                  </strong>
-                  {" • "}
-                  Срок:{" "}
-                  <strong>
-                    {selectedQuote.eta_days_min}-{selectedQuote.eta_days_max} дн.
-                  </strong>
-                </div>
-              </div>
-            ) : (
-              <div style={{ ...infoStyle, marginBottom: 20 }}>
-                Сначала выберите один тариф, после этого можно будет продолжить
-                оформление отправления.
+            {/* Hint */}
+            {!selectedQuote && (
+              <div
+                style={{
+                  background: "#EFF6FF",
+                  border: "1px solid #BFDBFE",
+                  borderRadius: 10,
+                  padding: "12px 16px",
+                  font: "400 14px/1.4 Inter Variable, sans-serif",
+                  color: "#1E3A8A",
+                  marginBottom: 20,
+                }}
+              >
+                Выберите тариф, чтобы продолжить оформление отправления.
               </div>
             )}
 
-            <div style={{ display: "grid", gap: 16 }}>
-              {data.quotes.map((quote) => (
-                <div
-                  key={quote.id ?? `${quote.carrier_code}-${quote.tariff_name}`}
-                  style={{
-                    ...cardStyle,
-                    border: quote.is_selected
-                      ? "1px solid #22c55e"
-                      : "1px solid #e5e7eb",
-                  }}
-                >
+            {/* Tariff cards */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
+              {data.quotes.map((rate) => {
+                const isBest = rate.price === minPrice;
+                const isSelected = rate.is_selected;
+                const badgeLabel = rate.badge ? BADGE_LABELS[rate.badge] : isBest && !rate.badge ? "Лучшая цена" : null;
+
+                return (
                   <div
+                    key={rate.id ?? `${rate.carrier_code}-${rate.tariff_name}`}
+                    className="result-card"
+                    onClick={(e) => {
+                      if (rate.id != null && !isSelected && selectingId !== rate.id) {
+                        void handleSelectQuote(e as unknown as React.MouseEvent<HTMLButtonElement>, rate);
+                      }
+                    }}
                     style={{
+                      background: isSelected ? "#EFF6FF" : "#ffffff",
+                      borderRadius: 16,
+                      border: `1.5px solid ${isSelected ? "#2563EB" : isBest ? "#2563EB" : "#E5E7EB"}`,
+                      padding: "20px 24px",
                       display: "flex",
+                      alignItems: "center",
                       justifyContent: "space-between",
                       gap: 16,
-                      flexWrap: "wrap",
-                      alignItems: "flex-start",
+                      cursor: isSelected ? "default" : "pointer",
+                      boxShadow: isBest || isSelected
+                        ? "0 4px 16px rgba(37,99,235,0.10)"
+                        : "0 1px 3px rgba(0,0,0,0.06)",
+                      transition: "all 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.boxShadow = "0 4px 16px rgba(37,99,235,0.10)";
+                        e.currentTarget.style.transform = "translateY(-2px)";
+                        e.currentTarget.style.borderColor = "#2563EB";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.boxShadow = isBest
+                          ? "0 4px 16px rgba(37,99,235,0.10)"
+                          : "0 1px 3px rgba(0,0,0,0.06)";
+                        e.currentTarget.style.transform = "translateY(0)";
+                        e.currentTarget.style.borderColor = isBest ? "#2563EB" : "#E5E7EB";
+                      }
                     }}
                   >
-                    <div>
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: 10,
-                          flexWrap: "wrap",
-                          alignItems: "center",
-                          marginBottom: 10,
-                        }}
-                      >
-                        <span style={getBadgeStyle(quote.badge)}>
-                          {formatBadgeLabel(quote.badge)}
-                        </span>
-
-                        {quote.is_selected ? (
-                          <span
-                            style={{
-                              ...badgeBaseStyle,
-                              background: "#dcfce7",
-                              color: "#166534",
-                            }}
-                          >
-                            Выбран ✓
-                          </span>
-                        ) : null}
-                      </div>
-
-                      <h2 style={{ margin: "0 0 8px", fontSize: 22 }}>
-                        {quote.carrier_name} - {quote.tariff_name}
-                      </h2>
-
-
-
-                      <p style={{ margin: 0, color: "#475569" }}>
-                        Срок доставки:{" "}
-                        <strong>
-                          {quote.eta_days_min}-{quote.eta_days_max} дн.
-                        </strong>
-                      </p>
-                    </div>
-
-                    <div style={{ textAlign: "right", minWidth: 180 }}>
-                      <div style={{ marginBottom: 12 }}>
+                    {/* Left */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
                         <div
                           style={{
-                            fontSize: 28,
-                            fontWeight: 800,
+                            width: 48,
+                            height: 48,
+                            borderRadius: 10,
+                            background: "#EFF6FF",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            font: "700 20px/1 Inter Variable, sans-serif",
+                            color: "#2563EB",
+                            flexShrink: 0,
                           }}
                         >
-                          {formatPrice(quote.price, quote.currency)}
+                          {rate.carrier_name[0]}
                         </div>
-                        {/эконом|econom/i.test(quote.tariff_name) && (
-                          <div style={{ fontSize: 12, color: "#f59e0b", marginTop: 4 }}>
-                            мин. 10 кг — выгодно от 10 кг
-                          </div>
+                        <div>
+                          <span style={{ font: "600 16px/1 Inter Variable, sans-serif", color: "#111827", marginRight: 8 }}>
+                            {rate.carrier_name}
+                          </span>
+                          <TariffBadge name={rate.tariff_name} />
+                          {badgeLabel && (
+                            <span
+                              style={{
+                                background: "#EFF6FF",
+                                color: "#1D4ED8",
+                                padding: "3px 10px",
+                                borderRadius: 999,
+                                font: "600 12px/1 Inter Variable, sans-serif",
+                                marginLeft: 6,
+                              }}
+                            >
+                              {badgeLabel}
+                            </span>
+                          )}
+                          {isSelected && (
+                            <span
+                              style={{
+                                background: "#D1FAE5",
+                                color: "#065F46",
+                                padding: "3px 10px",
+                                borderRadius: 999,
+                                font: "600 12px/1 Inter Variable, sans-serif",
+                                marginLeft: 6,
+                              }}
+                            >
+                              Выбран ✓
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div style={{ font: "400 13px/1 Inter Variable, sans-serif", color: "#6B7280", display: "flex", gap: 16, flexWrap: "wrap" }}>
+                        <span>Срок: {rate.eta_days_min}–{rate.eta_days_max} дн.</span>
+                        {/эконом|econom/i.test(rate.tariff_name) && (
+                          <span style={{ color: "#F59E0B" }}>мин. 10 кг</span>
                         )}
                       </div>
+                    </div>
 
+                    {/* Right */}
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0 }}>
+                      <div>
+                        <div style={{ font: "700 24px/1 Inter Variable, sans-serif", color: "#111827", textAlign: "right" }}>
+                          {formatPrice(rate.price, rate.currency)}
+                        </div>
+                        <div style={{ font: "400 12px/1 Inter Variable, sans-serif", color: "#9CA3AF", textAlign: "right", marginTop: 4 }}>
+                          с НДС
+                        </div>
+                      </div>
                       <button
+                        onClick={(e) => { e.stopPropagation(); void handleSelectQuote(e, rate); }}
+                        disabled={rate.id == null || selectingId === rate.id || isSelected}
                         style={{
-                          ...buttonPrimary,
-                          opacity:
-                            selectingId === quote.id || quote.is_selected
-                              ? 0.7
-                              : 1,
-                          cursor:
-                            selectingId === quote.id || quote.is_selected
-                              ? "not-allowed"
-                              : "pointer",
+                          border: isSelected ? "none" : "1.5px solid #E5E7EB",
+                          background: isSelected ? "#2563EB" : "#ffffff",
+                          color: isSelected ? "#ffffff" : "#111827",
+                          borderRadius: 10,
+                          padding: "8px 18px",
+                          font: "600 14px/1 Inter Variable, sans-serif",
+                          cursor: isSelected || selectingId === rate.id ? "not-allowed" : "pointer",
+                          fontFamily: "inherit",
+                          opacity: selectingId === rate.id ? 0.6 : 1,
+                          transition: "all 0.15s",
                         }}
-                        onClick={(e) => void handleSelectQuote(e, quote)}
-                        disabled={
-                          quote.id == null ||
-                          selectingId === quote.id ||
-                          quote.is_selected
-                        }
+                        onMouseEnter={(e) => {
+                          if (!isSelected && selectingId !== rate.id) {
+                            e.currentTarget.style.background = "#2563EB";
+                            e.currentTarget.style.color = "#ffffff";
+                            e.currentTarget.style.borderColor = "#2563EB";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isSelected && selectingId !== rate.id) {
+                            e.currentTarget.style.background = "#ffffff";
+                            e.currentTarget.style.color = "#111827";
+                            e.currentTarget.style.borderColor = "#E5E7EB";
+                          }
+                        }}
                       >
-                        {quote.is_selected
-                          ? "Тариф выбран"
-                          : selectingId === quote.id
-                            ? "Сохраняем..."
-                            : "Выбрать тариф"}
+                        {isSelected ? "Выбрано ✓" : selectingId === rate.id ? "Выбираем..." : "Выбрать"}
                       </button>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
+            </div>
+
+            {/* Continue button */}
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button
+                onClick={handleContinue}
+                disabled={!selectedQuote}
+                style={{
+                  background: selectedQuote ? "#2563EB" : "#E5E7EB",
+                  color: selectedQuote ? "#ffffff" : "#9CA3AF",
+                  border: "none",
+                  borderRadius: 10,
+                  padding: "14px 32px",
+                  font: "600 15px/1 Inter Variable, sans-serif",
+                  cursor: selectedQuote ? "pointer" : "not-allowed",
+                  fontFamily: "inherit",
+                  transition: "background 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  if (selectedQuote) e.currentTarget.style.background = "#1D4ED8";
+                }}
+                onMouseLeave={(e) => {
+                  if (selectedQuote) e.currentTarget.style.background = "#2563EB";
+                }}
+              >
+                Продолжить оформление →
+              </button>
             </div>
           </>
         )}
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
 
 export default function QuoteResultsPage() {
-  return <Suspense><QuoteResultsPageInner /></Suspense>;
+  return (
+    <Suspense>
+      <QuoteResultsPageInner />
+    </Suspense>
+  );
 }

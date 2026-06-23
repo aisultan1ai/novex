@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/providers/auth-provider";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import { ApiError, deleteOrderDraft, downloadOrderLabel, getOrderDraft } from "@/lib/api/orders";
 import type { OrderDraftResponse } from "@/types/order";
 
@@ -59,6 +60,12 @@ const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
 const CHECKOUT_STATUSES = new Set(["shipment_details_completed", "ready_for_checkout"]);
 const PAYMENT_PENDING_STATUSES = new Set(["awaiting_payment", "payment_rejected"]);
 const TRACKABLE_STATUSES = new Set(["paid", "sent_to_carrier", "picked_up", "in_transit", "arrived", "delivered"]);
+// Label can be downloaded from the point the shipment is registered with the carrier,
+// even before tracking events exist (covers manual/queued dispatch states).
+const LABEL_STATUSES = new Set([
+  "paid", "dispatch_queued", "dispatch_failed", "pending_manual", "pending_manual_dispatch",
+  "sent_to_carrier", "picked_up", "in_transit", "arrived", "delivered",
+]);
 
 function parseUTC(iso: string): Date {
   return new Date(/[Z+]/.test(iso) ? iso : iso + "Z");
@@ -93,6 +100,7 @@ const card = { background: "#ffffff", border: "1px solid #e5e7eb", borderRadius:
 
 export default function OrderDetailPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const isMobile = useIsMobile();
   const router = useRouter();
   const params = useParams();
   const draftId = Number(params.id);
@@ -201,7 +209,7 @@ export default function OrderDetailPage() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
-                <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "#0f172a" }}>Заказ #{order.draft_id}</h1>
+                <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 28, fontWeight: 800, color: "#111827" }}>Заказ #{order.draft_id}</h1>
                 <StatusBadge status={order.status} />
               </div>
               <div style={{ fontSize: 13, color: "#94a3b8" }}>Создан {formatDate(order.created_at)}</div>
@@ -209,12 +217,12 @@ export default function OrderDetailPage() {
 
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {CHECKOUT_STATUSES.has(order.status) && (
-                <Link href={`/checkout?draftId=${order.draft_id}`} style={{ padding: "10px 20px", borderRadius: 10, background: "#0f172a", color: "#fff", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
+                <Link href={`/checkout?draftId=${order.draft_id}`} style={{ padding: "10px 20px", borderRadius: 10, background: "#2563EB", color: "#fff", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
                   Оплатить
                 </Link>
               )}
               {PAYMENT_PENDING_STATUSES.has(order.status) && (
-                <Link href={`/checkout/payment?orderId=${order.draft_id}`} style={{ padding: "10px 20px", borderRadius: 10, background: "#0f172a", color: "#fff", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
+                <Link href={`/checkout/payment?orderId=${order.draft_id}`} style={{ padding: "10px 20px", borderRadius: 10, background: "#2563EB", color: "#fff", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
                   Оплатить
                 </Link>
               )}
@@ -223,11 +231,11 @@ export default function OrderDetailPage() {
                   Отследить
                 </Link>
               )}
-              {TRACKABLE_STATUSES.has(order.status) && (
+              {LABEL_STATUSES.has(order.status) && (
                 <button
                   onClick={() => void handleDownloadLabel()}
                   disabled={isDownloading}
-                  style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", color: "#0f172a", fontSize: 14, fontWeight: 600, cursor: isDownloading ? "not-allowed" : "pointer", opacity: isDownloading ? 0.6 : 1, fontFamily: "inherit" }}
+                  style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", color: "#111827", fontSize: 14, fontWeight: 600, cursor: isDownloading ? "not-allowed" : "pointer", opacity: isDownloading ? 0.6 : 1, fontFamily: "inherit" }}
                 >
                   {isDownloading ? "Скачиваем…" : "Скачать накладную"}
                 </button>
@@ -248,39 +256,39 @@ export default function OrderDetailPage() {
           <div style={{ ...card }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 14 }}>Маршрут и тариф</div>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
-              <span style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>{order.from_city_snapshot}</span>
+              <span style={{ fontSize: 22, fontWeight: 800, color: "#111827" }}>{order.from_city_snapshot}</span>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
               </svg>
-              <span style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>{order.to_city_snapshot}</span>
+              <span style={{ fontSize: 22, fontWeight: 800, color: "#111827" }}>{order.to_city_snapshot}</span>
             </div>
             <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
               <div>
                 <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Перевозчик</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{order.carrier_name_snapshot}</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>{order.carrier_name_snapshot}</div>
               </div>
               <div>
                 <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Тариф</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{order.tariff_name_snapshot}</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>{order.tariff_name_snapshot}</div>
               </div>
               <div>
                 <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Срок доставки</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{order.eta_days_min_snapshot}-{order.eta_days_max_snapshot} дн.</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>{order.eta_days_min_snapshot}-{order.eta_days_max_snapshot} дн.</div>
               </div>
               <div>
                 <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Стоимость</div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: "#0f172a" }}>{formatPrice(order.price_snapshot, order.currency_snapshot)}</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: "#111827" }}>{formatPrice(order.price_snapshot, order.currency_snapshot)}</div>
               </div>
             </div>
           </div>
 
           {/* Sender + Recipient */}
           {(order.sender ?? order.recipient) && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
               {order.sender && (
                 <div style={{ ...card }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>Отправитель</div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 4 }}>{order.sender.full_name}</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", marginBottom: 4 }}>{order.sender.full_name}</div>
                   {order.sender.company_name && <div style={{ fontSize: 13, color: "#64748b", marginBottom: 2 }}>{order.sender.company_name}</div>}
                   <div style={{ fontSize: 13, color: "#64748b", marginBottom: 2 }}>{order.sender.phone}</div>
                   {order.sender.email && <div style={{ fontSize: 13, color: "#64748b", marginBottom: 8 }}>{order.sender.email}</div>}
@@ -296,7 +304,7 @@ export default function OrderDetailPage() {
               {order.recipient && (
                 <div style={{ ...card }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>Получатель</div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 4 }}>{order.recipient.full_name}</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", marginBottom: 4 }}>{order.recipient.full_name}</div>
                   {order.recipient.company_name && <div style={{ fontSize: 13, color: "#64748b", marginBottom: 2 }}>{order.recipient.company_name}</div>}
                   <div style={{ fontSize: 13, color: "#64748b", marginBottom: 2 }}>{order.recipient.phone}</div>
                   {order.recipient.email && <div style={{ fontSize: 13, color: "#64748b", marginBottom: 8 }}>{order.recipient.email}</div>}
@@ -322,7 +330,7 @@ export default function OrderDetailPage() {
                 {order.packages.map((pkg) => (
                   <div key={pkg.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "#f8fafc", borderRadius: 12 }}>
                     <div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a", marginBottom: 2 }}>{pkg.description}</div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: "#111827", marginBottom: 2 }}>{pkg.description}</div>
                       <div style={{ fontSize: 12, color: "#94a3b8" }}>
                         {pkg.quantity} шт. · {pkg.weight_kg} кг · {pkg.width_cm}×{pkg.height_cm}×{pkg.depth_cm} см
                       </div>

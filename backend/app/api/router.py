@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.v1.address_book import router as address_book_router
 from app.api.v1.cse import router as cse_router
 from app.api.v1.admin_audit import router as admin_audit_router
+from app.api.v1.public_tracking import router as public_tracking_router
 from app.api.v1.admin_carrier_webhooks import router as admin_carrier_webhooks_router
 from app.api.v1.admin_carriers import router as admin_carriers_router
 from app.api.v1.admin_carrier_api import router as admin_carrier_api_router
@@ -53,3 +54,4 @@ api_router.include_router(admin_commission_configs_router)
 api_router.include_router(admin_carrier_api_router)
 api_router.include_router(admin_audit_router)
 api_router.include_router(cse_router)
+api_router.include_router(public_tracking_router)

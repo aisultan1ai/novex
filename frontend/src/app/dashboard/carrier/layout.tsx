@@ -37,7 +37,7 @@ export default function CarrierLayout({ children }: { children: ReactNode }) {
             </svg>
           </div>
           <div>
-            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0f172a" }}>Кабинет перевозчика</h1>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#111827" }}>Кабинет перевозчика</h1>
             <p style={{ margin: 0, fontSize: 13, color: "#64748b" }}>Управление интеграцией с Novex</p>
           </div>
         </div>

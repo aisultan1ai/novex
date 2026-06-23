@@ -60,7 +60,7 @@ export default function CarrierOrdersPage() {
 
   return (
     <div style={{ padding: "0 0 24px" }}>
-      <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, color: "#0f172a" }}>Заказы</h2>
+      <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, color: "#111827" }}>Заказы</h2>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
         <select

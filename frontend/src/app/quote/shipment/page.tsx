@@ -1,15 +1,14 @@
 "use client";
 
-import type { CSSProperties, FormEvent } from "react";
+import type { FormEvent } from "react";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Check } from "lucide-react";
 
+import Navbar from "@/components/layout/Navbar";
 import { useAuth } from "@/components/providers/auth-provider";
-import {
-  ApiError,
-  createDraftFromQuote,
-  updateOrderDraftShipment,
-} from "@/lib/api/orders";
+import { useIsMobile } from "@/hooks/use-is-mobile";
+import { ApiError, createDraftFromQuote, updateOrderDraftShipment } from "@/lib/api/orders";
 import type { ProfileResponse } from "@/types/auth";
 import type {
   OrderDraftResponse,
@@ -18,184 +17,58 @@ import type {
   UpdateShipmentDetailsRequest,
 } from "@/types/order";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+/* ─── Types ──────────────────────────────────────────────────────────────── */
 
 type PartyFormState = {
-  full_name: string;
-  phone: string;
-  email: string;
-  company_name: string;
-  country: string;
-  city: string;
-  address_line1: string;
-  address_line2: string;
-  postal_code: string;
-  comment: string;
-  save_to_address_book: boolean;
+  full_name: string; phone: string; email: string; company_name: string;
+  country: string; city: string; address_line1: string; address_line2: string;
+  postal_code: string; comment: string; save_to_address_book: boolean;
 };
 
 type PackageFormState = {
-  description: string;
-  quantity: string;
-  weight_kg: string;
-  width_cm: string;
-  height_cm: string;
-  depth_cm: string;
+  description: string; quantity: string; weight_kg: string;
+  width_cm: string; height_cm: string; depth_cm: string;
 };
 
 type ShipmentFormState = {
-  sender: PartyFormState;
-  recipient: PartyFormState;
+  sender: PartyFormState; recipient: PartyFormState;
   packageItem: PackageFormState;
-  call_before_delivery: boolean;
-  insurance: boolean;
-  fragile: boolean;
+  call_before_delivery: boolean; insurance: boolean; fragile: boolean;
 };
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
-const pageStyle: CSSProperties = {
-  minHeight: "100vh",
-  background: "linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%)",
-  padding: "32px 20px 64px",
-  color: "#0f172a",
-  fontFamily:
-    "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-};
-
-const containerStyle: CSSProperties = { maxWidth: 1100, margin: "0 auto" };
-
-const cardStyle: CSSProperties = {
-  border: "1px solid #e5e7eb",
-  borderRadius: 16,
-  padding: 20,
-  background: "#ffffff",
-  boxShadow: "0 8px 24px rgba(15, 23, 42, 0.06)",
-};
-
-const tariffCardStyle: CSSProperties = {
-  ...cardStyle,
-  border: "1.5px solid #6366f1",
-  background: "linear-gradient(135deg, #f5f3ff 0%, #eff6ff 100%)",
-  marginBottom: 24,
-};
-
-const inputStyle: CSSProperties = {
-  width: "100%",
-  padding: "12px 14px",
-  borderRadius: 12,
-  border: "1px solid #cbd5e1",
-  fontSize: 14,
-  outline: "none",
-  boxSizing: "border-box",
-};
-
-const labelStyle: CSSProperties = {
-  display: "block",
-  fontSize: 13,
-  fontWeight: 600,
-  marginBottom: 8,
-  color: "#334155",
-};
-
-const buttonPrimary: CSSProperties = {
-  background: "#0f172a",
-  color: "#ffffff",
-  border: "none",
-  borderRadius: 12,
-  padding: "12px 24px",
-  fontSize: 14,
-  fontWeight: 600,
-  cursor: "pointer",
-};
-
-const buttonSecondary: CSSProperties = {
-  background: "#ffffff",
-  color: "#0f172a",
-  border: "1px solid #cbd5e1",
-  borderRadius: 12,
-  padding: "12px 16px",
-  fontSize: 14,
-  fontWeight: 600,
-  cursor: "pointer",
-};
-
-const badgeStyle: CSSProperties = {
-  display: "inline-block",
-  padding: "6px 10px",
-  borderRadius: 999,
-  background: "#eff6ff",
-  color: "#1d4ed8",
-  fontSize: 12,
-  fontWeight: 700,
-};
-
-const errorStyle: CSSProperties = {
-  ...cardStyle,
-  border: "1px solid #fecaca",
-  background: "#fef2f2",
-  color: "#b91c1c",
-  marginBottom: 20,
-};
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+/* ─── Helpers ────────────────────────────────────────────────────────────── */
 
 const emptyParty = (): PartyFormState => ({
-  full_name: "",
-  phone: "",
-  email: "",
-  company_name: "",
-  country: "KZ",
-  city: "",
-  address_line1: "",
-  address_line2: "",
-  postal_code: "",
-  comment: "",
-  save_to_address_book: false,
+  full_name: "", phone: "", email: "", company_name: "", country: "KZ",
+  city: "", address_line1: "", address_line2: "", postal_code: "",
+  comment: "", save_to_address_book: false,
 });
 
 const emptyPackage = (): PackageFormState => ({
-  description: "",
-  quantity: "1",
-  weight_kg: "",
-  width_cm: "",
-  height_cm: "",
-  depth_cm: "",
+  description: "", quantity: "1", weight_kg: "", width_cm: "", height_cm: "", depth_cm: "",
 });
 
 function formatPrice(price: number, currency: string): string {
-  return `${new Intl.NumberFormat("ru-RU", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(price)} ${currency}`;
+  return `${new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(price)} ${currency}`;
 }
 
 function mapPartyFormToPayload(party: PartyFormState): ShipmentPartyInput {
   return {
-    full_name: party.full_name.trim(),
-    phone: party.phone.trim(),
-    email: party.email.trim() || null,
-    company_name: party.company_name.trim() || null,
-    country: party.country.trim().toUpperCase(),
-    city: party.city.trim(),
-    address_line1: party.address_line1.trim(),
-    address_line2: party.address_line2.trim() || null,
-    postal_code: party.postal_code.trim() || null,
-    comment: party.comment.trim() || null,
+    full_name: party.full_name.trim(), phone: party.phone.trim(),
+    email: party.email.trim() || null, company_name: party.company_name.trim() || null,
+    country: party.country.trim().toUpperCase(), city: party.city.trim(),
+    address_line1: party.address_line1.trim(), address_line2: party.address_line2.trim() || null,
+    postal_code: party.postal_code.trim() || null, comment: party.comment.trim() || null,
     save_to_address_book: party.save_to_address_book,
   };
 }
 
 function mapPackageFormToPayload(pkg: PackageFormState): ShipmentPackageInput {
   return {
-    description: pkg.description.trim(),
-    quantity: Number(pkg.quantity),
-    weight_kg: Number(pkg.weight_kg),
-    width_cm: Number(pkg.width_cm),
-    height_cm: Number(pkg.height_cm),
-    depth_cm: Number(pkg.depth_cm),
-    declared_value: null,
-    declared_value_currency: null,
+    description: pkg.description.trim(), quantity: Number(pkg.quantity),
+    weight_kg: Number(pkg.weight_kg), width_cm: Number(pkg.width_cm),
+    height_cm: Number(pkg.height_cm), depth_cm: Number(pkg.depth_cm),
+    declared_value: null, declared_value_currency: null,
   };
 }
 
@@ -210,136 +83,241 @@ function buildShipmentPayload(form: ShipmentFormState): UpdateShipmentDetailsReq
   };
 }
 
-function mergeSenderWithCurrentUser(
-  sender: PartyFormState,
-  currentUser: ProfileResponse | null,
-): PartyFormState {
+function mergeSenderWithCurrentUser(sender: PartyFormState, user: ProfileResponse | null): PartyFormState {
   return {
     ...sender,
-    full_name: sender.full_name || currentUser?.full_name || "",
-    phone: sender.phone || currentUser?.phone || "",
-    email: sender.email || currentUser?.email || "",
-    company_name: sender.company_name || currentUser?.company_name || "",
+    full_name: sender.full_name || user?.full_name || "",
+    phone: sender.phone || user?.phone || "",
+    email: sender.email || user?.email || "",
+    company_name: sender.company_name || user?.company_name || "",
   };
 }
 
-function mapDraftToForm(
-  draft: OrderDraftResponse,
-  currentUser: ProfileResponse | null,
-): ShipmentFormState {
+function mapDraftToForm(draft: OrderDraftResponse, user: ProfileResponse | null): ShipmentFormState {
   const baseSender = draft.sender
-    ? {
-        full_name: draft.sender.full_name,
-        phone: draft.sender.phone,
-        email: draft.sender.email || "",
-        company_name: draft.sender.company_name || "",
-        country: draft.sender.country,
-        city: draft.sender.city,
-        address_line1: draft.sender.address_line1,
-        address_line2: draft.sender.address_line2 || "",
-        postal_code: draft.sender.postal_code || "",
-        comment: draft.sender.comment || "",
-        save_to_address_book: false,
-      }
+    ? { full_name: draft.sender.full_name, phone: draft.sender.phone, email: draft.sender.email || "", company_name: draft.sender.company_name || "", country: draft.sender.country, city: draft.sender.city, address_line1: draft.sender.address_line1, address_line2: draft.sender.address_line2 || "", postal_code: draft.sender.postal_code || "", comment: draft.sender.comment || "", save_to_address_book: false }
     : { ...emptyParty(), country: draft.from_country_snapshot || "KZ", city: draft.from_city_snapshot || "" };
 
   return {
-    sender: mergeSenderWithCurrentUser(baseSender, currentUser),
+    sender: mergeSenderWithCurrentUser(baseSender, user),
     recipient: draft.recipient
-      ? {
-          full_name: draft.recipient.full_name,
-          phone: draft.recipient.phone,
-          email: draft.recipient.email || "",
-          company_name: draft.recipient.company_name || "",
-          country: draft.recipient.country,
-          city: draft.recipient.city,
-          address_line1: draft.recipient.address_line1,
-          address_line2: draft.recipient.address_line2 || "",
-          postal_code: draft.recipient.postal_code || "",
-          comment: draft.recipient.comment || "",
-          save_to_address_book: false,
-        }
+      ? { full_name: draft.recipient.full_name, phone: draft.recipient.phone, email: draft.recipient.email || "", company_name: draft.recipient.company_name || "", country: draft.recipient.country, city: draft.recipient.city, address_line1: draft.recipient.address_line1, address_line2: draft.recipient.address_line2 || "", postal_code: draft.recipient.postal_code || "", comment: draft.recipient.comment || "", save_to_address_book: false }
       : { ...emptyParty(), country: draft.to_country_snapshot || "KZ", city: draft.to_city_snapshot || "" },
     packageItem: draft.packages[0]
-      ? {
-          description: draft.packages[0].description,
-          quantity: String(draft.packages[0].quantity),
-          weight_kg: String(draft.packages[0].weight_kg),
-          width_cm: String(draft.packages[0].width_cm),
-          height_cm: String(draft.packages[0].height_cm),
-          depth_cm: String(draft.packages[0].depth_cm),
-        }
+      ? { description: draft.packages[0].description, quantity: String(draft.packages[0].quantity), weight_kg: String(draft.packages[0].weight_kg), width_cm: String(draft.packages[0].width_cm), height_cm: String(draft.packages[0].height_cm), depth_cm: String(draft.packages[0].depth_cm) }
       : emptyPackage(),
     call_before_delivery: draft.call_before_delivery ?? false,
-    insurance:            draft.insurance ?? false,
-    fragile:              draft.fragile ?? false,
+    insurance: draft.insurance ?? false,
+    fragile: draft.fragile ?? false,
   };
 }
 
-// ─── Tariff summary card ──────────────────────────────────────────────────────
+/* ─── Stepper ────────────────────────────────────────────────────────────── */
 
-function TariffCard({
-  draft,
-  onChangeTariff,
-}: {
-  draft: OrderDraftResponse;
-  onChangeTariff: () => void;
-}) {
+const STEPS = ["Данные отправления", "Отправитель", "Получатель", "Оплата"];
+
+function Stepper({ current }: { current: number }) {
+  const isMobile = useIsMobile();
   return (
-    <div style={tariffCardStyle}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          flexWrap: "wrap",
-          gap: 16,
-        }}
-      >
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#6366f1", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
-            Выбранный тариф
+    <div style={{ display: "flex", alignItems: "center", gap: 0, marginBottom: 40 }}>
+      {STEPS.map((label, i) => {
+        const done = i < current;
+        const active = i === current;
+        return (
+          <div key={i} style={{ display: "flex", alignItems: "center", flex: i < STEPS.length - 1 ? 1 : "none" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+              <div
+                style={{
+                  width: isMobile ? 32 : 40,
+                  height: isMobile ? 32 : 40,
+                  borderRadius: "50%",
+                  border: done ? "none" : active ? "none" : "2px solid #E5E7EB",
+                  background: done ? "#10B981" : active ? "#2563EB" : "#ffffff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  font: `700 ${isMobile ? "13px" : "15px"}/1 Inter Variable, sans-serif`,
+                  color: done || active ? "#ffffff" : "#9CA3AF",
+                  boxShadow: active ? "0 0 0 4px rgba(37,99,235,0.15)" : "none",
+                  flexShrink: 0,
+                  transition: "all 0.2s",
+                }}
+              >
+                {done ? <Check size={isMobile ? 13 : 16} strokeWidth={3} /> : i + 1}
+              </div>
+              {!isMobile && (
+                <span
+                  style={{
+                    font: "500 12px/1 Inter Variable, sans-serif",
+                    color: active ? "#111827" : done ? "#10B981" : "#9CA3AF",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {label}
+                </span>
+              )}
+            </div>
+            {i < STEPS.length - 1 && (
+              <div
+                style={{
+                  flex: 1,
+                  height: 2,
+                  background: done ? "#10B981" : active ? "#2563EB" : "#E5E7EB",
+                  margin: "0 6px",
+                  marginBottom: isMobile ? 0 : 18,
+                  transition: "background 0.2s",
+                }}
+              />
+            )}
           </div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: "#0f172a", marginBottom: 4 }}>
-            {draft.carrier_name_snapshot} - {draft.tariff_name_snapshot}
-          </div>
-          <div style={{ fontSize: 14, color: "#475569" }}>
-            {draft.from_city_snapshot} → {draft.to_city_snapshot}
-            {" · "}
-            {draft.shipment_type_snapshot}
-          </div>
-        </div>
+        );
+      })}
+    </div>
+  );
+}
 
-        <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: 28, fontWeight: 800, color: "#0f172a" }}>
-            {formatPrice(draft.price_snapshot, draft.currency_snapshot)}
-          </div>
-          <div style={{ fontSize: 13, color: "#6366f1", fontWeight: 600, marginBottom: 12 }}>
-            {draft.eta_days_min_snapshot}-{draft.eta_days_max_snapshot} дн.
-          </div>
-          <button style={{ ...buttonSecondary, fontSize: 13, padding: "8px 14px" }} onClick={onChangeTariff}>
-            Изменить тариф
-          </button>
+/* ─── Input field ────────────────────────────────────────────────────────── */
+
+function FormField({
+  label,
+  value,
+  onChange,
+  required,
+  inputMode,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  required?: boolean;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
+  placeholder?: string;
+}) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <div>
+      <label style={{ display: "block", font: "600 13px/1 Inter Variable, sans-serif", color: "#374151", marginBottom: 6 }}>
+        {label}
+        {required && <span style={{ color: "#EF4444", marginLeft: 2 }}>*</span>}
+      </label>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        required={required}
+        inputMode={inputMode}
+        placeholder={placeholder}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        style={{
+          width: "100%",
+          padding: "11px 14px",
+          borderRadius: 10,
+          border: focused ? "1.5px solid #2563EB" : "1.5px solid #E5E7EB",
+          boxShadow: focused ? "0 0 0 3px rgba(37,99,235,0.15)" : "none",
+          font: "400 14px/1 Inter Variable, sans-serif",
+          color: "#111827",
+          background: "#fff",
+          outline: "none",
+          boxSizing: "border-box",
+          fontFamily: "inherit",
+          transition: "border-color 0.15s, box-shadow 0.15s",
+        }}
+      />
+    </div>
+  );
+}
+
+/* ─── Section card ───────────────────────────────────────────────────────── */
+
+function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        background: "#ffffff",
+        border: "1px solid #E5E7EB",
+        borderRadius: 16,
+        padding: "24px",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+      }}
+    >
+      <h2 style={{ font: "600 18px/1.2 Inter Variable, sans-serif", color: "#111827", margin: "0 0 20px" }}>
+        {title}
+      </h2>
+      {children}
+    </div>
+  );
+}
+
+/* ─── Tariff summary card ────────────────────────────────────────────────── */
+
+function TariffSummary({ draft, onChangeTariff }: { draft: OrderDraftResponse; onChangeTariff: () => void }) {
+  return (
+    <div
+      style={{
+        background: "#EFF6FF",
+        border: "1.5px solid #2563EB",
+        borderRadius: 16,
+        padding: "20px 24px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        flexWrap: "wrap",
+        gap: 16,
+        marginBottom: 28,
+        boxShadow: "0 4px 16px rgba(37,99,235,0.10)",
+      }}
+    >
+      <div>
+        <div style={{ font: "500 11px/1 Inter Variable, sans-serif", textTransform: "uppercase", letterSpacing: "0.08em", color: "#2563EB", marginBottom: 8 }}>
+          Выбранный тариф
         </div>
+        <div style={{ font: "700 18px/1.2 Inter Variable, sans-serif", color: "#111827", marginBottom: 4 }}>
+          {draft.carrier_name_snapshot} - {draft.tariff_name_snapshot}
+        </div>
+        <div style={{ font: "400 14px/1 Inter Variable, sans-serif", color: "#6B7280" }}>
+          {draft.from_city_snapshot} → {draft.to_city_snapshot} · {draft.shipment_type_snapshot}
+        </div>
+      </div>
+      <div style={{ textAlign: "right" }}>
+        <div style={{ font: "700 26px/1 Inter Variable, sans-serif", color: "#111827", marginBottom: 4 }}>
+          {formatPrice(draft.price_snapshot, draft.currency_snapshot)}
+        </div>
+        <div style={{ font: "600 13px/1 Inter Variable, sans-serif", color: "#2563EB", marginBottom: 12 }}>
+          {draft.eta_days_min_snapshot}–{draft.eta_days_max_snapshot} дн.
+        </div>
+        <button
+          onClick={onChangeTariff}
+          style={{
+            border: "1.5px solid #2563EB",
+            background: "#ffffff",
+            color: "#2563EB",
+            borderRadius: 8,
+            padding: "7px 14px",
+            font: "600 13px/1 Inter Variable, sans-serif",
+            cursor: "pointer",
+            fontFamily: "inherit",
+            transition: "all 0.15s",
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = "#EFF6FF"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "#ffffff"; }}
+        >
+          Изменить тариф
+        </button>
       </div>
     </div>
   );
 }
 
-// ─── Party form section ───────────────────────────────────────────────────────
+/* ─── Party section ──────────────────────────────────────────────────────── */
 
-function PartySection({
-  title,
-  values,
-  onChange,
-  onToggleSave,
-}: {
+function PartySection({ title, values, onChange, onToggleSave }: {
   title: string;
   values: PartyFormState;
   onChange: (key: keyof PartyFormState, value: string) => void;
   onToggleSave: (val: boolean) => void;
 }) {
-  const textFields: { key: keyof PartyFormState; label: string; required?: boolean }[] = [
+  const isMobile = useIsMobile();
+  const fields: { key: keyof PartyFormState; label: string; required?: boolean }[] = [
     { key: "full_name", label: "ФИО", required: true },
     { key: "phone", label: "Телефон", required: true },
     { key: "email", label: "Email" },
@@ -353,22 +331,16 @@ function PartySection({
   ];
 
   return (
-    <div style={cardStyle}>
-      <h2 style={{ marginTop: 0, marginBottom: 20, fontSize: 20, fontWeight: 700 }}>{title}</h2>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 16 }}>
-        {textFields.map(({ key, label, required }) => (
-          <div key={key as string}>
-            <label style={labelStyle}>
-              {label}
-              {required && <span style={{ color: "#ef4444", marginLeft: 2 }}>*</span>}
-            </label>
-            <input
-              style={inputStyle}
-              value={values[key] as string}
-              onChange={(e) => onChange(key, e.target.value)}
-              required={required}
-            />
-          </div>
+    <SectionCard title={title}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))", gap: 14 }}>
+        {fields.map(({ key, label, required }) => (
+          <FormField
+            key={key as string}
+            label={label}
+            value={values[key] as string}
+            onChange={(v) => onChange(key, v)}
+            required={required}
+          />
         ))}
       </div>
       <label
@@ -378,33 +350,30 @@ function PartySection({
           gap: 10,
           marginTop: 16,
           cursor: "pointer",
-          fontSize: 14,
-          color: "#334155",
-          fontWeight: 500,
+          font: "500 14px/1 Inter Variable, sans-serif",
+          color: "#374151",
         }}
       >
         <input
           type="checkbox"
           checked={values.save_to_address_book}
           onChange={(e) => onToggleSave(e.target.checked)}
-          style={{ width: 16, height: 16, cursor: "pointer" }}
+          style={{ width: 16, height: 16, cursor: "pointer", accentColor: "#2563EB" }}
         />
         Сохранить в адресную книгу
       </label>
-    </div>
+    </SectionCard>
   );
 }
 
-// ─── Package form section ─────────────────────────────────────────────────────
+/* ─── Package section ────────────────────────────────────────────────────── */
 
-function PackageSection({
-  values,
-  onChange,
-}: {
+function PackageSection({ values, onChange }: {
   values: PackageFormState;
   onChange: (key: keyof PackageFormState, value: string) => void;
 }) {
-  const fields: { key: keyof PackageFormState; label: string; mode?: string }[] = [
+  const isMobile = useIsMobile();
+  const fields: { key: keyof PackageFormState; label: string; mode?: React.HTMLAttributes<HTMLInputElement>["inputMode"] }[] = [
     { key: "description", label: "Описание содержимого" },
     { key: "quantity", label: "Количество мест", mode: "numeric" },
     { key: "weight_kg", label: "Вес, кг", mode: "decimal" },
@@ -414,38 +383,24 @@ function PackageSection({
   ];
 
   return (
-    <div style={cardStyle}>
-      <h2 style={{ marginTop: 0, marginBottom: 20, fontSize: 20, fontWeight: 700 }}>
-        Параметры отправления
-      </h2>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-          gap: 16,
-        }}
-      >
+    <SectionCard title="Параметры отправления">
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))", gap: 14 }}>
         {fields.map(({ key, label, mode }) => (
-          <div key={key}>
-            <label style={labelStyle}>
-              {label}
-              <span style={{ color: "#ef4444", marginLeft: 2 }}>*</span>
-            </label>
-            <input
-              style={inputStyle}
-              value={values[key]}
-              onChange={(e) => onChange(key, e.target.value)}
-              inputMode={mode as React.HTMLAttributes<HTMLInputElement>["inputMode"]}
-              required
-            />
-          </div>
+          <FormField
+            key={key}
+            label={label}
+            value={values[key]}
+            onChange={(v) => onChange(key, v)}
+            required
+            inputMode={mode}
+          />
         ))}
       </div>
-    </div>
+    </SectionCard>
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+/* ─── Page ───────────────────────────────────────────────────────────────── */
 
 function ShipmentPageInner() {
   const router = useRouter();
@@ -462,96 +417,68 @@ function ShipmentPageInner() {
   const quoteToken = searchParams.get("token");
 
   const fullNextUrl = useMemo(
-    () => (quoteSessionId ? `/quote/shipment?quoteSessionId=${quoteSessionId}${quoteToken ? `&token=${quoteToken}` : ""}` : "/quote/shipment"),
+    () => (quoteSessionId
+      ? `/quote/shipment?quoteSessionId=${quoteSessionId}${quoteToken ? `&token=${quoteToken}` : ""}`
+      : "/quote/shipment"),
     [quoteSessionId, quoteToken],
   );
 
   const createDraftRequestedRef = useRef(false);
-
-  // Session-storage key scoped to the quote session so we don't mix stale data
   const storageKey = quoteSessionId ? `novex_shipment_form_${quoteSessionId}` : null;
 
   function loadSavedForm(): ShipmentFormState | null {
     if (!storageKey) return null;
-    try {
-      const raw = sessionStorage.getItem(storageKey);
-      return raw ? (JSON.parse(raw) as ShipmentFormState) : null;
-    } catch { return null; }
+    try { const raw = sessionStorage.getItem(storageKey); return raw ? JSON.parse(raw) : null; } catch { return null; }
   }
-
   function saveForm(f: ShipmentFormState) {
     if (!storageKey) return;
     try { sessionStorage.setItem(storageKey, JSON.stringify(f)); } catch { /* ignore */ }
   }
-
   function clearSavedForm() {
     if (!storageKey) return;
     try { sessionStorage.removeItem(storageKey); } catch { /* ignore */ }
   }
 
   const [form, setForm] = useState<ShipmentFormState>(
-    () => loadSavedForm() ?? {
-      sender: emptyParty(),
-      recipient: emptyParty(),
-      packageItem: emptyPackage(),
-      call_before_delivery: false,
-      insurance: false,
-      fragile: false,
-    },
+    () => loadSavedForm() ?? { sender: emptyParty(), recipient: emptyParty(), packageItem: emptyPackage(), call_before_delivery: false, insurance: false, fragile: false },
   );
 
   const [draft, setDraft] = useState<OrderDraftResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
 
-  // Redirect if not authenticated
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.replace(`/login?next=${encodeURIComponent(fullNextUrl)}`);
     }
   }, [fullNextUrl, isAuthenticated, isLoading, router]);
 
-  // Pre-fill sender from current user profile
   useEffect(() => {
     if (!currentUser) return;
-    setForm((prev) => ({
-      ...prev,
-      sender: mergeSenderWithCurrentUser(prev.sender, currentUser),
-    }));
+    setForm((prev) => ({ ...prev, sender: mergeSenderWithCurrentUser(prev.sender, currentUser) }));
   }, [currentUser]);
 
-  // Bootstrap draft
   useEffect(() => {
     if (isLoading || !isAuthenticated) return;
-
-    if (!quoteSessionId) {
-      setError("Не найден quoteSessionId. Вернитесь к выбору тарифа.");
-      setIsBootstrapping(false);
-      return;
-    }
-
+    if (!quoteSessionId) { setError("Не найден quoteSessionId. Вернитесь к выбору тарифа."); setIsBootstrapping(false); return; }
     if (createDraftRequestedRef.current) return;
     createDraftRequestedRef.current = true;
 
     let cancelled = false;
-
-    async function bootstrapDraft() {
+    async function bootstrap() {
       setError(null);
       setIsBootstrapping(true);
-
       try {
-        const createdDraft = await createDraftFromQuote({ quote_session_id: quoteSessionId!, public_token: quoteToken });
+        const created = await createDraftFromQuote({ quote_session_id: quoteSessionId!, public_token: quoteToken });
         if (cancelled) return;
-        setDraft(createdDraft);
-        setForm(mapDraftToForm(createdDraft, currentUser));
+        setDraft(created);
+        setForm(mapDraftToForm(created, currentUser));
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError) {
-          if (err.status === 401) {
-            logout(`/login?next=${encodeURIComponent(fullNextUrl)}`);
-            return;
-          }
+          if (err.status === 401) { logout(`/login?next=${encodeURIComponent(fullNextUrl)}`); return; }
           setError(err.detail);
         } else if (err instanceof Error) {
           setError(err.message);
@@ -562,61 +489,85 @@ function ShipmentPageInner() {
         if (!cancelled) setIsBootstrapping(false);
       }
     }
-
-    void bootstrapDraft();
-
-    return () => {
-      cancelled = true;
-      createDraftRequestedRef.current = false;
-    };
-  }, [currentUser, fullNextUrl, isAuthenticated, isLoading, logout, quoteSessionId]);
+    void bootstrap();
+    return () => { cancelled = true; createDraftRequestedRef.current = false; };
+  }, [currentUser, fullNextUrl, isAuthenticated, isLoading, logout, quoteSessionId, quoteToken]);
 
   function updateForm(updater: (prev: ShipmentFormState) => ShipmentFormState) {
-    setForm((prev) => {
-      const next = updater(prev);
-      saveForm(next);
-      return next;
-    });
+    setForm((prev) => { const next = updater(prev); saveForm(next); return next; });
   }
 
   function updatePartyField(role: "sender" | "recipient", key: keyof PartyFormState, value: string) {
     updateForm((prev) => ({ ...prev, [role]: { ...prev[role], [key]: value } }));
   }
-
   function toggleSaveAddress(role: "sender" | "recipient", val: boolean) {
     updateForm((prev) => ({ ...prev, [role]: { ...prev[role], save_to_address_book: val } }));
   }
-
   function toggleService(key: "call_before_delivery" | "insurance" | "fragile", val: boolean) {
     updateForm((prev) => ({ ...prev, [key]: val }));
   }
-
   function updatePackageField(key: keyof PackageFormState, value: string) {
     updateForm((prev) => ({ ...prev, packageItem: { ...prev.packageItem, [key]: value } }));
   }
 
+  function validateStep(step: number): string | null {
+    if (step === 0) {
+      const p = form.packageItem;
+      if (!p.description.trim()) return "Введите описание содержимого.";
+      const qty = Number(p.quantity);
+      if (!p.quantity || isNaN(qty) || qty <= 0 || !Number.isInteger(qty)) return "Укажите корректное количество мест.";
+      const w = Number(p.weight_kg);
+      if (!p.weight_kg || isNaN(w) || w <= 0) return "Укажите корректный вес.";
+      const wd = Number(p.width_cm), h = Number(p.height_cm), d = Number(p.depth_cm);
+      if (!p.width_cm || isNaN(wd) || wd <= 0) return "Укажите ширину.";
+      if (!p.height_cm || isNaN(h) || h <= 0) return "Укажите высоту.";
+      if (!p.depth_cm || isNaN(d) || d <= 0) return "Укажите глубину.";
+    }
+    if (step === 1) {
+      const s = form.sender;
+      if (!s.full_name.trim()) return "Укажите ФИО отправителя.";
+      if (!s.phone.trim()) return "Укажите телефон отправителя.";
+      if (!s.country.trim() || s.country.trim().length !== 2) return "Код страны - 2 буквы (например KZ).";
+      if (!s.city.trim()) return "Укажите город отправителя.";
+      if (!s.address_line1.trim()) return "Укажите адрес отправителя.";
+    }
+    if (step === 2) {
+      const r = form.recipient;
+      if (!r.full_name.trim()) return "Укажите ФИО получателя.";
+      if (!r.phone.trim()) return "Укажите телефон получателя.";
+      if (!r.country.trim() || r.country.trim().length !== 2) return "Код страны - 2 буквы (например KZ).";
+      if (!r.city.trim()) return "Укажите город получателя.";
+      if (!r.address_line1.trim()) return "Укажите адрес получателя.";
+    }
+    return null;
+  }
+
+  function handleNextStep() {
+    const err = validateStep(currentStep);
+    if (err) { setError(err); return; }
+    setError(null);
+    setCurrentStep((s) => s + 1);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function handlePrevStep() {
+    setError(null);
+    setCurrentStep((s) => s - 1);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    if (!draft) {
-      setError("Черновик заказа ещё не создан.");
-      return;
-    }
-
+    if (!draft) { setError("Черновик заказа ещё не создан."); return; }
     setError(null);
     setIsSubmitting(true);
-
     try {
-      const payload = buildShipmentPayload(form);
-      await updateOrderDraftShipment(draft.draft_id, payload);
+      await updateOrderDraftShipment(draft.draft_id, buildShipmentPayload(form));
       clearSavedForm();
       router.push(`/checkout?draftId=${draft.draft_id}`);
     } catch (err) {
       if (err instanceof ApiError) {
-        if (err.status === 401) {
-          logout(`/login?next=${encodeURIComponent(fullNextUrl)}`);
-          return;
-        }
+        if (err.status === 401) { logout(`/login?next=${encodeURIComponent(fullNextUrl)}`); return; }
         setError(err.detail);
       } else if (err instanceof Error) {
         setError(err.message);
@@ -628,144 +579,211 @@ function ShipmentPageInner() {
     }
   }
 
+  const cardBase = {
+    background: "#ffffff",
+    border: "1px solid #E5E7EB",
+    borderRadius: 16,
+    padding: "20px 24px",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+  };
+
   if (isLoading || (!isAuthenticated && !error)) {
     return (
-      <main style={pageStyle}>
-        <div style={containerStyle}>
-          <div style={cardStyle}>Проверяем доступ к оформлению...</div>
-        </div>
-      </main>
+      <div style={{ minHeight: "100vh", background: "#FAFAFA" }}>
+        <Navbar />
+        <main style={{ maxWidth: 860, margin: "0 auto", padding: "60px 20px" }}>
+          <div style={cardBase}>
+            <span style={{ font: "400 15px/1 Inter Variable, sans-serif", color: "#6B7280" }}>
+              Проверяем доступ к оформлению...
+            </span>
+          </div>
+        </main>
+      </div>
     );
   }
 
   return (
-    <main style={pageStyle}>
-      <div style={containerStyle}>
-        {/* Header */}
-        <header
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            gap: 16,
-            alignItems: "center",
-            marginBottom: 28,
-            flexWrap: "wrap",
-          }}
-        >
-          <div>
-            <div style={badgeStyle}>Оформление отправления</div>
-            <h1 style={{ margin: "14px 0 8px", fontSize: 34, lineHeight: 1.1 }}>
-              Данные отправления
+    <div style={{ minHeight: "100vh", background: "#FAFAFA" }}>
+      <Navbar />
+
+      <main style={{ maxWidth: 860, margin: "0 auto", padding: "40px 20px 80px" }}>
+        {/* Page title */}
+        <div style={{ marginBottom: 32 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 32 }}>
+            <h1 style={{ font: "700 28px/1.2 Inter Variable, sans-serif", letterSpacing: "-0.02em", color: "#111827", margin: 0 }}>
+              Оформление отправления
             </h1>
-            <p style={{ margin: 0, color: "#475569", lineHeight: 1.7 }}>
-              Заполните данные отправителя, получателя и параметры посылки.
-            </p>
+            <button
+              onClick={() => {
+                if (!quoteSessionId) { router.push("/"); return; }
+                router.push(`/quote/results?quoteSessionId=${quoteSessionId}${quoteToken ? `&token=${quoteToken}` : ""}`);
+              }}
+              style={{
+                border: "1.5px solid #E5E7EB",
+                background: "#ffffff",
+                color: "#111827",
+                borderRadius: 10,
+                padding: "10px 18px",
+                font: "600 14px/1 Inter Variable, sans-serif",
+                cursor: "pointer",
+                fontFamily: "inherit",
+                transition: "background 0.15s",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "#F9FAFB")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "#ffffff")}
+            >
+              ← Назад к тарифам
+            </button>
           </div>
 
-          <button
-            style={buttonSecondary}
-            onClick={() => {
-              if (!quoteSessionId) { router.push("/"); return; }
-              const url = `/quote/results?quoteSessionId=${quoteSessionId}${quoteToken ? `&token=${quoteToken}` : ""}`;
-              router.push(url);
+          <Stepper current={currentStep} />
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div
+            style={{
+              padding: "12px 16px",
+              borderRadius: 10,
+              background: "#FEF2F2",
+              border: "1px solid #FECACA",
+              color: "#B91C1C",
+              font: "400 14px/1.4 Inter Variable, sans-serif",
+              marginBottom: 20,
             }}
           >
-            Назад к тарифам
-          </button>
-        </header>
+            {error}
+          </div>
+        )}
 
-        {error && <div style={errorStyle}>{error}</div>}
-
+        {/* Bootstrapping */}
         {isBootstrapping ? (
-          <div style={{ ...cardStyle }}>Подготавливаем черновик заказа...</div>
+          <div style={cardBase}>
+            <span style={{ font: "400 15px/1 Inter Variable, sans-serif", color: "#6B7280" }}>
+              Подготавливаем черновик заказа...
+            </span>
+          </div>
         ) : draft ? (
           <>
-            {/* Selected tariff card */}
-            <TariffCard
+            {/* Tariff summary */}
+            <TariffSummary
               draft={draft}
               onChangeTariff={() =>
-                router.push(
-                  quoteSessionId ? `/quote/results?quoteSessionId=${quoteSessionId}` : "/",
-                )
+                router.push(quoteSessionId ? `/quote/results?quoteSessionId=${quoteSessionId}` : "/")
               }
             />
 
             {/* Shipment form */}
-            <form onSubmit={handleSubmit} style={{ display: "grid", gap: 20 }}>
-              <PartySection
-                title="Отправитель"
-                values={form.sender}
-                onChange={(key, val) => updatePartyField("sender", key, val)}
-                onToggleSave={(val) => toggleSaveAddress("sender", val)}
-              />
+            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
-              <PartySection
-                title="Получатель"
-                values={form.recipient}
-                onChange={(key, val) => updatePartyField("recipient", key, val)}
-                onToggleSave={(val) => toggleSaveAddress("recipient", val)}
-              />
+              {/* ── Step 0: Данные отправления ── */}
+              {currentStep === 0 && (
+                <>
+                  <PackageSection values={form.packageItem} onChange={updatePackageField} />
+                  <SectionCard title="Дополнительные услуги">
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                      {(
+                        [
+                          { key: "call_before_delivery", label: "Звонок перед доставкой" },
+                          { key: "insurance", label: "Страхование груза" },
+                          { key: "fragile", label: "Хрупкий груз" },
+                        ] as { key: "call_before_delivery" | "insurance" | "fragile"; label: string }[]
+                      ).map(({ key, label }) => (
+                        <label key={key} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", font: "500 14px/1 Inter Variable, sans-serif", color: "#374151" }}>
+                          <input type="checkbox" checked={form[key]} onChange={(e) => toggleService(key, e.target.checked)} style={{ width: 16, height: 16, cursor: "pointer", accentColor: "#2563EB" }} />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                  </SectionCard>
+                </>
+              )}
 
-              <PackageSection
-                values={form.packageItem}
-                onChange={updatePackageField}
-              />
+              {/* ── Step 1: Отправитель ── */}
+              {currentStep === 1 && (
+                <PartySection
+                  title="Отправитель"
+                  values={form.sender}
+                  onChange={(key, val) => updatePartyField("sender", key, val)}
+                  onToggleSave={(val) => toggleSaveAddress("sender", val)}
+                />
+              )}
 
-              {/* Additional services */}
-              <div style={cardStyle}>
-                <h2 style={{ marginTop: 0, marginBottom: 16, fontSize: 20, fontWeight: 700 }}>
-                  Дополнительные услуги
-                </h2>
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {(
-                    [
-                      { key: "call_before_delivery", label: "Звонок перед доставкой" },
-                      { key: "insurance", label: "Страхование груза" },
-                      { key: "fragile", label: "Хрупкий груз" },
-                    ] as { key: "call_before_delivery" | "insurance" | "fragile"; label: string }[]
-                  ).map(({ key, label }) => (
-                    <label
-                      key={key}
-                      style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 14, color: "#334155", fontWeight: 500 }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={form[key]}
-                        onChange={(e) => toggleService(key, e.target.checked)}
-                        style={{ width: 16, height: 16, cursor: "pointer" }}
-                      />
-                      {label}
-                    </label>
-                  ))}
-                </div>
-              </div>
+              {/* ── Step 2: Получатель ── */}
+              {currentStep === 2 && (
+                <PartySection
+                  title="Получатель"
+                  values={form.recipient}
+                  onChange={(key, val) => updatePartyField("recipient", key, val)}
+                  onToggleSave={(val) => toggleSaveAddress("recipient", val)}
+                />
+              )}
 
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <button
-                  type="submit"
-                  style={{
-                    ...buttonPrimary,
-                    opacity: isSubmitting ? 0.7 : 1,
-                    cursor: isSubmitting ? "not-allowed" : "pointer",
-                  }}
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? "Сохраняем..." : "Сохранить и продолжить →"}
-                </button>
-
+              {/* Navigation */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginTop: 8 }}>
                 <button
                   type="button"
-                  style={buttonSecondary}
-                  onClick={() => router.push("/")}
+                  onClick={currentStep === 0 ? () => router.push("/") : handlePrevStep}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "#6B7280",
+                    font: "500 14px/1 Inter Variable, sans-serif",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    padding: 0,
+                  }}
                 >
-                  На главную
+                  {currentStep === 0 ? "На главную" : "← Назад"}
                 </button>
+
+                {currentStep < 2 ? (
+                  <button
+                    type="button"
+                    onClick={handleNextStep}
+                    style={{
+                      background: "#2563EB",
+                      color: "#ffffff",
+                      border: "none",
+                      borderRadius: 10,
+                      padding: "14px 32px",
+                      font: "600 15px/1 Inter Variable, sans-serif",
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                      transition: "background 0.15s",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "#1D4ED8"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "#2563EB"; }}
+                  >
+                    Далее →
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    style={{
+                      background: isSubmitting ? "#93C5FD" : "#2563EB",
+                      color: "#ffffff",
+                      border: "none",
+                      borderRadius: 10,
+                      padding: "14px 32px",
+                      font: "600 15px/1 Inter Variable, sans-serif",
+                      cursor: isSubmitting ? "not-allowed" : "pointer",
+                      fontFamily: "inherit",
+                      transition: "background 0.15s",
+                    }}
+                    onMouseEnter={(e) => { if (!isSubmitting) e.currentTarget.style.background = "#1D4ED8"; }}
+                    onMouseLeave={(e) => { if (!isSubmitting) e.currentTarget.style.background = "#2563EB"; }}
+                  >
+                    {isSubmitting ? "Сохраняем..." : "Далее → Оплата"}
+                  </button>
+                )}
               </div>
             </form>
           </>
         ) : null}
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
 

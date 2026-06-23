@@ -89,6 +89,7 @@ services:
       MINIO_BUCKET: novex-dev
       MINIO_SECURE: "false"
 
+      MINIO_PUBLIC_ENDPOINT: "localhost:9000"
       SECRET_KEY: "${SECRET_KEY}"
       ACCESS_TOKEN_EXPIRE_MINUTES: "10080"
 
@@ -118,6 +119,9 @@ services:
       CSE_LOGIN: "${CSE_LOGIN:-}"
       CSE_PASSWORD: "${CSE_PASSWORD:-}"
       CSE_API_URL: "${CSE_API_URL:-http://web.cse.ru/1c/ws/Web1C.1cws}"
+
+      CARRIER_GATEWAY_URL: "http://carrier-gateway:8100"
+      GATEWAY_SECRET: "${GATEWAY_SECRET:-}"
 
       FRONTEND_URL: "http://localhost:3000"
       BACKEND_URL: "http://localhost:8000"
@@ -168,8 +172,36 @@ services:
       CSE_LOGIN: "${CSE_LOGIN:-}"
       CSE_PASSWORD: "${CSE_PASSWORD:-}"
       CSE_API_URL: "${CSE_API_URL:-http://web.cse.ru/1c/ws/Web1C.1cws}"
+
+      CARRIER_GATEWAY_URL: "http://carrier-gateway:8100"
+      GATEWAY_SECRET: "${GATEWAY_SECRET:-}"
     volumes:
       - ../../backend:/app
+
+  carrier-gateway:
+    build:
+      context: ../..
+      dockerfile: infra/docker/backend.Dockerfile
+    container_name: novex-carrier-gateway
+    restart: unless-stopped
+    working_dir: /app
+    environment:
+      ENVIRONMENT: development
+      GATEWAY_SECRET: "${GATEWAY_SECRET:-}"
+      EXLINE_EXTRA: "${EXLINE_EXTRA:-}"
+      EXLINE_LOGIN: "${EXLINE_LOGIN:-}"
+      EXLINE_PASSWORD: "${EXLINE_PASSWORD:-}"
+      EXLINE_API_URL: "${EXLINE_API_URL:-https://home.courierexe.ru/api/}"
+      CSE_LOGIN: "${CSE_LOGIN:-}"
+      CSE_PASSWORD: "${CSE_PASSWORD:-}"
+      CSE_API_URL: "${CSE_API_URL:-http://web.cse.ru/1c/ws/Web1C.1cws}"
+    volumes:
+      - ../../backend:/app
+    command: >
+      uvicorn carrier_gateway.gateway:app
+      --host 0.0.0.0
+      --port 8100
+      --reload
 
   frontend:
     build:

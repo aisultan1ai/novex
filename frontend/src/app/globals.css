@@ -1,23 +1,92 @@
-/* Inter Variable — bundled via npm, no network fetch during build */
+@import "tailwindcss";
 @import "@fontsource-variable/inter";
 
-:root {
-  --font-inter: "Inter Variable", ui-sans-serif, system-ui, -apple-system,
+/* ─── Design Tokens ──────────────────────────────────────────────────────── */
+@theme {
+  /* Font */
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system,
     BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  /* Brand colours */
+  --color-primary:       #2563EB;
+  --color-primary-hover: #1D4ED8;
+  --color-primary-light: #EFF6FF;
+
+  /* Surfaces */
+  --color-background: #FAFAFA;
+  --color-surface:    #FFFFFF;
+
+  /* Text */
+  --color-text:           #111827;
+  --color-text-secondary: #6B7280;
+  --color-text-label:     #374151;
+  --color-placeholder:    #9CA3AF;
+
+  /* Borders / dividers */
+  --color-border: #E5E7EB;
+
+  /* Semantic */
+  --color-success:  #10B981;
+  --color-warning:  #F59E0B;
+  --color-error:    #EF4444;
+
+  /* Dark surface (footer, tracking board) */
+  --color-dark:            #0F172A;
+  --color-dark-border:     #1E293B;
+  --color-dark-secondary:  #94A3B8;
+  --color-dark-muted:      #64748B;
+
+  /* Status badge backgrounds */
+  --color-badge-transit-bg:    #FEF3C7;
+  --color-badge-transit-text:  #92400E;
+  --color-badge-delivered-bg:  #D1FAE5;
+  --color-badge-delivered-text:#065F46;
+  --color-badge-pending-bg:    #F3F4F6;
+  --color-badge-pending-text:  #374151;
+  --color-badge-cancelled-bg:  #FEE2E2;
+  --color-badge-cancelled-text:#991B1B;
+
+  /* Border radii */
+  --radius-sm:   8px;
+  --radius-input: 10px;
+  --radius-card:  16px;
+  --radius-card-lg: 20px;
+  --radius-pill:  9999px;
+
+  /* Shadows */
+  --shadow-card:      0 1px 3px rgba(0,0,0,0.08);
+  --shadow-card-hover:0 4px 16px rgba(37,99,235,0.10);
+  --shadow-form:      0 10px 40px rgba(17,24,39,0.08);
+  --shadow-accent:    0 12px 40px rgba(37,99,235,0.16);
+  --shadow-auth:      0 12px 40px rgba(17,24,39,0.08);
 }
 
+/* ─── Base ───────────────────────────────────────────────────────────────── */
 *, *::before, *::after {
   box-sizing: border-box;
 }
 
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  background: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+}
+
+/* ─── Animations ─────────────────────────────────────────────────────────── */
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.4; }
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 @keyframes slideInRight {
@@ -25,23 +94,33 @@
   to   { opacity: 1; transform: translateX(0); }
 }
 
-.card-hover:hover {
-  box-shadow: 0 4px 20px rgba(0,0,0,0.10) !important;
-  transform: translateY(-1px);
-  transition: all 0.15s ease;
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+/* ─── Utility classes ────────────────────────────────────────────────────── */
+.animate-fade-in-up {
+  animation: fadeInUp 0.25s ease both;
 }
 
 .result-card {
   animation: fadeInUp 0.25s ease both;
 }
-
 .result-card:nth-child(1) { animation-delay: 0.05s; }
 .result-card:nth-child(2) { animation-delay: 0.10s; }
 .result-card:nth-child(3) { animation-delay: 0.15s; }
 .result-card:nth-child(4) { animation-delay: 0.20s; }
 .result-card:nth-child(5) { animation-delay: 0.25s; }
 
-@keyframes shimmer {
-  0%   { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: var(--radius-sm);
 }

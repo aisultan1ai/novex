@@ -1,63 +1,14 @@
 "use client";
 
-import type { CSSProperties } from "react";
 import { Suspense, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 
 import { useAuth } from "@/components/providers/auth-provider";
 import { useIsMobile } from "@/hooks/use-is-mobile";
-import {
-  ApiError,
-  getOrderDraft,
-  proceedToCheckout,
-} from "@/lib/api/orders";
+import { ApiError, getOrderDraft, proceedToCheckout } from "@/lib/api/orders";
 import type { OrderDraftResponse } from "@/types/order";
-
-// ─── Styles ──────────────────────────────────────────────────────────────────
-
-const pageStyle: CSSProperties = {
-  minHeight: "100vh",
-  background: "#f8fafc",
-  padding: "32px 20px 80px",
-  fontFamily:
-    "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-  color: "#0f172a",
-};
-
-const containerStyle: CSSProperties = {
-  maxWidth: 780,
-  margin: "0 auto",
-};
-
-const card: CSSProperties = {
-  background: "#ffffff",
-  border: "1px solid #e5e7eb",
-  borderRadius: 16,
-  boxShadow: "0 2px 12px rgba(15,23,42,0.05)",
-};
-
-const sectionTitle: CSSProperties = {
-  fontSize: 13,
-  fontWeight: 700,
-  color: "#94a3b8",
-  textTransform: "uppercase",
-  letterSpacing: "0.05em",
-  margin: "0 0 14px",
-};
-
-const label: CSSProperties = {
-  fontSize: 12,
-  color: "#94a3b8",
-  marginBottom: 3,
-};
-
-const value: CSSProperties = {
-  fontSize: 14,
-  fontWeight: 600,
-  color: "#0f172a",
-};
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatPrice(price: number, currency: string): string {
   return `${new Intl.NumberFormat("ru-RU", {
@@ -70,13 +21,11 @@ function InfoRow({ lbl, val }: { lbl: string; val: string | null | undefined }) 
   if (!val) return null;
   return (
     <div style={{ marginBottom: 10 }}>
-      <div style={label}>{lbl}</div>
-      <div style={value}>{val}</div>
+      <div style={{ fontSize: 12, color: "#6B7280", marginBottom: 3 }}>{lbl}</div>
+      <div style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>{val}</div>
     </div>
   );
 }
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
 
 function CheckoutPageInner() {
   const router = useRouter();
@@ -96,14 +45,12 @@ function CheckoutPageInner() {
   const [error, setError] = useState<string | null>(null);
   const [isPaying] = useState(false);
 
-  // Auth guard
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.push(`/login?next=/checkout?draftId=${draftId ?? ""}`);
     }
   }, [isAuthenticated, authLoading, draftId, router]);
 
-  // Load draft
   useEffect(() => {
     if (!isAuthenticated || !draftId) return;
 
@@ -111,23 +58,16 @@ function CheckoutPageInner() {
       setIsLoading(true);
       try {
         let data = await getOrderDraft(draftId!);
-
-        // If still in shipment_details_completed → move to ready_for_checkout
         if (data.status === "shipment_details_completed") {
           data = await proceedToCheckout(draftId!);
         }
-
-        // If already paid - redirect straight to orders
         if (data.status === "paid") {
           router.replace("/dashboard/orders");
           return;
         }
-
         setDraft(data);
       } catch (err) {
-        setError(
-          err instanceof ApiError ? err.detail : "Не удалось загрузить заказ.",
-        );
+        setError(err instanceof ApiError ? err.detail : "Не удалось загрузить заказ.");
       } finally {
         setIsLoading(false);
       }
@@ -146,77 +86,89 @@ function CheckoutPageInner() {
   const sender = draft?.sender;
   const recipient = draft?.recipient;
 
-  return (
-    <main style={pageStyle}>
-      <div style={containerStyle}>
+  const card = {
+    background: "#ffffff",
+    border: "1px solid #E5E7EB",
+    borderRadius: 16,
+    boxShadow: "0 2px 8px rgba(17,24,39,0.04)",
+  };
 
-        {/* Header */}
-        <div style={{ marginBottom: 28 }}>
-          <button
-            onClick={() => router.push("/dashboard/orders")}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              fontSize: 14,
-              color: "#64748b",
-              padding: 0,
-              marginBottom: 16,
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              fontFamily: "inherit",
-            }}
+  return (
+    <div style={{ minHeight: "100vh", background: "#FAFAFA", fontFamily: "Inter Variable, sans-serif" }}>
+
+      {/* Header */}
+      <header style={{ height: 64, background: "#ffffff", borderBottom: "1px solid #E5E7EB", padding: "0 24px", display: "flex", alignItems: "center", position: "sticky", top: 0, zIndex: 50 }}>
+        <Link
+          href="/"
+          style={{ display: "inline-flex", alignItems: "center", gap: 8, textDecoration: "none", font: "700 20px/1 Inter Variable, sans-serif", letterSpacing: "-0.02em", color: "#111827" }}
+        >
+          <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#2563EB", flexShrink: 0 }} />
+          novex
+        </Link>
+      </header>
+
+      <main style={{ maxWidth: 780, margin: "0 auto", padding: isMobile ? "24px 16px 80px" : "40px 24px 80px" }}>
+
+        {/* Back + title */}
+        <div style={{ marginBottom: 32 }}>
+          <Link
+            href="/dashboard/orders"
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, font: "500 13px/1 Inter Variable, sans-serif", color: "#6B7280", textDecoration: "none", marginBottom: 20 }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "#111827")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "#6B7280")}
           >
-            ← Мои заказы
-          </button>
-          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800 }}>
+            <ArrowLeft size={14} />
+            Мои заказы
+          </Link>
+          <h1 style={{ margin: 0, font: "700 28px/1.2 Inter Variable, sans-serif", color: "#111827", letterSpacing: "-0.01em" }}>
             Оформление оплаты
           </h1>
-          <p style={{ margin: "4px 0 0", fontSize: 14, color: "#64748b" }}>
+          <p style={{ margin: "6px 0 0", font: "400 15px/1 Inter Variable, sans-serif", color: "#6B7280" }}>
             Проверьте данные и подтвердите заказ
           </p>
         </div>
 
         {isLoading ? (
-          <div style={{ ...card, padding: 40, textAlign: "center", color: "#64748b", fontSize: 14 }}>
+          <div style={{ ...card, padding: 48, textAlign: "center", color: "#6B7280", font: "400 14px/1 Inter Variable, sans-serif" }}>
             Загружаем заказ…
           </div>
         ) : error && !draft ? (
-          <div style={{ ...card, padding: 24 }}>
-            <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "14px 16px", color: "#b91c1c", fontSize: 14, marginBottom: 16 }}>
+          <div style={{ ...card, padding: 28 }}>
+            <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10, padding: "14px 16px", color: "#B91C1C", font: "400 14px/1.4 Inter Variable, sans-serif", marginBottom: 16 }}>
               {error}
             </div>
-            <button
-              onClick={() => router.push("/")}
-              style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#f8fafc", fontSize: 14, fontWeight: 600, color: "#374151", cursor: "pointer", fontFamily: "inherit" }}
+            <Link
+              href="/"
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 20px", borderRadius: 10, border: "1px solid #E5E7EB", background: "#ffffff", font: "600 14px/1 Inter Variable, sans-serif", color: "#374151", textDecoration: "none" }}
             >
               ← Новый расчёт тарифа
-            </button>
+            </Link>
           </div>
         ) : draft ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
             {/* Route & carrier */}
-            <div style={{ ...card, padding: "20px 24px" }}>
-              <p style={sectionTitle}>Маршрут и тариф</p>
+            <div style={{ ...card, padding: "24px 28px" }}>
+              <div style={{ font: "700 11px/1 Inter Variable, sans-serif", color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>
+                Маршрут и тариф
+              </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
                 <div>
-                  <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 6 }}>
+                  <div style={{ font: "700 22px/1.2 Inter Variable, sans-serif", color: "#111827", marginBottom: 8 }}>
                     {draft.from_city_snapshot} → {draft.to_city_snapshot}
                   </div>
-                  <div style={{ fontSize: 13, color: "#64748b" }}>
+                  <div style={{ font: "400 13px/1.6 Inter Variable, sans-serif", color: "#6B7280" }}>
                     {draft.shipment_type_snapshot} · {draft.eta_days_min_snapshot}-{draft.eta_days_max_snapshot} дн.
                   </div>
-                  <div style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>
+                  <div style={{ font: "400 13px/1 Inter Variable, sans-serif", color: "#6B7280", marginTop: 4 }}>
                     {draft.carrier_name_snapshot} - {draft.tariff_name_snapshot}
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 28, fontWeight: 800, color: "#0f172a" }}>
+                  <div style={{ font: "800 30px/1 Inter Variable, sans-serif", color: "#111827" }}>
                     {formatPrice(Number(draft.price_snapshot), draft.currency_snapshot)}
                   </div>
-                  <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>
+                  <div style={{ font: "400 12px/1 Inter Variable, sans-serif", color: "#6B7280", marginTop: 6 }}>
                     стоимость доставки
                   </div>
                 </div>
@@ -225,33 +177,33 @@ function CheckoutPageInner() {
 
             {/* Sender + Recipient */}
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
-              <div style={{ ...card, padding: "20px 24px" }}>
-                <p style={sectionTitle}>Отправитель</p>
+              <div style={{ ...card, padding: "24px 28px" }}>
+                <div style={{ font: "700 11px/1 Inter Variable, sans-serif", color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>
+                  Отправитель
+                </div>
                 <InfoRow lbl="ФИО" val={sender?.full_name} />
                 <InfoRow lbl="Телефон" val={sender?.phone} />
                 <InfoRow lbl="Email" val={sender?.email} />
                 <InfoRow lbl="Компания" val={sender?.company_name} />
                 <InfoRow
                   lbl="Адрес"
-                  val={[sender?.country, sender?.city, sender?.address_line1, sender?.address_line2]
-                    .filter(Boolean)
-                    .join(", ")}
+                  val={[sender?.country, sender?.city, sender?.address_line1, sender?.address_line2].filter(Boolean).join(", ")}
                 />
                 <InfoRow lbl="Почтовый индекс" val={sender?.postal_code} />
                 <InfoRow lbl="Комментарий" val={sender?.comment} />
               </div>
 
-              <div style={{ ...card, padding: "20px 24px" }}>
-                <p style={sectionTitle}>Получатель</p>
+              <div style={{ ...card, padding: "24px 28px" }}>
+                <div style={{ font: "700 11px/1 Inter Variable, sans-serif", color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>
+                  Получатель
+                </div>
                 <InfoRow lbl="ФИО" val={recipient?.full_name} />
                 <InfoRow lbl="Телефон" val={recipient?.phone} />
                 <InfoRow lbl="Email" val={recipient?.email} />
                 <InfoRow lbl="Компания" val={recipient?.company_name} />
                 <InfoRow
                   lbl="Адрес"
-                  val={[recipient?.country, recipient?.city, recipient?.address_line1, recipient?.address_line2]
-                    .filter(Boolean)
-                    .join(", ")}
+                  val={[recipient?.country, recipient?.city, recipient?.address_line1, recipient?.address_line2].filter(Boolean).join(", ")}
                 />
                 <InfoRow lbl="Почтовый индекс" val={recipient?.postal_code} />
                 <InfoRow lbl="Комментарий" val={recipient?.comment} />
@@ -259,31 +211,21 @@ function CheckoutPageInner() {
             </div>
 
             {/* Packages */}
-            <div style={{ ...card, padding: "20px 24px" }}>
-              <p style={sectionTitle}>
+            <div style={{ ...card, padding: "24px 28px" }}>
+              <div style={{ font: "700 11px/1 Inter Variable, sans-serif", color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>
                 Грузовые места ({draft.packages.length})
-              </p>
+              </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {draft.packages.map((pkg, i) => (
                   <div
                     key={pkg.id}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      padding: "12px 16px",
-                      background: "#f8fafc",
-                      borderRadius: 10,
-                      fontSize: 14,
-                      flexWrap: "wrap",
-                      gap: 8,
-                    }}
+                    style={{ display: "flex", justifyContent: "space-between", padding: "12px 16px", background: "#F8FAFC", borderRadius: 12, font: "400 14px/1 Inter Variable, sans-serif", flexWrap: "wrap", gap: 8 }}
                   >
-                    <span style={{ fontWeight: 600 }}>
+                    <span style={{ fontWeight: 600, color: "#111827" }}>
                       {i + 1}. {pkg.description}
                     </span>
-                    <span style={{ color: "#64748b" }}>
-                      {pkg.quantity} шт · {Number(pkg.weight_kg)} кг ·{" "}
-                      {Number(pkg.width_cm)}×{Number(pkg.height_cm)}×{Number(pkg.depth_cm)} см
+                    <span style={{ color: "#6B7280" }}>
+                      {pkg.quantity} шт · {Number(pkg.weight_kg)} кг · {Number(pkg.width_cm)}×{Number(pkg.height_cm)}×{Number(pkg.depth_cm)} см
                     </span>
                   </div>
                 ))}
@@ -291,46 +233,25 @@ function CheckoutPageInner() {
             </div>
 
             {/* Payment section */}
-            <div style={{ ...card, padding: "20px 24px" }}>
-              <p style={sectionTitle}>Способ оплаты</p>
+            <div style={{ ...card, padding: "24px 28px" }}>
+              <div style={{ font: "700 11px/1 Inter Variable, sans-serif", color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>
+                Способ оплаты
+              </div>
 
-              {/* Bank transfer note */}
-              <div
-                style={{
-                  padding: "12px 16px",
-                  background: "#eff6ff",
-                  border: "1px solid #bfdbfe",
-                  borderRadius: 10,
-                  fontSize: 13,
-                  color: "#1e40af",
-                  marginBottom: 20,
-                }}
-              >
+              <div style={{ padding: "14px 18px", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 12, font: "400 13px/1.5 Inter Variable, sans-serif", color: "#1E40AF", marginBottom: 24 }}>
                 <strong>Банковский перевод.</strong> После нажатия кнопки вы получите реквизиты и сможете загрузить подтверждение оплаты.
               </div>
 
-              {/* Error */}
               {error && (
-                <div
-                  style={{
-                    padding: "12px 16px",
-                    background: "#fef2f2",
-                    border: "1px solid #fecaca",
-                    borderRadius: 10,
-                    fontSize: 13,
-                    color: "#b91c1c",
-                    marginBottom: 16,
-                  }}
-                >
+                <div style={{ padding: "12px 16px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10, font: "400 13px/1.4 Inter Variable, sans-serif", color: "#B91C1C", marginBottom: 20 }}>
                   {error}
                 </div>
               )}
 
-              {/* Pay button */}
-              <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", alignItems: isMobile ? "stretch" : "center", gap: 12 }}>
+              <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", alignItems: isMobile ? "stretch" : "center", gap: 16 }}>
                 <div>
-                  <div style={{ fontSize: 13, color: "#64748b" }}>Итого к оплате</div>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: "#0f172a" }}>
+                  <div style={{ font: "400 13px/1 Inter Variable, sans-serif", color: "#6B7280", marginBottom: 6 }}>Итого к оплате</div>
+                  <div style={{ font: "800 28px/1 Inter Variable, sans-serif", color: "#111827" }}>
                     {formatPrice(Number(draft.price_snapshot), draft.currency_snapshot)}
                   </div>
                 </div>
@@ -338,30 +259,30 @@ function CheckoutPageInner() {
                   onClick={() => void handlePay()}
                   disabled={isPaying}
                   style={{
-                    background: isPaying ? "#94a3b8" : "#0f172a",
+                    background: isPaying ? "#93C5FD" : "#2563EB",
                     color: "#fff",
                     border: "none",
                     borderRadius: 12,
                     padding: "14px 32px",
-                    fontSize: 15,
-                    fontWeight: 700,
+                    font: "600 15px/1 Inter Variable, sans-serif",
                     cursor: isPaying ? "not-allowed" : "pointer",
                     fontFamily: "inherit",
                     width: isMobile ? "100%" : "auto",
-                    minWidth: isMobile ? "auto" : 200,
+                    minWidth: isMobile ? "auto" : 220,
+                    transition: "background 0.15s",
                   }}
+                  onMouseEnter={(e) => { if (!isPaying) e.currentTarget.style.background = "#1D4ED8"; }}
+                  onMouseLeave={(e) => { if (!isPaying) e.currentTarget.style.background = "#2563EB"; }}
                 >
-                  {isPaying
-                    ? "Обрабатываем…"
-                    : `Оплатить ${formatPrice(Number(draft.price_snapshot), draft.currency_snapshot)}`}
+                  {isPaying ? "Обрабатываем…" : `Оплатить ${formatPrice(Number(draft.price_snapshot), draft.currency_snapshot)}`}
                 </button>
               </div>
             </div>
 
           </div>
         ) : null}
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
 

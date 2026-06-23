@@ -44,7 +44,7 @@ const inp: React.CSSProperties = {
   boxSizing: "border-box",
   outline: "none",
   fontFamily: "inherit",
-  color: "#0f172a",
+  color: "#111827",
   transition: "border-color 0.15s, background 0.15s",
 };
 
@@ -171,7 +171,7 @@ export default function ProfilePage() {
   return (
     <>
       <div style={{ marginBottom: 28 }}>
-        <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "#0f172a" }}>Профиль</h1>
+        <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "#111827" }}>Профиль</h1>
         <p style={{ margin: "4px 0 0", fontSize: 14, color: "#64748b" }}>
           Ваши данные и настройки аккаунта
         </p>
@@ -188,11 +188,11 @@ export default function ProfilePage() {
           <div style={{ flex: 1, minWidth: 0, background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, padding: 32 }}>
             {/* Avatar + name */}
             <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 32 }}>
-              <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#0f172a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 800, color: "#ffffff", flexShrink: 0 }}>
+              <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#111827", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 800, color: "#ffffff", flexShrink: 0 }}>
                 {initials}
               </div>
               <div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: "#0f172a", marginBottom: 4 }}>
+                <div style={{ fontSize: 22, fontWeight: 700, color: "#111827", marginBottom: 4 }}>
                   {dp?.full_name || dp?.email || "-"}
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -216,7 +216,7 @@ export default function ProfilePage() {
 
             <hr style={{ border: "none", borderTop: "1px solid #f1f5f9", margin: "0 0 24px" }} />
 
-            <h2 style={{ margin: "0 0 20px", fontSize: 16, fontWeight: 700, color: "#0f172a" }}>
+            <h2 style={{ margin: "0 0 20px", fontSize: 16, fontWeight: 700, color: "#111827" }}>
               Редактировать данные
             </h2>
 
@@ -232,7 +232,7 @@ export default function ProfilePage() {
                     style={inp} value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="+7 700 000 0000" inputMode="tel"
-                    onFocus={(e) => { e.currentTarget.style.borderColor = "#0f172a"; e.currentTarget.style.background = "#ffffff"; }}
+                    onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.background = "#ffffff"; }}
                     onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
                   />
                 </div>
@@ -242,7 +242,7 @@ export default function ProfilePage() {
                     style={inp} value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="Иван Иванов"
-                    onFocus={(e) => { e.currentTarget.style.borderColor = "#0f172a"; e.currentTarget.style.background = "#ffffff"; }}
+                    onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.background = "#ffffff"; }}
                     onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
                   />
                 </div>
@@ -252,7 +252,7 @@ export default function ProfilePage() {
                     style={inp} value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
                     placeholder="ТОО «Компания»"
-                    onFocus={(e) => { e.currentTarget.style.borderColor = "#0f172a"; e.currentTarget.style.background = "#ffffff"; }}
+                    onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.background = "#ffffff"; }}
                     onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
                   />
                 </div>
@@ -260,7 +260,7 @@ export default function ProfilePage() {
 
               <button
                 type="submit" disabled={isSaving}
-                style={{ background: "#0f172a", color: "#ffffff", border: "none", borderRadius: 10, padding: "12px 32px", fontWeight: 600, fontSize: 15, cursor: isSaving ? "not-allowed" : "pointer", opacity: isSaving ? 0.7 : 1, fontFamily: "inherit" }}
+                style={{ background: "#111827", color: "#ffffff", border: "none", borderRadius: 10, padding: "12px 32px", fontWeight: 600, fontSize: 15, cursor: isSaving ? "not-allowed" : "pointer", opacity: isSaving ? 0.7 : 1, fontFamily: "inherit" }}
               >
                 {isSaving ? "Сохраняем…" : "Сохранить"}
               </button>
@@ -287,14 +287,14 @@ export default function ProfilePage() {
               </svg>
             </div>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 6 }}>Сменить пароль</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", marginBottom: 6 }}>Сменить пароль</div>
               <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.5 }}>
                 Рекомендуем использовать надёжный пароль
               </div>
             </div>
             <button
               onClick={openPwModal}
-              style={{ width: "100%", padding: "11px 0", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", color: "#0f172a", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "background 0.15s" }}
+              style={{ width: "100%", padding: "11px 0", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", color: "#111827", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "background 0.15s" }}
               onMouseEnter={(e) => { e.currentTarget.style.background = "#f8fafc"; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = "#fff"; }}
             >
@@ -313,7 +313,7 @@ export default function ProfilePage() {
           <div style={{ background: "#fff", borderRadius: 20, padding: "36px 40px", width: 420, boxShadow: "0 24px 64px rgba(0,0,0,0.16)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 26 }}>
               <div>
-                <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#0f172a" }}>Сменить пароль</h2>
+                <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#111827" }}>Сменить пароль</h2>
                 <p style={{ margin: "4px 0 0", fontSize: 13, color: "#94a3b8" }}>Минимум 8 символов</p>
               </div>
               <button
@@ -329,7 +329,7 @@ export default function ProfilePage() {
                     <polyline points="20 6 9 17 4 12"/>
                   </svg>
                 </div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>Пароль изменён</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#111827" }}>Пароль изменён</div>
               </div>
             ) : (
               <form onSubmit={(e) => void handleChangePassword(e)}>
@@ -342,7 +342,7 @@ export default function ProfilePage() {
                       value={currentPassword}
                       onChange={(e) => setCurrentPassword(e.target.value)}
                       placeholder="••••••••" required
-                      style={{ flex: 1, border: "none", background: "transparent", padding: "11px 14px", fontSize: 14, outline: "none", fontFamily: "inherit", color: "#0f172a" }}
+                      style={{ flex: 1, border: "none", background: "transparent", padding: "11px 14px", fontSize: 14, outline: "none", fontFamily: "inherit", color: "#111827" }}
                     />
                     <button type="button" onClick={() => setShowCurrent(v => !v)}
                       style={{ padding: "0 14px", background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 12, fontFamily: "inherit" }}>
@@ -360,7 +360,7 @@ export default function ProfilePage() {
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="Минимум 8 символов" required
-                      style={{ flex: 1, border: "none", background: "transparent", padding: "11px 14px", fontSize: 14, outline: "none", fontFamily: "inherit", color: "#0f172a" }}
+                      style={{ flex: 1, border: "none", background: "transparent", padding: "11px 14px", fontSize: 14, outline: "none", fontFamily: "inherit", color: "#111827" }}
                     />
                     <button type="button" onClick={() => setShowNew(v => !v)}
                       style={{ padding: "0 14px", background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 12, fontFamily: "inherit" }}>
@@ -393,7 +393,7 @@ export default function ProfilePage() {
                 <div style={{ display: "flex", gap: 10 }}>
                   <button
                     type="submit" disabled={pwSaving}
-                    style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", background: "#0f172a", color: "#fff", fontSize: 14, fontWeight: 600, cursor: pwSaving ? "not-allowed" : "pointer", opacity: pwSaving ? 0.6 : 1, fontFamily: "inherit" }}
+                    style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", background: "#111827", color: "#fff", fontSize: 14, fontWeight: 600, cursor: pwSaving ? "not-allowed" : "pointer", opacity: pwSaving ? 0.6 : 1, fontFamily: "inherit" }}
                   >
                     {pwSaving ? "Сохраняем…" : "Изменить пароль"}
                   </button>

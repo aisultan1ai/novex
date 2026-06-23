@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 import { useAuth } from "@/components/providers/auth-provider";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 
 const ADMIN_TABS = [
   { label: "Обзор",         href: "/dashboard/admin" },
@@ -24,6 +25,7 @@ export default function AdminSubLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { currentUser, isLoading } = useAuth();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (!isLoading && currentUser?.role !== "admin") {
@@ -32,6 +34,24 @@ export default function AdminSubLayout({ children }: { children: ReactNode }) {
   }, [isLoading, currentUser, router]);
 
   if (isLoading || currentUser?.role !== "admin") return null;
+
+  if (isMobile) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh", padding: "40px 24px", textAlign: "center" }}>
+        <div style={{ width: 56, height: 56, borderRadius: 14, background: "#0f172a", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" />
+          </svg>
+        </div>
+        <h2 style={{ margin: "0 0 10px", font: "700 20px/1.3 Inter Variable, sans-serif", color: "#0f172a" }}>
+          Только для компьютера
+        </h2>
+        <p style={{ margin: 0, font: "400 14px/1.6 Inter Variable, sans-serif", color: "#64748b", maxWidth: 280 }}>
+          Административная панель доступна только с компьютера или ноутбука.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div>

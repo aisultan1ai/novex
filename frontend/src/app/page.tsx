@@ -3,13 +3,17 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Package, FileText, Clock, MapPin, Star, ChevronDown, ChevronUp } from "lucide-react";
 
 import { useAuth } from "@/components/providers/auth-provider";
 import { useIsMobile } from "@/hooks/use-is-mobile";
+import Navbar from "@/components/layout/Navbar";
+import Footer from "@/components/layout/Footer";
 import CitySelect from "@/components/ui/CitySelect";
-import { ApiError, calculateShippingQuote } from "@/lib/api/shipping";
-import { selectShippingQuote } from "@/lib/api/shipping";
+import { ApiError, calculateShippingQuote, selectShippingQuote } from "@/lib/api/shipping";
 import type { RateQuoteItem, ShipmentType, ShippingQuoteResponse } from "@/types/quote";
+
+/* ─── Types & helpers ────────────────────────────────────────────────────── */
 
 type FormState = {
   fromCity: string;
@@ -23,14 +27,14 @@ type FormState = {
 };
 
 const initialForm: FormState = {
-  fromCity: "Алматы",
-  toCity: "Астана",
+  fromCity: "",
+  toCity: "",
   shipmentType: "parcel",
-  weightKg: "2.5",
+  weightKg: "",
   quantity: "1",
-  widthCm: "20",
-  heightCm: "15",
-  depthCm: "10",
+  widthCm: "",
+  heightCm: "",
+  depthCm: "",
 };
 
 function validateQuoteForm(form: FormState): string | null {
@@ -43,12 +47,10 @@ function validateQuoteForm(form: FormState): string | null {
   if (!form.weightKg.trim() || isNaN(weight) || weight <= 0)
     return "Введите корректный вес (> 0).";
   if (weight > 1000) return "Вес не может превышать 1000 кг.";
-
   if (!form.quantity.trim() || isNaN(qty) || qty <= 0)
     return "Введите корректное количество (> 0).";
   if (!Number.isInteger(qty)) return "Количество должно быть целым числом.";
   if (qty > 999) return "Количество не может превышать 999.";
-
   if (!form.widthCm.trim() || isNaN(width) || width <= 0)
     return "Введите корректную ширину (> 0).";
   if (!form.heightCm.trim() || isNaN(height) || height <= 0)
@@ -57,7 +59,6 @@ function validateQuoteForm(form: FormState): string | null {
     return "Введите корректную глубину (> 0).";
   if (width > 500 || height > 500 || depth > 500)
     return "Размеры не могут превышать 500 см.";
-
   return null;
 }
 
@@ -67,73 +68,170 @@ const BADGE_LABELS: Record<string, string> = {
   best_value: "Лучшая цена",
 };
 
-const BADGE_STYLES: Record<string, React.CSSProperties> = {
-  fastest: { background: "#fff7ed", color: "#c2410c" },
-  recommended: { background: "#eff6ff", color: "#1d4ed8" },
-  best_value: { background: "#fefce8", color: "#854d0e" },
-};
-
-function getBadgeStyle(badge: string | null): React.CSSProperties {
-  if (!badge) return {};
-  return BADGE_STYLES[badge] ?? { background: "#f1f5f9", color: "#475569" };
-}
-
 function formatPrice(price: number, currency: string): string {
-  return `${new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(price)} ${currency}`;
+  return `${new Intl.NumberFormat("ru-RU", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(price)} ${currency}`;
 }
 
-function calcChargeable(weightKg: number, widthCm: number, heightCm: number, depthCm: number, qty: number): number {
+function calcChargeable(
+  weightKg: number,
+  widthCm: number,
+  heightCm: number,
+  depthCm: number,
+  qty: number,
+): number {
   const vol = (widthCm * heightCm * depthCm) / 6000;
   return Math.max(weightKg, vol) * qty;
 }
 
+
+/* ─── Sub-components ─────────────────────────────────────────────────────── */
+
 function SkeletonCard() {
   return (
     <div
-      style={{
-        height: 90,
-        borderRadius: 16,
-        background: "#e5e7eb",
-        animation: "pulse 1.5s ease infinite",
-      }}
+      className="skeleton"
+      style={{ height: 90, borderRadius: 16 }}
     />
   );
 }
 
-
-const QUOTE_FORM_KEY = "novex_quote_form";
-
-function saveQuoteForm(form: FormState) {
-  try { sessionStorage.setItem(QUOTE_FORM_KEY, JSON.stringify(form)); } catch { /* ignore */ }
+function TariffBadge({ name }: { name: string }) {
+  const lower = name.toLowerCase();
+  let bg: string, color: string;
+  if (lower.includes("экспресс") || lower.includes("express")) {
+    bg = "#FEF3C7"; color = "#92400E";
+  } else if (lower.includes("эконом") || lower.includes("econom")) {
+    bg = "#D1FAE5"; color = "#065F46";
+  } else {
+    bg = "#F3F4F6"; color = "#374151";
+  }
+  return (
+    <span style={{ background: bg, color, padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600 }}>
+      {name}
+    </span>
+  );
 }
 
-function loadQuoteForm(): FormState | null {
-  try {
-    const raw = sessionStorage.getItem(QUOTE_FORM_KEY);
-    return raw ? (JSON.parse(raw) as FormState) : null;
-  } catch { return null; }
+function DetailRow({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <span style={{ fontSize: 13, color: "#6B7280" }}>{label}</span>
+      <span style={{ fontSize: 14, fontWeight: 600, color: muted ? "#9CA3AF" : "#111827" }}>{value}</span>
+    </div>
+  );
 }
+
+function InputField({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+}) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <div>
+      <label style={{ display: "block", font: "500 13px/1 Inter Variable, sans-serif", color: "#374151", marginBottom: 6 }}>
+        {label}
+      </label>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        inputMode="decimal"
+        required
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        style={{
+          width: "100%",
+          border: focused ? "1.5px solid #2563EB" : "1.5px solid #E5E7EB",
+          borderRadius: 10,
+          padding: "12px 14px",
+          font: "400 15px/1 Inter Variable, sans-serif",
+          color: "#111827",
+          background: "#fff",
+          outline: "none",
+          boxShadow: focused ? "0 0 0 3px rgba(37,99,235,0.15)" : "none",
+          transition: "border-color 0.15s, box-shadow 0.15s",
+          boxSizing: "border-box",
+        }}
+      />
+    </div>
+  );
+}
+
+/* ─── Static sections ────────────────────────────────────────────────────── */
+
+const HOW_IT_WORKS = [
+  { step: 1, title: "Заполни форму", desc: "Укажи маршрут, вес и габариты посылки" },
+  { step: 2, title: "Выбери тариф", desc: "Сравни предложения курьерских служб" },
+  { step: 3, title: "Оплати онлайн", desc: "Безопасная оплата картой Казахстана" },
+  { step: 4, title: "Отслеживай", desc: "Следи за посылкой в реальном времени" },
+];
+
+const WHY_NOVEX = [
+  {
+    icon: <Star size={24} color="#2563EB" />,
+    title: "Выгодные цены",
+    desc: "Сравниваем тарифы 10+ курьерских служб и показываем лучшие предложения",
+  },
+  {
+    icon: <Clock size={24} color="#2563EB" />,
+    title: "Быстрое оформление",
+    desc: "От расчёта до оформления - 2 минуты. Без лишних звонков и визитов",
+  },
+  {
+    icon: <MapPin size={24} color="#2563EB" />,
+    title: "Надёжное отслеживание",
+    desc: "Актуальный статус посылки в одном окне, уведомления о каждом этапе",
+  },
+];
+
+const FAQ_ITEMS = [
+  {
+    q: "Как рассчитать стоимость доставки?",
+    a: "Введите город отправления и назначения, укажите вес и габариты посылки, нажмите «Рассчитать» - система покажет тарифы доступных служб.",
+  },
+  {
+    q: "Какие курьерские службы поддерживаются?",
+    a: "Сейчас доступны основные курьерские службы Казахстана. Список постоянно расширяется.",
+  },
+  {
+    q: "Как отследить посылку?",
+    a: "Перейдите в раздел «Отслеживание» и введите трек-номер, который вы получили при оформлении заказа.",
+  },
+  {
+    q: "Можно ли оформить доставку без регистрации?",
+    a: "Рассчитать тариф можно без регистрации. Для оформления заказа потребуется создать аккаунт - это займёт меньше минуты.",
+  },
+];
+
+/* ─── Main page ──────────────────────────────────────────────────────────── */
 
 export default function HomePage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading, currentUser } = useAuth();
   const isMobile = useIsMobile();
 
-  const [form, setForm] = useState<FormState>(() => loadQuoteForm() ?? initialForm);
+  const [form, setForm] = useState<FormState>(initialForm);
+
   const [results, setResults] = useState<ShippingQuoteResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedRate, setSelectedRate] = useState<RateQuoteItem | null>(null);
   const [isSelectingRate, setIsSelectingRate] = useState(false);
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   const resultsRef = useRef<HTMLDivElement>(null);
 
   function setField<K extends keyof FormState>(key: K, val: FormState[K]) {
-    setForm((prev) => {
-      const next = { ...prev, [key]: val };
-      saveQuoteForm(next);
-      return next;
-    });
+    setForm((prev) => ({ ...prev, [key]: val }));
   }
 
   useEffect(() => {
@@ -162,17 +260,12 @@ export default function HomePage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-
     if (form.fromCity.trim() === form.toCity.trim()) {
       setError("Город отправления и город назначения должны различаться.");
       return;
     }
-
     const numericError = validateQuoteForm(form);
-    if (numericError) {
-      setError(numericError);
-      return;
-    }
+    if (numericError) { setError(numericError); return; }
 
     setIsLoading(true);
     setResults(null);
@@ -192,9 +285,7 @@ export default function HomePage() {
       });
       setResults(res);
     } catch (err) {
-      setError(
-        err instanceof ApiError ? err.detail : "Не удалось рассчитать тарифы.",
-      );
+      setError(err instanceof ApiError ? err.detail : "Не удалось рассчитать тарифы.");
     } finally {
       setIsLoading(false);
     }
@@ -212,9 +303,7 @@ export default function HomePage() {
       );
       setSelectedRate(rate);
     } catch (err) {
-      setError(
-        err instanceof ApiError ? err.detail : "Не удалось выбрать тариф.",
-      );
+      setError(err instanceof ApiError ? err.detail : "Не удалось выбрать тариф.");
     } finally {
       setIsSelectingRate(false);
     }
@@ -223,7 +312,9 @@ export default function HomePage() {
   function handleProceed() {
     if (!selectedRate || !results) return;
     const token = results.public_token;
-    router.push(`/quote/shipment?quoteSessionId=${results.quote_session_id}${token ? `&token=${token}` : ""}`);
+    router.push(
+      `/quote/shipment?quoteSessionId=${results.quote_session_id}${token ? `&token=${token}` : ""}`,
+    );
   }
 
   const hasResults = results !== null;
@@ -236,472 +327,414 @@ export default function HomePage() {
     Number(form.quantity),
   );
 
-  const inp: React.CSSProperties = {
-    border: "1px solid #e5e7eb",
-    borderRadius: 10,
-    padding: "10px 12px",
-    background: "#f8fafc",
-    fontSize: 15,
-    width: "100%",
-    boxSizing: "border-box",
-    textAlign: "center",
-    outline: "none",
-    fontFamily: "inherit",
-    color: "#0f172a",
-    transition: "border-color 0.15s, background 0.15s",
-  };
-
-  const lbl: React.CSSProperties = {
-    display: "block",
-    fontSize: 10,
-    fontWeight: 700,
-    color: "#94a3b8",
-    textTransform: "uppercase",
-    letterSpacing: "0.05em",
-    marginBottom: 6,
-  };
-
   return (
-    <div style={{ minHeight: "100vh", background: "#f1f5f9" }}>
+    <div style={{ minHeight: "100vh", background: "#FAFAFA" }}>
+      <Navbar />
 
-      {/* HEADER */}
-      <header
-        style={{
-          height: 60,
-          background: "#ffffff",
-          borderBottom: "1px solid #e5e7eb",
-          padding: isMobile ? "0 16px" : "0 40px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          position: "sticky",
-          top: 0,
-          zIndex: 50,
-        }}
-      >
-        <span style={{ fontSize: 20, fontWeight: 800, color: "#0f172a" }}>Novex</span>
-
-        {!authLoading && (
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            {isAuthenticated ? (
-              <Link
-                href="/dashboard"
-                style={{
-                  padding: "8px 20px",
-                  borderRadius: 10,
-                  background: "#0f172a",
-                  color: "#ffffff",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  textDecoration: "none",
-                }}
-              >
-                {currentUser?.full_name ? currentUser.full_name.split(" ")[0] : "Кабинет"} →
-              </Link>
-            ) : (
-              <>
-                <Link
-                  href="/login"
-                  style={{
-                    padding: "8px 20px",
-                    borderRadius: 10,
-                    border: "1px solid #e5e7eb",
-                    background: "#ffffff",
-                    color: "#0f172a",
-                    fontSize: 14,
-                    fontWeight: 600,
-                    textDecoration: "none",
-                  }}
-                >
-                  Войти
-                </Link>
-                <Link
-                  href="/register"
-                  style={{
-                    padding: "8px 20px",
-                    borderRadius: 10,
-                    background: "#0f172a",
-                    color: "#ffffff",
-                    fontSize: 14,
-                    fontWeight: 600,
-                    textDecoration: "none",
-                  }}
-                >
-                  Регистрация
-                </Link>
-              </>
-            )}
-          </div>
-        )}
-      </header>
-
-      {/* MAIN */}
-      <main style={{ background: "#f1f5f9", minHeight: "calc(100vh - 60px)", paddingBottom: 80 }}>
-
-        {/* HERO (only before search) */}
-        {!hasResults && (
-          <div style={{ textAlign: "center", paddingTop: isMobile ? 40 : 80, paddingBottom: isMobile ? 32 : 48, padding: isMobile ? "40px 16px 32px" : "80px 20px 48px" }}>
-            <h1 style={{ fontSize: isMobile ? 32 : 48, fontWeight: 800, color: "#0f172a", lineHeight: 1.15, margin: "0 0 16px" }}>
-              Доставка по Казахстану
-            </h1>
-            <p style={{ fontSize: isMobile ? 15 : 18, color: "#64748b", maxWidth: 480, margin: "0 auto 40px", lineHeight: 1.6 }}>
-              Сравните тарифы курьерских служб и оформите отправление онлайн за несколько минут
-            </p>
-          </div>
-        )}
-
-        {/* BREADCRUMB (after search) */}
-        {hasResults && (
-          <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 20px 0" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              <button
-                onClick={() => { setResults(null); setSelectedRate(null); }}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "#64748b",
-                  fontSize: 14,
-                  fontWeight: 500,
-                  cursor: "pointer",
-                  padding: 0,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                  fontFamily: "inherit",
-                }}
-              >
-                ← Новый расчёт
-              </button>
-              <span style={{ color: "#94a3b8", fontSize: 13 }}>
-                {form.fromCity} → {form.toCity} · {form.weightKg}кг · {form.shipmentType === "parcel" ? "Посылка" : "Документ"}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* FORM CARD */}
-        <div
+      <main>
+        {/* ── HERO ──────────────────────────────────────────────────────── */}
+        <section
           style={{
-            maxWidth: hasResults ? 900 : 720,
-            margin: "0 auto",
-            padding: hasResults ? "16px 20px 0" : "0 20px",
-            transition: "max-width 0.3s ease",
+            background: "#FAFAFA",
+            padding: isMobile ? "48px 20px 56px" : "72px 48px 80px",
+            textAlign: "center",
           }}
         >
           <div
             style={{
-              background: "#ffffff",
-              borderRadius: 16,
-              boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04)",
-              padding: isMobile ? "20px 16px" : "32px",
+              font: "500 13px/1 Inter Variable, sans-serif",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              color: "#2563EB",
+              marginBottom: 16,
             }}
           >
-            <div style={{ marginBottom: 24 }}>
-              <h2 style={{ margin: "0 0 4px", fontSize: 20, fontWeight: 700, color: "#0f172a" }}>
-                Рассчитать стоимость
-              </h2>
-              <p style={{ margin: 0, fontSize: 14, color: "#64748b" }}>
-                Укажите маршрут и параметры отправления
-              </p>
-            </div>
+            Агрегатор курьерских служб
+          </div>
+          <h1
+            style={{
+              font: `700 ${isMobile ? "32px" : "48px"}/1.12 Inter Variable, sans-serif`,
+              letterSpacing: "-0.02em",
+              color: "#111827",
+              margin: "0 auto 16px",
+              maxWidth: 640,
+            }}
+          >
+            Доставка по Казахстану
+          </h1>
+          <p
+            style={{
+              font: "400 18px/1.6 Inter Variable, sans-serif",
+              color: "#6B7280",
+              margin: "0 auto 40px",
+              maxWidth: 520,
+            }}
+          >
+            Сравните тарифы курьерских служб и оформите отправление за 2&nbsp;минуты.
+          </p>
 
+          {/* ── FORM CARD ────────────────────────────────────────────── */}
+          <div
+            style={{
+              background: "#ffffff",
+              border: "1px solid #E5E7EB",
+              borderRadius: 20,
+              boxShadow: "0 10px 40px rgba(17,24,39,0.08)",
+              padding: isMobile ? "20px 16px" : "28px 28px",
+              maxWidth: 860,
+              margin: "0 auto",
+              textAlign: "left",
+            }}
+          >
             <form onSubmit={handleSubmit}>
-              {/* Route */}
+              {/* Row 1: route + shipment type */}
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: isMobile ? "1fr" : "1fr 40px 1fr",
-                  gap: 12,
+                  gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 220px",
+                  gap: 14,
                   alignItems: "end",
-                  marginBottom: 20,
+                  marginBottom: 18,
                 }}
               >
                 <div>
-                  <label style={lbl}>Откуда</label>
+                  <label style={{ display: "block", font: "500 13px/1 Inter Variable, sans-serif", color: "#374151", marginBottom: 6 }}>
+                    Откуда
+                  </label>
                   <CitySelect
                     value={form.fromCity}
                     onChange={(v) => setField("fromCity", v)}
                     placeholder="Город отправки"
                   />
                 </div>
-                {!isMobile && (
-                  <div style={{ display: "flex", justifyContent: "center", paddingBottom: 12 }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="5" y1="12" x2="19" y2="12" />
-                      <polyline points="12 5 19 12 12 19" />
-                    </svg>
-                  </div>
-                )}
                 <div>
-                  <label style={lbl}>Куда</label>
+                  <label style={{ display: "block", font: "500 13px/1 Inter Variable, sans-serif", color: "#374151", marginBottom: 6 }}>
+                    Куда
+                  </label>
                   <CitySelect
                     value={form.toCity}
                     onChange={(v) => setField("toCity", v)}
                     placeholder="Город доставки"
                   />
                 </div>
-              </div>
-
-              {/* Shipment type */}
-              <div style={{ marginBottom: 20 }}>
-                <label style={lbl}>Что отправляете</label>
-                <div style={{ display: "flex", gap: 8 }}>
-                  {(["parcel", "document"] as ShipmentType[]).map((t) => {
-                    const active = form.shipmentType === t;
-                    return (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => setField("shipmentType", t)}
-                        style={{
-                          padding: "8px 20px",
-                          borderRadius: 8,
-                          border: active ? "none" : "1px solid #e5e7eb",
-                          background: active ? "#0f172a" : "transparent",
-                          color: active ? "#ffffff" : "#64748b",
-                          fontSize: 14,
-                          fontWeight: 600,
-                          cursor: "pointer",
-                          fontFamily: "inherit",
-                        }}
-                      >
-                        {t === "parcel" ? "Посылка" : "Документ"}
-                      </button>
-                    );
-                  })}
+                <div>
+                  <label style={{ display: "block", font: "500 13px/1 Inter Variable, sans-serif", color: "#374151", marginBottom: 6 }}>
+                    Что отправляете
+                  </label>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {(["parcel", "document"] as ShipmentType[]).map((t) => {
+                      const active = form.shipmentType === t;
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => setField("shipmentType", t)}
+                          style={{
+                            flex: 1,
+                            border: active ? "1.5px solid #2563EB" : "1.5px solid #E5E7EB",
+                            background: active ? "#EFF6FF" : "#ffffff",
+                            color: active ? "#2563EB" : "#6B7280",
+                            borderRadius: 10,
+                            padding: "12px 0",
+                            font: "600 14px/1 Inter Variable, sans-serif",
+                            cursor: "pointer",
+                            transition: "all 0.15s",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: 6,
+                          }}
+                        >
+                          {t === "parcel" ? <Package size={14} /> : <FileText size={14} />}
+                          {t === "parcel" ? "Посылка" : "Документ"}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
-              {/* Parameters */}
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(5, 1fr)", gap: 12, marginBottom: 24 }}>
-                {(
-                  [
-                    { key: "weightKg", label: "Вес, кг", placeholder: "2.5" },
-                    { key: "quantity", label: "Кол-во", placeholder: "1" },
-                    { key: "widthCm", label: "Ширина, см", placeholder: "20" },
-                    { key: "heightCm", label: "Высота, см", placeholder: "15" },
-                    { key: "depthCm", label: "Глубина, см", placeholder: "10" },
-                  ] as { key: keyof FormState; label: string; placeholder: string }[]
-                ).map(({ key, label, placeholder }) => (
-                  <div key={key}>
-                    <label style={lbl}>{label}</label>
-                    <input
-                      style={inp}
-                      value={form[key]}
-                      onChange={(e) => setField(key, e.target.value)}
-                      placeholder={placeholder}
-                      inputMode="decimal"
-                      required
-                      onFocus={(e) => {
-                        e.currentTarget.style.borderColor = "#0f172a";
-                        e.currentTarget.style.background = "#ffffff";
-                      }}
-                      onBlur={(e) => {
-                        e.currentTarget.style.borderColor = "#e5e7eb";
-                        e.currentTarget.style.background = "#f8fafc";
-                      }}
-                    />
-                  </div>
-                ))}
-              </div>
-
-              <button
-                type="submit"
-                disabled={isLoading}
+              {/* Row 2: dimensions + submit */}
+              <div
                 style={{
-                  width: "100%",
-                  height: 52,
-                  background: isLoading ? "#1e293b" : "#0f172a",
-                  color: "#ffffff",
-                  borderRadius: 12,
-                  fontSize: 16,
-                  fontWeight: 600,
-                  border: "none",
-                  cursor: isLoading ? "not-allowed" : "pointer",
-                  opacity: isLoading ? 0.7 : 1,
-                  fontFamily: "inherit",
-                  transition: "background 0.15s",
-                }}
-                onMouseEnter={(e) => {
-                  if (!isLoading) e.currentTarget.style.background = "#1e293b";
-                }}
-                onMouseLeave={(e) => {
-                  if (!isLoading) e.currentTarget.style.background = "#0f172a";
+                  display: "grid",
+                  gridTemplateColumns: isMobile
+                    ? "repeat(2,1fr)"
+                    : "1fr 1fr 1fr 1fr 1fr auto",
+                  gap: 14,
+                  alignItems: "end",
                 }}
               >
-                {isLoading ? "Рассчитываем..." : "Рассчитать тарифы →"}
-              </button>
+                <InputField label="Вес, кг" value={form.weightKg} onChange={(v) => setField("weightKg", v)} placeholder="2.5" />
+                <InputField label="Кол-во" value={form.quantity} onChange={(v) => setField("quantity", v)} placeholder="1" />
+                <InputField label="Ширина, см" value={form.widthCm} onChange={(v) => setField("widthCm", v)} placeholder="20" />
+                <InputField label="Высота, см" value={form.heightCm} onChange={(v) => setField("heightCm", v)} placeholder="15" />
+                <InputField label="Глубина, см" value={form.depthCm} onChange={(v) => setField("depthCm", v)} placeholder="10" />
+
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  style={{
+                    background: isLoading ? "#93C5FD" : "#2563EB",
+                    color: "#ffffff",
+                    border: "none",
+                    borderRadius: 10,
+                    padding: "13px 24px",
+                    font: "600 15px/1 Inter Variable, sans-serif",
+                    cursor: isLoading ? "not-allowed" : "pointer",
+                    whiteSpace: "nowrap",
+                    transition: "background 0.15s",
+                    ...(isMobile ? { gridColumn: "1 / -1", padding: "14px" } : {}),
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isLoading) e.currentTarget.style.background = "#1D4ED8";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isLoading) e.currentTarget.style.background = "#2563EB";
+                  }}
+                >
+                  {isLoading ? "Рассчитываем..." : "Рассчитать"}
+                </button>
+              </div>
 
               {error && (
-                <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 10, background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c", fontSize: 13 }}>
+                <div
+                  style={{
+                    marginTop: 16,
+                    padding: "12px 14px",
+                    borderRadius: 10,
+                    background: "#FEF2F2",
+                    border: "1px solid #FECACA",
+                    color: "#B91C1C",
+                    font: "400 13px/1.5 Inter Variable, sans-serif",
+                  }}
+                >
                   {error}
                 </div>
               )}
             </form>
           </div>
-        </div>
 
-        {/* FEATURE PILLS (before search) */}
-        {!hasResults && (
-          <div style={{ textAlign: "center", marginTop: 24, display: "flex", justifyContent: "center", gap: 32, flexWrap: "wrap" }}>
-            {["Мгновенный расчёт", "Лучшие тарифы", "Онлайн-оформление"].map((f) => (
-              <span key={f} style={{ fontSize: 14, color: "#64748b", display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ color: "#16a34a", fontWeight: 700 }}>✓</span> {f}
-              </span>
-            ))}
-          </div>
-        )}
+          {/* Social proof */}
+          {!hasResults && (
+            <div
+              style={{
+                display: "flex",
+                gap: 32,
+                justifyContent: "center",
+                flexWrap: "wrap",
+                marginTop: 28,
+                font: "500 14px/1 Inter Variable, sans-serif",
+                color: "#6B7280",
+              }}
+            >
+              <span><b style={{ color: "#111827" }}>10+</b> служб доставки</span>
+              <span style={{ color: "#E5E7EB" }}>|</span>
+              <span><b style={{ color: "#111827" }}>50 000+</b> отправлений</span>
+              <span style={{ color: "#E5E7EB" }}>|</span>
+              <span><b style={{ color: "#111827" }}>5.0 ★</b> средний рейтинг</span>
+            </div>
+          )}
+        </section>
 
-        {/* RESULTS SECTION */}
+        {/* ── RESULTS (inline, appears below form) ──────────────────────── */}
         {hasResults && (
-          <div ref={resultsRef} style={{ maxWidth: 900, margin: "0 auto", padding: "0 20px" }}>
-            <h2 style={{ fontSize: 22, fontWeight: 700, color: "#0f172a", margin: "32px 0 20px" }}>
-              Результаты поиска
-            </h2>
+          <section
+            ref={resultsRef}
+            style={{
+              maxWidth: 900,
+              margin: "0 auto",
+              padding: "0 20px 80px",
+            }}
+          >
+            {/* Summary bar */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: 12,
+                marginBottom: 24,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <span style={{ font: "600 18px/1 Inter Variable, sans-serif", color: "#111827" }}>
+                  {form.fromCity} → {form.toCity}
+                </span>
+                <span
+                  style={{
+                    background: "#F3F4F6",
+                    color: "#374151",
+                    font: "500 13px/1 Inter Variable, sans-serif",
+                    padding: "4px 12px",
+                    borderRadius: 999,
+                  }}
+                >
+                  {form.weightKg} кг · {form.shipmentType === "parcel" ? "Посылка" : "Документ"}
+                </span>
+              </div>
+              <button
+                onClick={() => { setResults(null); setSelectedRate(null); }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#2563EB",
+                  font: "500 14px/1 Inter Variable, sans-serif",
+                  cursor: "pointer",
+                  textDecoration: "underline",
+                  fontFamily: "inherit",
+                  padding: 0,
+                }}
+              >
+                Изменить
+              </button>
+            </div>
 
             {isLoading ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                <SkeletonCard />
-                <SkeletonCard />
-                <SkeletonCard />
+                <SkeletonCard /><SkeletonCard /><SkeletonCard />
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {results.quotes.map((rate) => {
                   const isBest = rate.price === minPrice;
+                  const isSelected = selectedRate === rate;
+                  const showBestBadge =
+                    isBest && !rate.badge
+                      ? { label: "Лучшая цена", bg: "#EFF6FF", color: "#1D4ED8" }
+                      : null;
+                  const badgeInfo = rate.badge
+                    ? { label: BADGE_LABELS[rate.badge] ?? rate.badge, bg: "#EFF6FF", color: "#1D4ED8" }
+                    : showBestBadge;
+
                   return (
                     <div
                       key={rate.id ?? rate.carrier_code + rate.tariff_name}
                       className="result-card"
                       onClick={() => handleSelectRate(rate)}
                       style={{
-                        background: "#ffffff",
+                        background: isSelected ? "#EFF6FF" : "#ffffff",
                         borderRadius: 16,
-                        border: `1px solid ${selectedRate === rate ? "#0f172a" : "#e5e7eb"}`,
+                        border: `1.5px solid ${isSelected ? "#2563EB" : isBest ? "#2563EB" : "#E5E7EB"}`,
                         padding: "20px 24px",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "space-between",
                         gap: 16,
                         cursor: "pointer",
+                        boxShadow: isBest ? "0 4px 16px rgba(37,99,235,0.10)" : "0 1px 3px rgba(0,0,0,0.08)",
                         transition: "all 0.15s ease",
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.boxShadow = "0 4px 20px rgba(0,0,0,0.09)";
-                        e.currentTarget.style.borderColor = selectedRate === rate ? "#0f172a" : "#d1d5db";
+                        e.currentTarget.style.boxShadow = "0 4px 16px rgba(37,99,235,0.10)";
+                        e.currentTarget.style.transform = "translateY(-2px)";
+                        e.currentTarget.style.borderColor = "#2563EB";
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.boxShadow = "none";
-                        e.currentTarget.style.borderColor = selectedRate === rate ? "#0f172a" : "#e5e7eb";
+                        e.currentTarget.style.boxShadow = isBest
+                          ? "0 4px 16px rgba(37,99,235,0.10)"
+                          : "0 1px 3px rgba(0,0,0,0.08)";
+                        e.currentTarget.style.transform = "translateY(0)";
+                        e.currentTarget.style.borderColor = isSelected || isBest
+                          ? "#2563EB"
+                          : "#E5E7EB";
                       }}
                     >
-                      {/* Left */}
-                      <div style={{ flex: 1 }}>
+                      {/* Carrier info */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
                           <div
                             style={{
                               width: 48,
                               height: 48,
                               borderRadius: 10,
-                              background: "#f1f5f9",
+                              background: "#EFF6FF",
                               display: "flex",
                               alignItems: "center",
                               justifyContent: "center",
-                              fontSize: 20,
-                              fontWeight: 800,
-                              color: "#0f172a",
+                              font: "700 20px/1 Inter Variable, sans-serif",
+                              color: "#2563EB",
                               flexShrink: 0,
                             }}
                           >
                             {rate.carrier_name[0]}
                           </div>
                           <div>
-                            <span style={{ fontSize: 16, fontWeight: 700, color: "#0f172a", marginRight: 8 }}>
+                            <span style={{ font: "600 16px/1 Inter Variable, sans-serif", color: "#111827", marginRight: 8 }}>
                               {rate.carrier_name}
                             </span>
                             <TariffBadge name={rate.tariff_name} />
-                            {rate.badge && (
+                            {badgeInfo && (
                               <span
                                 style={{
-                                  ...getBadgeStyle(rate.badge),
+                                  background: badgeInfo.bg,
+                                  color: badgeInfo.color,
                                   padding: "3px 10px",
                                   borderRadius: 999,
-                                  fontSize: 12,
-                                  fontWeight: 600,
+                                  font: "600 12px/1 Inter Variable, sans-serif",
                                   marginLeft: 6,
                                 }}
                               >
-                                {BADGE_LABELS[rate.badge] ?? rate.badge}
-                              </span>
-                            )}
-                            {isBest && !rate.badge && (
-                              <span
-                                style={{
-                                  background: "#fefce8",
-                                  color: "#854d0e",
-                                  padding: "3px 10px",
-                                  borderRadius: 999,
-                                  fontSize: 12,
-                                  fontWeight: 600,
-                                  marginLeft: 6,
-                                }}
-                              >
-                                Лучшая цена
+                                {badgeInfo.label}
                               </span>
                             )}
                           </div>
                         </div>
-                        <div style={{ fontSize: 13, color: "#64748b", display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap" }}>
-                          <span>📅 Срок: {rate.eta_days_min}-{rate.eta_days_max} дн.</span>
-                          <span>🕐 Сбор: по будням</span>
-                          <span>🛡 Страховка: нет</span>
+                        <div
+                          style={{
+                            font: "400 13px/1 Inter Variable, sans-serif",
+                            color: "#6B7280",
+                            display: "flex",
+                            gap: 16,
+                            alignItems: "center",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <span>Срок: {rate.eta_days_min}–{rate.eta_days_max} дн.</span>
+                          <span>Сбор: по будням</span>
                         </div>
                       </div>
 
-                      {/* Right */}
+                      {/* Price + CTA */}
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0 }}>
                         <div>
-                          <div style={{ fontSize: 24, fontWeight: 800, color: "#0f172a", textAlign: "right" }}>
+                          <div style={{ font: "700 24px/1 Inter Variable, sans-serif", color: "#111827", textAlign: "right" }}>
                             {formatPrice(rate.price, rate.currency)}
                           </div>
-                          <div style={{ fontSize: 12, color: "#94a3b8", textAlign: "right" }}>с НДС</div>
-                          {/эконом|econom/i.test(rate.tariff_name) && (
-                            <div style={{ fontSize: 11, color: "#f59e0b", textAlign: "right", marginTop: 2 }}>
-                              мин. 10 кг — выгодно от 10 кг
-                            </div>
-                          )}
+                          <div style={{ font: "400 12px/1 Inter Variable, sans-serif", color: "#9CA3AF", textAlign: "right", marginTop: 4 }}>
+                            с НДС
+                          </div>
                         </div>
                         <button
                           onClick={(e) => { e.stopPropagation(); void handleSelectRate(rate); }}
                           style={{
-                            border: "1px solid #e5e7eb",
-                            background: selectedRate === rate ? "#0f172a" : "#ffffff",
-                            color: selectedRate === rate ? "#ffffff" : "#0f172a",
-                            borderColor: selectedRate === rate ? "#0f172a" : "#e5e7eb",
+                            border: isSelected ? "none" : "1.5px solid #E5E7EB",
+                            background: isSelected ? "#2563EB" : "#ffffff",
+                            color: isSelected ? "#ffffff" : "#111827",
                             borderRadius: 10,
                             padding: "8px 20px",
-                            fontWeight: 600,
-                            fontSize: 14,
+                            font: "600 14px/1 Inter Variable, sans-serif",
                             cursor: "pointer",
                             fontFamily: "inherit",
                             transition: "all 0.15s",
                           }}
                           onMouseEnter={(e) => {
-                            if (selectedRate !== rate) {
-                              e.currentTarget.style.background = "#0f172a";
+                            if (!isSelected) {
+                              e.currentTarget.style.background = "#2563EB";
                               e.currentTarget.style.color = "#ffffff";
-                              e.currentTarget.style.borderColor = "#0f172a";
+                              e.currentTarget.style.borderColor = "#2563EB";
                             }
                           }}
                           onMouseLeave={(e) => {
-                            if (selectedRate !== rate) {
+                            if (!isSelected) {
                               e.currentTarget.style.background = "#ffffff";
-                              e.currentTarget.style.color = "#0f172a";
-                              e.currentTarget.style.borderColor = "#e5e7eb";
+                              e.currentTarget.style.color = "#111827";
+                              e.currentTarget.style.borderColor = "#E5E7EB";
                             }
                           }}
                         >
-                          {selectedRate === rate ? "Выбрано ✓" : "Выбрать →"}
+                          {isSelected ? "Выбрано ✓" : "Выбрать"}
                         </button>
                       </div>
                     </div>
@@ -709,20 +742,231 @@ export default function HomePage() {
                 })}
               </div>
             )}
-          </div>
+          </section>
+        )}
+
+        {/* ── STATIC SECTIONS (hidden when results shown) ─────────────── */}
+        {!hasResults && (
+          <>
+            {/* How it works */}
+            <section style={{ background: "#ffffff", padding: isMobile ? "56px 20px" : "80px 48px" }}>
+              <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+                <h2
+                  style={{
+                    font: "600 32px/1.25 Inter Variable, sans-serif",
+                    color: "#111827",
+                    textAlign: "center",
+                    margin: "0 0 48px",
+                  }}
+                >
+                  Как это работает
+                </h2>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4,1fr)",
+                    gap: 24,
+                  }}
+                >
+                  {HOW_IT_WORKS.map(({ step, title, desc }) => (
+                    <div key={step} style={{ textAlign: "center" }}>
+                      <div
+                        style={{
+                          width: 48,
+                          height: 48,
+                          borderRadius: 12,
+                          background: "#EFF6FF",
+                          color: "#2563EB",
+                          font: "700 20px/1 Inter Variable, sans-serif",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          margin: "0 auto 16px",
+                        }}
+                      >
+                        {step}
+                      </div>
+                      <div style={{ font: "600 18px/1.3 Inter Variable, sans-serif", color: "#111827", marginBottom: 8 }}>
+                        {title}
+                      </div>
+                      <div style={{ font: "400 15px/1.5 Inter Variable, sans-serif", color: "#6B7280" }}>
+                        {desc}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            {/* Partners / carriers */}
+            <section style={{ background: "#FAFAFA", borderTop: "1px solid #E5E7EB", padding: isMobile ? "48px 20px" : "56px 48px", textAlign: "center" }}>
+              <p style={{ font: "400 15px/1 Inter Variable, sans-serif", color: "#6B7280", margin: "0 0 28px" }}>
+                Сравниваем цены ведущих служб в реальном времени
+              </p>
+              <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
+                {[
+                  { code: "AZ", label: "Azimuth" },
+                  { code: "EX", label: "Exline" },
+                  { code: "CSE", label: "CSE" },
+                ].map(({ code, label }) => (
+                  <div
+                    key={code}
+                    style={{
+                      background: "#ffffff",
+                      border: "1px solid #E5E7EB",
+                      borderRadius: 10,
+                      padding: "14px 28px",
+                      font: "700 16px/1 Inter Variable, sans-serif",
+                      color: "#374151",
+                      letterSpacing: "0.01em",
+                    }}
+                  >
+                    {label}
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Why Novex */}
+            <section style={{ background: "#FAFAFA", padding: isMobile ? "56px 20px" : "80px 48px" }}>
+              <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+                <h2
+                  style={{
+                    font: "600 32px/1.25 Inter Variable, sans-serif",
+                    color: "#111827",
+                    textAlign: "center",
+                    margin: "0 0 48px",
+                  }}
+                >
+                  Почему Novex
+                </h2>
+                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap: 24 }}>
+                  {WHY_NOVEX.map(({ icon, title, desc }) => (
+                    <div
+                      key={title}
+                      style={{
+                        background: "#ffffff",
+                        borderRadius: 16,
+                        border: "1px solid #E5E7EB",
+                        padding: "28px 24px",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: 10,
+                          background: "#EFF6FF",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          marginBottom: 16,
+                        }}
+                      >
+                        {icon}
+                      </div>
+                      <div style={{ font: "600 20px/1.3 Inter Variable, sans-serif", color: "#111827", marginBottom: 8 }}>
+                        {title}
+                      </div>
+                      <div style={{ font: "400 15px/1.6 Inter Variable, sans-serif", color: "#6B7280" }}>
+                        {desc}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            {/* FAQ */}
+            <section id="help" style={{ background: "#ffffff", padding: isMobile ? "56px 20px" : "80px 48px" }}>
+              <div style={{ maxWidth: 1200, margin: "0 auto", display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1.5fr", gap: 64 }}>
+                <div>
+                  <h2 style={{ font: "600 32px/1.25 Inter Variable, sans-serif", color: "#111827", margin: "0 0 16px" }}>
+                    Часто задаваемые вопросы
+                  </h2>
+                  <p style={{ font: "400 16px/1.6 Inter Variable, sans-serif", color: "#6B7280", margin: "0 0 28px" }}>
+                    Не нашли ответ? Напишите нам.
+                  </p>
+                  <a
+                    href="mailto:support@novex.kz"
+                    style={{
+                      display: "inline-block",
+                      border: "1.5px solid #E5E7EB",
+                      background: "#ffffff",
+                      color: "#111827",
+                      borderRadius: 10,
+                      padding: "12px 24px",
+                      font: "600 15px/1 Inter Variable, sans-serif",
+                      textDecoration: "none",
+                      transition: "background 0.15s",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "#F9FAFB")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "#ffffff")}
+                  >
+                    Написать в поддержку
+                  </a>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                  {FAQ_ITEMS.map((item, i) => {
+                    const isOpen = openFaq === i;
+                    return (
+                      <div
+                        key={i}
+                        style={{ borderBottom: "1px solid #E5E7EB" }}
+                      >
+                        <button
+                          onClick={() => setOpenFaq(isOpen ? null : i)}
+                          style={{
+                            width: "100%",
+                            background: "none",
+                            border: "none",
+                            padding: "20px 0",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            cursor: "pointer",
+                            font: "500 16px/1.4 Inter Variable, sans-serif",
+                            color: "#111827",
+                            textAlign: "left",
+                            gap: 16,
+                            fontFamily: "inherit",
+                          }}
+                        >
+                          {item.q}
+                          {isOpen
+                            ? <ChevronUp size={18} color="#2563EB" style={{ flexShrink: 0 }} />
+                            : <ChevronDown size={18} color="#9CA3AF" style={{ flexShrink: 0 }} />
+                          }
+                        </button>
+                        {isOpen && (
+                          <div
+                            style={{
+                              padding: "0 0 20px",
+                              font: "400 15px/1.6 Inter Variable, sans-serif",
+                              color: "#6B7280",
+                            }}
+                          >
+                            {item.a}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </section>
+          </>
         )}
       </main>
 
-      {/* SIDE PANEL OVERLAY */}
+      <Footer />
+
+      {/* ── SIDE PANEL (rate details) ──────────────────────────────────── */}
       {selectedRate && (
         <>
           <div
-            style={{
-              position: "fixed",
-              inset: 0,
-              background: "rgba(0,0,0,0.3)",
-              zIndex: 199,
-            }}
+            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 199 }}
             onClick={() => setSelectedRate(null)}
           />
           <div
@@ -740,7 +984,6 @@ export default function HomePage() {
               animation: "slideInRight 0.2s ease",
             }}
           >
-            {/* Close */}
             <button
               onClick={() => setSelectedRate(null)}
               style={{
@@ -750,58 +993,56 @@ export default function HomePage() {
                 width: 36,
                 height: 36,
                 borderRadius: "50%",
-                border: "1px solid #e5e7eb",
+                border: "1px solid #E5E7EB",
                 background: "#ffffff",
                 cursor: "pointer",
                 fontSize: 18,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "#64748b",
+                color: "#6B7280",
                 fontFamily: "inherit",
               }}
             >
               ×
             </button>
 
-            {/* Logo + name */}
             <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
               <div
                 style={{
                   width: 56,
                   height: 56,
                   borderRadius: 12,
-                  background: "#f1f5f9",
+                  background: "#EFF6FF",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: 24,
-                  fontWeight: 800,
-                  color: "#0f172a",
+                  font: "700 24px/1 Inter Variable, sans-serif",
+                  color: "#2563EB",
                 }}
               >
                 {selectedRate.carrier_name[0]}
               </div>
               <div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: "#0f172a" }}>
+                <div style={{ font: "700 18px/1 Inter Variable, sans-serif", color: "#111827" }}>
                   {selectedRate.carrier_name}
                 </div>
-                <span style={{ background: "#f0fdf4", color: "#16a34a", padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600 }}>
+                <span style={{ background: "#D1FAE5", color: "#065F46", padding: "3px 10px", borderRadius: 999, font: "600 12px/1 Inter Variable, sans-serif" }}>
                   Активен
                 </span>
               </div>
             </div>
 
-            <hr style={{ border: "none", borderTop: "1px solid #f1f5f9", margin: "0 0 20px" }} />
+            <hr style={{ border: "none", borderTop: "1px solid #E5E7EB", margin: "0 0 20px" }} />
 
             <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
               <DetailRow label="Тариф" value={selectedRate.tariff_name} />
-              <DetailRow label="Срок доставки" value={`${selectedRate.eta_days_min}-${selectedRate.eta_days_max} рабочих дней`} />
+              <DetailRow label="Срок доставки" value={`${selectedRate.eta_days_min}–${selectedRate.eta_days_max} рабочих дней`} />
               <DetailRow label="Ограничения" value="Макс. 30 кг · 150×150×150 см" muted />
               <DetailRow label="Страховка" value="Нет" />
             </div>
 
-            <hr style={{ border: "none", borderTop: "1px solid #f1f5f9", margin: "0 0 20px" }} />
+            <hr style={{ border: "none", borderTop: "1px solid #E5E7EB", margin: "0 0 20px" }} />
 
             <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
               <DetailRow label="Маршрут" value={`${form.fromCity} → ${form.toCity}`} />
@@ -810,10 +1051,12 @@ export default function HomePage() {
             </div>
 
             <div style={{ textAlign: "center", marginBottom: 24 }}>
-              <div style={{ fontSize: 32, fontWeight: 800, color: "#0f172a" }}>
+              <div style={{ font: "700 32px/1 Inter Variable, sans-serif", color: "#111827" }}>
                 {formatPrice(selectedRate.price, selectedRate.currency)}
               </div>
-              <div style={{ fontSize: 13, color: "#94a3b8", marginTop: 4 }}>с НДС · тенге</div>
+              <div style={{ font: "400 13px/1 Inter Variable, sans-serif", color: "#9CA3AF", marginTop: 4 }}>
+                с НДС · тенге
+              </div>
             </div>
 
             <button
@@ -822,15 +1065,20 @@ export default function HomePage() {
               style={{
                 width: "100%",
                 height: 52,
-                background: "#0f172a",
+                background: isSelectingRate ? "#93C5FD" : "#2563EB",
                 color: "#ffffff",
-                borderRadius: 12,
-                fontSize: 16,
-                fontWeight: 600,
+                borderRadius: 10,
+                font: "600 16px/1 Inter Variable, sans-serif",
                 border: "none",
                 cursor: isSelectingRate ? "not-allowed" : "pointer",
-                opacity: isSelectingRate ? 0.7 : 1,
                 fontFamily: "inherit",
+                transition: "background 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                if (!isSelectingRate) e.currentTarget.style.background = "#1D4ED8";
+              }}
+              onMouseLeave={(e) => {
+                if (!isSelectingRate) e.currentTarget.style.background = "#2563EB";
               }}
             >
               {isSelectingRate ? "Оформляем..." : "Оформить доставку →"}
@@ -838,32 +1086,6 @@ export default function HomePage() {
           </div>
         </>
       )}
-    </div>
-  );
-}
-
-function TariffBadge({ name }: { name: string }) {
-  const lower = name.toLowerCase();
-  let style: React.CSSProperties;
-  if (lower.includes("экспресс") || lower.includes("express")) {
-    style = { background: "#fff7ed", color: "#c2410c" };
-  } else if (lower.includes("эконом") || lower.includes("econom")) {
-    style = { background: "#f0fdf4", color: "#15803d" };
-  } else {
-    style = { background: "#f1f5f9", color: "#475569" };
-  }
-  return (
-    <span style={{ ...style, padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600 }}>
-      {name}
-    </span>
-  );
-}
-
-function DetailRow({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-      <span style={{ fontSize: 13, color: "#94a3b8" }}>{label}</span>
-      <span style={{ fontSize: 14, fontWeight: 600, color: muted ? "#94a3b8" : "#0f172a" }}>{value}</span>
     </div>
   );
 }

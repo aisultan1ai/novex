@@ -117,8 +117,8 @@ function ReviewForm({
   }
 
   return (
-    <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: "28px 32px", maxWidth: 640, marginTop: 24 }}>
-      <h3 style={{ margin: "0 0 16px", fontSize: 18, fontWeight: 700, color: "#0f172a" }}>
+    <div style={{ background: "#fff", border: "1px solid #E5E7EB", borderRadius: 16, padding: "28px 32px", maxWidth: 640, marginTop: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+      <h3 style={{ margin: "0 0 16px", fontSize: 18, fontWeight: 700, color: "#111827" }}>
         Оцените доставку
       </h3>
       <div style={{ marginBottom: 14 }}>
@@ -133,31 +133,33 @@ function ReviewForm({
           width: "100%",
           minHeight: 90,
           padding: "12px 14px",
-          borderRadius: 12,
-          border: "1px solid #cbd5e1",
-          fontSize: 14,
+          borderRadius: 10,
+          border: "1.5px solid #E5E7EB",
+          font: "400 14px/1.5 Inter Variable, sans-serif",
           resize: "vertical",
           boxSizing: "border-box",
           marginBottom: 12,
           fontFamily: "inherit",
+          outline: "none",
+          color: "#111827",
         }}
       />
       {error && (
-        <div style={{ color: "#b91c1c", fontSize: 13, marginBottom: 10 }}>{error}</div>
+        <div style={{ color: "#B91C1C", font: "400 13px/1.4 Inter Variable, sans-serif", marginBottom: 10 }}>{error}</div>
       )}
       <button
         onClick={handleSubmit}
         disabled={submitting || rating === 0}
         style={{
-          background: "#0f172a",
-          color: "#fff",
+          background: submitting || rating === 0 ? "#E5E7EB" : "#2563EB",
+          color: submitting || rating === 0 ? "#9CA3AF" : "#fff",
           border: "none",
           borderRadius: 10,
           padding: "10px 24px",
-          fontSize: 14,
-          fontWeight: 600,
+          font: "600 14px/1 Inter Variable, sans-serif",
           cursor: submitting || rating === 0 ? "not-allowed" : "pointer",
-          opacity: submitting || rating === 0 ? 0.6 : 1,
+          fontFamily: "inherit",
+          transition: "background 0.15s",
         }}
       >
         {submitting ? "Отправка..." : "Отправить отзыв"}
@@ -232,10 +234,10 @@ export default function OrderTrackingPage() {
       </div>
 
       <div style={{ marginBottom: 28 }}>
-        <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "#0f172a" }}>
+        <h1 style={{ margin: 0, font: "700 28px/1.2 Inter Variable, sans-serif", color: "#111827", letterSpacing: "-0.02em" }}>
           Отслеживание заказа
         </h1>
-        <p style={{ margin: "4px 0 0", fontSize: 14, color: "#64748b" }}>
+        <p style={{ margin: "4px 0 0", font: "400 14px/1 Inter Variable, sans-serif", color: "#6B7280" }}>
           Заказ #{draftId}
         </p>
       </div>
@@ -253,7 +255,7 @@ export default function OrderTrackingPage() {
       ) : events.length === 0 ? (
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: "64px 24px", textAlign: "center" }}>
           <div style={{ marginBottom: 12 }}><IconPackage /></div>
-          <p style={{ fontSize: 16, fontWeight: 700, margin: "0 0 8px", color: "#0f172a" }}>
+          <p style={{ fontSize: 16, fontWeight: 700, margin: "0 0 8px", color: "#111827" }}>
             История отслеживания пуста
           </p>
           <p style={{ margin: 0, fontSize: 14, color: "#64748b" }}>
@@ -261,7 +263,7 @@ export default function OrderTrackingPage() {
           </p>
         </div>
       ) : (
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: "32px 40px", maxWidth: 640 }}>
+        <div style={{ background: "#fff", border: "1px solid #E5E7EB", borderRadius: 16, padding: "32px 40px", maxWidth: 640, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
           {events.map((event, idx) => {
             const colors = STATUS_COLORS[event.status] ?? { dot: "#94a3b8", line: "#e5e7eb" };
             const isLast = idx === events.length - 1;
@@ -276,16 +278,16 @@ export default function OrderTrackingPage() {
                 </div>
                 {/* content */}
                 <div style={{ flex: 1, paddingBottom: isLast ? 0 : 4 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 2 }}>
+                  <div style={{ font: "600 14px/1.3 Inter Variable, sans-serif", color: "#111827", marginBottom: 2 }}>
                     {STATUS_LABELS[event.status] ?? event.status}
                   </div>
                   {event.description && (
-                    <div style={{ fontSize: 13, color: "#475569", marginBottom: 2 }}>{event.description}</div>
+                    <div style={{ font: "400 13px/1.4 Inter Variable, sans-serif", color: "#6B7280", marginBottom: 2 }}>{event.description}</div>
                   )}
                   {event.location && (
-                    <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 2 }}>{event.location}</div>
+                    <div style={{ font: "400 12px/1 Inter Variable, sans-serif", color: "#9CA3AF", marginBottom: 2 }}>{event.location}</div>
                   )}
-                  <div style={{ fontSize: 12, color: "#94a3b8" }}>{formatDateTime(event.occurred_at)}</div>
+                  <div style={{ font: "400 12px/1 Inter Variable, sans-serif", color: "#9CA3AF" }}>{formatDateTime(event.occurred_at)}</div>
                 </div>
               </div>
             );
@@ -298,10 +300,10 @@ export default function OrderTrackingPage() {
       )}
 
       {review && (
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: "24px 32px", maxWidth: 640, marginTop: 24 }}>
+        <div style={{ background: "#fff", border: "1px solid #E5E7EB", borderRadius: 16, padding: "24px 32px", maxWidth: 640, marginTop: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a" }}>Ваш отзыв</h3>
-            <span style={{ fontSize: 11, fontWeight: 600, color: "#16a34a", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 20, padding: "3px 10px" }}>
+            <h3 style={{ margin: 0, font: "700 16px/1 Inter Variable, sans-serif", color: "#111827" }}>Ваш отзыв</h3>
+            <span style={{ font: "600 11px/1 Inter Variable, sans-serif", color: "#065F46", background: "#D1FAE5", border: "1px solid #A7F3D0", borderRadius: 999, padding: "3px 10px" }}>
               Отправлен
             </span>
           </div>

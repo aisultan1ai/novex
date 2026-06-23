@@ -28,3 +28,24 @@ class TrackingEventResponse(BaseModel):
 class TrackingHistoryResponse(BaseModel):
     order_draft_id: int
     events: list[TrackingEventResponse]
+
+
+class PublicTrackingEventResponse(BaseModel):
+    status: str
+    description: str | None
+    location: str | None
+    occurred_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class PublicTrackingResponse(BaseModel):
+    tracking_number: str
+    carrier_name: str
+    from_city: str
+    to_city: str
+    order_status: str
+    eta_days_min: int
+    eta_days_max: int
+    created_at: datetime
+    events: list[PublicTrackingEventResponse]

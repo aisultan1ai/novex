@@ -94,6 +94,8 @@ class MinioStorageService(StorageService):
     def __init__(self) -> None:
         from app.core.config import get_settings
         settings = get_settings()
+        self._internal_endpoint = settings.minio_endpoint
+        self._public_endpoint = settings.minio_public_endpoint or settings.minio_endpoint
         try:
             from minio import Minio
             self._client = Minio(
@@ -148,7 +150,10 @@ class MinioStorageService(StorageService):
 
     def get_file_url(self, object_name: str) -> str:
         if self._client:
-            return self._client.presigned_get_object(self._bucket, object_name)
+            url = self._client.presigned_get_object(self._bucket, object_name)
+            if self._public_endpoint and self._internal_endpoint:
+                url = url.replace(self._internal_endpoint, self._public_endpoint, 1)
+            return url
         return f"/storage/{object_name}"
 
     def delete_file(self, object_name: str) -> None:

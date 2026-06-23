@@ -35,7 +35,7 @@ function BellButton({ unread, onClick }: { unread: number; onClick: () => void }
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        color: unread > 0 ? "#0f172a" : "#94a3b8",
+        color: unread > 0 ? "#2563EB" : "#94a3b8",
         flexShrink: 0,
       }}
     >
@@ -107,12 +107,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const hPad = isMobile ? "0 16px" : "0 40px";
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f1f5f9" }}>
+    <div style={{ minHeight: "100vh", background: "#FAFAFA" }}>
 
       {/* HEADER */}
       <header
         style={{
-          height: 56,
+          height: 64,
           background: "#ffffff",
           borderBottom: "1px solid #e5e7eb",
           padding: hPad,
@@ -126,13 +126,26 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, overflow: "hidden" }}>
-          <Link href="/" style={{ fontSize: 18, fontWeight: 800, color: "#0f172a", textDecoration: "none", flexShrink: 0 }}>
-            Novex
+          <Link
+            href="/"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              textDecoration: "none",
+              font: "700 20px/1 Inter Variable, sans-serif",
+              letterSpacing: "-0.02em",
+              color: "#111827",
+              flexShrink: 0,
+            }}
+          >
+            <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#2563EB", flexShrink: 0 }} />
+            novex
           </Link>
           {!isMobile && (
             <>
               <span style={{ color: "#e5e7eb", fontSize: 18 }}>|</span>
-              <span style={{ fontSize: 14, color: "#64748b", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span style={{ fontSize: 14, color: "#6B7280", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {displayName}
               </span>
             </>
@@ -182,9 +195,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       >
         {navTabs.map(({ label, href, admin }) => {
           const active = pathname.startsWith(href);
-          const activeColor = admin ? "#d97706" : "#0f172a";
-          const activeBorder = admin ? "#d97706" : "#0f172a";
-          const idleColor = admin ? "#b45309" : "#64748b";
+          const activeColor = admin ? "#d97706" : "#2563EB";
+          const activeBorder = admin ? "#d97706" : "#2563EB";
+          const idleColor = admin ? "#b45309" : "#6B7280";
           const showDot = href === "/dashboard/notifications" && unreadCount > 0 && !active;
           return (
             <Link
@@ -219,9 +232,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       <div
         style={{
           padding: isMobile ? "20px 16px" : "32px 40px",
-          background: "#f1f5f9",
-          minHeight: "calc(100vh - 112px)",
-          fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, sans-serif",
+          background: "#FAFAFA",
+          minHeight: "calc(100vh - 128px)",
+          fontFamily: "Inter Variable, sans-serif",
         }}
       >
         {children}

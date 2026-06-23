@@ -18,7 +18,7 @@ const inp: React.CSSProperties = {
   boxSizing: "border-box",
   outline: "none",
   fontFamily: "inherit",
-  color: "#0f172a",
+  color: "#111827",
 };
 
 const lbl: React.CSSProperties = {
@@ -140,7 +140,7 @@ export default function AddressBookPage() {
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "#0f172a" }}>Адресная книга</h1>
+          <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "#111827" }}>Адресная книга</h1>
           <p style={{ margin: "4px 0 0", fontSize: 14, color: "#64748b" }}>
             Сохранённые адреса отправителя и получателя
           </p>
@@ -154,7 +154,7 @@ export default function AddressBookPage() {
             padding: "9px 18px",
             borderRadius: 10,
             border: "none",
-            background: "#0f172a",
+            background: "#111827",
             color: "#fff",
             fontSize: 14,
             fontWeight: 600,
@@ -175,7 +175,7 @@ export default function AddressBookPage() {
       {/* Form */}
       {showForm && (
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: 28, marginBottom: 24 }}>
-          <h2 style={{ margin: "0 0 20px", fontSize: 16, fontWeight: 700, color: "#0f172a" }}>
+          <h2 style={{ margin: "0 0 20px", fontSize: 16, fontWeight: 700, color: "#111827" }}>
             Новый адрес
           </h2>
           <form onSubmit={(e) => void handleSubmit(e)}>
@@ -183,70 +183,70 @@ export default function AddressBookPage() {
               <div>
                 <label style={lbl}>Метка (необязательно)</label>
                 <input style={inp} placeholder="Офис / Склад / Дом" value={form.label ?? ""} onChange={(e) => setField("label", e.target.value)}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = "#0f172a"; e.currentTarget.style.background = "#fff"; }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.background = "#fff"; }}
                   onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
                 />
               </div>
               <div>
                 <label style={lbl}>Контактное лицо *</label>
                 <input style={inp} required placeholder="Иван Иванов" value={form.full_name} onChange={(e) => setField("full_name", e.target.value)}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = "#0f172a"; e.currentTarget.style.background = "#fff"; }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.background = "#fff"; }}
                   onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
                 />
               </div>
               <div>
                 <label style={lbl}>Телефон *</label>
                 <input style={inp} required placeholder="+7 700 000 0000" value={form.phone} onChange={(e) => setField("phone", e.target.value)}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = "#0f172a"; e.currentTarget.style.background = "#fff"; }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.background = "#fff"; }}
                   onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
                 />
               </div>
               <div>
                 <label style={lbl}>Email</label>
                 <input style={inp} type="email" placeholder="ivan@example.com" value={form.email ?? ""} onChange={(e) => setField("email", e.target.value)}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = "#0f172a"; e.currentTarget.style.background = "#fff"; }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.background = "#fff"; }}
                   onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
                 />
               </div>
               <div>
                 <label style={lbl}>Компания</label>
                 <input style={inp} placeholder="ТОО «Компания»" value={form.company_name ?? ""} onChange={(e) => setField("company_name", e.target.value)}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = "#0f172a"; e.currentTarget.style.background = "#fff"; }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.background = "#fff"; }}
                   onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
                 />
               </div>
               <div>
                 <label style={lbl}>Страна (ISO) *</label>
                 <input style={inp} required maxLength={2} placeholder="KZ" value={form.country} onChange={(e) => setField("country", e.target.value.toUpperCase())}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = "#0f172a"; e.currentTarget.style.background = "#fff"; }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.background = "#fff"; }}
                   onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
                 />
               </div>
               <div>
                 <label style={lbl}>Город *</label>
                 <input style={inp} required placeholder="Алматы" value={form.city} onChange={(e) => setField("city", e.target.value)}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = "#0f172a"; e.currentTarget.style.background = "#fff"; }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.background = "#fff"; }}
                   onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
                 />
               </div>
               <div>
                 <label style={lbl}>Индекс</label>
                 <input style={inp} placeholder="050000" value={form.postal_code ?? ""} onChange={(e) => setField("postal_code", e.target.value)}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = "#0f172a"; e.currentTarget.style.background = "#fff"; }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.background = "#fff"; }}
                   onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
                 />
               </div>
               <div style={{ gridColumn: "1 / -1" }}>
                 <label style={lbl}>Адрес, строка 1 *</label>
                 <input style={inp} required placeholder="ул. Абая, д. 10, кв. 5" value={form.address_line1} onChange={(e) => setField("address_line1", e.target.value)}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = "#0f172a"; e.currentTarget.style.background = "#fff"; }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.background = "#fff"; }}
                   onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
                 />
               </div>
               <div style={{ gridColumn: "1 / -1" }}>
                 <label style={lbl}>Адрес, строка 2</label>
                 <input style={inp} placeholder="Офис 301" value={form.address_line2 ?? ""} onChange={(e) => setField("address_line2", e.target.value)}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = "#0f172a"; e.currentTarget.style.background = "#fff"; }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.background = "#fff"; }}
                   onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
                 />
               </div>
@@ -275,7 +275,7 @@ export default function AddressBookPage() {
               <button
                 type="submit"
                 disabled={saving}
-                style={{ padding: "10px 24px", borderRadius: 10, border: "none", background: "#0f172a", color: "#fff", fontSize: 14, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1, fontFamily: "inherit" }}
+                style={{ padding: "10px 24px", borderRadius: 10, border: "none", background: "#111827", color: "#fff", fontSize: 14, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1, fontFamily: "inherit" }}
               >
                 {saving ? "Сохраняем…" : "Сохранить"}
               </button>
@@ -299,7 +299,7 @@ export default function AddressBookPage() {
       ) : addresses.length === 0 ? (
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: "64px 24px", textAlign: "center" }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>📍</div>
-          <p style={{ fontSize: 16, fontWeight: 700, margin: "0 0 6px", color: "#0f172a" }}>
+          <p style={{ fontSize: 16, fontWeight: 700, margin: "0 0 6px", color: "#111827" }}>
             Адресов пока нет
           </p>
           <p style={{ margin: "0 0 20px", fontSize: 14, color: "#64748b" }}>
@@ -307,7 +307,7 @@ export default function AddressBookPage() {
           </p>
           <button
             onClick={() => setShowForm(true)}
-            style={{ padding: "10px 24px", borderRadius: 10, border: "none", background: "#0f172a", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+            style={{ padding: "10px 24px", borderRadius: 10, border: "none", background: "#111827", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
           >
             Добавить первый адрес
           </button>
@@ -352,7 +352,7 @@ export default function AddressBookPage() {
                   </button>
                 </div>
 
-                <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 4 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", marginBottom: 4 }}>
                   {addr.full_name}
                 </div>
                 <div style={{ fontSize: 13, color: "#475569", marginBottom: 2 }}>{addr.phone}</div>

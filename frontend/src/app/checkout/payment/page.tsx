@@ -1,7 +1,9 @@
 "use client";
 
 import { Suspense, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { ArrowLeft, Copy, Check } from "lucide-react";
 import {
   initiatePayment,
   getPaymentStatus,
@@ -19,13 +21,26 @@ const STATUS_LABELS: Record<string, string> = {
   poll_timeout: "Ожидание подтверждения",
 };
 
-const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
+  awaiting_payment:     { bg: "#FEF3C7", color: "#92400E" },
+  payment_under_review: { bg: "#DBEAFE", color: "#1E40AF" },
+  paid:                 { bg: "#DCFCE7", color: "#166534" },
+  dispatch_queued:      { bg: "#DCFCE7", color: "#166534" },
+  payment_rejected:     { bg: "#FEE2E2", color: "#991B1B" },
+  cancelled:            { bg: "#F1F5F9", color: "#475569" },
+};
+
+const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 const POLL_INTERVAL_MS = 5000;
-const POLL_MAX_ATTEMPTS = 360; // 30 minutes at 5 s intervals
+const POLL_MAX_ATTEMPTS = 360;
 
 export default function PaymentPage() {
   return (
-    <Suspense fallback={<div style={styles.container}><p style={styles.muted}>Загрузка...</p></div>}>
+    <Suspense fallback={
+      <div style={{ minHeight: "100vh", background: "#FAFAFA", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <p style={{ font: "400 14px/1 Inter Variable, sans-serif", color: "#6B7280" }}>Загрузка...</p>
+      </div>
+    }>
       <PaymentPageContent />
     </Suspense>
   );
@@ -63,25 +78,22 @@ function PaymentPageContent() {
       .finally(() => setLoading(false));
   }, [orderId]);
 
-  // Poll payment status after proof upload
   useEffect(() => {
     if (!uploadSuccess) return;
     pollAttemptsRef.current = 0;
 
     pollingRef.current = setInterval(async () => {
       pollAttemptsRef.current += 1;
-
       if (pollAttemptsRef.current >= POLL_MAX_ATTEMPTS) {
         clearInterval(pollingRef.current!);
         setPollTimedOut(true);
         return;
       }
-
       const s = await getPaymentStatus(orderId);
       setStatus(s.status);
       if (s.status === "paid" || s.status === "dispatch_queued") {
         clearInterval(pollingRef.current!);
-        router.push(`/dashboard/orders`);
+        router.push("/dashboard/orders");
       } else if (s.status === "cancelled") {
         clearInterval(pollingRef.current!);
       } else if (s.status === "payment_rejected") {
@@ -91,255 +103,218 @@ function PaymentPageContent() {
       }
     }, POLL_INTERVAL_MS);
 
-    return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
-    };
+    return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
   }, [uploadSuccess, orderId, router]);
 
   const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const file = fileInputRef.current?.files?.[0];
     if (!file || !paymentData) return;
-
     if (file.size > MAX_FILE_SIZE_BYTES) {
       setUploadError("Файл слишком большой. Максимальный размер: 5 МБ.");
       return;
     }
-
     setUploading(true);
     setUploadError(null);
-
     try {
       await uploadPaymentProof(orderId, paymentData.payment_id, file);
       setUploadSuccess(true);
       setStatus("payment_under_review");
     } catch (err) {
-      const detail = err instanceof Error ? err.message : "Ошибка загрузки файла";
-      setUploadError(detail);
+      setUploadError(err instanceof Error ? err.message : "Ошибка загрузки файла");
     } finally {
       setUploading(false);
     }
   };
 
+  const card = {
+    background: "#ffffff",
+    border: "1px solid #E5E7EB",
+    borderRadius: 16,
+    boxShadow: "0 2px 8px rgba(17,24,39,0.04)",
+    padding: "24px 28px",
+    marginBottom: 16,
+  };
+
   if (loading) {
     return (
-      <div style={styles.container}>
-        <p style={styles.muted}>Загрузка...</p>
+      <div style={{ minHeight: "100vh", background: "#FAFAFA", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <p style={{ font: "400 14px/1 Inter Variable, sans-serif", color: "#6B7280" }}>Загрузка...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div style={styles.container}>
-        <p style={{ color: "#dc2626" }}>{error}</p>
+      <div style={{ minHeight: "100vh", background: "#FAFAFA", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 16px" }}>
+        <div style={{ maxWidth: 480, width: "100%", background: "#ffffff", border: "1px solid #E5E7EB", borderRadius: 16, padding: "32px 28px", textAlign: "center" }}>
+          <p style={{ font: "400 14px/1.5 Inter Variable, sans-serif", color: "#B91C1C", marginBottom: 20 }}>{error}</p>
+          <Link href="/dashboard/orders" style={{ font: "600 14px/1 Inter Variable, sans-serif", color: "#2563EB", textDecoration: "none" }}>
+            ← К заказам
+          </Link>
+        </div>
       </div>
     );
   }
 
   const d = paymentData!.bank_details;
+  const statusStyle = STATUS_COLORS[status] ?? { bg: "#F1F5F9", color: "#475569" };
 
   return (
-    <div style={styles.container}>
-      <button onClick={() => router.push("/dashboard/orders")} style={styles.backBtn}>
-        ← Назад к заказам
-      </button>
-      <h1 style={styles.title}>Оплата заказа</h1>
-      <p style={styles.ref}>Заказ: {paymentData!.order_reference}</p>
+    <div style={{ minHeight: "100vh", background: "#FAFAFA", fontFamily: "Inter Variable, sans-serif" }}>
 
-      {/* Status badge */}
-      <div style={{ ...styles.badge, ...statusBadgeStyle(status) }}>
-        {STATUS_LABELS[status] ?? status}
-      </div>
+      {/* Header */}
+      <header style={{ height: 64, background: "#ffffff", borderBottom: "1px solid #E5E7EB", padding: "0 24px", display: "flex", alignItems: "center", position: "sticky", top: 0, zIndex: 50 }}>
+        <Link
+          href="/"
+          style={{ display: "inline-flex", alignItems: "center", gap: 8, textDecoration: "none", font: "700 20px/1 Inter Variable, sans-serif", letterSpacing: "-0.02em", color: "#111827" }}
+        >
+          <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#2563EB", flexShrink: 0 }} />
+          novex
+        </Link>
+      </header>
 
-      {uploadSuccess ? (
-        <div style={styles.successBox}>
-          <p style={styles.successText}>
-            Чек загружен. Оплата отправлена на проверку оператором.
-          </p>
-          <p style={styles.muted}>
-            Обычно подтверждение занимает до 24 часов в рабочие дни.
-            {pollTimedOut
-              ? " Автоматическая проверка завершена. Обновите страницу или обратитесь в поддержку, если оплата не подтверждается."
-              : " Статус обновляется автоматически."}
+      <main style={{ maxWidth: 640, margin: "0 auto", padding: "40px 20px 80px" }}>
+
+        {/* Back + title */}
+        <div style={{ marginBottom: 32 }}>
+          <Link
+            href="/dashboard/orders"
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, font: "500 13px/1 Inter Variable, sans-serif", color: "#6B7280", textDecoration: "none", marginBottom: 20 }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "#111827")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "#6B7280")}
+          >
+            <ArrowLeft size={14} />
+            Назад к заказам
+          </Link>
+          <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+            <h1 style={{ margin: 0, font: "700 28px/1.2 Inter Variable, sans-serif", color: "#111827", letterSpacing: "-0.01em" }}>
+              Оплата заказа
+            </h1>
+            <span style={{ display: "inline-block", padding: "5px 14px", borderRadius: 999, font: "600 13px/1 Inter Variable, sans-serif", background: statusStyle.bg, color: statusStyle.color }}>
+              {STATUS_LABELS[status] ?? status}
+            </span>
+          </div>
+          <p style={{ margin: "8px 0 0", font: "400 14px/1 Inter Variable, sans-serif", color: "#6B7280" }}>
+            {paymentData!.order_reference}
           </p>
         </div>
-      ) : (
-        <>
-          {/* Requisites */}
-          <div style={styles.card}>
-            <h2 style={styles.cardTitle}>Реквизиты для оплаты</h2>
-            <ReqRow label="Получатель" value={d.recipient_name} />
-            <ReqRow label="Банк" value={d.bank_name} />
-            <ReqRow label="IBAN" value={d.iban} copy />
-            <ReqRow label="БИН" value={d.bin} />
-            <ReqRow label="КНП" value={d.knp} />
-            <ReqRow label="Назначение платежа" value={d.purpose} copy />
-            <div style={styles.amountRow}>
-              <span style={styles.amountLabel}>Сумма</span>
-              <span style={styles.amount}>
-                {d.amount} {d.currency}
-              </span>
-            </div>
-          </div>
 
-          {/* Upload form */}
-          {status !== "paid" && (
-            <div style={styles.card}>
-              <h2 style={styles.cardTitle}>Подтверждение оплаты</h2>
-              <ol style={{ ...styles.muted, paddingLeft: 18, margin: "0 0 12px", lineHeight: 1.8 }}>
-                <li>Переведите точную сумму по реквизитам выше.</li>
-                <li>В назначении платежа укажите номер заказа (скопируйте поле «Назначение платежа»).</li>
-                <li>Сохраните скриншот или PDF-квитанцию из вашего банка.</li>
-                <li>Загрузите файл ниже - оператор проверит оплату в течение 24 ч.</li>
-              </ol>
-              <p style={{ ...styles.muted, fontSize: 12, color: "#94a3b8" }}>
-                Принимаются: JPEG, PNG, PDF. Максимальный размер: 5 МБ.
-              </p>
-              <form onSubmit={handleUpload} style={styles.form}>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,application/pdf"
-                  required
-                  style={styles.fileInput}
-                />
-                {uploadError && (
-                  <p style={{ color: "#dc2626", fontSize: 14 }}>{uploadError}</p>
-                )}
-                <button type="submit" disabled={uploading} style={styles.btn}>
-                  {uploading ? "Загрузка..." : "Я оплатил - загрузить чек"}
-                </button>
-              </form>
+        {uploadSuccess ? (
+          <div style={{ background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 16, padding: "28px 28px" }}>
+            <div style={{ font: "700 16px/1.4 Inter Variable, sans-serif", color: "#166534", marginBottom: 10 }}>
+              Чек успешно загружен
             </div>
-          )}
-        </>
-      )}
+            <p style={{ font: "400 14px/1.6 Inter Variable, sans-serif", color: "#166534", margin: 0 }}>
+              Оплата отправлена на проверку оператором. Обычно подтверждение занимает до 24 часов в рабочие дни.
+              {pollTimedOut
+                ? " Автоматическая проверка завершена — обновите страницу или обратитесь в поддержку."
+                : " Статус обновляется автоматически."}
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Requisites */}
+            <div style={card}>
+              <div style={{ font: "700 11px/1 Inter Variable, sans-serif", color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 20 }}>
+                Реквизиты для оплаты
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                <ReqRow label="Получатель" value={d.recipient_name} />
+                <ReqRow label="Банк" value={d.bank_name} />
+                <ReqRow label="IBAN" value={d.iban} copy />
+                <ReqRow label="БИН" value={d.bin} />
+                <ReqRow label="КНП" value={d.knp} />
+                <ReqRow label="Назначение платежа" value={d.purpose} copy />
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16, paddingTop: 16, borderTop: "1px solid #F1F5F9" }}>
+                <span style={{ font: "400 13px/1 Inter Variable, sans-serif", color: "#6B7280" }}>Итого к оплате</span>
+                <span style={{ font: "800 24px/1 Inter Variable, sans-serif", color: "#111827" }}>
+                  {d.amount} {d.currency}
+                </span>
+              </div>
+            </div>
+
+            {/* Upload form */}
+            {status !== "paid" && (
+              <div style={card}>
+                <div style={{ font: "700 11px/1 Inter Variable, sans-serif", color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 20 }}>
+                  Подтверждение оплаты
+                </div>
+                <ol style={{ font: "400 13px/1.8 Inter Variable, sans-serif", color: "#6B7280", paddingLeft: 18, margin: "0 0 16px" }}>
+                  <li>Переведите точную сумму по реквизитам выше.</li>
+                  <li>В назначении платежа укажите номер заказа.</li>
+                  <li>Сохраните скриншот или PDF-квитанцию из банка.</li>
+                  <li>Загрузите файл ниже — оператор проверит оплату в течение 24 ч.</li>
+                </ol>
+                <p style={{ font: "400 12px/1 Inter Variable, sans-serif", color: "#9CA3AF", marginBottom: 16 }}>
+                  Принимаются: JPEG, PNG, PDF. Максимальный размер: 5 МБ.
+                </p>
+                <form onSubmit={handleUpload} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,application/pdf"
+                    required
+                    style={{ font: "400 14px/1 Inter Variable, sans-serif", color: "#374151" }}
+                  />
+                  {uploadError && (
+                    <div style={{ padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10, font: "400 13px/1.4 Inter Variable, sans-serif", color: "#B91C1C" }}>
+                      {uploadError}
+                    </div>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={uploading}
+                    style={{
+                      background: uploading ? "#93C5FD" : "#2563EB",
+                      color: "#fff",
+                      padding: "13px 24px",
+                      border: "none",
+                      borderRadius: 12,
+                      font: "600 15px/1 Inter Variable, sans-serif",
+                      cursor: uploading ? "not-allowed" : "pointer",
+                      fontFamily: "inherit",
+                      transition: "background 0.15s",
+                      marginTop: 4,
+                    }}
+                    onMouseEnter={(e) => { if (!uploading) e.currentTarget.style.background = "#1D4ED8"; }}
+                    onMouseLeave={(e) => { if (!uploading) e.currentTarget.style.background = "#2563EB"; }}
+                  >
+                    {uploading ? "Загрузка..." : "Я оплатил - загрузить чек"}
+                  </button>
+                </form>
+              </div>
+            )}
+          </>
+        )}
+      </main>
     </div>
   );
 }
 
-function ReqRow({
-  label,
-  value,
-  copy,
-}: {
-  label: string;
-  value: string;
-  copy?: boolean;
-}) {
+function ReqRow({ label, value, copy }: { label: string; value: string; copy?: boolean }) {
   const [copied, setCopied] = useState(false);
   const handleCopy = () => {
-    navigator.clipboard.writeText(value);
+    void navigator.clipboard.writeText(value);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
   return (
-    <div style={styles.reqRow}>
-      <span style={styles.reqLabel}>{label}</span>
-      <span style={styles.reqValue}>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid #F1F5F9", gap: 12 }}>
+      <span style={{ font: "400 13px/1 Inter Variable, sans-serif", color: "#6B7280", minWidth: 160, flexShrink: 0 }}>{label}</span>
+      <span style={{ font: "500 14px/1.4 Inter Variable, sans-serif", color: "#111827", display: "flex", gap: 10, alignItems: "center", textAlign: "right" }}>
         {value}
         {copy && (
-          <button onClick={handleCopy} style={styles.copyBtn}>
-            {copied ? "✓" : "Копировать"}
+          <button
+            onClick={handleCopy}
+            style={{ background: "none", border: "1px solid #E5E7EB", borderRadius: 6, padding: "3px 8px", cursor: "pointer", color: copied ? "#166534" : "#6B7280", display: "flex", alignItems: "center", gap: 4, transition: "all 0.15s", flexShrink: 0 }}
+          >
+            {copied ? <Check size={12} /> : <Copy size={12} />}
+            <span style={{ font: "500 11px/1 Inter Variable, sans-serif" }}>{copied ? "Скопировано" : "Копировать"}</span>
           </button>
         )}
       </span>
     </div>
   );
 }
-
-function statusBadgeStyle(status: string): React.CSSProperties {
-  const map: Record<string, React.CSSProperties> = {
-    awaiting_payment: { background: "#fef9c3", color: "#854d0e" },
-    payment_under_review: { background: "#dbeafe", color: "#1e40af" },
-    paid: { background: "#dcfce7", color: "#166534" },
-    payment_rejected: { background: "#fee2e2", color: "#991b1b" },
-    cancelled: { background: "#f1f5f9", color: "#475569" },
-  };
-  return map[status] ?? { background: "#f1f5f9", color: "#475569" };
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  container: { maxWidth: 620, margin: "40px auto", padding: "0 16px" },
-  backBtn: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 20,
-    padding: "6px 14px",
-    borderRadius: 8,
-    border: "1px solid #e5e7eb",
-    background: "#f8fafc",
-    fontSize: 13,
-    fontWeight: 500,
-    color: "#374151",
-    cursor: "pointer",
-    fontFamily: "inherit",
-  },
-  title: { fontSize: 24, fontWeight: 700, marginBottom: 4 },
-  ref: { color: "#6b7280", marginBottom: 16, fontSize: 14 },
-  badge: {
-    display: "inline-block",
-    padding: "4px 12px",
-    borderRadius: 20,
-    fontSize: 13,
-    fontWeight: 600,
-    marginBottom: 20,
-  },
-  card: {
-    border: "1px solid #e5e7eb",
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 20,
-    background: "#fff",
-  },
-  cardTitle: { fontSize: 16, fontWeight: 700, marginBottom: 14 },
-  reqRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "8px 0",
-    borderBottom: "1px solid #f3f4f6",
-  },
-  reqLabel: { color: "#6b7280", fontSize: 13, minWidth: 160 },
-  reqValue: { fontWeight: 500, fontSize: 14, display: "flex", gap: 8, alignItems: "center" },
-  copyBtn: {
-    fontSize: 11,
-    padding: "2px 8px",
-    background: "#f1f5f9",
-    border: "1px solid #e2e8f0",
-    borderRadius: 4,
-    cursor: "pointer",
-    color: "#374151",
-  },
-  amountRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingTop: 12,
-    marginTop: 4,
-  },
-  amountLabel: { color: "#6b7280", fontSize: 13 },
-  amount: { fontSize: 22, fontWeight: 800, color: "#111827" },
-  form: { display: "flex", flexDirection: "column", gap: 12, marginTop: 12 },
-  fileInput: { fontSize: 14 },
-  btn: {
-    background: "#1d4ed8",
-    color: "#fff",
-    padding: "10px 20px",
-    border: "none",
-    borderRadius: 8,
-    fontSize: 14,
-    fontWeight: 600,
-    cursor: "pointer",
-  },
-  successBox: {
-    background: "#f0fdf4",
-    border: "1px solid #bbf7d0",
-    borderRadius: 12,
-    padding: 20,
-  },
-  successText: { color: "#166534", fontWeight: 600, marginBottom: 8 },
-  muted: { color: "#6b7280", fontSize: 14 },
-};
