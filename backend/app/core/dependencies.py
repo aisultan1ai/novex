@@ -128,6 +128,7 @@ def get_current_carrier_id(
     current_user: User = Depends(require_carrier),
 ) -> int:
     from sqlalchemy import select
+
     from app.modules.identity.models import CarrierProfile
 
     profile = db.scalar(

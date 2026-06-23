@@ -7,12 +7,10 @@ from fastapi.testclient import TestClient
 
 import app.core.redis as _redis_module
 from app.core.db import get_async_db, get_db
-from app.core.dependencies import get_current_user, require_admin
 from app.core.security import create_access_token
 from app.main import app
 from app.modules.identity.models import RoleCode
 from app.modules.identity.schemas import ProfileResponse, TokenResponse
-
 
 # ---------------------------------------------------------------------------
 # Redis mock — applied to every API test so get_redis() never dials real Redis

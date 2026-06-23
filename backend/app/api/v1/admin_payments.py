@@ -92,8 +92,12 @@ def get_payment(
     admin: User = Depends(require_admin_or_operator),
 ) -> dict:
     from sqlalchemy import select
+
     from app.core.storage import get_storage
-    from app.modules.payments.transaction_models import PaymentProof, PaymentStatusHistory
+    from app.modules.payments.transaction_models import (
+        PaymentProof,
+        PaymentStatusHistory,
+    )
 
     tx = db.get(PaymentTransaction, payment_id)
     if not tx:

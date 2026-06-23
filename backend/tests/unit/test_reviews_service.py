@@ -4,7 +4,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
+from app.core.exceptions import (
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+    ValidationError,
+)
 from app.modules.reviews.service import ReviewsService
 
 

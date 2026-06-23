@@ -9,7 +9,8 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import httpx
-from sqlalchemy import select, update as sa_update
+from sqlalchemy import select
+from sqlalchemy import update as sa_update
 from sqlalchemy.orm import Session
 
 from app.common.status_machine import InvalidTransitionError, transition_order
@@ -18,7 +19,11 @@ from app.modules.carriers.api_credentials import CarrierAPICredentialsRepository
 from app.modules.carriers.integration_log import IntegrationLogRepository
 from app.modules.carriers.pii_mask import mask_pii
 from app.modules.carriers.webhook_config import CarrierWebhookRepository
-from app.modules.dispatch.models import DispatchJob, DispatchJobStatus, OrderStatusHistory
+from app.modules.dispatch.models import (
+    DispatchJob,
+    DispatchJobStatus,
+    OrderStatusHistory,
+)
 from app.modules.orders.models import OrderDraft
 from app.modules.shipments.repository import ShipmentsRepository
 from app.modules.shipments.service import ShipmentsService
@@ -407,7 +412,7 @@ def _build_api_order_data(order: OrderDraft) -> dict:
 
 
 def _save_waybill_document(
-    db: "Session",
+    db: Session,
     order: OrderDraft,
     waybill_number: str,
     pdf_bytes: bytes,

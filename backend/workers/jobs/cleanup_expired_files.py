@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
 from app.modules.notifications.models import NotificationJob

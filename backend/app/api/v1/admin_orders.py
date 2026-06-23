@@ -230,7 +230,7 @@ def update_order_status(
         new_status=payload.status,
         changed_by_user_id=admin.id,
         source="admin",
-        comment=f"Manual status override by admin",
+        comment="Manual status override by admin",
     ))
     _tracking_repo.add_event(
         db,

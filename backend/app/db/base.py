@@ -19,9 +19,9 @@ from app.modules.payments.transaction_models import (
     PaymentTransaction,
     ProviderWebhookEvent,
 )
-from app.modules.tracking.models import TrackingWebhookEvent
 from app.modules.quotes.models import QuoteSession, RateQuote
 from app.modules.reviews.models import Review
+from app.modules.tracking.models import TrackingWebhookEvent
 
 __all__ = [
     "Base",

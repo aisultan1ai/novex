@@ -27,8 +27,8 @@ from typing import TYPE_CHECKING
 
 import httpx
 
-from app.modules.carriers.zone_mapper import get_zone
 from app.modules.carriers.cse_geography import city_to_postcode_geo
+from app.modules.carriers.zone_mapper import get_zone
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -781,10 +781,10 @@ async def _call_cse_calc_async(
     api_url: str,
 ) -> list[QuoteResult]:
     from app.modules.carriers.api_clients.cse import (
+        _build_calc_inner,
         build_envelope,
         extract_return,
         parse_calc_response,
-        _build_calc_inner,
     )
 
     inner = _build_calc_inner(login, password, from_geo, to_geo, kg, 1, "")
@@ -795,7 +795,7 @@ async def _call_cse_calc_async(
                 content=build_envelope("Calc", inner),
                 headers={
                     "Content-Type": "text/xml; charset=utf-8",
-                    "SOAPAction": f'"http://web.cse.ru/WS/Web1CWS/Calc"',
+                    "SOAPAction": '"http://web.cse.ru/WS/Web1CWS/Calc"',
                 },
                 timeout=_CSE_TIMEOUT,
             )

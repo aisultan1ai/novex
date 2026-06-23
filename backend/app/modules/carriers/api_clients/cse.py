@@ -59,7 +59,7 @@ def build_envelope(method: str, inner: str) -> bytes:
         f"<m:{method}>{inner}</m:{method}>"
         "</soap:Body>"
         "</soap:Envelope>"
-    ).encode("utf-8")
+    ).encode()
 
 
 def extract_return(text: str, method: str) -> ET.Element:

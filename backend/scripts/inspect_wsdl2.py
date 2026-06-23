@@ -1,7 +1,10 @@
 """Inspect CSE WSDL — get all method signatures."""
 import warnings
+
 warnings.filterwarnings("ignore")
-import httpx, re
+import re
+
+import httpx
 
 resp = httpx.get("http://web.cse.ru/1c/ws/Web1C.1cws?wsdl", timeout=20)
 wsdl = resp.text

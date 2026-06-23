@@ -3,10 +3,6 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 
-
-def _utcnow() -> datetime:
-    return datetime.now(UTC).replace(tzinfo=None)
-
 from sqlalchemy.orm import Session
 
 from app.common.pagination import PageParams
@@ -26,6 +22,10 @@ from app.modules.orders.schemas import (
 from app.modules.quotes.models import QuoteSession
 
 logger = logging.getLogger(__name__)
+
+
+def _utcnow() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class OrdersService:

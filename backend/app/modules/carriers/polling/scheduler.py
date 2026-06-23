@@ -12,7 +12,11 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.common.status_machine import can_transition
-from app.core.carrier_gateway_client import CarrierGatewayClient, GatewayTrackingEvent, get_gateway_client
+from app.core.carrier_gateway_client import (
+    CarrierGatewayClient,
+    GatewayTrackingEvent,
+    get_gateway_client,
+)
 from app.modules.carriers.api_credentials import CarrierAPICredentialsRepository
 from app.modules.carriers.integration_log import IntegrationLogRepository
 from app.modules.dispatch.models import OrderStatusHistory

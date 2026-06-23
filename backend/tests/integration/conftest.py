@@ -32,9 +32,9 @@ def db_engine():
     # Import every ORM model so metadata is fully populated before create_all.
     import app.modules.address_book.models  # noqa: F401
     import app.modules.audit.models  # noqa: F401
-    import app.modules.carriers.models  # noqa: F401
     import app.modules.carriers.api_credentials  # noqa: F401
     import app.modules.carriers.integration_log  # noqa: F401
+    import app.modules.carriers.models  # noqa: F401
     import app.modules.carriers.webhook_config  # noqa: F401
     import app.modules.commissions.models  # noqa: F401
     import app.modules.dispatch.models  # noqa: F401

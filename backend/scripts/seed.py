@@ -27,7 +27,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 log = logging.getLogger("seed")
 
 
-def _ensure_admin(db: "Session") -> None:
+def _ensure_admin(db: Session) -> None:
     """Создаёт admin-пользователя если его нет. Идемпотентен."""
     import os
 

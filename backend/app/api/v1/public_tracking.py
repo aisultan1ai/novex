@@ -8,7 +8,10 @@ from app.core.db import get_db
 from app.modules.orders.models import OrderDraft
 from app.modules.shipments.models import Shipment
 from app.modules.tracking.repository import TrackingRepository
-from app.modules.tracking.schemas import PublicTrackingEventResponse, PublicTrackingResponse
+from app.modules.tracking.schemas import (
+    PublicTrackingEventResponse,
+    PublicTrackingResponse,
+)
 
 router = APIRouter(prefix="/tracking", tags=["tracking"])
 _tracking_repo = TrackingRepository()

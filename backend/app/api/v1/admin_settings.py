@@ -3,7 +3,7 @@ from __future__ import annotations
 from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db

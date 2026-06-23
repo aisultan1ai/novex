@@ -1,8 +1,10 @@
 """Inspect CSE WSDL to extract real namespace and method signatures."""
 import warnings
+
 warnings.filterwarnings("ignore")
 
 import re
+
 import httpx
 
 resp = httpx.get("http://web.cse.ru/1c/ws/Web1C.1cws?wsdl", timeout=20)

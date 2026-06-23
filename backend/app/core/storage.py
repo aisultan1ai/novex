@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import io
 import logging
-import mimetypes
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass

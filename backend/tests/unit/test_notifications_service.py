@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
-from app.modules.notifications.service import NotificationsService, _STATUS_TITLES
+from app.modules.notifications.service import _STATUS_TITLES, NotificationsService
 
 
 class TestStatusTitles:

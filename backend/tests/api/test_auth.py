@@ -2,11 +2,8 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-import pytest
-
 from app.core.exceptions import UnauthorizedError
 from tests.api.conftest import make_profile, make_token, make_token_response
-
 
 # ---------------------------------------------------------------------------
 # POST /auth/register

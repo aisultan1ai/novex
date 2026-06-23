@@ -66,7 +66,7 @@ class CSEPollingAdapter(CarrierPollingAdapter):
     carrier_code = "cse"
 
     def fetch_status(self, tracking_number: str, creds: dict) -> list[TrackingEventData]:
-        from app.modules.carriers.api_clients.cse import CSEAPIClient, DEFAULT_API_URL
+        from app.modules.carriers.api_clients.cse import DEFAULT_API_URL, CSEAPIClient
 
         login = creds.get("login") or os.getenv("CSE_LOGIN", "")
         password = creds.get("password") or os.getenv("CSE_PASSWORD", "")

@@ -10,7 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.exceptions import NotFoundError
-from app.modules.carriers.tariff_engine import calculate_quotes_async as _engine_quotes_async
+from app.modules.carriers.tariff_engine import (
+    calculate_quotes_async as _engine_quotes_async,
+)
 from app.modules.quotes.models import QuoteSession, RateQuote
 from app.modules.quotes.schemas import (
     QuoteSelectionRequest,

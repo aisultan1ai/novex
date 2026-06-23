@@ -13,12 +13,10 @@ from app.core.db import get_db
 from app.core.dependencies import get_current_user_id
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.limiter import limiter
-from app.core.storage import MAX_FILE_SIZE
-from app.core.storage import get_storage
+from app.core.storage import MAX_FILE_SIZE, get_storage
 from app.modules.dispatch.models import OrderStatusHistory
 from app.modules.orders.repository import OrdersRepository
 from app.modules.payments.payment_service import PaymentService
-from app.modules.payments.transaction_models import TxStatus
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/payments", tags=["payments"])
@@ -127,10 +125,10 @@ async def upload_payment_proof(
         raise HTTPException(status_code=400, detail=str(exc))
 
     if file.size is not None and file.size > MAX_FILE_SIZE:
-        raise HTTPException(status_code=413, detail=f"Файл слишком большой (максимум {MAX_FILE_SIZE // (1024 * 1024)} МБ)")
+        raise HTTPException(status_code=413, detail=f"Файл слишком большой (максимум {MAX_FILE_SIZE // (1024 * 1024)} МБ)")  # noqa: E501
     file_data = await file.read()
     if len(file_data) > MAX_FILE_SIZE:
-        raise HTTPException(status_code=413, detail=f"Файл слишком большой (максимум {MAX_FILE_SIZE // (1024 * 1024)} МБ)")
+        raise HTTPException(status_code=413, detail=f"Файл слишком большой (максимум {MAX_FILE_SIZE // (1024 * 1024)} МБ)")  # noqa: E501
     mime_type = file.content_type or "application/octet-stream"
 
     storage = get_storage()
@@ -231,8 +229,9 @@ def _build_kaspi_provider():
     include_in_schema=False,
 )
 async def kaspi_webhook(request: Request, db: Session = Depends(get_db)) -> dict:
-    from app.core.config import get_settings
     from sqlalchemy import text as _text
+
+    from app.core.config import get_settings
     settings = get_settings()
 
     if settings.is_production and not settings.kaspi_merchant_id:

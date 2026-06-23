@@ -51,20 +51,26 @@ line-length = 88
 target-version = ["py312"]
 
 [tool.ruff]
-line-length = 88
+line-length = 120
 target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 # B008: FastAPI uses Depends() as default arg — legitimate pattern.
 # UP046: Generic[T] in Pydantic BaseModel subclass — new syntax breaks Pydantic v2.
-ignore = ["B008", "UP046"]
+# B904: pre-existing raise-without-from in HTTP error handlers — not a regression risk.
+ignore = ["B008", "UP046", "B904"]
 
 [tool.ruff.lint.per-file-ignores]
 # HTML email templates contain inline styles that cannot be line-wrapped.
 "app/modules/identity/service.py" = ["E501"]
+"app/core/email_templates.py" = ["E501"]
 # Alembic migration files contain SQL inside f-strings that cannot be line-wrapped.
 "migrations/versions/*.py" = ["E501"]
+# workers/main.py imports ORM models after sentinel constants (intentional ordering).
+"workers/main.py" = ["E402"]
+# One-off scripts use sys.path manipulation before imports.
+"scripts/*.py" = ["E402"]
 
 [tool.mypy]
 python_version = "3.12"

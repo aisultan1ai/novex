@@ -4,7 +4,16 @@ from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import (
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import Mapped, mapped_column
 

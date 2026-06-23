@@ -80,6 +80,7 @@ class NotificationsService:
         reject_reason: str | None = None,
     ) -> None:
         import json
+
         from app.core.streams import STREAM_EMAILS, publish
 
         payload: dict[str, str] = {}

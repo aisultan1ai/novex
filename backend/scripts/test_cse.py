@@ -5,18 +5,15 @@
 from __future__ import annotations
 
 import warnings
+
 warnings.filterwarnings("ignore")
 
 import httpx
+
 from app.modules.carriers.api_clients.cse import (
+    DEFAULT_API_URL,
     CSEAPIClient,
     build_envelope,
-    extract_return,
-    list_items,
-    find_text,
-    fields_of,
-    _build_calc_inner,
-    DEFAULT_API_URL,
 )
 from app.modules.carriers.cse_geography import city_to_postcode_geo
 

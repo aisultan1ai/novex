@@ -18,10 +18,10 @@ _ALIVE_TTL = 90  # seconds — must be > main loop interval (30s)
 # raise NoReferencedTableError at flush time.
 import app.modules.address_book.models  # noqa: F401
 import app.modules.audit.models  # noqa: F401
-import app.modules.carriers.models  # noqa: F401
-import app.modules.carriers.webhook_config  # noqa: F401
 import app.modules.carriers.api_credentials  # noqa: F401
 import app.modules.carriers.integration_log  # noqa: F401
+import app.modules.carriers.models  # noqa: F401
+import app.modules.carriers.webhook_config  # noqa: F401
 import app.modules.commissions.models  # noqa: F401
 import app.modules.dispatch.models  # noqa: F401
 import app.modules.documents.models  # noqa: F401
@@ -34,7 +34,6 @@ import app.modules.quotes.models  # noqa: F401
 import app.modules.reviews.models  # noqa: F401
 import app.modules.shipments.models  # noqa: F401
 import app.modules.tracking.models  # noqa: F401
-
 from workers.consumers import dispatch_consumer, email_consumer
 from workers.jobs import (
     cleanup_expired_files,

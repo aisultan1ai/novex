@@ -68,7 +68,7 @@ class CarrierAPICredentialsResponse(BaseModel):
     model_config = {"from_attributes": True}
 
     @classmethod
-    def from_orm_masked(cls, obj: CarrierAPICredentials) -> "CarrierAPICredentialsResponse":
+    def from_orm_masked(cls, obj: CarrierAPICredentials) -> CarrierAPICredentialsResponse:
         token = obj.api_token or ""
         masked = token[:6] + "•" * max(0, len(token) - 10) + token[-4:] if len(token) > 10 else "••••"
         return cls(

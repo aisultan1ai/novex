@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -10,14 +9,16 @@ from sqlalchemy.orm import Session
 
 from app.common.status_machine import can_transition, transition_order
 from app.core.exceptions import NotFoundError, ValidationError
-from app.core.streams import STREAM_DISPATCH, publish as stream_publish
-from app.modules.dispatch.models import OrderStatusHistory
-from app.modules.platform_settings.repository import PlatformSettingsRepository
+from app.core.streams import STREAM_DISPATCH
+from app.core.streams import publish as stream_publish
 from app.modules.commissions.service import CommissionsService
+from app.modules.dispatch.models import OrderStatusHistory
 from app.modules.dispatch.service import create_dispatch_job
 from app.modules.notifications.service import NotificationsService
 from app.modules.orders.models import OrderDraft
-from app.modules.payments.providers.manual_bank_transfer import ManualBankTransferProvider
+from app.modules.payments.providers.manual_bank_transfer import (
+    ManualBankTransferProvider,
+)
 from app.modules.payments.transaction_models import (
     PaymentProof,
     PaymentStatusHistory,
@@ -27,6 +28,7 @@ from app.modules.payments.transaction_models import (
     TxProvider,
     TxStatus,
 )
+from app.modules.platform_settings.repository import PlatformSettingsRepository
 
 logger = logging.getLogger(__name__)
 _notifications_svc = NotificationsService()

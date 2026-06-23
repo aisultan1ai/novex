@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import logging
 
-import httpx
-
 from app.modules.carriers.polling.base import CarrierPollingAdapter, TrackingEventData
 
 logger = logging.getLogger(__name__)

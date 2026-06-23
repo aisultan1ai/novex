@@ -5,7 +5,6 @@ from app.main import app
 from app.modules.identity.models import RoleCode
 from tests.api.conftest import make_mock_user
 
-
 # ---------------------------------------------------------------------------
 # GET /admin/users/stats — requires ADMIN role
 # ---------------------------------------------------------------------------

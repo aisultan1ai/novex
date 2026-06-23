@@ -1,22 +1,20 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import logging
 import math
+import time
+import uuid
 from datetime import date
 
+import httpx
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy import update as sa_update
 from sqlalchemy.orm import Session, selectinload
-
-import hashlib
-import hmac
-import time
-import uuid
-
-import httpx
 
 from app.core.config import get_settings
 from app.core.db import get_db
@@ -28,7 +26,10 @@ from app.modules.carriers.models import (
     CarrierTariffRate,
     CarrierZoneCity,
 )
-from app.modules.carriers.webhook_config import CarrierWebhookRepository, CarrierWebhookUpdate
+from app.modules.carriers.webhook_config import (
+    CarrierWebhookRepository,
+    CarrierWebhookUpdate,
+)
 from app.modules.identity.service import CreateCarrierAccountRequest, IdentityService
 
 _webhook_repo = CarrierWebhookRepository()
@@ -568,7 +569,10 @@ def test_integration_webhook(
         "tariff_code": "test",
         "test": True,
         "sender": {"full_name": "Тест Отправитель", "phone": "+70000000000", "city": "Almaty", "address": "Test St 1"},
-        "recipient": {"full_name": "Тест Получатель", "phone": "+70000000001", "city": "Astana", "address": "Test Ave 2"},
+        "recipient": {
+            "full_name": "Тест Получатель", "phone": "+70000000001",
+            "city": "Astana", "address": "Test Ave 2",
+        },
         "packages": [{"weight_kg": 1.0, "width_cm": 20, "height_cm": 15, "depth_cm": 10, "quantity": 1}],
         "declared_value": 1000.0,
         "currency": "KZT",
