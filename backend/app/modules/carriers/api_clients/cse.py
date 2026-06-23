@@ -33,8 +33,8 @@ _NM = f"{{{_NS_M}}}"
 _TIMEOUT = 30
 _CALC_TIMEOUT = 10
 
-# In-process cache for TypesOfCargo GUID (stable reference data)
-_cargo_type_guid_cache: str | None = None
+# In-process cache for TypesOfCargo GUID keyed by login (stable reference data)
+_cargo_type_guid_cache: dict[str, str] = {}
 
 
 # ---------------------------------------------------------------------------
@@ -219,7 +219,7 @@ class CSEAPIClient(CarrierAPIClient):
             content=build_envelope(method, inner),
             headers={
                 "Content-Type": "text/xml; charset=utf-8",
-                "SOAPAction": f'"{_NS_M}{method}"',
+                "SOAPAction": f'"{_NS_M}#WebService:{method}"',
             },
             timeout=timeout,
         )
@@ -252,23 +252,29 @@ class CSEAPIClient(CarrierAPIClient):
         ]
 
     def _cargo_type_guid(self, creds: dict) -> str:
-        global _cargo_type_guid_cache
-        if _cargo_type_guid_cache:
-            return _cargo_type_guid_cache
+        cache_key = creds.get("login", "")
+        if cache_key in _cargo_type_guid_cache:
+            return _cargo_type_guid_cache[cache_key]
         types = self._types_of_cargo(creds)
+        guid: str | None = None
         for t in types:
             if t.get("is_default"):
-                _cargo_type_guid_cache = t["guid"]
-                return t["guid"]
-        for keyword in ("груз", "cargo", "посылк", "parcel"):
-            for t in types:
-                if keyword in t.get("name", "").lower():
-                    _cargo_type_guid_cache = t["guid"]
-                    return t["guid"]
-        if types:
-            _cargo_type_guid_cache = types[0]["guid"]
-            return types[0]["guid"]
-        raise RuntimeError("CSE: cannot resolve TypeOfCargo GUID")
+                guid = t["guid"]
+                break
+        if guid is None:
+            for keyword in ("груз", "cargo", "посылк", "parcel"):
+                for t in types:
+                    if keyword in t.get("name", "").lower():
+                        guid = t["guid"]
+                        break
+                if guid:
+                    break
+        if guid is None and types:
+            guid = types[0]["guid"]
+        if guid is None:
+            raise RuntimeError("CSE: cannot resolve TypeOfCargo GUID")
+        _cargo_type_guid_cache[cache_key] = guid
+        return guid
 
     # ── Geography ────────────────────────────────────────────────────────────
 

@@ -781,6 +781,7 @@ async def _call_cse_calc_async(
     api_url: str,
 ) -> list[QuoteResult]:
     from app.modules.carriers.api_clients.cse import (
+        _NS_M,
         _build_calc_inner,
         build_envelope,
         extract_return,
@@ -795,7 +796,7 @@ async def _call_cse_calc_async(
                 content=build_envelope("Calc", inner),
                 headers={
                     "Content-Type": "text/xml; charset=utf-8",
-                    "SOAPAction": '"http://web.cse.ru/WS/Web1CWS/Calc"',
+                    "SOAPAction": f'"{_NS_M}#WebService:Calc"',
                 },
                 timeout=_CSE_TIMEOUT,
             )

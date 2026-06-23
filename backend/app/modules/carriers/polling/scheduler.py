@@ -219,18 +219,17 @@ def poll_all_active_shipments(db: Session) -> None:
                     source="polling",
                     comment=f"Carrier status: {ev.carrier_status}",
                 ))
+                _notifications_svc.notify_order_status(
+                    db,
+                    user_id=order.user_id,
+                    order_id=order.id,
+                    status=ev.status,
+                )
             elif ev.status != order.status:
                 logger.warning(
                     "polling: invalid transition order_id=%s %s -> %s (carrier=%s)",
                     order.id, order.status, ev.status, ev.carrier_status,
                 )
-
-            _notifications_svc.notify_order_status(
-                db,
-                user_id=order.user_id,
-                order_id=order.id,
-                status=ev.status,
-            )
 
         try:
             db.commit()

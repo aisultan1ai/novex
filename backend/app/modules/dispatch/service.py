@@ -41,6 +41,25 @@ _integration_log = IntegrationLogRepository()
 
 RETRY_DELAYS_SECONDS = [60, 300, 900]
 
+_PERMANENT_ERROR_KEYWORDS = (
+    "авторизаци",  # CSE/Exline auth failure messages
+    "логин или пароль",
+    "unauthorized",
+    "forbidden",
+    "authentication",
+    "invalid credentials",
+    "access denied",
+)
+
+
+def _is_permanent_error(exc: Exception) -> bool:
+    """Return True for errors that will not resolve on retry (auth, config)."""
+    import httpx
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code in (401, 403)
+    msg = str(exc).lower()
+    return any(kw in msg for kw in _PERMANENT_ERROR_KEYWORDS)
+
 
 def create_dispatch_job(
     db: Session,
@@ -189,7 +208,13 @@ class DispatchWorker:
             )
             job.last_error = str(exc)
 
-            if job.attempts < job.max_attempts:
+            if _is_permanent_error(exc):
+                logger.error(
+                    "dispatch_worker: job %s permanent error (no retry): %s",
+                    job.id, exc,
+                )
+                job.status = DispatchJobStatus.FAILED
+            elif job.attempts < job.max_attempts:
                 delay = RETRY_DELAYS_SECONDS[min(job.attempts - 1, len(RETRY_DELAYS_SECONDS) - 1)]
                 job.next_retry_at = _utcnow() + timedelta(seconds=delay)
                 job.status = DispatchJobStatus.QUEUED
