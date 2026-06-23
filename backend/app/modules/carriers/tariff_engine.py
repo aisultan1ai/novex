@@ -594,17 +594,17 @@ def _call_exline_calculator(
     max_el = calc_el.find("maxdeliverydays")
     zone_el = calc_el.find("zone")
 
-    if min_el is not None and (min_el.text or "").strip().lstrip("-").isdigit():
+    if min_el is not None and min_el.text and min_el.text.strip().lstrip("-").isdigit():
         val = int(min_el.text.strip())
         if val > 0:
             eta_min = val  # type: ignore[assignment]
-    if max_el is not None and (max_el.text or "").strip().lstrip("-").isdigit():
+    if max_el is not None and max_el.text and max_el.text.strip().lstrip("-").isdigit():
         val = int(max_el.text.strip())
         if val > 0:
             eta_max = val  # type: ignore[assignment]
 
     zone = 1
-    if zone_el is not None and (zone_el.text or "").strip().lstrip("-").isdigit():
+    if zone_el is not None and zone_el.text and zone_el.text.strip().lstrip("-").isdigit():
         zone = max(0, int(zone_el.text.strip()))
 
     return QuoteResult(
@@ -712,17 +712,17 @@ async def _call_exline_calculator_async(
     max_el = calc_el.find("maxdeliverydays")
     zone_el = calc_el.find("zone")
 
-    if min_el is not None and (min_el.text or "").strip().lstrip("-").isdigit():
+    if min_el is not None and min_el.text and min_el.text.strip().lstrip("-").isdigit():
         val = int(min_el.text.strip())
         if val > 0:
             eta_min = val  # type: ignore[assignment]
-    if max_el is not None and (max_el.text or "").strip().lstrip("-").isdigit():
+    if max_el is not None and max_el.text and max_el.text.strip().lstrip("-").isdigit():
         val = int(max_el.text.strip())
         if val > 0:
             eta_max = val  # type: ignore[assignment]
 
     zone = 1
-    if zone_el is not None and (zone_el.text or "").strip().lstrip("-").isdigit():
+    if zone_el is not None and zone_el.text and zone_el.text.strip().lstrip("-").isdigit():
         zone = max(0, int(zone_el.text.strip()))
 
     return QuoteResult(

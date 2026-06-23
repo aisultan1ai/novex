@@ -95,5 +95,5 @@ def update_settings(
         new_value=payload.model_dump(exclude_none=True),
     )
     db.commit()
-    rate = _repo.get(db, COMMISSION_RATE_KEY, default="0.00")
-    return PlatformSettingsResponse(commission_rate=rate, bank_transfer=_load_bank(db))
+    current_rate: str = _repo.get(db, COMMISSION_RATE_KEY, default="0.00")
+    return PlatformSettingsResponse(commission_rate=current_rate, bank_transfer=_load_bank(db))

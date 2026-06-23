@@ -43,10 +43,10 @@ class ExlineAdapter(CarrierPollingAdapter):
     carrier_code = "exline"
 
     def fetch_status(self, tracking_number: str, creds: dict) -> list[TrackingEventData]:
-        extra = creds.get("extra") or os.getenv("EXLINE_EXTRA", "")
-        login = creds.get("login") or os.getenv("EXLINE_LOGIN", "")
-        password = creds.get("password") or os.getenv("EXLINE_PASSWORD", "")
-        api_url = (creds.get("api_url") or os.getenv("EXLINE_API_URL", _DEFAULT_API_URL)).rstrip("/") + "/"
+        extra = str(creds.get("extra") or os.getenv("EXLINE_EXTRA") or "")
+        login = str(creds.get("login") or os.getenv("EXLINE_LOGIN") or "")
+        password = str(creds.get("password") or os.getenv("EXLINE_PASSWORD") or "")
+        api_url = str(creds.get("api_url") or os.getenv("EXLINE_API_URL") or _DEFAULT_API_URL).rstrip("/") + "/"
 
         if not extra or not login:
             logger.warning(
