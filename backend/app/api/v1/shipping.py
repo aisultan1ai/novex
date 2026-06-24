@@ -24,7 +24,7 @@ def _validate_token(db: Session, quote_session_id: int, token: str | None) -> Qu
     session = db.get(QuoteSession, quote_session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Quote session not found")
-    if session.public_token and token != session.public_token:
+    if token != session.public_token:
         raise HTTPException(status_code=403, detail="Invalid or missing quote token")
     if session.expires_at and session.expires_at < datetime.now(UTC).replace(tzinfo=None):
         raise HTTPException(status_code=410, detail="Quote session has expired")

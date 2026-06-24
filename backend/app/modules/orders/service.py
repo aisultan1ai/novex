@@ -61,7 +61,7 @@ class OrdersService:
             )
             raise NotFoundError("Quote session not found")
 
-        if quote_session.public_token and payload.public_token != quote_session.public_token:
+        if payload.public_token != quote_session.public_token:
             logger.warning(
                 "Invalid quote token: quote_session_id=%s user_id=%s",
                 payload.quote_session_id,

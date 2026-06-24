@@ -134,6 +134,23 @@ class QuotesService:
         quote_session_id: int,
         payload: QuoteSelectionRequest,
     ) -> ShippingQuoteResponse:
+        # Lock the target row first to prevent concurrent double-selection
+        rate = db.scalar(
+            select(RateQuote)
+            .where(
+                RateQuote.quote_session_id == quote_session_id,
+                RateQuote.id == payload.rate_quote_id,
+            )
+            .with_for_update()
+        )
+        if not rate:
+            logger.warning(
+                "Rate quote not found: session_id=%s rate_quote_id=%s",
+                quote_session_id,
+                payload.rate_quote_id,
+            )
+            raise NotFoundError("Rate quote not found.")
+
         db.execute(
             update(RateQuote)
             .where(
@@ -142,19 +159,6 @@ class QuotesService:
             )
             .values(is_selected=False)
         )
-
-        stmt = select(RateQuote).where(
-            RateQuote.quote_session_id == quote_session_id,
-            RateQuote.id == payload.rate_quote_id,
-        )
-        rate = db.scalar(stmt)
-        if not rate:
-            logger.warning(
-                "Rate quote not found: session_id=%s rate_quote_id=%s",
-                quote_session_id,
-                payload.rate_quote_id,
-            )
-            raise NotFoundError("Rate quote not found.")
 
         rate.is_selected = True
         db.commit()

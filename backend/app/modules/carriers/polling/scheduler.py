@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-import time
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -17,6 +16,7 @@ from app.core.carrier_gateway_client import (
     GatewayTrackingEvent,
     get_gateway_client,
 )
+from app.core.config import get_settings
 from app.modules.carriers.api_credentials import CarrierAPICredentialsRepository
 from app.modules.carriers.integration_log import IntegrationLogRepository
 from app.modules.dispatch.models import OrderStatusHistory
@@ -36,29 +36,36 @@ _ACTIVE_STATUSES = {
     "sent_to_carrier", "dispatched", "picked_up", "in_transit",
     "out_for_delivery", "customs_hold", "delivery_failed",
 }
-_MAX_WORKERS = 10
 
-# Only re-poll a shipment after this cooldown to avoid redundant carrier API calls.
-_POLL_COOLDOWN_SECONDS = 100
-
-# Module-level TTL cache for carrier credentials — avoids a DB query every 120s
-# per carrier. Invalidates automatically after 5 minutes.
-_creds_ttl: dict[str, tuple[dict, float]] = {}
-_CREDS_TTL_SECS = 300
+_CREDS_CACHE_PREFIX = "carrier_creds:"
 
 
 def _get_creds(db: Session, carrier_code: str) -> dict:
-    """Return carrier creds from cache or DB. Cache TTL = 5 minutes."""
-    entry = _creds_ttl.get(carrier_code)
-    if entry and time.monotonic() - entry[1] < _CREDS_TTL_SECS:
-        return entry[0]
+    """Return carrier creds from Redis cache or DB."""
+    settings = get_settings()
+    cache_key = f"{_CREDS_CACHE_PREFIX}{carrier_code}"
+
+    try:
+        from app.core.redis import get_redis
+        cached = get_redis().get(cache_key)
+        if cached:
+            return json.loads(cached)
+    except Exception as exc:
+        logger.debug("Creds cache read failed for %s: %s", carrier_code, exc)
+
     db_creds = _creds_repo.get_by_carrier_code(db, carrier_code)
     creds = (
         {"api_url": db_creds.api_url, **(db_creds.extra_config or {})}
         if db_creds and db_creds.is_active
         else {}
     )
-    _creds_ttl[carrier_code] = (creds, time.monotonic())
+
+    try:
+        from app.core.redis import get_redis
+        get_redis().setex(cache_key, settings.polling_creds_ttl_seconds, json.dumps(creds))
+    except Exception as exc:
+        logger.debug("Creds cache write failed for %s: %s", carrier_code, exc)
+
     return creds
 
 
@@ -106,7 +113,8 @@ def _fetch(work: _PollWork, gateway: CarrierGatewayClient) -> _PollResult:
 def poll_all_active_shipments(db: Session) -> None:
     from app.modules.orders.models import OrderDraft
 
-    cooldown_threshold = datetime.utcnow() - timedelta(seconds=_POLL_COOLDOWN_SECONDS)
+    settings = get_settings()
+    cooldown_threshold = datetime.utcnow() - timedelta(seconds=settings.polling_cooldown_seconds)
 
     rows = db.execute(
         select(Shipment, OrderDraft)
@@ -119,7 +127,7 @@ def poll_all_active_shipments(db: Session) -> None:
                 Shipment.last_polled_at < cooldown_threshold,
             ),
         )
-        .limit(200)
+        .limit(settings.polling_batch_size)
     ).all()
 
     work_items: list[_PollWork] = []
@@ -138,8 +146,9 @@ def poll_all_active_shipments(db: Session) -> None:
 
     gateway = get_gateway_client()
 
+    max_workers = get_settings().polling_max_workers
     results: list[_PollResult] = []
-    with ThreadPoolExecutor(max_workers=min(_MAX_WORKERS, len(work_items))) as pool:
+    with ThreadPoolExecutor(max_workers=min(max_workers, len(work_items))) as pool:
         futures: dict[Future, _PollWork] = {
             pool.submit(_fetch, w, gateway): w for w in work_items
         }

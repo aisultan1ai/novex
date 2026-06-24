@@ -43,10 +43,18 @@ _commissions_svc = CommissionsService()
 
 
 def _get_manual_provider(db: Session) -> ManualBankTransferProvider:
+    recipient_name = _settings_repo.get(db, "bank_recipient_name", default="")
+    bank_name = _settings_repo.get(db, "bank_name", default="")
+    iban = _settings_repo.get(db, "bank_iban", default="")
+    if not recipient_name or not bank_name or not iban:
+        raise ValidationError(
+            "Банковские реквизиты не настроены. "
+            "Администратор должен заполнить bank_recipient_name, bank_name и bank_iban в настройках платформы."
+        )
     return ManualBankTransferProvider(
-        recipient_name=_settings_repo.get(db, "bank_recipient_name", default="ТОО Novex"),
-        bank_name=_settings_repo.get(db, "bank_name", default="Halyk Bank"),
-        iban=_settings_repo.get(db, "bank_iban", default=""),
+        recipient_name=recipient_name,
+        bank_name=bank_name,
+        iban=iban,
         bin_number=_settings_repo.get(db, "bank_bin", default=""),
         knp=_settings_repo.get(db, "bank_knp", default="710"),
     )

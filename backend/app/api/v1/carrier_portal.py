@@ -4,7 +4,7 @@ import secrets
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.db import get_db
 from app.core.dependencies import get_current_carrier_id, require_carrier
@@ -250,17 +250,17 @@ def list_orders(
 
     orders = db.scalars(
         select(OrderDraft)
+        .options(
+            selectinload(OrderDraft.parties),
+            selectinload(OrderDraft.packages),
+        )
         .where(*base_where)
         .order_by(OrderDraft.created_at.desc())
         .offset((page - 1) * size)
         .limit(size)
     ).all()
 
-    items = []
-    for order in orders:
-        parties = db.scalars(select(ShipmentParty).where(ShipmentParty.order_draft_id == order.id)).all()
-        packages = db.scalars(select(ShipmentPackage).where(ShipmentPackage.order_draft_id == order.id)).all()
-        items.append(_order_to_dict(order, list(parties), list(packages)))
+    items = [_order_to_dict(order, list(order.parties), list(order.packages)) for order in orders]
 
     return {"items": items, "total": total or 0, "page": page, "size": size}
 

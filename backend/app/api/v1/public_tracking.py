@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
+from app.core.limiter import limiter
 from app.modules.orders.models import OrderDraft
 from app.modules.shipments.models import Shipment
 from app.modules.tracking.repository import TrackingRepository
@@ -22,7 +23,9 @@ _tracking_repo = TrackingRepository()
     response_model=PublicTrackingResponse,
     summary="Публичное отслеживание по номеру",
 )
+@limiter.limit("60/minute")
 def get_public_tracking(
+    request: Request,
     tracking_number: str,
     db: Session = Depends(get_db),
 ) -> PublicTrackingResponse:

@@ -100,6 +100,12 @@ class Settings(BaseSettings):
     carrier_gateway_url: str = "http://carrier-gateway:8100"
     gateway_secret: str = ""
 
+    # Carrier polling scheduler
+    polling_max_workers: int = 10
+    polling_cooldown_seconds: int = 100
+    polling_batch_size: int = 200
+    polling_creds_ttl_seconds: int = 300
+
     backend_cors_origins: list[str] = Field(
         default_factory=lambda: [
             "http://localhost",

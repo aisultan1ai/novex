@@ -273,7 +273,7 @@ async def calculate_quotes_async(
     if not any(r.carrier_code == "exline" for r in results):
         live_tasks.append(_calculate_exline_live_async(from_city, to_city, kg))
     if not any(r.carrier_code == "cse" for r in results):
-        live_tasks.append(_calculate_cse_live_async(from_city, to_city, kg))
+        live_tasks.append(_calculate_cse_live_async(from_city, to_city, kg, shipment_type))
 
     if live_tasks:
         live_lists = await asyncio.gather(*live_tasks, return_exceptions=True)
@@ -776,6 +776,12 @@ async def _calculate_exline_live_async(
 _CSE_TIMEOUT = 10  # seconds
 
 
+_CSE_CARGO_TYPE_GUIDS: dict[str, str] = {
+    "document": "81dd8a13-8235-494f-84fd-9c04c51d50ec",
+    "parcel":   "4aab1fc6-fc2b-473a-8728-58bcd4ff79ba",
+}
+
+
 async def _call_cse_calc_async(
     from_geo: str,
     to_geo: str,
@@ -783,6 +789,7 @@ async def _call_cse_calc_async(
     login: str,
     password: str,
     api_url: str,
+    cargo_type_guid: str = "",
 ) -> list[QuoteResult]:
     from app.modules.carriers.api_clients.cse import (
         _NS_M,
@@ -792,7 +799,7 @@ async def _call_cse_calc_async(
         parse_calc_response,
     )
 
-    inner = _build_calc_inner(login, password, from_geo, to_geo, kg, 1, "")
+    inner = _build_calc_inner(login, password, from_geo, to_geo, kg, 1, cargo_type_guid)
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.post(
@@ -835,6 +842,7 @@ async def _calculate_cse_live_async(
     from_city: str,
     to_city: str,
     kg: float,
+    shipment_type: str = "parcel",
 ) -> list[QuoteResult]:
     login = os.getenv("CSE_LOGIN", "")
     password = os.getenv("CSE_PASSWORD", "")
@@ -852,4 +860,5 @@ async def _calculate_cse_live_async(
         )
         return []
 
-    return await _call_cse_calc_async(from_geo, to_geo, kg, login, password, api_url)
+    cargo_type_guid = _CSE_CARGO_TYPE_GUIDS.get(shipment_type, "")
+    return await _call_cse_calc_async(from_geo, to_geo, kg, login, password, api_url, cargo_type_guid)
