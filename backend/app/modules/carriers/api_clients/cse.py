@@ -2,13 +2,14 @@
 CSE (Courier Service Express) SOAP API client.
 
 Protocol: SOAP over HTTP, XML UTF-8.
-WSDL: http://web.cse.ru/1c/ws/Web1C.1cws?wsdl
-Namespace: http://www.cargo3.ru  (confirmed from WSDL targetNamespace)
+WSDL: http://lk-test.cse.ru/1c/ws/web1c.1cws?wsdl  (test)
+      http://web.cse.ru/1c/ws/Web1C.1cws?wsdl        (prod)
+Namespace: http://www.cargo3.ru
 
 Credentials via CarrierAPICredentials.extra_config:
     login    — API login (test creds: "test")
     password — API password (test creds: "2016")
-api_url — SOAP endpoint (default: http://web.cse.ru/1c/ws/Web1C.1cws)
+    api_url  — SOAP endpoint (default: prod URL below)
 """
 from __future__ import annotations
 
@@ -25,6 +26,7 @@ from app.modules.carriers.api_clients.base import CarrierAPIClient, InvoiceResul
 logger = logging.getLogger(__name__)
 
 DEFAULT_API_URL = "http://web.cse.ru/1c/ws/Web1C.1cws"
+TEST_API_URL = "http://lk-test.cse.ru/1c/ws/web1c.1cws"
 
 _NS_SOAP = "http://schemas.xmlsoap.org/soap/envelope/"
 _NS_M = "http://www.cargo3.ru"
@@ -55,11 +57,41 @@ def build_envelope(method: str, inner: str) -> bytes:
         '<?xml version="1.0" encoding="UTF-8"?>'
         '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"'
         f' xmlns:m="{_NS_M}">'
+        "<soap:Header/>"
         "<soap:Body>"
         f"<m:{method}>{inner}</m:{method}>"
         "</soap:Body>"
         "</soap:Envelope>"
     ).encode()
+
+
+def _list_item(key: str, value: str, vtype: str = "string") -> str:
+    """Build a single <m:List> param item for GetReferenceData parameters."""
+    return (
+        "<m:List>"
+        f"<m:Key>{_esc(key)}</m:Key>"
+        f"<m:Value>{_esc(value)}</m:Value>"
+        f"<m:ValueType>{vtype}</m:ValueType>"
+        "</m:List>"
+    )
+
+
+def _ref_params(reference: str, *extras: tuple[str, str, str]) -> str:
+    """
+    Build the <m:parameters> block for GetReferenceData.
+
+    Per CSE API docs: parameters must have Key='parameters' and all
+    actual params passed as List items (Key/Value/ValueType).
+    """
+    body = (
+        "<m:parameters>"
+        "<m:Key>parameters</m:Key>"
+        + _list_item("Reference", reference)
+    )
+    for key, value, vtype in extras:
+        body += _list_item(key, value, vtype)
+    body += "</m:parameters>"
+    return body
 
 
 def extract_return(text: str, method: str) -> ET.Element:
@@ -74,13 +106,11 @@ def extract_return(text: str, method: str) -> ET.Element:
     if body is None:
         raise ValueError(f"CSE: no SOAP Body in {method} response")
 
-    # SOAP Fault
     fault = body.find(f"{{{_NS_SOAP}}}Fault")
     if fault is not None:
         msg = (fault.findtext("faultstring") or "").strip()
         raise RuntimeError(f"CSE SOAP Fault in {method}: {msg}")
 
-    # Try with namespace first, then without (use `is None` — ET.Element is falsy when childless)
     resp_el = body.find(f"{_NM}{method}Response")
     if resp_el is None:
         resp_el = body.find(f"{method}Response")
@@ -93,7 +123,7 @@ def extract_return(text: str, method: str) -> ET.Element:
     if return_el is None:
         raise ValueError(f"CSE: no <return> in {method}Response")
 
-    # Check for application-level error: <m:Properties><m:Key>Error</m:Key><m:Value>true</m:Value>
+    # Check for application-level error
     for prop in return_el.findall(f"{_NM}Properties"):
         key_el = prop.find(f"{_NM}Key")
         val_el = prop.find(f"{_NM}Value")
@@ -105,11 +135,15 @@ def extract_return(text: str, method: str) -> ET.Element:
                     lv = list_el.find(f"{_NM}Value")
                     if lk is not None and (lk.text or "") == "Description" and lv is not None:
                         desc = (lv.text or "").strip()
+                # 02011 = auth error per CSE error code registry
                 code_map = {
                     "02011": "Неверный логин или пароль (ошибка авторизации CSE)",
+                    "02053": "По указанным данным информация не найдена",
                     "03010": "Пункт маршрута не найден (неверный geography GUID)",
+                    "05011": "Указан некорректный код срочности",
+                    "05042": "Указан некорректный код географии",
                 }
-                human = code_map.get(desc, f"код {desc}")
+                human = code_map.get(desc, f"код {desc}" if desc else "неизвестная ошибка")
                 raise RuntimeError(f"CSE {method} error: {human}")
 
     return return_el
@@ -129,9 +163,9 @@ def fields_of(el: ET.Element) -> dict[str, Any]:
             continue
         v: Any = find_text(field_el, "Value")
         vtype = find_text(field_el, "ValueType")
-        if vtype == "int" and v:
+        if vtype in ("int",) and v:
             try:
-                v = int(v)
+                v = int(float(v))
             except ValueError:
                 pass
         elif vtype == "float" and v:
@@ -149,13 +183,16 @@ def list_items(el: ET.Element) -> list[ET.Element]:
     return el.findall(f"{_NM}List")
 
 
+def props_of(el: ET.Element) -> list[ET.Element]:
+    return el.findall(f"{_NM}Properties")
+
+
 def parse_calc_response(ret: ET.Element) -> list[dict]:
     """
     Parse the <return> element from a Calc SOAP response.
 
     Structure: return → List(Destination) → List(Tariff) → Fields
-    Returns a list of tariff dicts with keys:
-        tariff_guid, service_name, price, currency, min_days, max_days
+    Returns a list of tariff dicts.
     """
     tariffs: list[dict] = []
     for dest_item in list_items(ret):
@@ -179,6 +216,8 @@ def parse_calc_response(ret: ET.Element) -> list[dict]:
             if price <= 0:
                 continue
 
+            urgency_guid = f.get("Urgency", "")
+
             tariffs.append({
                 "tariff_guid": tariff_guid,
                 "service_name": str(service_name),
@@ -186,6 +225,7 @@ def parse_calc_response(ret: ET.Element) -> list[dict]:
                 "currency": str(currency),
                 "min_days": int(min_period) if min_period is not None else 3,
                 "max_days": int(max_period) if max_period is not None else 10,
+                "urgency_guid": urgency_guid,
             })
     return tariffs
 
@@ -217,10 +257,7 @@ class CSEAPIClient(CarrierAPIClient):
         resp = httpx.post(
             self._url(creds),
             content=build_envelope(method, inner),
-            headers={
-                "Content-Type": "text/xml; charset=utf-8",
-                "SOAPAction": f'"{_NS_M}#WebService:{method}"',
-            },
+            headers={"Content-Type": "text/xml; charset=utf-8"},
             timeout=timeout,
         )
         resp.raise_for_status()
@@ -237,10 +274,7 @@ class CSEAPIClient(CarrierAPIClient):
     # ── TypesOfCargo (cached) ────────────────────────────────────────────────
 
     def _types_of_cargo(self, creds: dict) -> list[dict]:
-        inner = (
-            self._auth(creds)
-            + "<m:parameters><m:Key>TypesOfCargo</m:Key></m:parameters>"
-        )
+        inner = self._auth(creds) + _ref_params("TypesOfCargo")
         ret = self._post("GetReferenceData", inner, creds)
         return [
             {
@@ -280,12 +314,9 @@ class CSEAPIClient(CarrierAPIClient):
 
     def search_geography(self, search: str, creds: dict) -> list[dict]:
         """Search CSE Geography by name / postcode / FIAS. Returns [{guid, name, parent, type, fias}]."""
-        inner = (
-            self._auth(creds)
-            + "<m:parameters>"
-            + "<m:Key>Geography</m:Key>"
-            + f"<m:Fields><m:Key>Search</m:Key><m:Value>{_esc(search)}</m:Value></m:Fields>"
-            + "</m:parameters>"
+        inner = self._auth(creds) + _ref_params(
+            "Geography",
+            ("Search", search, "string"),
         )
         ret = self._post("GetReferenceData", inner, creds)
         results = []
@@ -305,26 +336,21 @@ class CSEAPIClient(CarrierAPIClient):
 
     def get_pvz(self, creds: dict, geography_guid: str | None = None) -> list[dict]:
         """List pickup/delivery points. Optionally filter by city GUID."""
-        params = "<m:Key>pvz</m:Key>"
+        extras: list[tuple[str, str, str]] = []
         if geography_guid:
-            params += f"<m:Fields><m:Key>InGroup</m:Key><m:Value>{_esc(geography_guid)}</m:Value></m:Fields>"
-        inner = (
-            self._auth(creds)
-            + f"<m:parameters>{params}</m:parameters>"
-        )
+            extras.append(("Ingroup", geography_guid, "string"))
+        inner = self._auth(creds) + _ref_params("pvz", *extras)
         ret = self._post("GetReferenceData", inner, creds)
         results = []
         for item in list_items(ret):
             f = fields_of(item)
             results.append({
                 "guid": find_text(item, "Key"),
-                "address": find_text(item, "Value"),
-                "city": f.get("City", ""),
-                "lat": f.get("Latitude", ""),
-                "lon": f.get("Longitude", ""),
-                "schedule": f.get("Schedule", ""),
+                "address": f.get("Address", find_text(item, "Value")),
+                "city": f.get("NameGeography", f.get("Geography", "")),
                 "phone": f.get("Phone", ""),
-                "type": f.get("Type", ""),
+                "type": f.get("TypeOfPVZ", ""),
+                "code": f.get("CodePVZ", ""),
             })
         return results
 
@@ -335,35 +361,40 @@ class CSEAPIClient(CarrierAPIClient):
         from_geo: str,
         to_geo: str,
         creds: dict,
-        cargo_type_guid: str | None = None,
+        urgency_guid: str | None = None,
     ) -> dict:
-        """Get transit times, COD/card availability for a route."""
-        if not cargo_type_guid:
-            try:
-                cargo_type_guid = self._cargo_type_guid(creds)
-            except Exception:
-                cargo_type_guid = ""
-        inner = (
-            self._auth(creds)
-            + "<m:parameters>"
-            + "<m:Key>deliveryinfo</m:Key>"
-            + f"<m:Fields><m:Key>SenderGeography</m:Key><m:Value>{_esc(from_geo)}</m:Value></m:Fields>"
-            + f"<m:Fields><m:Key>RecipientGeography</m:Key><m:Value>{_esc(to_geo)}</m:Value></m:Fields>"
-            + f"<m:Fields><m:Key>TypeOfCargo</m:Key><m:Value>{_esc(cargo_type_guid)}</m:Value></m:Fields>"
-            + "</m:parameters>"
-        )
+        """Get transit times and COD availability for a route."""
+        extras: list[tuple[str, str, str]] = [
+            ("Search", to_geo, "string"),
+            ("geography", from_geo, "string"),
+        ]
+        if urgency_guid:
+            extras.append(("other", urgency_guid, "string"))
+        inner = self._auth(creds) + _ref_params("deliveryinfo", *extras)
         ret = self._post("GetReferenceData", inner, creds)
-        f = fields_of(ret)
-        return {
-            "min_days": f.get("MinDays") or f.get("MinPeriod"),
-            "max_days": f.get("MaxDays") or f.get("MaxPeriod"),
-            "cod_available": bool(f.get("COD", False)),
-            "card_available": bool(f.get("CardPayment", False)),
-            "services": [
-                {"guid": find_text(s, "Key"), "name": find_text(s, "Value")}
-                for s in list_items(ret)
-            ],
+        # Response: return > List(Data) > Fields
+        result: dict[str, Any] = {
+            "min_days": None,
+            "max_days": None,
+            "cod_available": False,
+            "card_available": False,
+            "services": [],
         }
+        for item in list_items(ret):
+            f = fields_of(item)
+            if f.get("MinPeriod") is not None:
+                result["min_days"] = f.get("MinPeriod")
+            if f.get("MaxPeriod") is not None:
+                result["max_days"] = f.get("MaxPeriod")
+            if f.get("COD") is not None:
+                result["cod_available"] = bool(f.get("COD"))
+            if f.get("PaymentByRecipient") is not None:
+                result["card_available"] = bool(f.get("PaymentByRecipient"))
+            urgency = f.get("Urgency", "")
+            desc = f.get("UrgencyDescription", "")
+            if urgency:
+                result["services"].append({"guid": urgency, "name": desc})
+        return result
 
     # ── Available delivery dates ──────────────────────────────────────────────
 
@@ -375,31 +406,30 @@ class CSEAPIClient(CarrierAPIClient):
         urgency_guid: str | None = None,
     ) -> list[dict]:
         """Available delivery date/time slots for a route."""
-        today = date.today().isoformat()
-        params = (
-            "<m:Key>availabledeliverydates</m:Key>"
-            f"<m:Fields><m:Key>Search</m:Key><m:Value>{_esc(to_geo)}</m:Value></m:Fields>"
-            f"<m:Fields><m:Key>Geography</m:Key><m:Value>{_esc(from_geo)}</m:Value></m:Fields>"
-            f"<m:Fields><m:Key>takedate</m:Key><m:Value>{today}</m:Value></m:Fields>"
-        )
+        today = date.today().isoformat() + "T00:00:00"
+        extras: list[tuple[str, str, str]] = [
+            ("Search", to_geo, "string"),
+            ("geography", from_geo, "string"),
+            ("takedate", today, "dateTime"),
+        ]
         if urgency_guid:
-            params += f"<m:Fields><m:Key>other</m:Key><m:Value>{_esc(urgency_guid)}</m:Value></m:Fields>"
-        inner = (
-            self._auth(creds)
-            + f"<m:parameters>{params}</m:parameters>"
-        )
+            extras.append(("other", urgency_guid, "string"))
+        inner = self._auth(creds) + _ref_params("availabledeliverydates", *extras)
         ret = self._post("GetReferenceData", inner, creds)
+        # Response: return > List(DeliveryDates) > Properties(Interval) > Fields(TimeFrom/TimeTo)
         results = []
         for item in list_items(ret):
             f = fields_of(item)
-            slots = [
-                {"from": find_text(s, "Key"), "to": find_text(s, "Value")}
-                for s in list_items(item)
-            ]
+            date_val = f.get("DeliveryDate", find_text(item, "Key"))
+            slots = []
+            for prop in props_of(item):
+                pf = fields_of(prop)
+                time_from = pf.get("TimeFrom", "")
+                time_to = pf.get("TimeTo", "")
+                if time_from or time_to:
+                    slots.append({"from": time_from, "to": time_to})
             results.append({
-                "date": find_text(item, "Key"),
-                "time_from": f.get("TimeFrom", ""),
-                "time_to": f.get("TimeTo", ""),
+                "date": date_val,
                 "slots": slots,
             })
         return results
@@ -413,24 +443,26 @@ class CSEAPIClient(CarrierAPIClient):
         urgency_guid: str | None = None,
     ) -> list[dict]:
         """Available courier pickup date/time slots from origin city."""
-        params = (
-            "<m:Key>availabletakedates</m:Key>"
-            f"<m:Fields><m:Key>Geography</m:Key><m:Value>{_esc(from_geo)}</m:Value></m:Fields>"
-        )
+        extras: list[tuple[str, str, str]] = [
+            ("geography", from_geo, "string"),
+        ]
         if urgency_guid:
-            params += f"<m:Fields><m:Key>other</m:Key><m:Value>{_esc(urgency_guid)}</m:Value></m:Fields>"
-        inner = (
-            self._auth(creds)
-            + f"<m:parameters>{params}</m:parameters>"
-        )
+            extras.append(("other", urgency_guid, "string"))
+        inner = self._auth(creds) + _ref_params("availabletakedates", *extras)
         ret = self._post("GetReferenceData", inner, creds)
+        # Response: return > List(TakeDates) > Properties(Interval) > Fields + Fields(TakeDate)
         results = []
         for item in list_items(ret):
-            slots = [
-                {"from": find_text(s, "Key"), "to": find_text(s, "Value")}
-                for s in list_items(item)
-            ]
-            results.append({"date": find_text(item, "Key"), "slots": slots})
+            f = fields_of(item)
+            date_val = f.get("TakeDate", find_text(item, "Key"))
+            slots = []
+            for prop in props_of(item):
+                pf = fields_of(prop)
+                time_from = pf.get("TimeFrom", "")
+                time_to = pf.get("TimeTo", "")
+                if time_from or time_to:
+                    slots.append({"from": time_from, "to": time_to})
+            results.append({"date": date_val, "slots": slots})
         return results
 
     # ── GetDocuments ──────────────────────────────────────────────────────────
@@ -441,14 +473,15 @@ class CSEAPIClient(CarrierAPIClient):
             self._auth(creds)
             + "<m:data>"
             + "<m:Key>Documents</m:Key>"
-            + "<m:List>"
-            + "<m:Key>Document</m:Key>"
-            + f"<m:Fields><m:Key>Number</m:Key><m:Value>{_esc(waybill_number)}</m:Value></m:Fields>"
-            + "</m:List>"
+            + f"<m:List><m:Key>{_esc(waybill_number)}</m:Key></m:List>"
             + "</m:data>"
             + "<m:parameters>"
             + "<m:Key>Parameters</m:Key>"
-            + "<m:Fields><m:Key>DocumentType</m:Key><m:Value>Waybill</m:Value></m:Fields>"
+            + "<m:Properties>"
+            + "<m:Key>DocumentType</m:Key>"
+            + "<m:Value>Waybill</m:Value>"
+            + "<m:ValueType>string</m:ValueType>"
+            + "</m:Properties>"
             + "</m:parameters>"
         )
         ret = self._post("GetDocuments", inner, creds)
@@ -501,25 +534,20 @@ class CSEAPIClient(CarrierAPIClient):
             self._auth(creds)
             + "<m:documents>"
             + "<m:Key>Documents</m:Key>"
-            + "<m:List>"
-            + "<m:Key>Document</m:Key>"
-            + f"<m:Fields><m:Key>Number</m:Key><m:Value>{_esc(waybill_number)}</m:Value></m:Fields>"
-            + "</m:List>"
+            + f"<m:List><m:Key>{_esc(waybill_number)}</m:Key></m:List>"
             + "</m:documents>"
             + "<m:parameters>"
             + "<m:Key>Parameters</m:Key>"
-            + "<m:Fields><m:Key>DocumentType</m:Key><m:Value>Waybill</m:Value></m:Fields>"
-            + "<m:Fields><m:Key>Type</m:Key><m:Value>print</m:Value></m:Fields>"
-            + "<m:Fields><m:Key>Format</m:Key><m:Value>pdf</m:Value></m:Fields>"
+            + "<m:Properties><m:Key>DocumentType</m:Key><m:Value>Waybill</m:Value><m:ValueType>string</m:ValueType></m:Properties>"
+            + "<m:Properties><m:Key>Type</m:Key><m:Value>print</m:Value><m:ValueType>string</m:ValueType></m:Properties>"
+            + "<m:Properties><m:Key>Format</m:Key><m:Value>pdf</m:Value><m:ValueType>string</m:ValueType></m:Properties>"
             + "</m:parameters>"
         )
         ret = self._post("GetFormsForDocuments", inner, creds, timeout=_TIMEOUT)
-        # PDF is in BData field (base64) on each document item
         for item in list_items(ret):
             bdata = fields_of(item).get("BData", "") or find_text(item, "BData")
             if bdata:
                 return base64.b64decode(bdata)
-        # Sometimes BData is directly on return element
         bdata = find_text(ret, "BData")
         if bdata:
             return base64.b64decode(bdata)
@@ -533,29 +561,38 @@ class CSEAPIClient(CarrierAPIClient):
             self._auth(creds)
             + "<m:documents>"
             + "<m:Key>Documents</m:Key>"
-            + "<m:List>"
-            + "<m:Key>Document</m:Key>"
-            + f"<m:Fields><m:Key>Number</m:Key><m:Value>{_esc(waybill_number)}</m:Value></m:Fields>"
-            + "</m:List>"
+            + "<m:Properties>"
+            + "<m:Key>DocumentType</m:Key>"
+            + "<m:Value>Waybill</m:Value>"
+            + "<m:ValueType>string</m:ValueType>"
+            + "</m:Properties>"
+            + f"<m:List><m:Key>{_esc(waybill_number)}</m:Key></m:List>"
             + "</m:documents>"
-            + "<m:parameters>"
-            + "<m:Key>Parameters</m:Key>"
-            + "<m:Fields><m:Key>DocumentType</m:Key><m:Value>Waybill</m:Value></m:Fields>"
-            + "</m:parameters>"
+            + "<m:parameters><m:Key>Parameters</m:Key></m:parameters>"
         )
         ret = self._post("Tracking", inner, creds)
         events: list[dict] = []
         for doc_item in list_items(ret):
-            for status_item in list_items(doc_item):
-                f = fields_of(status_item)
-                events.append({
-                    "guid": find_text(status_item, "Key"),
-                    "status": f.get("StatusName") or f.get("Status", ""),
-                    "occurred_at": f.get("DateTime") or f.get("Date", ""),
-                    "location": f.get("Location", ""),
-                    "comment": f.get("Comment", ""),
-                    "recipient": f.get("RecipientName", ""),
-                })
+            # Status events are in Tables > List > List
+            tables_el = doc_item.find(f"{_NM}Tables")
+            if tables_el is not None:
+                for table_item in list_items(tables_el):
+                    for status_item in list_items(table_item):
+                        p = {
+                            (prop.find(f"{_NM}Key").text or "").strip(): (
+                                prop.find(f"{_NM}Value").text or ""
+                            ).strip()
+                            for prop in props_of(status_item)
+                            if prop.find(f"{_NM}Key") is not None
+                        }
+                        events.append({
+                            "guid": p.get("GUID", ""),
+                            "status": p.get("StatusName") or p.get("Status", ""),
+                            "occurred_at": p.get("DateTime") or p.get("Date", ""),
+                            "location": p.get("Location", ""),
+                            "comment": p.get("Comment", ""),
+                            "recipient": p.get("Recipient", ""),
+                        })
         return events
 
     # ── Calc ──────────────────────────────────────────────────────────────────
@@ -608,50 +645,47 @@ class CSEAPIClient(CarrierAPIClient):
         sender_geo = sender.get("geography_guid") or sender.get("city", "")
         recipient_geo = recipient.get("geography_guid") or recipient.get("city", "")
 
+        def _field(key: str, value: str, vtype: str = "string") -> str:
+            return (
+                f"<m:Fields><m:Key>{key}</m:Key>"
+                f"<m:Value>{_esc(value)}</m:Value>"
+                f"<m:ValueType>{vtype}</m:ValueType></m:Fields>"
+            )
+
         order_xml = (
-            f"<m:TakeDate>{_esc(take_date)}</m:TakeDate>"
-            "<m:Sender>"
-            f"<m:Name>{_esc(sender.get('full_name', ''))}</m:Name>"
-            f"<m:Phone>{_esc(sender.get('phone', ''))}</m:Phone>"
-            f"<m:Geography>{_esc(sender_geo)}</m:Geography>"
-            f"<m:Address>{_esc(sender.get('address', sender.get('address_line1', '')))}</m:Address>"
-            "</m:Sender>"
-            "<m:Recipient>"
-            f"<m:Name>{_esc(recipient.get('full_name', ''))}</m:Name>"
-            f"<m:Phone>{_esc(recipient.get('phone', ''))}</m:Phone>"
-            f"<m:Geography>{_esc(recipient_geo)}</m:Geography>"
-            f"<m:Address>{_esc(recipient.get('address', recipient.get('address_line1', '')))}</m:Address>"
-            "</m:Recipient>"
-            f"<m:Weight>{round(float(total_weight), 3)}</m:Weight>"
-            f"<m:Quantity>{int(total_qty)}</m:Quantity>"
-            f"<m:Description>{_esc(description)}</m:Description>"
-            "<m:TypeOfPayer>Sender</m:TypeOfPayer>"
-            "<m:WayOfPayment>NonCash</m:WayOfPayment>"
+            _field("TakeDate", take_date, "dateTime")
+            + _field("Sender", sender.get("full_name", ""))
+            + _field("SenderPhone", sender.get("phone", ""))
+            + _field("SenderGeography", sender_geo)
+            + _field("SenderAddress", sender.get("address", sender.get("address_line1", "")))
+            + _field("Recipient", recipient.get("full_name", ""))
+            + _field("RecipientPhone", recipient.get("phone", ""))
+            + _field("RecipientGeography", recipient_geo)
+            + _field("RecipientAddress", recipient.get("address", recipient.get("address_line1", "")))
+            + _field("Weight", f"{round(float(total_weight), 3)}", "float")
+            + _field("Quantity", str(int(total_qty)), "int")
+            + _field("Description", description)
+            + _field("TypeOfPayer", "Sender")
+            + _field("WayOfPayment", "1")
         )
 
-        # SaveWaybillOffice uses capital-case Login/Password (different from other methods)
         login = _esc(self._login(creds))
         pwd = _esc(self._password(creds))
         inner = (
-            "<m:Language>ru</m:Language>"
-            f"<m:Login>{login}</m:Login>"
-            f"<m:Password>{pwd}</m:Password>"
-            "<m:Company></m:Company>"
-            "<m:Number></m:Number>"
-            "<m:ClientNumber></m:ClientNumber>"
-            f"<m:OrderData>{order_xml}</m:OrderData>"
-            "<m:Office></m:Office>"
+            f"<m:login>{login}</m:login>"
+            f"<m:password>{pwd}</m:password>"
+            "<m:order>"
+            + order_xml
+            + "</m:order>"
         )
         ret = self._post("SaveWaybillOffice", inner, creds)
 
-        # resultstring — waybill number or error message as text
         result_text = (ret.text or "").strip()
         if result_text:
             if "ошибк" in result_text.lower() or "error" in result_text.lower():
                 raise RuntimeError(f"CSE SaveWaybillOffice error: {result_text}")
             return result_text
 
-        # Fallback: try first List item key as waybill number
         for item in list_items(ret):
             num = find_text(item, "Key") or find_text(item, "Value")
             if num:
@@ -696,7 +730,6 @@ class CSEAPIClient(CarrierAPIClient):
         Step 2: GetReferenceData TypesOfCargo — verifies credentials.
         """
         try:
-            # Step 1: Ping
             ping_resp = httpx.post(
                 self._url(creds),
                 content=build_envelope("Ping", ""),
@@ -707,7 +740,6 @@ class CSEAPIClient(CarrierAPIClient):
             if (ping_ret.text or "").strip().lower() != "true":
                 raise RuntimeError("CSE Ping returned non-true response")
 
-            # Step 2: Auth check
             self._types_of_cargo(creds)
             return True
         except httpx.HTTPStatusError as exc:
