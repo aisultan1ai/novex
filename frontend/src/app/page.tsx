@@ -40,9 +40,6 @@ const initialForm: FormState = {
 function validateQuoteForm(form: FormState): string | null {
   const weight = Number(form.weightKg);
   const qty = Number(form.quantity);
-  const width = Number(form.widthCm);
-  const height = Number(form.heightCm);
-  const depth = Number(form.depthCm);
 
   if (!form.weightKg.trim() || isNaN(weight) || weight <= 0)
     return "Введите корректный вес (> 0).";
@@ -51,14 +48,20 @@ function validateQuoteForm(form: FormState): string | null {
     return "Введите корректное количество (> 0).";
   if (!Number.isInteger(qty)) return "Количество должно быть целым числом.";
   if (qty > 999) return "Количество не может превышать 999.";
-  if (!form.widthCm.trim() || isNaN(width) || width <= 0)
-    return "Введите корректную ширину (> 0).";
-  if (!form.heightCm.trim() || isNaN(height) || height <= 0)
-    return "Введите корректную высоту (> 0).";
-  if (!form.depthCm.trim() || isNaN(depth) || depth <= 0)
-    return "Введите корректную глубину (> 0).";
-  if (width > 500 || height > 500 || depth > 500)
-    return "Размеры не могут превышать 500 см.";
+
+  if (form.shipmentType !== "document") {
+    const width = Number(form.widthCm);
+    const height = Number(form.heightCm);
+    const depth = Number(form.depthCm);
+    if (!form.widthCm.trim() || isNaN(width) || width <= 0)
+      return "Введите корректную ширину (> 0).";
+    if (!form.heightCm.trim() || isNaN(height) || height <= 0)
+      return "Введите корректную высоту (> 0).";
+    if (!form.depthCm.trim() || isNaN(depth) || depth <= 0)
+      return "Введите корректную глубину (> 0).";
+    if (width > 500 || height > 500 || depth > 500)
+      return "Размеры не могут превышать 500 см.";
+  }
   return null;
 }
 
@@ -271,6 +274,7 @@ export default function HomePage() {
     setResults(null);
     setSelectedRate(null);
     try {
+      const isDoc = form.shipmentType === "document";
       const res = await calculateShippingQuote({
         from_country: "KZ",
         from_city: form.fromCity.trim(),
@@ -279,9 +283,9 @@ export default function HomePage() {
         shipment_type: form.shipmentType,
         weight_kg: Number(form.weightKg),
         quantity: Number(form.quantity),
-        width_cm: Number(form.widthCm),
-        height_cm: Number(form.heightCm),
-        depth_cm: Number(form.depthCm),
+        width_cm: isDoc ? 0 : Number(form.widthCm),
+        height_cm: isDoc ? 0 : Number(form.heightCm),
+        depth_cm: isDoc ? 0 : Number(form.depthCm),
       });
       setResults(res);
     } catch (err) {
@@ -319,13 +323,15 @@ export default function HomePage() {
 
   const hasResults = results !== null;
   const minPrice = results ? Math.min(...results.quotes.map((q) => q.price)) : null;
-  const chargeable = calcChargeable(
-    Number(form.weightKg),
-    Number(form.widthCm),
-    Number(form.heightCm),
-    Number(form.depthCm),
-    Number(form.quantity),
-  );
+  const chargeable = form.shipmentType === "document"
+    ? Number(form.weightKg) * Number(form.quantity)
+    : calcChargeable(
+        Number(form.weightKg),
+        Number(form.widthCm),
+        Number(form.heightCm),
+        Number(form.depthCm),
+        Number(form.quantity),
+      );
 
   return (
     <div style={{ minHeight: "100vh", background: "#FAFAFA" }}>
@@ -460,16 +466,22 @@ export default function HomePage() {
                   display: "grid",
                   gridTemplateColumns: isMobile
                     ? "repeat(2,1fr)"
-                    : "1fr 1fr 1fr 1fr 1fr auto",
+                    : form.shipmentType === "document"
+                      ? "1fr 1fr auto"
+                      : "1fr 1fr 1fr 1fr 1fr auto",
                   gap: 14,
                   alignItems: "end",
                 }}
               >
                 <InputField label="Вес, кг" value={form.weightKg} onChange={(v) => setField("weightKg", v)} placeholder="2.5" />
                 <InputField label="Кол-во" value={form.quantity} onChange={(v) => setField("quantity", v)} placeholder="1" />
-                <InputField label="Ширина, см" value={form.widthCm} onChange={(v) => setField("widthCm", v)} placeholder="20" />
-                <InputField label="Высота, см" value={form.heightCm} onChange={(v) => setField("heightCm", v)} placeholder="15" />
-                <InputField label="Глубина, см" value={form.depthCm} onChange={(v) => setField("depthCm", v)} placeholder="10" />
+                {form.shipmentType !== "document" && (
+                  <>
+                    <InputField label="Ширина, см" value={form.widthCm} onChange={(v) => setField("widthCm", v)} placeholder="20" />
+                    <InputField label="Высота, см" value={form.heightCm} onChange={(v) => setField("heightCm", v)} placeholder="15" />
+                    <InputField label="Глубина, см" value={form.depthCm} onChange={(v) => setField("depthCm", v)} placeholder="10" />
+                  </>
+                )}
 
                 <button
                   type="submit"
@@ -532,7 +544,7 @@ export default function HomePage() {
               <span style={{ color: "#E5E7EB" }}>|</span>
               <span><b style={{ color: "#111827" }}>50 000+</b> отправлений</span>
               <span style={{ color: "#E5E7EB" }}>|</span>
-              <span><b style={{ color: "#111827" }}>5.0 ★</b> средний рейтинг</span>
+              <span><b style={{ color: "#111827" }}>5.0 {"★"}</b> средний рейтинг</span>
             </div>
           )}
         </section>

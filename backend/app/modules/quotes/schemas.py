@@ -15,9 +15,9 @@ class ShippingQuoteRequest(BaseModel):
 
     weight_kg: Decimal = Field(gt=0)
     quantity: int = Field(gt=0)
-    width_cm: Decimal = Field(gt=0)
-    height_cm: Decimal = Field(gt=0)
-    depth_cm: Decimal = Field(gt=0)
+    width_cm: Decimal = Field(default=Decimal("0"), ge=0)
+    height_cm: Decimal = Field(default=Decimal("0"), ge=0)
+    depth_cm: Decimal = Field(default=Decimal("0"), ge=0)
 
     @field_validator("from_country", "to_country")
     @classmethod

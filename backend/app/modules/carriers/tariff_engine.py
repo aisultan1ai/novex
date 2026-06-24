@@ -256,10 +256,14 @@ async def calculate_quotes_async(
     height_cm: float,
     depth_cm: float,
     db: AsyncSession,
+    shipment_type: str = "parcel",
 ) -> list[QuoteResult]:
     """Async version для /api/shipping/quote — DB и Exline HTTP не держат соединение одновременно."""
     fallback_zone = get_zone(from_city, to_city)
-    kg = chargeable_weight(weight_kg, quantity, width_cm, height_cm, depth_cm)
+    if shipment_type == "document":
+        kg = round_up_to_half(weight_kg * quantity)
+    else:
+        kg = chargeable_weight(weight_kg, quantity, width_cm, height_cm, depth_cm)
 
     db_results = await _calculate_from_db_async(db, from_city, to_city, fallback_zone, kg)
     results: list[QuoteResult] = db_results if db_results else _calculate_hardcoded(fallback_zone, kg)

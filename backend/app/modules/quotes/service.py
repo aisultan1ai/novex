@@ -45,6 +45,7 @@ class QuotesService:
             height_cm=float(payload.height_cm),
             depth_cm=float(payload.depth_cm),
             db=db,
+            shipment_type=payload.shipment_type,
         )
 
         quote_session = QuoteSession(
