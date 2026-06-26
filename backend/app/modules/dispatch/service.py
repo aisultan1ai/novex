@@ -199,14 +199,16 @@ class DispatchWorker:
             logger.info("dispatch_worker: job %s completed, order %s sent_to_carrier", job.id, order.id)
 
         except Exception as exc:
+            exc_msg = str(exc) or repr(exc) or f"{type(exc).__name__}: (no message)"
             logger.warning(
-                "dispatch_worker: job %s attempt %d/%d failed: %s",
+                "dispatch_worker: job %s attempt %d/%d failed [%s]: %s",
                 job.id,
                 job.attempts,
                 job.max_attempts,
-                exc,
+                type(exc).__name__,
+                exc_msg,
             )
-            job.last_error = str(exc)
+            job.last_error = exc_msg
 
             if _is_permanent_error(exc):
                 logger.error(
@@ -433,6 +435,8 @@ def _build_api_order_data(order: OrderDraft) -> dict:
         ),
         "currency": order.currency_snapshot,
         "fragile": order.fragile,
+        "call_before_delivery": order.call_before_delivery,
+        "insurance": order.insurance,
     }
 
 

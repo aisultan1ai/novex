@@ -4,7 +4,7 @@ import logging
 
 import httpx
 
-from app.modules.carriers.api_clients.base import CarrierAPIClient, InvoiceResult
+from app.modules.carriers.api_clients.base import CarrierAPIClient, CarrierServiceOption, InvoiceResult
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +27,17 @@ class AzimuthAPIClient(CarrierAPIClient):
         )
         total_qty = sum(p.get("quantity", 1) for p in packages)
         notes_parts = [p["description"] for p in packages if p.get("description")]
+
+        # Build service flags for notes
+        service_flags: list[str] = []
+        if order_data.get("fragile"):
+            service_flags.append("ХРУПКИЙ ГРУЗ")
+        if order_data.get("call_before_delivery"):
+            service_flags.append("ПОЗВОНИТЬ ПЕРЕД ДОСТАВКОЙ")
+        if order_data.get("insurance"):
+            service_flags.append("СТРАХОВАНИЕ")
+        if service_flags:
+            notes_parts = service_flags + notes_parts
 
         body = {
             "sender_name": sender.get("full_name", ""),
@@ -110,6 +121,33 @@ class AzimuthAPIClient(CarrierAPIClient):
             f"Отмена накладной {invoice_id} через API Azimuth недоступна. "
             "Обратитесь напрямую в службу поддержки Azimuth для аннулирования отправления."
         )
+
+    def get_available_services(
+        self,
+        creds: dict,
+        from_city: str = "",
+        to_city: str = "",
+    ) -> list[CarrierServiceOption]:
+        return [
+            CarrierServiceOption(
+                code="fragile",
+                name="Хрупкий груз",
+                available=True,
+                note="Отмечается в поле примечания накладной",
+            ),
+            CarrierServiceOption(
+                code="insurance",
+                name="Страхование (объявленная ценность)",
+                available=True,
+                note="Тариф уточняется у перевозчика; передаётся через поле declared_value",
+            ),
+            CarrierServiceOption(
+                code="call_before_delivery",
+                name="Звонок перед доставкой",
+                available=True,
+                note="Включено в тариф",
+            ),
+        ]
 
     def test_connection(self, creds: dict) -> bool:
         """GET /api/integration/invoices (list) as a connectivity check."""

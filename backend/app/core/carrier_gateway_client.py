@@ -57,13 +57,32 @@ class CarrierGatewayClient:
     def _headers(self) -> dict[str, str]:
         return {"X-Gateway-Secret": self._secret}
 
+    def _post_with_retry(self, url: str, *, json: dict, timeout: int) -> httpx.Response:
+        """POST with one automatic retry on stale-connection errors.
+
+        httpx keeps TCP connections alive in a pool. If the carrier-gateway
+        container restarts, the pooled sockets become stale and the next
+        request raises RemoteProtocolError / ConnectError with an empty or
+        misleading message. We catch those, close the client, open a fresh
+        one, and retry once so the dispatch job doesn't fail spuriously.
+        """
+        try:
+            return self._client.post(url, json=json, headers=self._headers(), timeout=timeout)
+        except (httpx.RemoteProtocolError, httpx.ConnectError) as exc:
+            logger.warning("Gateway stale-connection error, reopening client and retrying: %r", exc)
+            try:
+                self._client.close()
+            except Exception:
+                pass
+            self._client = httpx.Client(limits=_HTTP_LIMITS)
+            return self._client.post(url, json=json, headers=self._headers(), timeout=timeout)
+
     def create_invoice(
         self, carrier_code: str, order_data: dict, creds: dict
     ) -> GatewayInvoiceResult:
-        resp = self._client.post(
+        resp = self._post_with_retry(
             f"{self._base_url}/invoke/create-invoice",
             json={"carrier_code": carrier_code, "order_data": order_data, "creds": creds},
-            headers=self._headers(),
             timeout=_DISPATCH_TIMEOUT,
         )
         self._raise_for_carrier_error(resp)
@@ -78,10 +97,9 @@ class CarrierGatewayClient:
     def fetch_tracking(
         self, carrier_code: str, tracking_number: str, creds: dict
     ) -> list[GatewayTrackingEvent]:
-        resp = self._client.post(
+        resp = self._post_with_retry(
             f"{self._base_url}/invoke/fetch-tracking",
             json={"carrier_code": carrier_code, "tracking_number": tracking_number, "creds": creds},
-            headers=self._headers(),
             timeout=_TRACKING_TIMEOUT,
         )
         self._raise_for_carrier_error(resp)
@@ -97,20 +115,18 @@ class CarrierGatewayClient:
         ]
 
     def test_connection(self, carrier_code: str, creds: dict) -> dict:
-        resp = self._client.post(
+        resp = self._post_with_retry(
             f"{self._base_url}/invoke/test-connection",
             json={"carrier_code": carrier_code, "creds": creds},
-            headers=self._headers(),
             timeout=_TEST_TIMEOUT,
         )
         resp.raise_for_status()
         return resp.json()
 
     def cancel_invoice(self, carrier_code: str, invoice_id: str, creds: dict) -> bool:
-        resp = self._client.post(
+        resp = self._post_with_retry(
             f"{self._base_url}/invoke/cancel-invoice",
             json={"carrier_code": carrier_code, "invoice_id": invoice_id, "creds": creds},
-            headers=self._headers(),
             timeout=_TEST_TIMEOUT,
         )
         self._raise_for_carrier_error(resp)

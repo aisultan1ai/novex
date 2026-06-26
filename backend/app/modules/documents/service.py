@@ -11,6 +11,7 @@ from app.core.storage import get_storage
 from app.modules.documents.label_generator import generate_label_pdf
 from app.modules.documents.models import Document, DocumentType
 from app.modules.orders.repository import OrdersRepository
+from app.modules.shipments.repository import ShipmentsRepository
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ _LABEL_CACHE_TTL = 60 * 60 * 24  # 24h — matches typical presigned URL validit
 class DocumentsService:
     def __init__(self, orders_repo: OrdersRepository | None = None) -> None:
         self.orders_repo = orders_repo or OrdersRepository()
+        self._shipments_repo = ShipmentsRepository()
 
     def get_label(
         self,
@@ -45,17 +47,21 @@ class DocumentsService:
             return cached_object_name, filename  # type: ignore[return-value]
 
         existing = db.scalar(
-            select(Document).where(
+            select(Document)
+            .where(
                 Document.order_id == order_draft_id,
                 Document.document_type == DocumentType.LABEL,
             )
+            .order_by(Document.id.desc())
         )
         if existing:
             r.set(cache_key, existing.file_url, ex=_LABEL_CACHE_TTL)
             logger.info("Label served from DB/storage cache: order_id=%s", order_draft_id)
             return existing.file_url, existing.file_name
 
-        pdf_bytes = generate_label_pdf(order)
+        shipment = self._shipments_repo.get_by_order_id(db, order_draft_id)
+        carrier_tracking = shipment.carrier_tracking_number if shipment else None
+        pdf_bytes = generate_label_pdf(order, carrier_tracking_number=carrier_tracking)
 
         storage = get_storage()
         try:

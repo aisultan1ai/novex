@@ -21,7 +21,7 @@ from typing import Any
 
 import httpx
 
-from app.modules.carriers.api_clients.base import CarrierAPIClient, InvoiceResult
+from app.modules.carriers.api_clients.base import CarrierAPIClient, CarrierServiceOption, InvoiceResult
 
 logger = logging.getLogger(__name__)
 
@@ -664,11 +664,25 @@ class CSEAPIClient(CarrierAPIClient):
         total_weight = sum(p.get("weight_kg", 0) * p.get("quantity", 1) for p in packages)
         total_qty = sum(p.get("quantity", 1) for p in packages)
         desc_parts = [p["description"] for p in packages if p.get("description")]
-        description = "; ".join(desc_parts) if desc_parts else "Посылка"
+
+        # Prepend service markers to description for CSE operators
+        service_markers: list[str] = []
+        if order_data.get("fragile"):
+            service_markers.append("ХРУПКИЙ")
+        if order_data.get("call_before_delivery"):
+            service_markers.append("ПОЗВОНИТЬ ПЕРЕД ДОСТАВКОЙ")
+        if order_data.get("insurance"):
+            service_markers.append("СТРАХОВАНИЕ")
+        prefix = "; ".join(service_markers)
+        body_desc = "; ".join(desc_parts) if desc_parts else "Посылка"
+        description = f"{prefix}; {body_desc}" if prefix else body_desc
+
         take_date = order_data.get("take_date", date.today().isoformat())
 
         sender_geo = sender.get("geography_guid") or sender.get("city", "")
         recipient_geo = recipient.get("geography_guid") or recipient.get("city", "")
+
+        declared_value = order_data.get("declared_value", 0)
 
         def _field(key: str, value: str, vtype: str = "string") -> str:
             return (
@@ -692,6 +706,11 @@ class CSEAPIClient(CarrierAPIClient):
             + _field("Description", description)
             + _field("TypeOfPayer", "Sender")
             + _field("WayOfPayment", "1")
+            + (
+                _field("DeclaredValue", f"{float(declared_value):.2f}", "float")
+                if declared_value
+                else ""
+            )
         )
 
         login = _esc(self._login(creds))
@@ -717,6 +736,68 @@ class CSEAPIClient(CarrierAPIClient):
                 return num
 
         raise RuntimeError("CSE: SaveWaybillOffice returned no waybill number")
+
+    # ── Service discovery ─────────────────────────────────────────────────────
+
+    def get_available_services(
+        self,
+        creds: dict,
+        from_city: str = "",
+        to_city: str = "",
+    ) -> list[CarrierServiceOption]:
+        from app.modules.carriers.cse_geography import city_to_postcode_geo
+
+        services: list[CarrierServiceOption] = [
+            CarrierServiceOption(
+                code="fragile",
+                name="Хрупкий груз",
+                available=True,
+                note="Отмечается в описании вложения",
+            ),
+            CarrierServiceOption(
+                code="insurance",
+                name="Страхование (объявленная ценность)",
+                available=True,
+                note="Стоимость уточняется индивидуально",
+            ),
+            CarrierServiceOption(
+                code="call_before_delivery",
+                name="Звонок перед доставкой",
+                available=True,
+                note="Включено в тариф",
+            ),
+        ]
+
+        cod_available = False
+        card_available = False
+        info_fetched = False
+
+        if from_city and to_city:
+            from_geo = city_to_postcode_geo(from_city)
+            to_geo = city_to_postcode_geo(to_city)
+            if from_geo and to_geo:
+                try:
+                    info = self.get_delivery_info(from_geo, to_geo, creds)
+                    cod_available = bool(info.get("cod_available"))
+                    card_available = bool(info.get("card_available"))
+                    info_fetched = True
+                except Exception as exc:
+                    logger.debug("CSE get_delivery_info (non-fatal): %s", exc)
+
+        note_suffix = "" if info_fetched else " (не удалось определить для маршрута)"
+        services.append(CarrierServiceOption(
+            code="cod",
+            name="Наложенный платёж (COD)",
+            available=cod_available,
+            note=f"Доступность зависит от маршрута{note_suffix}",
+        ))
+        services.append(CarrierServiceOption(
+            code="card_payment",
+            name="Оплата картой при получении",
+            available=card_available,
+            note=f"Доступность зависит от маршрута{note_suffix}",
+        ))
+        return services
 
     # ── CarrierAPIClient interface ───────────────────────────────────────────
 

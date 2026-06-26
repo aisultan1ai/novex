@@ -21,7 +21,7 @@ import logging
 import math
 import os
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
@@ -167,6 +167,31 @@ def _economy_price(weight: float, zone: int) -> int:
     return base + extra_kg * BESTSENDER_ECONOMY_EXTRA_PER_KG[zone_idx]
 
 
+_AZIMUTH_STATIC_SERVICES: list[dict] = [
+    {"code": "fragile", "name": "Хрупкий груз", "available": True, "price": None, "currency": "KZT", "note": "Отмечается в примечании накладной"},
+    {"code": "insurance", "name": "Страхование (объявленная ценность)", "available": True, "price": None, "currency": "KZT", "note": "Тариф уточняется у перевозчика"},
+    {"code": "call_before_delivery", "name": "Звонок перед доставкой", "available": True, "price": None, "currency": "KZT", "note": "Включено в тариф"},
+]
+
+_EXLINE_STATIC_SERVICES: list[dict] = [
+    {"code": "fragile", "name": "Хрупкий груз", "available": True, "price": None, "currency": "KZT", "note": "Отмечается в поле вложения"},
+    {"code": "insurance", "name": "Страхование (объявленная ценность)", "available": True, "price": None, "currency": "KZT", "note": "Тариф зависит от объявленной ценности"},
+    {"code": "call_before_delivery", "name": "Звонок перед доставкой", "available": True, "price": None, "currency": "KZT", "note": "Включено в тариф"},
+]
+
+_CSE_STATIC_SERVICES: list[dict] = [
+    {"code": "fragile", "name": "Хрупкий груз", "available": True, "price": None, "currency": "KZT", "note": "Отмечается в описании вложения"},
+    {"code": "insurance", "name": "Страхование (объявленная ценность)", "available": True, "price": None, "currency": "KZT", "note": "Стоимость уточняется индивидуально"},
+    {"code": "call_before_delivery", "name": "Звонок перед доставкой", "available": True, "price": None, "currency": "KZT", "note": "Включено в тариф"},
+]
+
+_CARRIER_STATIC_SERVICES: dict[str, list[dict]] = {
+    "azimuth": _AZIMUTH_STATIC_SERVICES,
+    "exline": _EXLINE_STATIC_SERVICES,
+    "cse": _CSE_STATIC_SERVICES,
+}
+
+
 @dataclass
 class QuoteResult:
     carrier_code: str
@@ -179,6 +204,7 @@ class QuoteResult:
     eta_days_max: int
     zone: int
     chargeable_kg: float
+    available_services: list[dict] = field(default_factory=list)
 
 
 def calculate_quotes(
@@ -307,6 +333,7 @@ def _calculate_hardcoded(zone: int, kg: float) -> list[QuoteResult]:
             eta_days_max=std_eta[1],
             zone=zone,
             chargeable_kg=kg,
+            available_services=_AZIMUTH_STATIC_SERVICES,
         )
     )
 
@@ -329,6 +356,7 @@ def _calculate_hardcoded(zone: int, kg: float) -> list[QuoteResult]:
             eta_days_max=exp_eta[1],
             zone=zone,
             chargeable_kg=kg,
+            available_services=_AZIMUTH_STATIC_SERVICES,
         )
     )
 
@@ -348,6 +376,7 @@ def _calculate_hardcoded(zone: int, kg: float) -> list[QuoteResult]:
                 eta_days_max=eco_eta[1],
                 zone=zone,
                 chargeable_kg=kg,
+                available_services=_AZIMUTH_STATIC_SERVICES,
             )
         )
 
@@ -468,6 +497,7 @@ def _quotes_from_carriers(
                 eta_days_max=eta_max,
                 zone=zone,
                 chargeable_kg=kg,
+                available_services=_CARRIER_STATIC_SERVICES.get(carrier.code.lower(), []),
             ))
     return results
 
@@ -622,6 +652,7 @@ def _call_exline_calculator(
         eta_days_max=eta_max,
         zone=zone,
         chargeable_kg=kg,
+        available_services=_EXLINE_STATIC_SERVICES,
     )
 
 
@@ -740,6 +771,7 @@ async def _call_exline_calculator_async(
         eta_days_max=eta_max,
         zone=zone,
         chargeable_kg=kg,
+        available_services=_EXLINE_STATIC_SERVICES,
     )
 
 
@@ -838,6 +870,63 @@ async def _call_cse_calc_async(
     return results
 
 
+async def _get_cse_delivery_services_async(
+    from_geo: str,
+    to_geo: str,
+    login: str,
+    password: str,
+    api_url: str,
+) -> list[dict]:
+    """Fetch COD/card availability for a CSE route and return a full service list."""
+    from app.modules.carriers.api_clients.cse import (
+        _esc,
+        _ref_params,
+        build_envelope,
+        extract_return,
+        fields_of,
+        list_items,
+    )
+
+    inner = (
+        f"<m:login>{_esc(login)}</m:login>"
+        f"<m:password>{_esc(password)}</m:password>"
+        + _ref_params(
+            "deliveryinfo",
+            ("Search", to_geo, "string"),
+            ("geography", from_geo, "string"),
+        )
+    )
+
+    cod_available = False
+    card_available = False
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                api_url,
+                content=build_envelope("GetReferenceData", inner),
+                headers={"Content-Type": "text/xml; charset=utf-8"},
+                timeout=_CSE_TIMEOUT,
+            )
+        resp.raise_for_status()
+        ret = extract_return(resp.text, "GetReferenceData")
+        for item in list_items(ret):
+            f = fields_of(item)
+            if f.get("COD") is not None:
+                cod_available = bool(f.get("COD"))
+            if f.get("PaymentByRecipient") is not None:
+                card_available = bool(f.get("PaymentByRecipient"))
+    except Exception as exc:
+        logger.debug("CSE delivery info fetch failed (services unknown): %s", exc)
+
+    return [
+        {"code": "fragile", "name": "Хрупкий груз", "available": True, "price": None, "currency": "KZT", "note": "Отмечается в описании вложения"},
+        {"code": "insurance", "name": "Страхование (объявленная ценность)", "available": True, "price": None, "currency": "KZT", "note": "Стоимость уточняется индивидуально"},
+        {"code": "call_before_delivery", "name": "Звонок перед доставкой", "available": True, "price": None, "currency": "KZT", "note": "Включено в тариф"},
+        {"code": "cod", "name": "Наложенный платёж (COD)", "available": cod_available, "price": None, "currency": "KZT", "note": "Доступность зависит от маршрута"},
+        {"code": "card_payment", "name": "Оплата картой при получении", "available": card_available, "price": None, "currency": "KZT", "note": "Доступность зависит от маршрута"},
+    ]
+
+
 async def _calculate_cse_live_async(
     from_city: str,
     to_city: str,
@@ -861,4 +950,12 @@ async def _calculate_cse_live_async(
         return []
 
     cargo_type_guid = _CSE_CARGO_TYPE_GUIDS.get(shipment_type, "")
-    return await _call_cse_calc_async(from_geo, to_geo, kg, login, password, api_url, cargo_type_guid)
+
+    # Fetch tariffs and delivery-info (COD/card flags) concurrently
+    results, services = await asyncio.gather(
+        _call_cse_calc_async(from_geo, to_geo, kg, login, password, api_url, cargo_type_guid),
+        _get_cse_delivery_services_async(from_geo, to_geo, login, password, api_url),
+    )
+    for r in results:
+        r.available_services = services
+    return results

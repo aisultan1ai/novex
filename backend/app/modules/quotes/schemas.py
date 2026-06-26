@@ -30,6 +30,15 @@ class ShippingQuoteRequest(BaseModel):
         return value.strip()
 
 
+class CarrierServiceItem(BaseModel):
+    code: str
+    name: str
+    available: bool
+    price: Decimal | None = None
+    currency: str = "KZT"
+    note: str = ""
+
+
 class RateQuoteItem(BaseModel):
     id: int | None = None
     carrier_code: str
@@ -41,6 +50,7 @@ class RateQuoteItem(BaseModel):
     eta_days_max: int
     badge: str | None = None
     is_selected: bool = False
+    available_services: list[CarrierServiceItem] = []
 
 
 class ShippingQuoteResponse(BaseModel):

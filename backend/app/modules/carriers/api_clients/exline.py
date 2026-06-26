@@ -7,7 +7,7 @@ from datetime import date
 
 import httpx
 
-from app.modules.carriers.api_clients.base import CarrierAPIClient, InvoiceResult
+from app.modules.carriers.api_clients.base import CarrierAPIClient, CarrierServiceOption, InvoiceResult
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,25 @@ class ExlineAPIClient(CarrierAPIClient):
         )
         total_qty = sum(p.get("quantity", 1) for p in packages)
         descriptions = [p["description"] for p in packages if p.get("description")]
-        enclosure = _esc("; ".join(descriptions) if descriptions else "Посылка")
+
+        # Build enclosure with service markers
+        service_markers: list[str] = []
+        if order_data.get("fragile"):
+            service_markers.append("ХРУПКИЙ")
+        if order_data.get("call_before_delivery"):
+            service_markers.append("ПОЗВОНИТЬ ПЕРЕД ДОСТАВКОЙ")
+        if order_data.get("insurance"):
+            service_markers.append("СТРАХОВАНИЕ")
+        all_parts = service_markers + descriptions
+        enclosure = _esc("; ".join(all_parts) if all_parts else "Посылка")
+
+        # Declared value for insurance (Exline field: <inshprice>)
+        declared_value = order_data.get("declared_value", 0)
+        inshprice_tag = (
+            f"    <inshprice>{float(declared_value):.2f}</inshprice>\n"
+            if declared_value
+            else ""
+        )
 
         xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <neworder>
@@ -114,7 +132,7 @@ class ExlineAPIClient(CarrierAPIClient):
     <weight>{round(float(total_weight), 3)}</weight>
     <quantity>{int(total_qty)}</quantity>
     <paytype>NO</paytype>
-    <enclosure>{enclosure}</enclosure>
+{inshprice_tag}    <enclosure>{enclosure}</enclosure>
   </order>
 </neworder>"""
 
@@ -161,6 +179,22 @@ class ExlineAPIClient(CarrierAPIClient):
         resp = httpx.get(print_url, timeout=_TIMEOUT, follow_redirects=True)
         resp.raise_for_status()
 
+        # Exline's /print/ redirects to session login when URL-based auth fails.
+        # Detect this early so we don't save a login-page PDF as the waybill.
+        final_url = str(resp.url)
+        if "login" in final_url or "auth" in final_url:
+            raise RuntimeError(
+                f"Exline print page requires web session auth — "
+                f"got redirected to login page (orderno={invoice_id}). "
+                "URL-based credentials are only accepted by the XML API, not the web UI."
+            )
+
+        html_snippet = resp.text[:500].lower()
+        if "войти" in html_snippet or ("login" in html_snippet and "password" in html_snippet):
+            raise RuntimeError(
+                f"Exline print page returned a login form instead of the waybill (orderno={invoice_id})"
+            )
+
         pdf_bytes: bytes = weasyprint.HTML(
             string=resp.text,
             base_url=print_url,
@@ -190,6 +224,33 @@ class ExlineAPIClient(CarrierAPIClient):
         except Exception as exc:
             logger.warning("Exline cancel_invoice exception: %s", exc)
             return False
+
+    def get_available_services(
+        self,
+        creds: dict,
+        from_city: str = "",
+        to_city: str = "",
+    ) -> list[CarrierServiceOption]:
+        return [
+            CarrierServiceOption(
+                code="fragile",
+                name="Хрупкий груз",
+                available=True,
+                note="Отмечается в поле вложения (enclosure)",
+            ),
+            CarrierServiceOption(
+                code="insurance",
+                name="Страхование (объявленная ценность)",
+                available=True,
+                note="Поле inshprice; тариф зависит от объявленной ценности",
+            ),
+            CarrierServiceOption(
+                code="call_before_delivery",
+                name="Звонок перед доставкой",
+                available=True,
+                note="Включено в тариф",
+            ),
+        ]
 
     def test_connection(self, creds: dict) -> bool:
         today = date.today().isoformat()

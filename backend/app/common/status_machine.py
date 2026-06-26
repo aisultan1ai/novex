@@ -25,8 +25,8 @@ ALLOWED_ORDER_TRANSITIONS: dict[str, list[str]] = {
     "cancelled": [],
     "payment_rejected": ["awaiting_payment", "cancelled"],
     "dispatch_failed": ["dispatch_queued", "cancelled"],
-    "pending_manual_dispatch": ["dispatch_queued", "cancelled"],
-    "pending_manual": ["dispatch_queued", "cancelled"],
+    "pending_manual_dispatch": ["dispatch_queued", "dispatch_failed", "cancelled"],
+    "pending_manual": ["dispatch_queued", "dispatch_failed", "cancelled"],
 }
 
 

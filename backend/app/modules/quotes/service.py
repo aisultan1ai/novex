@@ -15,6 +15,7 @@ from app.modules.carriers.tariff_engine import (
 )
 from app.modules.quotes.models import QuoteSession, RateQuote
 from app.modules.quotes.schemas import (
+    CarrierServiceItem,
     QuoteSelectionRequest,
     RateQuoteItem,
     ShippingQuoteRequest,
@@ -105,7 +106,10 @@ class QuotesService:
         return ShippingQuoteResponse(
             quote_session_id=quote_session.id,
             public_token=quote_session.public_token,
-            quotes=[self._to_item(rq) for rq in rate_rows],
+            quotes=[
+                self._to_item(rq, q.available_services)
+                for rq, q in zip(rate_rows, quotes)
+            ],
         )
 
     def get_quote_session(
@@ -172,7 +176,8 @@ class QuotesService:
         return self.get_quote_session(db, quote_session_id)
 
     @staticmethod
-    def _to_item(rq: RateQuote) -> RateQuoteItem:
+    def _to_item(rq: RateQuote, services: list[dict] | None = None) -> RateQuoteItem:
+        svc_items = [CarrierServiceItem(**s) for s in (services or [])]
         return RateQuoteItem(
             id=rq.id,
             carrier_code=rq.carrier_code,
@@ -184,4 +189,5 @@ class QuotesService:
             eta_days_max=rq.eta_days_max,
             badge=rq.badge,
             is_selected=rq.is_selected,
+            available_services=svc_items,
         )

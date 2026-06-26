@@ -97,6 +97,7 @@ class MinioStorageService(StorageService):
         self._public_endpoint = settings.minio_public_endpoint or settings.minio_endpoint
         try:
             from minio import Minio
+            # Primary client — uses internal Docker endpoint for uploads/deletes
             self._client = Minio(
                 settings.minio_endpoint,
                 access_key=settings.minio_access_key,
@@ -105,9 +106,31 @@ class MinioStorageService(StorageService):
             )
             self._bucket = settings.minio_bucket
             self._ensure_bucket()
+
+            # Presign client — uses public endpoint so the signed Host in the URL
+            # matches what the browser actually connects to (prevents SignatureDoesNotMatch).
+            # We pre-seed the bucket region from the internal client so the presign
+            # client never needs to make a network request to the public endpoint
+            # (which isn't reachable from inside the Docker container).
+            if self._public_endpoint != self._internal_endpoint:
+                self._presign_client = Minio(
+                    self._public_endpoint,
+                    access_key=settings.minio_access_key,
+                    secret_key=settings.minio_secret_key,
+                    secure=settings.minio_secure,
+                )
+                try:
+                    region = self._client._get_region(self._bucket)
+                    self._presign_client._region_map[self._bucket] = region
+                except Exception as reg_exc:
+                    logger.debug("Could not seed presign client region: %s", reg_exc)
+                    self._presign_client._region_map[self._bucket] = "us-east-1"
+            else:
+                self._presign_client = self._client
         except Exception as exc:
             logger.warning("MinIO not available: %s", exc)
             self._client = None  # type: ignore[assignment]
+            self._presign_client = None  # type: ignore[assignment]
             self._bucket = settings.minio_bucket
 
     def _ensure_bucket(self) -> None:
@@ -148,11 +171,10 @@ class MinioStorageService(StorageService):
         )
 
     def get_file_url(self, object_name: str) -> str:
-        if self._client:
-            url = self._client.presigned_get_object(self._bucket, object_name)
-            if self._public_endpoint and self._internal_endpoint:
-                url = url.replace(self._internal_endpoint, self._public_endpoint, 1)
-            return url
+        if self._presign_client:
+            # Use the presign client (public endpoint) so the URL is signed for the
+            # hostname the browser will actually connect to — prevents SignatureDoesNotMatch.
+            return self._presign_client.presigned_get_object(self._bucket, object_name)
         return f"/storage/{object_name}"
 
     def delete_file(self, object_name: str) -> None:

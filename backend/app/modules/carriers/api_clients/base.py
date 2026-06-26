@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from decimal import Decimal
 
 
 @dataclass
@@ -12,10 +13,33 @@ class InvoiceResult:
     waybill_pdf_bytes: bytes | None = None  # PDF накладной, если доступен сразу
 
 
+@dataclass
+class CarrierServiceOption:
+    """Дополнительная услуга перевозчика — результат запроса к API."""
+    code: str               # внутренний код: "cod", "card_payment", "insurance", "fragile", "call_before_delivery"
+    name: str               # название для отображения
+    available: bool         # доступна ли услуга (для данного маршрута)
+    price: Decimal | None = None    # доп. стоимость; None = включено в тариф / неизвестно
+    currency: str = "KZT"
+    note: str = ""          # пояснение: "2% от объявленной ценности", "при наличии кассы" и т.д.
+
+
 class CarrierAPIClient(ABC):
     """Базовый интерфейс для всех API-интеграций перевозчиков."""
 
     carrier_code: str
+
+    def get_available_services(
+        self,
+        creds: dict,
+        from_city: str = "",
+        to_city: str = "",
+    ) -> list[CarrierServiceOption]:
+        """Return additional services available for this carrier (optionally route-specific).
+
+        Default returns an empty list. Subclasses override to provide real data.
+        """
+        return []
 
     @abstractmethod
     def create_invoice(self, order_data: dict, creds: dict) -> InvoiceResult:

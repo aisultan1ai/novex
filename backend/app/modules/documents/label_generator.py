@@ -78,7 +78,7 @@ _FONT_REGULAR: str | None = _find_unicode_font()
 _FONT_BOLD: str | None = _find_unicode_font_bold()
 
 
-def generate_label_pdf(order: OrderDraft) -> bytes:
+def generate_label_pdf(order: OrderDraft, carrier_tracking_number: str | None = None) -> bytes:
     if not _FPDF_AVAILABLE:
         raise RuntimeError(
             "Для генерации накладных установите пакет: pip install fpdf2"
@@ -224,12 +224,21 @@ def generate_label_pdf(order: OrderDraft) -> bytes:
         )
         pdf.ln(2)
 
-    # Reference barcode-style footer
+    # Footer — carrier tracking number (if dispatched) + internal reference
     pdf.line(10, pdf.get_y(), 200, pdf.get_y())
     pdf.ln(4)
-    bold(14)
-    pdf.cell(
-        0, 10, f"REF: NOVEX-{order.id:08d}", new_x="LMARGIN", new_y="NEXT", align="C"
-    )
+    if carrier_tracking_number:
+        bold(9)
+        pdf.cell(0, 6, "Номер отслеживания перевозчика:", new_x="LMARGIN", new_y="NEXT", align="C")
+        bold(18)
+        pdf.cell(0, 12, carrier_tracking_number, new_x="LMARGIN", new_y="NEXT", align="C")
+        pdf.ln(2)
+        regular(9)
+        pdf.cell(0, 6, f"REF: NOVEX-{order.id:08d}", new_x="LMARGIN", new_y="NEXT", align="C")
+    else:
+        bold(14)
+        pdf.cell(
+            0, 10, f"REF: NOVEX-{order.id:08d}", new_x="LMARGIN", new_y="NEXT", align="C"
+        )
 
     return bytes(pdf.output())
