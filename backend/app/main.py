@@ -9,6 +9,8 @@ from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
+import sentry_sdk
+
 from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.exceptions import (
@@ -25,6 +27,15 @@ from app.core.middleware import RequestIdMiddleware, SecurityHeadersMiddleware
 settings = get_settings()
 setup_logging(level="DEBUG" if settings.debug else "INFO")
 logger = logging.getLogger(__name__)
+
+if settings.sentry_dsn:
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        environment=settings.environment,
+        traces_sample_rate=settings.sentry_traces_sample_rate,
+        release=settings.app_version,
+    )
+    logger.info("Sentry initialised (env=%s)", settings.environment)
 
 
 @asynccontextmanager

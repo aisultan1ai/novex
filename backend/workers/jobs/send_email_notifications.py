@@ -7,14 +7,28 @@ from datetime import datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.redis import get_redis
 from app.modules.notifications.models import NotificationJob
 
 logger = logging.getLogger(__name__)
 
 _BATCH_SIZE = 20
+_LOCK_KEY = "lock:send_email_notifications"
+_LOCK_TTL = 45  # seconds — must be < job interval (60s)
 
 
 def run(db: Session) -> None:
+    r = get_redis()
+    if not r.set(_LOCK_KEY, "1", nx=True, ex=_LOCK_TTL):
+        logger.debug("send_email_notifications: skipped — another replica holds the lock")
+        return
+    try:
+        _run(db)
+    finally:
+        r.delete(_LOCK_KEY)
+
+
+def _run(db: Session) -> None:
     now = datetime.utcnow()
     jobs = db.scalars(
         select(NotificationJob)

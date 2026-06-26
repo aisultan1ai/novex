@@ -11,6 +11,8 @@ import logging
 import signal
 from threading import Event
 
+import sentry_sdk
+
 # Import all ORM models so SQLAlchemy metadata is fully populated
 import app.modules.address_book.models  # noqa: F401
 import app.modules.audit.models  # noqa: F401
@@ -43,6 +45,15 @@ logger = logging.getLogger("novex.tracking_poller")
 
 settings = get_settings()
 stop_event = Event()
+
+if settings.sentry_dsn:
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        environment=settings.environment,
+        traces_sample_rate=settings.sentry_traces_sample_rate,
+        release=settings.app_version,
+    )
+    logger.info("Sentry initialised in tracking-poller (env=%s)", settings.environment)
 
 _ALIVE_KEY = "tracking_poller:alive"
 _ALIVE_TTL = 180  # > poll interval (120s)

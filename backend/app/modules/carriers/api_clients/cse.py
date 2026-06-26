@@ -312,23 +312,48 @@ class CSEAPIClient(CarrierAPIClient):
 
     # ── Geography ────────────────────────────────────────────────────────────
 
-    def search_geography(self, search: str, creds: dict) -> list[dict]:
-        """Search CSE Geography by name / postcode / FIAS. Returns [{guid, name, parent, type, fias}]."""
-        inner = self._auth(creds) + _ref_params(
-            "Geography",
-            ("Search", search, "string"),
-        )
+    def search_geography(
+        self,
+        search: str,
+        creds: dict,
+        country_code: str = "KZ",
+    ) -> list[dict]:
+        """Search CSE Geography by name / postcode.
+
+        country_code: ISO 3166-1 alpha-2 code passed to the API and used for
+        client-side filtering (default 'KZ' — Kazakhstan only).
+        Pass None or '' to return all countries without filtering.
+        """
+        extras: list[tuple[str, str, str]] = [("Search", search, "string")]
+        if country_code:
+            extras.append(("CountryCode", country_code, "string"))
+
+        inner = self._auth(creds) + _ref_params("Geography", *extras)
         ret = self._post("GetReferenceData", inner, creds)
+
         results = []
         for item in list_items(ret):
             f = fields_of(item)
+            api_country = (f.get("CountryCode") or f.get("Country") or "").upper().strip()
+            parent = f.get("ParentName", "")
+
+            if country_code:
+                kz_aliases = {"KZ", "КАЗАХСТАН", "KAZAKHSTAN"}
+                if api_country and api_country not in kz_aliases:
+                    continue
+                # FIAS (Федеральная информационная адресная система) is Russia-only.
+                # Kazakhstan cities have no FIAS code — skip cities that do.
+                if not api_country and f.get("FIAS"):
+                    continue
+
             results.append({
                 "guid": find_text(item, "Key"),
                 "name": find_text(item, "Value"),
-                "parent": f.get("ParentName", ""),
+                "parent": parent,
                 "type": f.get("Type", ""),
                 "fias": f.get("FIAS", ""),
                 "iata": f.get("IATA", ""),
+                "country": api_country or country_code or "",
             })
         return results
 

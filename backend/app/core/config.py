@@ -96,6 +96,9 @@ class Settings(BaseSettings):
     secret_key: str = ""
     access_token_expire_minutes: int = 60
 
+    sentry_dsn: str = ""
+    sentry_traces_sample_rate: float = 0.1
+
     # Internal carrier gateway service
     carrier_gateway_url: str = "http://carrier-gateway:8100"
     gateway_secret: str = ""

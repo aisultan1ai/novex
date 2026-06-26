@@ -103,9 +103,13 @@ class AzimuthAPIClient(CarrierAPIClient):
         return resp.content
 
     def cancel_invoice(self, invoice_id: str, creds: dict) -> bool:
-        # Azimuth cancellation endpoint not documented — log and return False
-        logger.warning("Azimuth cancel_invoice not implemented: invoice_id=%s", invoice_id)
-        return False
+        # Azimuth не предоставляет публичный API для отмены накладных.
+        # Для отмены необходимо обратиться напрямую в службу поддержки Azimuth.
+        logger.warning("Azimuth cancel_invoice: API not available, invoice_id=%s", invoice_id)
+        raise RuntimeError(
+            f"Отмена накладной {invoice_id} через API Azimuth недоступна. "
+            "Обратитесь напрямую в службу поддержки Azimuth для аннулирования отправления."
+        )
 
     def test_connection(self, creds: dict) -> bool:
         """GET /api/integration/invoices (list) as a connectivity check."""

@@ -5,6 +5,8 @@ import signal
 import threading
 from threading import Event
 
+import sentry_sdk
+
 from app.core.config import get_settings
 from app.core.db import check_database_connection
 from app.core.redis import get_redis
@@ -53,6 +55,15 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger("novex.worker")
+
+if settings.sentry_dsn:
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        environment=settings.environment,
+        traces_sample_rate=settings.sentry_traces_sample_rate,
+        release=settings.app_version,
+    )
+    logger.info("Sentry initialised in worker (env=%s)", settings.environment)
 
 
 def _handle_shutdown(signum: int, _frame) -> None:

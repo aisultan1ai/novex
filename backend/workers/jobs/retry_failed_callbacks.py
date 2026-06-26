@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.redis import get_redis
 from app.modules.dispatch.models import DispatchJob, DispatchJobStatus
 from app.modules.identity.models import Role, RoleCode, User
 from app.modules.notifications.repository import NotificationsRepository
@@ -14,9 +15,22 @@ logger = logging.getLogger(__name__)
 
 _LOOK_BACK_HOURS = 24
 _repo = NotificationsRepository()
+_LOCK_KEY = "lock:retry_failed_callbacks"
+_LOCK_TTL = 60  # seconds — must be < job interval (300s)
 
 
 def run(db: Session) -> None:
+    r = get_redis()
+    if not r.set(_LOCK_KEY, "1", nx=True, ex=_LOCK_TTL):
+        logger.debug("retry_failed_callbacks: skipped — another replica holds the lock")
+        return
+    try:
+        _run(db)
+    finally:
+        r.delete(_LOCK_KEY)
+
+
+def _run(db: Session) -> None:
     cutoff = datetime.utcnow() - timedelta(hours=_LOOK_BACK_HOURS)
 
     failed_jobs = db.scalars(
