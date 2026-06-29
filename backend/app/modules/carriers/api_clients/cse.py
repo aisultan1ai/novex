@@ -198,7 +198,7 @@ def parse_calc_response(ret: ET.Element) -> list[dict]:
     for dest_item in list_items(ret):
         for tariff_item in list_items(dest_item):
             f = fields_of(tariff_item)
-            tariff_guid = find_text(tariff_item, "Key")
+            tariff_guid = find_text(tariff_item, "Value")  # Key="Tariff" (constant); GUID is in Value
             total = f.get("Total") or f.get("Price") or f.get("Summa")
             service_name = (
                 f.get("Service") or f.get("ServiceName") or f.get("TariffName") or "CSE"
@@ -291,17 +291,19 @@ class CSEAPIClient(CarrierAPIClient):
             return _cargo_type_guid_cache[cache_key]
         types = self._types_of_cargo(creds)
         guid: str | None = None
-        for t in types:
-            if t.get("is_default"):
-                guid = t["guid"]
+        # Prefer "Груз" (freight/parcel) over "Документы" (documents is Default=true
+        # but wrong for parcel shipments). Search keywords first, then fall back to default.
+        for keyword in ("груз", "cargo", "посылк", "parcel"):
+            for t in types:
+                if keyword in t.get("name", "").lower():
+                    guid = t["guid"]
+                    break
+            if guid:
                 break
         if guid is None:
-            for keyword in ("груз", "cargo", "посылк", "parcel"):
-                for t in types:
-                    if keyword in t.get("name", "").lower():
-                        guid = t["guid"]
-                        break
-                if guid:
+            for t in types:
+                if t.get("is_default"):
+                    guid = t["guid"]
                     break
         if guid is None and types:
             guid = types[0]["guid"]
@@ -324,9 +326,10 @@ class CSEAPIClient(CarrierAPIClient):
         client-side filtering (default 'KZ' — Kazakhstan only).
         Pass None or '' to return all countries without filtering.
         """
+        # Geography reference only accepts: Reference, Search, InGroup
+        # CountryCode is NOT a supported parameter — use postcode-KZ- prefix in search
+        # to scope results to Kazakhstan (e.g. search="postcode-KZ-050000").
         extras: list[tuple[str, str, str]] = [("Search", search, "string")]
-        if country_code:
-            extras.append(("CountryCode", country_code, "string"))
 
         inner = self._auth(creds) + _ref_params("Geography", *extras)
         ret = self._post("GetReferenceData", inner, creds)
@@ -334,16 +337,13 @@ class CSEAPIClient(CarrierAPIClient):
         results = []
         for item in list_items(ret):
             f = fields_of(item)
-            api_country = (f.get("CountryCode") or f.get("Country") or "").upper().strip()
             parent = f.get("ParentName", "")
+            fias = f.get("FIAS", "")
 
-            if country_code:
-                kz_aliases = {"KZ", "КАЗАХСТАН", "KAZAKHSTAN"}
-                if api_country and api_country not in kz_aliases:
-                    continue
-                # FIAS (Федеральная информационная адресная система) is Russia-only.
-                # Kazakhstan cities have no FIAS code — skip cities that do.
-                if not api_country and f.get("FIAS"):
+            if country_code and country_code.upper() == "KZ":
+                # Geography response has no CountryCode/Country fields.
+                # KZ entries never have a FIAS code (FIAS is Russia-only).
+                if fias:
                     continue
 
             results.append({
@@ -351,9 +351,9 @@ class CSEAPIClient(CarrierAPIClient):
                 "name": find_text(item, "Value"),
                 "parent": parent,
                 "type": f.get("Type", ""),
-                "fias": f.get("FIAS", ""),
+                "fias": fias,
                 "iata": f.get("IATA", ""),
-                "country": api_country or country_code or "",
+                "country": country_code or "",
             })
         return results
 
@@ -652,10 +652,14 @@ class CSEAPIClient(CarrierAPIClient):
         Create a waybill via SaveWaybillOffice. Returns the waybill number string.
 
         order_data keys:
-            sender      — dict with full_name, phone, city/geography_guid, address
-            recipient   — same
-            packages    — list of {weight_kg, quantity, description}
-            take_date   — YYYY-MM-DD string (defaults to today)
+            sender          — dict: full_name, phone, geography_guid (or city postcode), address
+            recipient       — dict: full_name, phone, geography_guid (or city postcode), address,
+                              urgency_guid (required by CSE)
+            packages        — list of {weight_kg, quantity, description}
+            take_date       — YYYY-MM-DD (defaults to today)
+            declared_value  — float, объявленная стоимость
+            cargo_type_guid — str, GUID типа груза (defaults to Груз)
+            fragile / call_before_delivery / insurance — bool service flags → description
         """
         sender = order_data.get("sender", {})
         recipient = order_data.get("recipient", {})
@@ -665,7 +669,6 @@ class CSEAPIClient(CarrierAPIClient):
         total_qty = sum(p.get("quantity", 1) for p in packages)
         desc_parts = [p["description"] for p in packages if p.get("description")]
 
-        # Prepend service markers to description for CSE operators
         service_markers: list[str] = []
         if order_data.get("fragile"):
             service_markers.append("ХРУПКИЙ")
@@ -678,62 +681,125 @@ class CSEAPIClient(CarrierAPIClient):
         description = f"{prefix}; {body_desc}" if prefix else body_desc
 
         take_date = order_data.get("take_date", date.today().isoformat())
+        if "T" not in take_date:
+            take_date += "T09:00:00"
 
-        sender_geo = sender.get("geography_guid") or sender.get("city", "")
-        recipient_geo = recipient.get("geography_guid") or recipient.get("city", "")
+        sender_geo = _esc(sender.get("geography_guid") or sender.get("city", ""))
+        recipient_geo = _esc(recipient.get("geography_guid") or recipient.get("city", ""))
+        sender_addr = _esc(sender.get("address") or sender.get("address_line1", ""))
+        recipient_addr = _esc(recipient.get("address") or recipient.get("address_line1", ""))
 
         declared_value = order_data.get("declared_value", 0)
-
-        def _field(key: str, value: str, vtype: str = "string") -> str:
-            return (
-                f"<m:Fields><m:Key>{key}</m:Key>"
-                f"<m:Value>{_esc(value)}</m:Value>"
-                f"<m:ValueType>{vtype}</m:ValueType></m:Fields>"
-            )
-
-        order_xml = (
-            _field("TakeDate", take_date, "dateTime")
-            + _field("Sender", sender.get("full_name", ""))
-            + _field("SenderPhone", sender.get("phone", ""))
-            + _field("SenderGeography", sender_geo)
-            + _field("SenderAddress", sender.get("address", sender.get("address_line1", "")))
-            + _field("Recipient", recipient.get("full_name", ""))
-            + _field("RecipientPhone", recipient.get("phone", ""))
-            + _field("RecipientGeography", recipient_geo)
-            + _field("RecipientAddress", recipient.get("address", recipient.get("address_line1", "")))
-            + _field("Weight", f"{round(float(total_weight), 3)}", "float")
-            + _field("Quantity", str(int(total_qty)), "int")
-            + _field("Description", description)
-            + _field("TypeOfPayer", "Sender")
-            + _field("WayOfPayment", "1")
-            + (
-                _field("DeclaredValue", f"{float(declared_value):.2f}", "float")
-                if declared_value
-                else ""
-            )
-        )
+        cargo_type_guid = order_data.get("cargo_type_guid", "4aab1fc6-fc2b-473a-8728-58bcd4ff79ba")
+        urgency_guid = _esc(recipient.get("urgency_guid", ""))
 
         login = _esc(self._login(creds))
         pwd = _esc(self._password(creds))
-        inner = (
-            f"<m:login>{login}</m:login>"
-            f"<m:password>{pwd}</m:password>"
-            "<m:order>"
-            + order_xml
-            + "</m:order>"
+
+        declared_xml = (
+            f"<m:DeclaredValueRate>{float(declared_value):.2f}</m:DeclaredValueRate>"
+            if declared_value else ""
         )
-        ret = self._post("SaveWaybillOffice", inner, creds)
+        comment_xml = (
+            f"<m:Comment>{_esc(description)}</m:Comment>"
+            if description else ""
+        )
+        urgency_xml = (
+            f"<m:Urgency>{urgency_guid}</m:Urgency>"
+            if urgency_guid else ""
+        )
 
-        result_text = (ret.text or "").strip()
-        if result_text:
-            if "ошибк" in result_text.lower() or "error" in result_text.lower():
-                raise RuntimeError(f"CSE SaveWaybillOffice error: {result_text}")
-            return result_text
+        # SaveWaybillOffice uses typed XML elements (not Element Key/Value/Fields).
+        # TypeOfPayer: 0 = заказчик; WayOfPayment: 1 = безнал.
+        inner = (
+            f"<m:Language/>"
+            f"<m:Login>{login}</m:Login>"
+            f"<m:Password>{pwd}</m:Password>"
+            f"<m:Company/>"
+            f"<m:Number/>"
+            f"<m:ClientNumber/>"
+            f"<m:OrderData>"
+            f"<m:Recipient>"
+            f"<m:Client>{_esc(recipient.get('full_name', ''))}</m:Client>"
+            f"<m:Address>"
+            f"<m:Geography>{recipient_geo}</m:Geography>"
+            f"<m:Info>{recipient_addr}</m:Info>"
+            f"<m:FreeForm>true</m:FreeForm>"
+            f"</m:Address>"
+            f"<m:Phone>{_esc(recipient.get('phone', ''))}</m:Phone>"
+            + urgency_xml +
+            f"<m:Cargo>"
+            f"<m:CargoDescription>{_esc(body_desc)}</m:CargoDescription>"
+            f"<m:CargoPackageQty>{int(total_qty)}</m:CargoPackageQty>"
+            f"<m:Weight>{round(float(total_weight), 3)}</m:Weight>"
+            + declared_xml +
+            f"</m:Cargo>"
+            f"</m:Recipient>"
+            f"<m:Sender>"
+            f"<m:Client>{_esc(sender.get('full_name', ''))}</m:Client>"
+            f"<m:Address>"
+            f"<m:Geography>{sender_geo}</m:Geography>"
+            f"<m:Info>{sender_addr}</m:Info>"
+            f"<m:FreeForm>true</m:FreeForm>"
+            f"</m:Address>"
+            f"<m:Phone>{_esc(sender.get('phone', ''))}</m:Phone>"
+            f"</m:Sender>"
+            f"<m:TakeDate>{_esc(take_date)}</m:TakeDate>"
+            f"<m:TypeOfCargo>{_esc(cargo_type_guid)}</m:TypeOfCargo>"
+            f"<m:TypeOfPayer>0</m:TypeOfPayer>"
+            f"<m:WayOfPayment>1</m:WayOfPayment>"
+            + comment_xml +
+            f"</m:OrderData>"
+            f"<m:Office/>"
+        )
+        resp_xml = httpx.post(
+            self._url(creds),
+            content=build_envelope("SaveWaybillOffice", inner),
+            headers={"Content-Type": "text/xml; charset=utf-8"},
+            timeout=_TIMEOUT,
+        )
+        resp_xml.raise_for_status()
 
-        for item in list_items(ret):
-            num = find_text(item, "Key") or find_text(item, "Value")
-            if num:
-                return num
+        # Response: <m:return><m:Items><m:Value>waybill_number</m:Value><m:Error>false</m:Error>...
+        try:
+            root = ET.fromstring(resp_xml.text)
+        except ET.ParseError as exc:
+            raise RuntimeError(f"CSE SaveWaybillOffice: invalid XML response: {exc}") from exc
+
+        ns = _NM
+        body = root.find(f"{{{_NS_SOAP}}}Body")
+        if body is None:
+            raise RuntimeError("CSE SaveWaybillOffice: no SOAP Body in response")
+
+        fault = body.find(f"{{{_NS_SOAP}}}Fault")
+        if fault is not None:
+            msg = (fault.findtext("faultstring") or "").strip()
+            raise RuntimeError(f"CSE SaveWaybillOffice SOAP Fault: {msg}")
+
+        ret_el = None
+        for resp_el in body:
+            ret_el = resp_el.find(f"{ns}return")
+            if ret_el is not None:
+                break
+
+        if ret_el is None:
+            raise RuntimeError("CSE SaveWaybillOffice: no <return> in response")
+
+        # Check top-level error
+        top_error = ret_el.find(f"{ns}Error")
+        if top_error is not None and (top_error.text or "").strip().lower() == "true":
+            error_info = (ret_el.findtext(f"{ns}ErrorInfo") or "").strip()
+            raise RuntimeError(f"CSE SaveWaybillOffice error: {error_info or 'unknown'}")
+
+        # Extract waybill number from Items/Value
+        for items_el in ret_el.findall(f"{ns}Items"):
+            item_error = items_el.find(f"{ns}Error")
+            if item_error is not None and (item_error.text or "").strip().lower() == "true":
+                error_info = (items_el.findtext(f"{ns}ErrorInfo") or "").strip()
+                raise RuntimeError(f"CSE SaveWaybillOffice item error: {error_info or 'unknown'}")
+            val_el = items_el.find(f"{ns}Value")
+            if val_el is not None and (val_el.text or "").strip():
+                return (val_el.text or "").strip()
 
         raise RuntimeError("CSE: SaveWaybillOffice returned no waybill number")
 
@@ -876,9 +942,12 @@ def _build_calc_inner(
         "<m:Key>Destinations</m:Key>"
         "<m:List>"
         "<m:Key>Destination</m:Key>"
-        f"<m:Fields><m:Key>SenderGeography</m:Key><m:Value>{_esc(from_geo)}</m:Value></m:Fields>"
-        f"<m:Fields><m:Key>RecipientGeography</m:Key><m:Value>{_esc(to_geo)}</m:Value></m:Fields>"
-        f"<m:Fields><m:Key>TypeOfCargo</m:Key><m:Value>{_esc(cargo_type_guid)}</m:Value></m:Fields>"
+        f"<m:Fields><m:Key>SenderGeography</m:Key><m:Value>{_esc(from_geo)}</m:Value>"
+        "<m:ValueType>string</m:ValueType></m:Fields>"
+        f"<m:Fields><m:Key>RecipientGeography</m:Key><m:Value>{_esc(to_geo)}</m:Value>"
+        "<m:ValueType>string</m:ValueType></m:Fields>"
+        f"<m:Fields><m:Key>TypeOfCargo</m:Key><m:Value>{_esc(cargo_type_guid)}</m:Value>"
+        "<m:ValueType>string</m:ValueType></m:Fields>"
         f"<m:Fields><m:Key>Weight</m:Key><m:Value>{weight:.3f}</m:Value>"
         "<m:ValueType>float</m:ValueType></m:Fields>"
         f"<m:Fields><m:Key>Qty</m:Key><m:Value>{qty}</m:Value>"
