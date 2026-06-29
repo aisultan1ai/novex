@@ -987,11 +987,11 @@ export default function HomePage() {
               right: 0,
               top: 0,
               bottom: 0,
-              width: 420,
+              width: isMobile ? "100%" : 420,
               background: "#ffffff",
               boxShadow: "-4px 0 32px rgba(0,0,0,0.12)",
               overflowY: "auto",
-              padding: 32,
+              padding: isMobile ? "24px 20px" : 32,
               zIndex: 200,
               animation: "slideInRight 0.2s ease",
             }}

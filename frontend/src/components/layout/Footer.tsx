@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 
 const FOOTER_COLS = [
   {
@@ -28,26 +31,28 @@ const FOOTER_COLS = [
 ];
 
 export default function Footer() {
+  const isMobile = useIsMobile();
+
   return (
     <footer
       style={{
         background: "#0F172A",
         color: "#94A3B8",
-        padding: "64px 48px 32px",
+        padding: isMobile ? "40px 20px 24px" : "64px 48px 32px",
       }}
     >
       <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-        {/* Top row: 4 columns */}
+        {/* Top row */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1.5fr 1fr 1fr 1fr",
-            gap: 48,
-            marginBottom: 48,
+            gridTemplateColumns: isMobile ? "1fr 1fr" : "1.5fr 1fr 1fr 1fr",
+            gap: isMobile ? 32 : 48,
+            marginBottom: isMobile ? 36 : 48,
           }}
         >
-          {/* Brand */}
-          <div>
+          {/* Brand — spans both columns on mobile */}
+          <div style={isMobile ? { gridColumn: "1 / -1" } : {}}>
             <Link
               href="/"
               style={{
@@ -76,7 +81,7 @@ export default function Footer() {
               style={{
                 font: "400 15px/1.6 Inter Variable, sans-serif",
                 color: "#64748B",
-                margin: "12px 0 24px",
+                margin: "12px 0 0",
                 maxWidth: 260,
               }}
             >
@@ -99,13 +104,22 @@ export default function Footer() {
               >
                 {col.title}
               </div>
-              <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 12 }}>
+              <ul
+                style={{
+                  listStyle: "none",
+                  margin: 0,
+                  padding: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12,
+                }}
+              >
                 {col.links.map((l) => (
                   <li key={l.label}>
                     <Link
                       href={l.href}
                       style={{
-                        font: "400 14px/1 Inter Variable, sans-serif",
+                        font: "400 14px/1.4 Inter Variable, sans-serif",
                         color: "#94A3B8",
                         textDecoration: "none",
                         transition: "color 0.15s",
@@ -127,28 +141,27 @@ export default function Footer() {
         </div>
 
         {/* Divider */}
-        <div
-          style={{
-            height: 1,
-            background: "#1E293B",
-            margin: "0 0 24px",
-          }}
-        />
+        <div style={{ height: 1, background: "#1E293B", margin: "0 0 24px" }} />
 
         {/* Bottom row */}
         <div
           style={{
             display: "flex",
+            flexDirection: isMobile ? "column" : "row",
             justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
+            alignItems: isMobile ? "flex-start" : "center",
             gap: 12,
           }}
         >
-          <span style={{ font: "400 13px/1 Inter Variable, sans-serif", color: "#64748B" }}>
+          <span
+            style={{
+              font: "400 13px/1 Inter Variable, sans-serif",
+              color: "#64748B",
+            }}
+          >
             © {new Date().getFullYear()} Novex. Все права защищены.
           </span>
-          <div style={{ display: "flex", gap: 24 }}>
+          <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
             {[
               { label: "Политика конфиденциальности", href: "/privacy" },
               { label: "Условия использования", href: "/terms" },
@@ -162,12 +175,8 @@ export default function Footer() {
                   textDecoration: "none",
                   transition: "color 0.15s",
                 }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.color = "#94A3B8")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.color = "#64748B")
-                }
+                onMouseEnter={(e) => (e.currentTarget.style.color = "#94A3B8")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "#64748B")}
               >
                 {l.label}
               </Link>
