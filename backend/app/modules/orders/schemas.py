@@ -173,6 +173,8 @@ class OrderDraftResponse(BaseModel):
     recipient: ShipmentPartyResponse | None = None
     packages: list[ShipmentPackageResponse]
 
+    tracking_number: str | None = None
+
 
 class OrderDraftListResponse(BaseModel):
     items: list[OrderDraftResponse]

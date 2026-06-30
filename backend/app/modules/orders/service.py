@@ -10,6 +10,7 @@ from app.core.exceptions import ForbiddenError, NotFoundError, ValidationError
 from app.modules.address_book.repository import AddressBookRepository
 from app.modules.orders.models import OrderDraft, ShipmentPackage, ShipmentParty
 from app.modules.orders.repository import OrdersRepository
+from app.modules.shipments.models import Shipment
 from app.modules.orders.schemas import (
     CreateDraftFromQuoteRequest,
     OrderDraftListResponse,
@@ -200,7 +201,12 @@ class OrdersService:
             )
             raise ForbiddenError("Order draft does not belong to the current user")
 
-        return self._build_order_draft_response(order_draft)
+        from sqlalchemy import select as _select
+        shipment = db.scalar(_select(Shipment).where(Shipment.order_draft_id == draft_id))
+        response = self._build_order_draft_response(order_draft)
+        if shipment:
+            response.tracking_number = shipment.tracking_number
+        return response
 
     def list_order_drafts(
         self,

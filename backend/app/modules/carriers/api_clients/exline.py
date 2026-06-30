@@ -167,41 +167,75 @@ class ExlineAPIClient(CarrierAPIClient):
             waybill_pdf_bytes=None,
         )
 
+    def _is_login_page(self, resp: httpx.Response) -> bool:
+        final_url = str(resp.url)
+        if "login" in final_url or "auth" in final_url:
+            return True
+        snippet = resp.text[:800].lower()
+        return "войти" in snippet or ("login" in snippet and "password" in snippet)
+
+    def _fetch_print_html(self, invoice_id: str, creds: dict) -> tuple[str, str]:
+        """Получить HTML страницы печати накладной. Возвращает (html, print_url)."""
+        print_url = self._get_print_url(invoice_id, creds)
+        base = self._print_base_url(creds)
+
+        with httpx.Client(follow_redirects=True, timeout=_TIMEOUT) as client:
+            resp = client.get(print_url)
+            resp.raise_for_status()
+
+            if not self._is_login_page(resp):
+                return resp.text, print_url
+
+            # URL-параметры не приняты — логинимся через форму с CSRF (cookie-сессия)
+            logger.info("Exline: URL-auth rejected, trying cookie-based session login (orderno=%s)", invoice_id)
+            login_url = f"{base}extraauth/login"
+
+            # GET логин-страницы для получения CSRF-токена
+            login_page = client.get(login_url)
+            csrf = ""
+            import re as _re
+            csrf_match = _re.search(r'name="_csrf"\s+value="([^"]+)"', login_page.text)
+            if csrf_match:
+                csrf = csrf_match.group(1)
+
+            # POST логина с правильными именами полей MeaSoft + CSRF
+            client.post(
+                login_url,
+                data={
+                    "_csrf": csrf,
+                    "ExtraLoginForm[login]": creds.get("login", ""),
+                    "ExtraLoginForm[password]": creds.get("password", ""),
+                },
+            )
+
+            # После логина запрашиваем страницу печати без auth-параметров в URL
+            clean_print_url = f"{base}print/?orderno={urllib.parse.quote(invoice_id)}"
+            resp = client.get(clean_print_url)
+            resp.raise_for_status()
+
+            if self._is_login_page(resp):
+                raise RuntimeError(
+                    f"Exline: не удалось авторизоваться для получения накладной (orderno={invoice_id}). "
+                    "Проверьте учётные данные Exline в настройках."
+                )
+
+            return resp.text, clean_print_url
+
     def get_invoice_pdf(self, invoice_id: str, creds: dict) -> bytes:
         try:
             import weasyprint
         except ImportError as exc:
-            raise RuntimeError(
-                "weasyprint не установлен: pip install weasyprint"
-            ) from exc
+            raise RuntimeError("weasyprint не установлен: pip install weasyprint") from exc
 
-        print_url = self._get_print_url(invoice_id, creds)
-        resp = httpx.get(print_url, timeout=_TIMEOUT, follow_redirects=True)
-        resp.raise_for_status()
-
-        # Exline's /print/ redirects to session login when URL-based auth fails.
-        # Detect this early so we don't save a login-page PDF as the waybill.
-        final_url = str(resp.url)
-        if "login" in final_url or "auth" in final_url:
-            raise RuntimeError(
-                f"Exline print page requires web session auth — "
-                f"got redirected to login page (orderno={invoice_id}). "
-                "URL-based credentials are only accepted by the XML API, not the web UI."
-            )
-
-        html_snippet = resp.text[:500].lower()
-        if "войти" in html_snippet or ("login" in html_snippet and "password" in html_snippet):
-            raise RuntimeError(
-                f"Exline print page returned a login form instead of the waybill (orderno={invoice_id})"
-            )
+        html, print_url = self._fetch_print_html(invoice_id, creds)
 
         pdf_bytes: bytes = weasyprint.HTML(
-            string=resp.text,
+            string=html,
             base_url=print_url,
         ).write_pdf()
 
         logger.info(
-            "Exline: PDF сгенерирован для накладной invoice_id=%s size=%d bytes",
+            "Exline: PDF накладной сгенерирован invoice_id=%s size=%d bytes",
             invoice_id, len(pdf_bytes),
         )
         return pdf_bytes

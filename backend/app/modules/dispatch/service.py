@@ -502,7 +502,7 @@ def _build_dispatch_payload(order: OrderDraft) -> dict:
             }
             for p in order.packages
         ],
-        "declared_value": float(order.price_snapshot or 0),
+        "declared_value": float(order.price_snapshot or 0) if order.insurance else 0,
         "currency": order.currency_snapshot,
         "additional_services": {
             "call_before_delivery": order.call_before_delivery,

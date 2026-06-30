@@ -116,6 +116,8 @@ export type OrderDraftResponse = {
   sender: ShipmentPartyResponse | null;
   recipient: ShipmentPartyResponse | null;
   packages: ShipmentPackageResponse[];
+
+  tracking_number: string | null;
 };
 
 export type OrderDraftListResponse = {

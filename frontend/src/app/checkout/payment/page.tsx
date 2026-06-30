@@ -200,20 +200,32 @@ function PaymentPageContent() {
           </p>
         </div>
 
-        {uploadSuccess ? (
-          <div style={{ background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 16, padding: "28px 28px" }}>
-            <div style={{ font: "700 16px/1.4 Inter Variable, sans-serif", color: "#166534", marginBottom: 10 }}>
-              Чек успешно загружен
+        {/* Success modal overlay */}
+        {uploadSuccess && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
+            <div style={{ background: "#fff", borderRadius: 20, padding: "36px 32px", maxWidth: 420, width: "100%", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }}>
+              <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#F0FDF4", border: "2px solid #BBF7D0", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              </div>
+              <div style={{ font: "700 18px/1.3 Inter Variable, sans-serif", color: "#111827", marginBottom: 12 }}>
+                Чек успешно загружен
+              </div>
+              <p style={{ font: "400 14px/1.6 Inter Variable, sans-serif", color: "#6B7280", margin: "0 0 28px" }}>
+                Оплата отправлена на проверку оператором. Обычно подтверждение занимает до 24 часов в рабочие дни.
+              </p>
+              <button
+                onClick={() => router.push("/dashboard/orders")}
+                style={{ width: "100%", padding: "13px 0", borderRadius: 12, border: "none", background: "#2563EB", color: "#fff", font: "600 15px/1 Inter Variable, sans-serif", cursor: "pointer" }}
+              >
+                OK
+              </button>
             </div>
-            <p style={{ font: "400 14px/1.6 Inter Variable, sans-serif", color: "#166534", margin: 0 }}>
-              Оплата отправлена на проверку оператором. Обычно подтверждение занимает до 24 часов в рабочие дни.
-              {pollTimedOut
-                ? " Автоматическая проверка завершена — обновите страницу или обратитесь в поддержку."
-                : " Статус обновляется автоматически."}
-            </p>
           </div>
-        ) : (
-          <>
+        )}
+
+        <>
             {/* Requisites */}
             <div style={card}>
               <div style={{ font: "700 11px/1 Inter Variable, sans-serif", color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 20 }}>
@@ -287,7 +299,6 @@ function PaymentPageContent() {
               </div>
             )}
           </>
-        )}
       </main>
     </div>
   );
