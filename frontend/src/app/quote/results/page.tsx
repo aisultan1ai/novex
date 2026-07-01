@@ -416,6 +416,11 @@ function QuoteResultsPageInner() {
               })}
             </div>
 
+            {/* Disclaimer */}
+            <p style={{ font: "400 12px/1.5 Inter Variable, sans-serif", color: "#9CA3AF", margin: "4px 0 0" }}>
+              * Расчёт носит предварительный характер и может измениться после контрольного измерения отправления.
+            </p>
+
             {/* Continue button */}
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button

@@ -286,6 +286,23 @@ class ExlineAPIClient(CarrierAPIClient):
             ),
         ]
 
+    def get_city_list(self, creds: dict) -> list[dict]:
+        """Справочник городов Exline (раздел 16 API).
+        Возвращает список словарей с ключами: name, code, region и др.
+        """
+        xml = (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            "<townlist>"
+            f"{self._auth_tag(creds)}"
+            "</townlist>"
+        )
+        root = self._post_xml(xml, self._api_url(creds))
+        cities = []
+        for town in root.findall("town"):
+            cities.append({k: (town.attrib.get(k) or (town.find(k).text if town.find(k) is not None else ""))
+                           for k in ("name", "code", "region", "district", "type")})
+        return cities
+
     def test_connection(self, creds: dict) -> bool:
         today = date.today().isoformat()
         xml = f"""<?xml version="1.0" encoding="UTF-8"?>

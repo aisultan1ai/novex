@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING
 import httpx
 
 from app.modules.carriers.cse_geography import city_to_postcode_geo
-from app.modules.carriers.zone_mapper import get_zone
+from app.modules.carriers.zone_mapper import get_zone, is_known_city
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,8 +38,9 @@ logger = logging.getLogger(__name__)
 
 # Exline service-code → (tariff_code, tariff_name, eta_min, eta_max)
 _EXLINE_SERVICES: dict[str, tuple[str, str, int, int]] = {
-    "1": ("standard", "Стандарт",  3, 10),
-    "2": ("express",  "Экспресс",  1,  3),
+    "2": ("standard", "Стандарт",  3, 10),
+    "3": ("express",  "Экспресс",  1,  3),
+    "5": ("urgent",   "Срочный",   0,  1),
 }
 _EXLINE_TIMEOUT = 8  # секунд; не блокируем пользователя дольше
 
@@ -234,22 +235,27 @@ def calculate_quotes(
 
     results: list[QuoteResult] = []
 
-    if db is not None:
-        db_results = _calculate_from_db(db, from_city, to_city, fallback_zone, kg)
-        if db_results:
-            logger.debug(
-                "tariff_engine: DB rates used (%d quotes, kg=%.2f)",
-                len(db_results),
-                kg,
-            )
-            results = db_results
+    # Azimuth рассчитывает только для городов из своего справочника.
+    # Для неизвестных городов пропускаем — иначе вернётся некорректная Zone 3 цена.
+    azimuth_applicable = is_known_city(from_city) and is_known_city(to_city)
+
+    if azimuth_applicable:
+        if db is not None:
+            db_results = _calculate_from_db(db, from_city, to_city, fallback_zone, kg)
+            if db_results:
+                logger.debug(
+                    "tariff_engine: DB rates used (%d quotes, kg=%.2f)",
+                    len(db_results),
+                    kg,
+                )
+                results = db_results
+            else:
+                logger.debug(
+                    "tariff_engine: DB has no rates, falling back to hardcoded Azimuth table"
+                )
+                results = _calculate_hardcoded(fallback_zone, kg)
         else:
-            logger.debug(
-                "tariff_engine: DB has no rates, falling back to hardcoded Azimuth table"
-            )
             results = _calculate_hardcoded(fallback_zone, kg)
-    else:
-        results = _calculate_hardcoded(fallback_zone, kg)
 
     if include_live:
         # Добавляем live-котировки Exline только если DB не вернула Exline-ставки
@@ -293,7 +299,13 @@ async def calculate_quotes_async(
         kg = chargeable_weight(weight_kg, quantity, width_cm, height_cm, depth_cm)
 
     db_results = await _calculate_from_db_async(db, from_city, to_city, fallback_zone, kg)
-    results: list[QuoteResult] = db_results if db_results else _calculate_hardcoded(fallback_zone, kg)
+    azimuth_applicable = is_known_city(from_city) and is_known_city(to_city)
+    if db_results:
+        results: list[QuoteResult] = db_results
+    elif azimuth_applicable:
+        results = _calculate_hardcoded(fallback_zone, kg)
+    else:
+        results = []
 
     # Run Exline and CSE live calls concurrently
     live_tasks = []

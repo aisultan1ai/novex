@@ -787,6 +787,11 @@ export default function HomePage() {
                 })}
               </div>
             )}
+            {hasResults && (
+              <p style={{ font: "400 12px/1.5 Inter Variable, sans-serif", color: "#9CA3AF", margin: "8px 0 0", padding: "0 4px" }}>
+                * Расчёт носит предварительный характер и может измениться после контрольного измерения отправления.
+              </p>
+            )}
           </section>
         )}
 
