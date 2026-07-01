@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import math
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -73,6 +74,12 @@ class CommissionsService:
         )
         return CommissionResponse.model_validate(c)
 
+    def void_for_order(self, db: Session, order_draft_id: int) -> bool:
+        deleted = self.repo.delete_for_order(db, order_draft_id)
+        if deleted:
+            logger.info("Commission voided on refund: order_id=%s", order_draft_id)
+        return deleted
+
     def _calculate(
         self,
         *,
@@ -94,9 +101,19 @@ class CommissionsService:
         *,
         page: int = 1,
         size: int = 50,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
+        carrier_code: str | None = None,
     ) -> dict:
         offset = (page - 1) * size
-        items, total = self.repo.list_all(db, offset=offset, limit=size)
+        items, total = self.repo.list_all(
+            db,
+            offset=offset,
+            limit=size,
+            date_from=date_from,
+            date_to=date_to,
+            carrier_code=carrier_code,
+        )
         pages = math.ceil(total / size) if total > 0 else 1
         return {
             "items": [CommissionResponse.model_validate(c) for c in items],
@@ -106,8 +123,15 @@ class CommissionsService:
             "pages": pages,
         }
 
-    def get_summary(self, db: Session) -> CommissionSummary:
-        data = self.repo.summary(db)
+    def get_summary(
+        self,
+        db: Session,
+        *,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
+        carrier_code: str | None = None,
+    ) -> CommissionSummary:
+        data = self.repo.summary(db, date_from=date_from, date_to=date_to, carrier_code=carrier_code)
         return CommissionSummary(
             total_gross=Decimal(str(data["total_gross"])),
             total_commission=Decimal(str(data["total_commission"])),

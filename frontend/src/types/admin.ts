@@ -36,12 +36,14 @@ export interface AdminOrderRow {
   price: number;
   currency: string;
   created_at: string;
+  tracking_number: string | null;
 }
 
 export interface AdminOrderDetail extends AdminOrderRow {
   eta_days_min: number;
   eta_days_max: number;
   shipment_type: string;
+  carrier_tracking_number: string | null;
   updated_at: string;
   parties: { role: string; full_name: string; phone: string; city: string; address_line1: string }[];
   packages: { quantity: number; weight_kg: number; description: string }[];

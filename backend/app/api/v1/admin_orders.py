@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.common.status_machine import can_transition
 from app.core.db import get_db
-from app.core.dependencies import require_admin
+from app.core.dependencies import require_admin, require_admin_or_operator
 from app.core.limiter import limiter
 from app.modules.audit.service import AuditService
 from app.modules.dispatch.models import OrderStatusHistory
@@ -47,8 +47,10 @@ VALID_STATUSES = {
     "sent_to_carrier",
     "picked_up",
     "in_transit",
+    "out_for_delivery",
     "arrived",
     "delivered",
+    "delivery_failed",
     "return_requested",
     "return_in_progress",
     "returned",
@@ -67,7 +69,7 @@ class MarkDispatchedPayload(BaseModel):
 @router.get("/dispatch-queue")
 def get_dispatch_queue(
     db: Session = Depends(get_db),
-    _=Depends(require_admin),
+    _=Depends(require_admin_or_operator),
 ) -> dict:
     stmt = (
         select(OrderDraft)
@@ -99,7 +101,7 @@ def list_all_orders(
     status: str | None = Query(default=None),
     user_id: int | None = Query(default=None),
     db: Session = Depends(get_db),
-    _=Depends(require_admin),
+    _=Depends(require_admin_or_operator),
 ) -> dict:
     stmt = select(OrderDraft).order_by(OrderDraft.created_at.desc())
     if status:
@@ -115,6 +117,13 @@ def list_all_orders(
     if user_ids:
         users = db.scalars(select(User).where(User.id.in_(user_ids))).all()
         users_map = {u.id: u for u in users}
+
+    from app.modules.shipments.models import Shipment as _Shipment
+    order_ids = [o.id for o in orders]
+    shipments_map: dict[int, str] = {}
+    if order_ids:
+        shps = db.scalars(select(_Shipment).where(_Shipment.order_draft_id.in_(order_ids))).all()
+        shipments_map = {s.order_draft_id: s.tracking_number for s in shps}
 
     items = [
         {
@@ -134,6 +143,7 @@ def list_all_orders(
             "price": float(o.price_snapshot),
             "currency": o.currency_snapshot,
             "created_at": o.created_at.isoformat(),
+            "tracking_number": shipments_map.get(o.id),
         }
         for o in orders
     ]
@@ -147,7 +157,7 @@ def list_all_orders(
 def get_order(
     order_id: int,
     db: Session = Depends(get_db),
-    _=Depends(require_admin),
+    _=Depends(require_admin_or_operator),
 ) -> dict:
     order = db.scalar(
         select(OrderDraft)
@@ -161,6 +171,8 @@ def get_order(
         raise HTTPException(404, "Заказ не найден")
 
     user = db.get(User, order.user_id)
+    from app.modules.shipments.models import Shipment as _Shipment
+    shipment = db.scalar(select(_Shipment).where(_Shipment.order_draft_id == order_id))
 
     return {
         "id": order.id,
@@ -177,6 +189,8 @@ def get_order(
         "eta_days_min": order.eta_days_min_snapshot,
         "eta_days_max": order.eta_days_max_snapshot,
         "shipment_type": order.shipment_type_snapshot,
+        "tracking_number": shipment.tracking_number if shipment else None,
+        "carrier_tracking_number": shipment.carrier_tracking_number if shipment else None,
         "created_at": order.created_at.isoformat(),
         "updated_at": order.updated_at.isoformat(),
         "parties": [
@@ -207,7 +221,7 @@ def update_order_status(
     order_id: int,
     payload: OrderStatusUpdate,
     db: Session = Depends(get_db),
-    admin: User = Depends(require_admin),
+    admin: User = Depends(require_admin_or_operator),
 ) -> dict:
     if payload.status not in VALID_STATUSES:
         raise HTTPException(
@@ -261,7 +275,7 @@ def update_order_status(
 def retry_dispatch(
     draft_id: int,
     db: Session = Depends(get_db),
-    admin: User = Depends(require_admin),
+    admin: User = Depends(require_admin_or_operator),
 ) -> dict:
     order = db.get(OrderDraft, draft_id)
     if not order:
@@ -293,7 +307,7 @@ def mark_dispatched(
     draft_id: int,
     payload: MarkDispatchedPayload,
     db: Session = Depends(get_db),
-    admin: User = Depends(require_admin),
+    admin: User = Depends(require_admin_or_operator),
 ) -> dict:
     order = db.get(OrderDraft, draft_id)
     if not order:

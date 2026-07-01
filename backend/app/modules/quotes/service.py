@@ -87,6 +87,7 @@ class QuotesService:
                 eta_days_min=q.eta_days_min,
                 eta_days_max=q.eta_days_max,
                 badge=badge,
+                urgency_guid=q.urgency_guid,
             )
             rate_rows.append(rq)
 

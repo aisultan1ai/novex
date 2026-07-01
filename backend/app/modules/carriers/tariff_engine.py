@@ -204,6 +204,7 @@ class QuoteResult:
     eta_days_max: int
     zone: int
     chargeable_kg: float
+    urgency_guid: str | None = None
     available_services: list[dict] = field(default_factory=list)
 
 
@@ -864,6 +865,7 @@ async def _call_cse_calc_async(
             eta_days_max=t["max_days"],
             zone=zone,
             chargeable_kg=kg,
+            urgency_guid=t.get("urgency_guid") or None,
         ))
 
     logger.debug("CSE async: %d quotes for %s→%s kg=%.2f", len(results), from_geo, to_geo, kg)

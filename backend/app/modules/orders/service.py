@@ -203,10 +203,9 @@ class OrdersService:
 
         from sqlalchemy import select as _select
         shipment = db.scalar(_select(Shipment).where(Shipment.order_draft_id == draft_id))
-        response = self._build_order_draft_response(order_draft)
-        if shipment:
-            response.tracking_number = shipment.tracking_number
-        return response
+        return self._build_order_draft_response(
+            order_draft, tracking_number=shipment.tracking_number if shipment else None
+        )
 
     def list_order_drafts(
         self,
@@ -230,8 +229,18 @@ class OrdersService:
             page_params.size,
             total,
         )
+        from sqlalchemy import select as _select
+        draft_ids = [d.id for d in items]
+        shipments = (
+            db.scalars(_select(Shipment).where(Shipment.order_draft_id.in_(draft_ids))).all()
+            if draft_ids else []
+        )
+        tracking_map = {s.order_draft_id: s.tracking_number for s in shipments}
         return OrderDraftListResponse(
-            items=[self._build_order_draft_response(d) for d in items],
+            items=[
+                self._build_order_draft_response(d, tracking_number=tracking_map.get(d.id))
+                for d in items
+            ],
             total=total,
             page=page_params.page,
             size=page_params.size,
@@ -514,7 +523,7 @@ class OrdersService:
         )
 
     def _build_order_draft_response(
-        self, order_draft: OrderDraft
+        self, order_draft: OrderDraft, tracking_number: str | None = None
     ) -> OrderDraftResponse:
         sender = self._find_party(order_draft.parties, "sender")
         recipient = self._find_party(order_draft.parties, "recipient")
@@ -544,6 +553,7 @@ class OrdersService:
             sender=self._map_party(sender) if sender else None,
             recipient=self._map_party(recipient) if recipient else None,
             packages=[self._map_package(item) for item in order_draft.packages],
+            tracking_number=tracking_number,
         )
 
     def _find_party(

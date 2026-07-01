@@ -347,6 +347,9 @@ export default function AdminOrdersPage() {
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{order.from_city} → {order.to_city}</div>
                     <div style={{ fontSize: 11, color: "#94a3b8" }}>{new Date(order.created_at).toLocaleDateString("ru-RU")}</div>
+                    {order.tracking_number && (
+                      <div style={{ fontSize: 11, color: "#1d4ed8", fontFamily: "monospace", marginTop: 2 }}>{order.tracking_number}</div>
+                    )}
                   </div>
 
                   <div style={{ fontSize: 13, color: "#475569" }}>{order.carrier_name}</div>

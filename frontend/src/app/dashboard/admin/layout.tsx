@@ -8,17 +8,17 @@ import { useEffect } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 
-const ADMIN_TABS = [
-  { label: "Обзор",         href: "/dashboard/admin" },
-  { label: "Заказы",        href: "/dashboard/admin/orders" },
-  { label: "Пользователи",  href: "/dashboard/admin/users" },
-  { label: "Перевозчики",       href: "/dashboard/admin/carriers" },
-  { label: "Отзывы",            href: "/dashboard/admin/reviews" },
-  { label: "Комиссии",          href: "/dashboard/admin/commissions" },
-  { label: "Очередь заказов",   href: "/dashboard/admin/dispatch-queue" },
-  { label: "API",               href: "/dashboard/admin/api" },
-  { label: "Настройки",         href: "/dashboard/admin/settings" },
-  { label: "Аудит",             href: "/dashboard/admin/audit-logs" },
+const ALL_ADMIN_TABS = [
+  { label: "Обзор",           href: "/dashboard/admin",                adminOnly: true  },
+  { label: "Заказы",          href: "/dashboard/admin/orders",         adminOnly: false },
+  { label: "Пользователи",    href: "/dashboard/admin/users",          adminOnly: false },
+  { label: "Перевозчики",     href: "/dashboard/admin/carriers",       adminOnly: false },
+  { label: "Отзывы",          href: "/dashboard/admin/reviews",        adminOnly: true  },
+  { label: "Комиссии",        href: "/dashboard/admin/commissions",    adminOnly: false },
+  { label: "Очередь заказов", href: "/dashboard/admin/dispatch-queue", adminOnly: false },
+  { label: "Настройки",       href: "/dashboard/admin/settings",       adminOnly: false },
+  { label: "API",             href: "/dashboard/admin/api",            adminOnly: true  },
+  { label: "Аудит",           href: "/dashboard/admin/audit-logs",     adminOnly: true  },
 ];
 
 export default function AdminSubLayout({ children }: { children: ReactNode }) {
@@ -27,13 +27,18 @@ export default function AdminSubLayout({ children }: { children: ReactNode }) {
   const { currentUser, isLoading } = useAuth();
   const isMobile = useIsMobile();
 
+  const isAdmin    = currentUser?.role === "admin";
+  const isOperator = currentUser?.role === "operator";
+
   useEffect(() => {
-    if (!isLoading && currentUser?.role !== "admin") {
+    if (!isLoading && !isAdmin && !isOperator) {
       router.replace("/dashboard/orders");
     }
-  }, [isLoading, currentUser, router]);
+  }, [isLoading, isAdmin, isOperator, router]);
 
-  if (isLoading || currentUser?.role !== "admin") return null;
+  if (isLoading || (!isAdmin && !isOperator)) return null;
+
+  const tabs = isAdmin ? ALL_ADMIN_TABS : ALL_ADMIN_TABS.filter((t) => !t.adminOnly);
 
   if (isMobile) {
     return (
@@ -64,14 +69,18 @@ export default function AdminSubLayout({ children }: { children: ReactNode }) {
             </svg>
           </div>
           <div>
-            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0f172a" }}>Администрирование</h1>
-            <p style={{ margin: 0, fontSize: 13, color: "#64748b" }}>Управление платформой Novex</p>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0f172a" }}>
+              {isAdmin ? "Администрирование" : "Панель оператора"}
+            </h1>
+            <p style={{ margin: 0, fontSize: 13, color: "#64748b" }}>
+              {isAdmin ? "Управление платформой Novex" : "Управление заказами и диспетчеризацией"}
+            </p>
           </div>
         </div>
 
         {/* Sub-nav pills */}
-        <div style={{ display: "flex", gap: 6, background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 4, width: "fit-content" }}>
-          {ADMIN_TABS.map(({ label, href }) => {
+        <div style={{ display: "flex", gap: 6, background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 4, width: "fit-content", flexWrap: "wrap" }}>
+          {tabs.map(({ label, href }) => {
             const active = href === "/dashboard/admin"
               ? pathname === "/dashboard/admin"
               : pathname.startsWith(href);

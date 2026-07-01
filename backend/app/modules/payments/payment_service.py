@@ -16,6 +16,7 @@ from app.modules.dispatch.models import OrderStatusHistory
 from app.modules.dispatch.service import create_dispatch_job
 from app.modules.notifications.service import NotificationsService
 from app.modules.orders.models import OrderDraft
+from app.modules.shipments.service import ShipmentsService
 from app.modules.payments.providers.manual_bank_transfer import (
     ManualBankTransferProvider,
 )
@@ -32,6 +33,7 @@ from app.modules.platform_settings.repository import PlatformSettingsRepository
 
 logger = logging.getLogger(__name__)
 _notifications_svc = NotificationsService()
+_shipments_svc = ShipmentsService()
 
 
 def _utcnow() -> datetime:
@@ -280,6 +282,12 @@ class PaymentService:
                 gross_amount=tx.amount,
                 currency=tx.currency,
             )
+            # Create internal shipment record immediately so customer sees tracking number
+            _shipments_svc.create_for_order(
+                db,
+                order_draft_id=order.id,
+                carrier_code=order.carrier_code_snapshot,
+            )
             dispatch_job = create_dispatch_job(db, order=order, changed_by_user_id=admin_id)
             _notifications_svc.notify_order_status(
                 db, user_id=order.user_id, order_id=order.id, status="paid"
@@ -428,6 +436,11 @@ class PaymentService:
                 gross_amount=tx.amount,
                 currency=tx.currency,
             )
+            _shipments_svc.create_for_order(
+                db,
+                order_draft_id=order.id,
+                carrier_code=order.carrier_code_snapshot,
+            )
             dispatch_job = create_dispatch_job(db, order=order)
             _notifications_svc.notify_order_status(
                 db, user_id=order.user_id, order_id=order.id, status="paid"
@@ -484,6 +497,8 @@ class PaymentService:
 
         order = db.get(OrderDraft, tx.order_id)
         if order:
+            _commissions_svc.void_for_order(db, order.id)
+
             old_order_status = order.status
             if not can_transition(old_order_status, "cancelled"):
                 logger.warning(

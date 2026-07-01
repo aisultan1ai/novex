@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import func, select
@@ -33,34 +34,58 @@ class CommissionsRepository:
         db.flush()
         return c
 
+    def delete_for_order(self, db: Session, order_draft_id: int) -> bool:
+        c = db.scalar(select(Commission).where(Commission.order_draft_id == order_draft_id))
+        if c is None:
+            return False
+        db.delete(c)
+        db.flush()
+        return True
+
     def list_all(
         self,
         db: Session,
         *,
         offset: int = 0,
         limit: int = 50,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
+        carrier_code: str | None = None,
     ) -> tuple[Sequence[Commission], int]:
-        total = db.scalar(select(func.count(Commission.id))) or 0
+        stmt = select(Commission)
+        if date_from:
+            stmt = stmt.where(Commission.created_at >= date_from)
+        if date_to:
+            stmt = stmt.where(Commission.created_at <= date_to)
+        if carrier_code:
+            stmt = stmt.where(Commission.carrier_code == carrier_code)
+
+        total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
         items = db.scalars(
-            select(Commission)
-            .order_by(Commission.created_at.desc())
-            .offset(offset)
-            .limit(limit)
+            stmt.order_by(Commission.created_at.desc()).offset(offset).limit(limit)
         ).all()
         return items, total
 
-    def summary(self, db: Session) -> dict:
-        row = db.execute(
-            select(
-                func.coalesce(func.sum(Commission.gross_amount), 0).label(
-                    "total_gross"
-                ),
-                func.coalesce(func.sum(Commission.commission_amount), 0).label(
-                    "total_commission"
-                ),
-                func.count(Commission.id).label("count"),
-            )
-        ).one()
+    def summary(
+        self,
+        db: Session,
+        *,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
+        carrier_code: str | None = None,
+    ) -> dict:
+        stmt = select(
+            func.coalesce(func.sum(Commission.gross_amount), 0).label("total_gross"),
+            func.coalesce(func.sum(Commission.commission_amount), 0).label("total_commission"),
+            func.count(Commission.id).label("count"),
+        )
+        if date_from:
+            stmt = stmt.where(Commission.created_at >= date_from)
+        if date_to:
+            stmt = stmt.where(Commission.created_at <= date_to)
+        if carrier_code:
+            stmt = stmt.where(Commission.carrier_code == carrier_code)
+        row = db.execute(stmt).one()
         return {
             "total_gross": row.total_gross,
             "total_commission": row.total_commission,

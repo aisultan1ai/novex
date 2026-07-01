@@ -23,8 +23,11 @@ const STATUS_LABELS: Record<string, string> = {
   pending_manual_dispatch:    "Ожидает ручной отправки",
   sent_to_carrier:            "Передан курьеру",
   picked_up:                  "Забран",
+  out_for_delivery:           "Выезд на доставку",
   in_transit:                 "В пути",
   arrived:                    "Прибыл",
+  delivery_failed:            "Попытка не удалась",
+  customs_hold:               "Таможня",
   delivered:                  "Доставлен",
   return_requested:           "Запрос возврата",
   return_in_progress:         "Возврат в пути",
@@ -47,8 +50,11 @@ const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
   pending_manual_dispatch:    { bg: "#fef3c7", color: "#92400e" },
   sent_to_carrier:            { bg: "#dbeafe", color: "#1e40af" },
   picked_up:                  { bg: "#dbeafe", color: "#1e40af" },
+  out_for_delivery:           { bg: "#dbeafe", color: "#1e40af" },
   in_transit:                 { bg: "#ede9fe", color: "#5b21b6" },
   arrived:                    { bg: "#ede9fe", color: "#5b21b6" },
+  delivery_failed:            { bg: "#fef3c7", color: "#92400e" },
+  customs_hold:               { bg: "#fef3c7", color: "#92400e" },
   delivered:                  { bg: "#dcfce7", color: "#166534" },
   return_requested:           { bg: "#fee2e2", color: "#991b1b" },
   return_in_progress:         { bg: "#fee2e2", color: "#991b1b" },
@@ -59,7 +65,7 @@ const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
 
 const CHECKOUT_STATUSES = new Set(["shipment_details_completed", "ready_for_checkout"]);
 const PAYMENT_PENDING_STATUSES = new Set(["awaiting_payment", "payment_rejected"]);
-const TRACKABLE_STATUSES = new Set(["paid", "sent_to_carrier", "picked_up", "in_transit", "arrived", "delivered"]);
+const TRACKABLE_STATUSES = new Set(["paid", "sent_to_carrier", "picked_up", "out_for_delivery", "in_transit", "arrived", "delivery_failed", "customs_hold", "delivered"]);
 // Label can be downloaded from the point the shipment is registered with the carrier,
 // even before tracking events exist (covers manual/queued dispatch states).
 const LABEL_STATUSES = new Set([

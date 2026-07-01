@@ -50,14 +50,15 @@ function validateQuoteForm(form: FormState): string | null {
   if (qty > 999) return "Количество не может превышать 999.";
 
   if (form.shipmentType !== "document") {
-    const width = Number(form.widthCm);
-    const height = Number(form.heightCm);
-    const depth = Number(form.depthCm);
-    if (!form.widthCm.trim() || isNaN(width) || width <= 0)
+    // Dimensions are optional for parcels — used for volumetric weight if provided
+    const width = form.widthCm.trim() ? Number(form.widthCm) : 0;
+    const height = form.heightCm.trim() ? Number(form.heightCm) : 0;
+    const depth = form.depthCm.trim() ? Number(form.depthCm) : 0;
+    if (form.widthCm.trim() && (isNaN(width) || width <= 0))
       return "Введите корректную ширину (> 0).";
-    if (!form.heightCm.trim() || isNaN(height) || height <= 0)
+    if (form.heightCm.trim() && (isNaN(height) || height <= 0))
       return "Введите корректную высоту (> 0).";
-    if (!form.depthCm.trim() || isNaN(depth) || depth <= 0)
+    if (form.depthCm.trim() && (isNaN(depth) || depth <= 0))
       return "Введите корректную глубину (> 0).";
     if (width > 500 || height > 500 || depth > 500)
       return "Размеры не могут превышать 500 см.";
@@ -132,11 +133,13 @@ function InputField({
   value,
   onChange,
   placeholder,
+  required = true,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
+  required?: boolean;
 }) {
   const [focused, setFocused] = useState(false);
   return (
@@ -149,7 +152,7 @@ function InputField({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         inputMode="decimal"
-        required
+        required={required}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         style={{
@@ -168,6 +171,21 @@ function InputField({
       />
     </div>
   );
+}
+
+/* ─── Carrier logos ──────────────────────────────────────────────────────── */
+
+const CARRIER_LOGOS: Record<string, string> = {
+  azimuth: "/carriers/azimuth.png",
+  az:      "/carriers/azimuth.png",
+  exline:  "/carriers/exline.svg",
+  ex:      "/carriers/exline.svg",
+  cse:     "/carriers/cse.png",
+  kse:     "/carriers/cse.png",
+};
+
+function getCarrierLogo(carrierCode: string): string | null {
+  return CARRIER_LOGOS[carrierCode.toLowerCase()] ?? null;
 }
 
 /* ─── Static sections ────────────────────────────────────────────────────── */
@@ -283,9 +301,9 @@ export default function HomePage() {
         shipment_type: form.shipmentType,
         weight_kg: Number(form.weightKg),
         quantity: Number(form.quantity),
-        width_cm: isDoc ? 0 : Number(form.widthCm),
-        height_cm: isDoc ? 0 : Number(form.heightCm),
-        depth_cm: isDoc ? 0 : Number(form.depthCm),
+        width_cm: isDoc ? 0 : (Number(form.widthCm) || 0),
+        height_cm: isDoc ? 0 : (Number(form.heightCm) || 0),
+        depth_cm: isDoc ? 0 : (Number(form.depthCm) || 0),
       });
       setResults(res);
     } catch (err) {
@@ -341,11 +359,16 @@ export default function HomePage() {
         {/* ── HERO ──────────────────────────────────────────────────────── */}
         <section
           style={{
-            background: "#FAFAFA",
-            padding: isMobile ? "48px 20px 56px" : "72px 48px 80px",
+            background: "linear-gradient(160deg, #EFF6FF 0%, #F8FAFF 45%, #F0FDF4 100%)",
+            padding: isMobile ? "56px 20px 64px" : "88px 48px 96px",
             textAlign: "center",
+            position: "relative",
+            overflow: "hidden",
           }}
         >
+          {/* Decorative background blobs */}
+          <div style={{ position: "absolute", top: -60, left: -80, width: 320, height: 320, borderRadius: "50%", background: "rgba(37,99,235,0.06)", pointerEvents: "none" }} />
+          <div style={{ position: "absolute", bottom: -80, right: -60, width: 280, height: 280, borderRadius: "50%", background: "rgba(16,185,129,0.05)", pointerEvents: "none" }} />
           <div
             style={{
               font: "500 13px/1 Inter Variable, sans-serif",
@@ -384,12 +407,14 @@ export default function HomePage() {
             style={{
               background: "#ffffff",
               border: "1px solid #E5E7EB",
-              borderRadius: 20,
-              boxShadow: "0 10px 40px rgba(17,24,39,0.08)",
-              padding: isMobile ? "20px 16px" : "28px 28px",
-              maxWidth: 860,
+              borderRadius: 24,
+              boxShadow: "0 20px 60px rgba(37,99,235,0.10), 0 4px 16px rgba(0,0,0,0.06)",
+              padding: isMobile ? "24px 20px" : "36px 36px",
+              maxWidth: 940,
               margin: "0 auto",
               textAlign: "left",
+              position: "relative",
+              zIndex: 1,
             }}
           >
             <form onSubmit={handleSubmit}>
@@ -477,9 +502,9 @@ export default function HomePage() {
                 <InputField label="Кол-во" value={form.quantity} onChange={(v) => setField("quantity", v)} placeholder="1" />
                 {form.shipmentType !== "document" && (
                   <>
-                    <InputField label="Ширина, см" value={form.widthCm} onChange={(v) => setField("widthCm", v)} placeholder="20" />
-                    <InputField label="Высота, см" value={form.heightCm} onChange={(v) => setField("heightCm", v)} placeholder="15" />
-                    <InputField label="Глубина, см" value={form.depthCm} onChange={(v) => setField("depthCm", v)} placeholder="10" />
+                    <InputField label="Ширина, см (необяз.)" value={form.widthCm} onChange={(v) => setField("widthCm", v)} placeholder="20" required={false} />
+                    <InputField label="Высота, см (необяз.)" value={form.heightCm} onChange={(v) => setField("heightCm", v)} placeholder="15" required={false} />
+                    <InputField label="Глубина, см (необяз.)" value={form.depthCm} onChange={(v) => setField("depthCm", v)} placeholder="10" required={false} />
                   </>
                 )}
 
@@ -527,26 +552,28 @@ export default function HomePage() {
             </form>
           </div>
 
-          {/* Social proof */}
-          {!hasResults && (
-            <div
-              style={{
-                display: "flex",
-                gap: 32,
-                justifyContent: "center",
-                flexWrap: "wrap",
-                marginTop: 28,
-                font: "500 14px/1 Inter Variable, sans-serif",
-                color: "#6B7280",
-              }}
-            >
-              <span><b style={{ color: "#111827" }}>10+</b> служб доставки</span>
-              <span style={{ color: "#E5E7EB" }}>|</span>
-              <span><b style={{ color: "#111827" }}>50 000+</b> отправлений</span>
-              <span style={{ color: "#E5E7EB" }}>|</span>
-              <span><b style={{ color: "#111827" }}>5.0 {"★"}</b> средний рейтинг</span>
-            </div>
-          )}
+          {/* Social proof — always visible */}
+          <div
+            style={{
+              display: "flex",
+              gap: 32,
+              justifyContent: "center",
+              flexWrap: "wrap",
+              marginTop: 24,
+              font: "500 13px/1 Inter Variable, sans-serif",
+              color: "#6B7280",
+              position: "relative",
+              zIndex: 1,
+            }}
+          >
+            <span><b style={{ color: "#111827" }}>10+</b> служб доставки</span>
+            <span style={{ color: "#D1D5DB" }}>|</span>
+            <span><b style={{ color: "#111827" }}>50 000+</b> отправлений</span>
+            <span style={{ color: "#D1D5DB" }}>|</span>
+            <span><b style={{ color: "#10B981" }}>5.0 ★</b> средний рейтинг</span>
+          </div>
+
+          {/* Mini how-it-works — shown only before results */}
         </section>
 
         {/* ── RESULTS (inline, appears below form) ──────────────────────── */}
@@ -668,9 +695,15 @@ export default function HomePage() {
                               font: "700 20px/1 Inter Variable, sans-serif",
                               color: "#2563EB",
                               flexShrink: 0,
+                              overflow: "hidden",
                             }}
                           >
-                            {rate.carrier_name[0]}
+                            {getCarrierLogo(rate.carrier_code) ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={getCarrierLogo(rate.carrier_code)!} alt={rate.carrier_name} style={{ width: 40, height: 40, objectFit: "contain" }} />
+                            ) : (
+                              rate.carrier_name[0]
+                            )}
                           </div>
                           <div>
                             <span style={{ font: "600 16px/1 Inter Variable, sans-serif", color: "#111827", marginRight: 8 }}>
@@ -815,19 +848,15 @@ export default function HomePage() {
               <p style={{ font: "400 15px/1 Inter Variable, sans-serif", color: "#6B7280", margin: "0 0 28px" }}>
                 Сравниваем цены ведущих служб в реальном времени
               </p>
-              <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
-                {[
-                  { code: "AZ", label: "Azimuth" },
-                  { code: "EX", label: "Exline" },
-                  { code: "CSE", label: "CSE" },
-                ].map(({ code, label }) => (
+              <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", alignItems: "center" }}>
+                {["Azimuth", "Exline", "CSE"].map((label) => (
                   <div
-                    key={code}
+                    key={label}
                     style={{
                       background: "#ffffff",
                       border: "1px solid #E5E7EB",
                       borderRadius: 10,
-                      padding: "14px 28px",
+                      padding: "12px 28px",
                       font: "700 16px/1 Inter Variable, sans-serif",
                       color: "#374151",
                       letterSpacing: "0.01em",
@@ -840,7 +869,7 @@ export default function HomePage() {
             </section>
 
             {/* Why Novex */}
-            <section style={{ background: "#FAFAFA", padding: isMobile ? "56px 20px" : "80px 48px" }}>
+            <section style={{ background: "#FAFAFA", borderTop: "1px solid #E5E7EB", padding: isMobile ? "56px 20px" : "80px 48px" }}>
               <div style={{ maxWidth: 1200, margin: "0 auto" }}>
                 <h2
                   style={{
@@ -1031,9 +1060,15 @@ export default function HomePage() {
                   justifyContent: "center",
                   font: "700 24px/1 Inter Variable, sans-serif",
                   color: "#2563EB",
+                  overflow: "hidden",
                 }}
               >
-                {selectedRate.carrier_name[0]}
+                {getCarrierLogo(selectedRate.carrier_code) ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={getCarrierLogo(selectedRate.carrier_code)!} alt={selectedRate.carrier_name} style={{ width: 48, height: 48, objectFit: "contain" }} />
+                ) : (
+                  selectedRate.carrier_name[0]
+                )}
               </div>
               <div>
                 <div style={{ font: "700 18px/1 Inter Variable, sans-serif", color: "#111827" }}>

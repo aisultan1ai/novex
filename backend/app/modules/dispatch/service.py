@@ -301,12 +301,18 @@ class DispatchWorker:
 
         if creds and creds.is_active:
             logger.info("dispatch_worker: calling carrier-gateway for carrier=%s order=%s", carrier_code, order.id)
-            order_data = _build_api_order_data(order)
             api_creds = {
                 "api_url": creds.api_url,
                 "api_token": creds.api_token,
                 **(creds.extra_config or {}),
             }
+            urgency_guid: str | None = None
+            if order.selected_rate_quote_id:
+                from app.modules.quotes.models import RateQuote as _RateQuote
+                rq = db.get(_RateQuote, order.selected_rate_quote_id)
+                if rq:
+                    urgency_guid = rq.urgency_guid
+            order_data = _build_api_order_data(order, creds=api_creds, urgency_guid=urgency_guid)
             t0 = time.monotonic()
             try:
                 result = get_gateway_client().create_invoice(carrier_code, order_data, api_creds)
@@ -400,25 +406,43 @@ class DispatchWorker:
             raise
 
 
-def _build_api_order_data(order: OrderDraft) -> dict:
+def _build_api_order_data(order: OrderDraft, creds: dict | None = None, urgency_guid: str | None = None) -> dict:
     """Нормализованные данные заказа для передачи в CarrierAPIClient."""
     sender = next((p for p in order.parties if p.role == "sender"), None)
     recipient = next((p for p in order.parties if p.role == "recipient"), None)
+
+    sender_city = sender.city if sender else order.from_city_snapshot
+    recipient_city = recipient.city if recipient else order.to_city_snapshot
+
+    # For CSE, resolve Geography GUIDs from city names (non-fatal if unavailable)
+    sender_geo_guid: str | None = None
+    recipient_geo_guid: str | None = None
+    if order.carrier_code_snapshot and order.carrier_code_snapshot.lower() == "cse" and creds:
+        try:
+            from app.modules.carriers.cse_geography import get_city_guid
+            sender_geo_guid = get_city_guid(sender_city, creds)
+            recipient_geo_guid = get_city_guid(recipient_city, creds)
+        except Exception as exc:
+            logger.debug("CSE geography GUID lookup failed (non-fatal): %s", exc)
+
     return {
         "order_id": order.id,
         "order_reference": f"NOVEX-{order.id:06d}",
         "sender": {
             "full_name": sender.full_name if sender else "",
             "phone": sender.phone if sender else "",
-            "city": sender.city if sender else order.from_city_snapshot,
+            "city": sender_city,
             "address": sender.address_line1 if sender else "",
+            **({"geography_guid": sender_geo_guid} if sender_geo_guid else {}),
         },
         "recipient": {
             "full_name": recipient.full_name if recipient else "",
             "company": recipient.company_name if recipient else "",
             "phone": recipient.phone if recipient else "",
-            "city": recipient.city if recipient else order.to_city_snapshot,
+            "city": recipient_city,
             "address": recipient.address_line1 if recipient else "",
+            **({"geography_guid": recipient_geo_guid} if recipient_geo_guid else {}),
+            **({"urgency_guid": urgency_guid} if urgency_guid else {}),
         },
         "packages": [
             {

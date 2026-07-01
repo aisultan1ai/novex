@@ -70,6 +70,7 @@ class RateQuote(Base):
     eta_days_max: Mapped[int] = mapped_column(Integer, nullable=False)
 
     badge: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    urgency_guid: Mapped[str | None] = mapped_column(String(100), nullable=True)
     is_selected: Mapped[bool] = mapped_column(default=False, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(

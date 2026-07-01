@@ -91,10 +91,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       .catch((err) => console.error("Failed to load notifications:", err));
   }, [isAuthenticated, pathname]);
 
+  const isAdminOrOperator = currentUser?.role === "admin" || currentUser?.role === "operator";
+  const adminTabLabel = currentUser?.role === "operator" ? "Оператор" : "Админ";
+
   const navTabs = [
     ...BASE_TABS,
-    ...(currentUser?.role === "admin"
-      ? [{ label: "Админ", href: "/dashboard/admin", admin: true }]
+    ...(isAdminOrOperator
+      ? [{ label: adminTabLabel, href: "/dashboard/admin", admin: true }]
       : []),
   ];
 
