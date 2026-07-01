@@ -229,7 +229,7 @@ export default function OrderDetailPage() {
                 </Link>
               )}
               {PAYMENT_PENDING_STATUSES.has(order.status) && (
-                <Link href={`/checkout/payment?orderId=${order.draft_id}`} style={{ padding: "10px 20px", borderRadius: 10, background: "#2563EB", color: "#fff", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
+                <Link href={`/checkout?draftId=${order.draft_id}`} style={{ padding: "10px 20px", borderRadius: 10, background: "#2563EB", color: "#fff", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
                   Оплатить
                 </Link>
               )}

@@ -173,6 +173,13 @@ function CheckoutPageInner() {
           return;
         }
         setDraft(data);
+        // If payment already initiated (e.g. user returning after leaving), skip straight to payment view
+        if (data.status === "awaiting_payment" || data.status === "payment_rejected") {
+          const payment = await initiatePayment(String(draftId!));
+          setPaymentData(payment);
+          setStatus(payment.status);
+          setView("payment");
+        }
       } catch (err) {
         setError(err instanceof ApiError ? err.detail : "Не удалось загрузить заказ.");
       } finally {
