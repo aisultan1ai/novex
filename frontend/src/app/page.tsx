@@ -414,7 +414,7 @@ export default function HomePage() {
               margin: "0 auto",
               textAlign: "left",
               position: "relative",
-              zIndex: 1,
+              zIndex: 10,
             }}
           >
             <form onSubmit={handleSubmit}>
@@ -562,8 +562,6 @@ export default function HomePage() {
               marginTop: 24,
               font: "500 13px/1 Inter Variable, sans-serif",
               color: "#6B7280",
-              position: "relative",
-              zIndex: 1,
             }}
           >
             <span><b style={{ color: "#111827" }}>10+</b> служб доставки</span>

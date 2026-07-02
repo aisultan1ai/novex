@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import urllib.parse
 import xml.etree.ElementTree as ET
 from datetime import date
 
@@ -13,6 +12,17 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_API_URL = "https://home.courierexe.ru/api/"
 _TIMEOUT = 30
+
+# Маппинг внутреннего tariff_code → код услуги Exline (<service> в API)
+_TARIFF_TO_SERVICE: dict[str, str] = {
+    "standard":  "2",
+    "express":   "3",
+    "urgent":    "5",
+    # на случай если snapshot хранит русское название
+    "стандарт":  "2",
+    "экспресс":  "3",
+    "срочный":   "5",
+}
 
 
 def _esc(s: str) -> str:
@@ -49,6 +59,16 @@ class ExlineAPIClient(CarrierAPIClient):
         resp.raise_for_status()
         return ET.fromstring(resp.text)
 
+    def _post_xml_raw(self, xml_body: str, api_url: str) -> httpx.Response:
+        resp = httpx.post(
+            api_url,
+            content=xml_body.encode("utf-8"),
+            headers={"Content-Type": "text/xml; charset=utf-8"},
+            timeout=_TIMEOUT,
+        )
+        resp.raise_for_status()
+        return resp
+
     def _auth_tag(self, creds: dict) -> str:
         extra = creds.get("extra", "")
         login = creds.get("login", "")
@@ -57,25 +77,6 @@ class ExlineAPIClient(CarrierAPIClient):
 
     def _api_url(self, creds: dict) -> str:
         return creds.get("api_url", _DEFAULT_API_URL).rstrip("/") + "/"
-
-    def _print_base_url(self, creds: dict) -> str:
-        """Возвращает корневой URL инсталляции MeaSoft (без /api/).
-        https://home.courierexe.ru/api/ → https://home.courierexe.ru/
-        """
-        api_url = self._api_url(creds)
-        idx = api_url.find("/api")
-        return api_url[:idx] + "/" if idx != -1 else api_url
-
-    def _get_print_url(self, invoice_id: str, creds: dict) -> str:
-        """Внутренний URL страницы печати MeaSoft. Содержит credentials — не возвращать клиентам."""
-        base = self._print_base_url(creds)
-        params = urllib.parse.urlencode({
-            "extra": creds.get("extra", ""),
-            "login": creds.get("login", ""),
-            "pass": creds.get("password", ""),
-            "orderno": invoice_id,
-        })
-        return f"{base}print/?{params}"
 
     # ── public interface ────────────────────────────────────────────────────
 
@@ -92,7 +93,6 @@ class ExlineAPIClient(CarrierAPIClient):
         total_qty = sum(p.get("quantity", 1) for p in packages)
         descriptions = [p["description"] for p in packages if p.get("description")]
 
-        # Build enclosure with service markers
         service_markers: list[str] = []
         if order_data.get("fragile"):
             service_markers.append("ХРУПКИЙ")
@@ -103,13 +103,16 @@ class ExlineAPIClient(CarrierAPIClient):
         all_parts = service_markers + descriptions
         enclosure = _esc("; ".join(all_parts) if all_parts else "Посылка")
 
-        # Declared value for insurance (Exline field: <inshprice>)
         declared_value = order_data.get("declared_value", 0)
         inshprice_tag = (
             f"    <inshprice>{float(declared_value):.2f}</inshprice>\n"
             if declared_value
             else ""
         )
+
+        tariff_raw = (order_data.get("tariff_code") or "").lower().strip()
+        service_code = _TARIFF_TO_SERVICE.get(tariff_raw, "")
+        service_tag = f"    <service>{service_code}</service>\n" if service_code else ""
 
         xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <neworder>
@@ -132,14 +135,12 @@ class ExlineAPIClient(CarrierAPIClient):
     <weight>{round(float(total_weight), 3)}</weight>
     <quantity>{int(total_qty)}</quantity>
     <paytype>NO</paytype>
-{inshprice_tag}    <enclosure>{enclosure}</enclosure>
+{service_tag}{inshprice_tag}    <enclosure>{enclosure}</enclosure>
   </order>
 </neworder>"""
 
         root = self._post_xml(xml, self._api_url(creds))
 
-        # Exline wraps result in <createorder> child, not root attributes
-        # NOTE: must use "is not None" — empty XML elements are falsy in ElementTree
         found = root.find("createorder")
         node = found if found is not None else root
 
@@ -161,81 +162,74 @@ class ExlineAPIClient(CarrierAPIClient):
             "Exline invoice created: orderno=%s barcode=%s order_id=%s",
             orderno, barcode, order_id,
         )
+
+        pdf_bytes: bytes | None = None
+        try:
+            pdf_bytes = self.get_invoice_pdf(orderno, creds)
+            logger.info("Exline: waybill PDF fetched for orderno=%s (%d bytes)", orderno, len(pdf_bytes))
+        except Exception as exc:
+            logger.warning("Exline: could not fetch waybill PDF for orderno=%s: %s", orderno, exc)
+
         return InvoiceResult(
             waybill_number=barcode or orderno,
             carrier_invoice_id=orderno,
-            waybill_pdf_bytes=None,
+            waybill_pdf_bytes=pdf_bytes,
         )
 
-    def _is_login_page(self, resp: httpx.Response) -> bool:
-        final_url = str(resp.url)
-        if "login" in final_url or "auth" in final_url:
-            return True
-        snippet = resp.text[:800].lower()
-        return "войти" in snippet or ("login" in snippet and "password" in snippet)
-
-    def _fetch_print_html(self, invoice_id: str, creds: dict) -> tuple[str, str]:
-        """Получить HTML страницы печати накладной. Возвращает (html, print_url)."""
-        print_url = self._get_print_url(invoice_id, creds)
-        base = self._print_base_url(creds)
-
-        with httpx.Client(follow_redirects=True, timeout=_TIMEOUT) as client:
-            resp = client.get(print_url)
-            resp.raise_for_status()
-
-            if not self._is_login_page(resp):
-                return resp.text, print_url
-
-            # URL-параметры не приняты — логинимся через форму с CSRF (cookie-сессия)
-            logger.info("Exline: URL-auth rejected, trying cookie-based session login (orderno=%s)", invoice_id)
-            login_url = f"{base}extraauth/login"
-
-            # GET логин-страницы для получения CSRF-токена
-            login_page = client.get(login_url)
-            csrf = ""
-            import re as _re
-            csrf_match = _re.search(r'name="_csrf"\s+value="([^"]+)"', login_page.text)
-            if csrf_match:
-                csrf = csrf_match.group(1)
-
-            # POST логина с правильными именами полей MeaSoft + CSRF
-            client.post(
-                login_url,
-                data={
-                    "_csrf": csrf,
-                    "ExtraLoginForm[login]": creds.get("login", ""),
-                    "ExtraLoginForm[password]": creds.get("password", ""),
-                },
-            )
-
-            # После логина запрашиваем страницу печати без auth-параметров в URL
-            clean_print_url = f"{base}print/?orderno={urllib.parse.quote(invoice_id)}"
-            resp = client.get(clean_print_url)
-            resp.raise_for_status()
-
-            if self._is_login_page(resp):
-                raise RuntimeError(
-                    f"Exline: не удалось авторизоваться для получения накладной (orderno={invoice_id}). "
-                    "Проверьте учётные данные Exline в настройках."
-                )
-
-            return resp.text, clean_print_url
-
     def get_invoice_pdf(self, invoice_id: str, creds: dict) -> bytes:
+        """Получить PDF накладной через официальный API метод waybill (раздел 15).
+
+        API принимает XML с auth-тегом (те же credentials что и для создания заказа)
+        и возвращает документ накладной. Авторизация — в XML, не через браузерную сессию.
+        """
+        xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<waybill>
+  {self._auth_tag(creds)}
+  <orders>
+    <order orderno="{_esc(invoice_id)}" />
+  </orders>
+  <form>1</form>
+</waybill>"""
+
+        resp = self._post_xml_raw(xml, self._api_url(creds))
+        content_type = resp.headers.get("content-type", "").lower()
+
+        # Случай 1: API вернул PDF напрямую
+        if "pdf" in content_type or "octet-stream" in content_type:
+            logger.info(
+                "Exline waybill: PDF получен напрямую от API, invoice_id=%s size=%d",
+                invoice_id, len(resp.content),
+            )
+            return resp.content
+
+        # Случай 2: XML-ответ с ошибкой
+        body = resp.text.strip()
+        if body.startswith("<") and ("error" in body.lower()):
+            try:
+                root = ET.fromstring(body)
+                err = root.attrib.get("error", "0")
+                if err and err != "0":
+                    msg = root.attrib.get("errormsg", root.attrib.get("errormsgru", "unknown"))
+                    raise RuntimeError(f"Exline waybill API error {err}: {msg}")
+            except ET.ParseError:
+                pass
+
+        # Случай 3: HTML-документ накладной — конвертируем в PDF через weasyprint
         try:
             import weasyprint
         except ImportError as exc:
             raise RuntimeError("weasyprint не установлен: pip install weasyprint") from exc
 
-        html, print_url = self._fetch_print_html(invoice_id, creds)
+        if not body:
+            raise RuntimeError(f"Exline waybill API вернул пустой ответ для invoice_id={invoice_id}")
 
         pdf_bytes: bytes = weasyprint.HTML(
-            string=html,
-            base_url=print_url,
+            string=body,
+            base_url=self._api_url(creds),
         ).write_pdf()
 
         logger.info(
-            "Exline: PDF накладной сгенерирован invoice_id=%s size=%d bytes",
+            "Exline waybill: HTML→PDF сконвертирован, invoice_id=%s size=%d bytes",
             invoice_id, len(pdf_bytes),
         )
         return pdf_bytes
@@ -287,9 +281,7 @@ class ExlineAPIClient(CarrierAPIClient):
         ]
 
     def get_city_list(self, creds: dict) -> list[dict]:
-        """Справочник городов Exline (раздел 16 API).
-        Возвращает список словарей с ключами: name, code, region и др.
-        """
+        """Справочник городов Exline (раздел 16 API)."""
         xml = (
             '<?xml version="1.0" encoding="UTF-8"?>'
             "<townlist>"

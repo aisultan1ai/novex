@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import math
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -11,10 +11,12 @@ from sqlalchemy.orm import Session
 from app.modules.carriers.models import CarrierCommissionConfig
 from app.modules.commissions.repository import CommissionsRepository
 from app.modules.commissions.schemas import CommissionResponse, CommissionSummary
+from app.modules.platform_settings.repository import PlatformSettingsRepository
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_COMMISSION_RATE = Decimal("0.00")
+_settings_repo = PlatformSettingsRepository()
 
 
 class CommissionsService:
@@ -54,8 +56,27 @@ class CommissionsService:
                 else Decimal("0")
             )
         else:
-            commission_amount = (gross_amount * rate).quantize(Decimal("0.01"))
-            effective_rate = rate
+            # No carrier-specific config — fall back to global platform rate.
+            global_rate_raw = _settings_repo.get(db, "commission_rate", default="")
+            if global_rate_raw:
+                try:
+                    effective_rate = Decimal(global_rate_raw)
+                except InvalidOperation:
+                    logger.warning(
+                        "Invalid global commission_rate value '%s'; using 0", global_rate_raw
+                    )
+                    effective_rate = rate
+            else:
+                effective_rate = rate  # DEFAULT_COMMISSION_RATE = 0.00
+            if effective_rate == Decimal("0"):
+                logger.warning(
+                    "Commission recorded with rate=0 for carrier '%s' order_id=%s — "
+                    "configure a CarrierCommissionConfig or set the global 'commission_rate' "
+                    "in platform settings.",
+                    carrier_code,
+                    order_draft_id,
+                )
+            commission_amount = (gross_amount * effective_rate).quantize(Decimal("0.01"))
 
         c = self.repo.create(
             db,

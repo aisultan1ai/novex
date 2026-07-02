@@ -5,12 +5,13 @@ import { useEffect, useState, useCallback } from "react";
 import {
   listAdminOrders,
   updateOrderStatus,
+  getAdminOrder,
   getAdminOrderPayments,
   getAdminPayment,
   approveAdminPayment,
   rejectAdminPayment,
 } from "@/lib/api/admin";
-import type { AdminOrderRow, AdminPaymentDetail } from "@/types/admin";
+import type { AdminOrderRow, AdminOrderDetail, AdminPaymentDetail } from "@/types/admin";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -33,11 +34,11 @@ const STATUS_LABELS: Record<string, string> = {
   arrived: "Прибыл",
   delivered: "Доставлен",
   delivery_failed: "Попытка доставки не удалась",
+  customs_hold: "Удержан на таможне",
   return_requested: "Запрос возврата",
   return_in_progress: "Возврат в пути",
   returned: "Возвращён",
   cancelled: "Отменён",
-  return: "Возврат",
 };
 
 const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
@@ -53,8 +54,9 @@ const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
   in_transit:                 { bg: "#ede9fe", color: "#5b21b6" },
   arrived:                    { bg: "#ede9fe", color: "#5b21b6" },
   delivered:                  { bg: "#dcfce7", color: "#166534" },
+  delivery_failed:            { bg: "#fee2e2", color: "#991b1b" },
+  customs_hold:               { bg: "#fef3c7", color: "#92400e" },
   cancelled:                  { bg: "#fee2e2", color: "#991b1b" },
-  return:                     { bg: "#fee2e2", color: "#991b1b" },
   dispatch_failed:            { bg: "#fee2e2", color: "#991b1b" },
   pending_manual:             { bg: "#fef3c7", color: "#92400e" },
 };
@@ -228,6 +230,119 @@ function PaymentPanel({ orderId, onAction }: PaymentPanelProps) {
   );
 }
 
+const ROLE_LABELS: Record<string, string> = { sender: "Отправитель", recipient: "Получатель" };
+const SHIPMENT_TYPE_LABELS: Record<string, string> = { parcel: "Посылка", document: "Документ" };
+
+function OrderDetailPanel({ orderId }: { orderId: number }) {
+  const [detail, setDetail] = useState<AdminOrderDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState<string | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    getAdminOrder(orderId)
+      .then(setDetail)
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, [orderId]);
+
+  if (loading) return <div style={dp.wrap}><span style={{ color: "#64748b", fontSize: 13 }}>Загружаем детали…</span></div>;
+  if (error)   return <div style={dp.wrap}><span style={{ color: "#dc2626", fontSize: 13 }}>{error}</span></div>;
+  if (!detail) return null;
+
+  const sender    = detail.parties.find((p) => p.role === "sender");
+  const recipient = detail.parties.find((p) => p.role === "recipient");
+
+  return (
+    <div style={dp.wrap}>
+      {/* ── Метаданные ──────────────────────────────────────────────── */}
+      <div style={dp.section}>
+        <div style={dp.sectionTitle}>Информация о заказе</div>
+        <div style={dp.grid3}>
+          <dp.Field label="Тип отправления"  value={SHIPMENT_TYPE_LABELS[detail.shipment_type] ?? detail.shipment_type} />
+          <dp.Field label="Перевозчик"        value={detail.carrier_name} />
+          <dp.Field label="Тариф"             value={detail.tariff_name} />
+          <dp.Field label="Срок доставки"     value={`${detail.eta_days_min}–${detail.eta_days_max} раб. дней`} />
+          <dp.Field label="Создан"            value={new Date(detail.created_at).toLocaleString("ru-RU")} />
+          <dp.Field label="Обновлён"          value={new Date(detail.updated_at).toLocaleString("ru-RU")} />
+        </div>
+      </div>
+
+      {/* ── Трекинг ─────────────────────────────────────────────────── */}
+      {(detail.tracking_number || detail.carrier_tracking_number) && (
+        <div style={dp.section}>
+          <div style={dp.sectionTitle}>Трекинг</div>
+          <div style={dp.grid3}>
+            {detail.tracking_number && (
+              <dp.Field label="Внутренний трек-номер" value={detail.tracking_number} mono />
+            )}
+            {detail.carrier_tracking_number && (
+              <dp.Field label="Трек-номер перевозчика" value={detail.carrier_tracking_number} mono />
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Маршрут ─────────────────────────────────────────────────── */}
+      <div style={dp.section}>
+        <div style={dp.sectionTitle}>Маршрут</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          {[sender, recipient].map((party) => {
+            if (!party) return null;
+            return (
+              <div key={party.role} style={dp.partyCard}>
+                <div style={dp.partyRole}>{ROLE_LABELS[party.role] ?? party.role}</div>
+                <div style={dp.partyName}>{party.full_name}</div>
+                <div style={dp.partyLine}>{party.phone}</div>
+                <div style={dp.partyLine}>{party.city}</div>
+                <div style={dp.partyLine}>{party.address_line1}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Посылки ─────────────────────────────────────────────────── */}
+      {detail.packages.length > 0 && (
+        <div style={{ ...dp.section, borderBottom: "none" }}>
+          <div style={dp.sectionTitle}>Посылки ({detail.packages.length})</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {detail.packages.map((pkg, i) => (
+              <div key={i} style={dp.packageRow}>
+                <span style={{ fontSize: 13, color: "#0f172a", fontWeight: 500, flex: 1 }}>{pkg.description}</span>
+                <span style={dp.pkgBadge}>{pkg.quantity} шт</span>
+                <span style={dp.pkgBadge}>{pkg.weight_kg} кг</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Helpers inside OrderDetailPanel namespace ──────────────────────────────
+const dp = {
+  wrap:        { padding: "16px 20px 4px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb" } as React.CSSProperties,
+  section:     { borderBottom: "1px solid #f1f5f9", paddingBottom: 16, marginBottom: 16 } as React.CSSProperties,
+  sectionTitle:{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" as const, letterSpacing: "0.05em", marginBottom: 10 },
+  grid3:       { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px 24px" } as React.CSSProperties,
+  partyCard:   { background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "12px 14px" } as React.CSSProperties,
+  partyRole:   { fontSize: 10, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 6 },
+  partyName:   { fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 4 },
+  partyLine:   { fontSize: 13, color: "#475569" },
+  packageRow:  { display: "flex", alignItems: "center", gap: 10, background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 14px" } as React.CSSProperties,
+  pkgBadge:   { fontSize: 12, fontWeight: 600, color: "#1e40af", background: "#dbeafe", padding: "2px 9px", borderRadius: 999 },
+  Field: function({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+    return (
+      <div>
+        <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, marginBottom: 2 }}>{label}</div>
+        <div style={{ fontSize: 13, color: "#0f172a", fontWeight: 600, fontFamily: mono ? "monospace" : "inherit" }}>{value}</div>
+      </div>
+    );
+  },
+};
+
 const ps: Record<string, React.CSSProperties> = {
   wrap: { padding: "14px 20px 16px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb" },
   row:  { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" },
@@ -255,6 +370,7 @@ export default function AdminOrdersPage() {
   const [saving, setSaving] = useState(false);
 
   const [paymentOpenId, setPaymentOpenId] = useState<number | null>(null);
+  const [detailOpenId, setDetailOpenId] = useState<number | null>(null);
 
   const SIZE = 20;
 
@@ -323,13 +439,14 @@ export default function AdminOrdersPage() {
           orders.map((order, idx) => {
             const isEditing = editingId === order.id;
             const isPaymentOpen = paymentOpenId === order.id;
+            const isDetailOpen = detailOpenId === order.id;
             const hasPayment = PAYMENT_STATUSES.has(order.status);
             const isLast = idx === orders.length - 1;
 
             return (
               <div key={order.id}>
                 <div
-                  style={{ display: "grid", gridTemplateColumns: "70px 160px 1fr 150px 110px 150px 160px", gap: 12, padding: "14px 20px", borderBottom: isLast && !isEditing && !isPaymentOpen ? "none" : "1px solid #f1f5f9", alignItems: "center", fontSize: 14 }}
+                  style={{ display: "grid", gridTemplateColumns: "70px 160px 1fr 150px 110px 150px 160px", gap: 12, padding: "14px 20px", borderBottom: isLast && !isEditing && !isPaymentOpen && !isDetailOpen ? "none" : "1px solid #f1f5f9", alignItems: "center", fontSize: 14 }}
                   onMouseEnter={(e) => { e.currentTarget.style.background = "#f8fafc"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = ""; }}
                 >
@@ -372,6 +489,16 @@ export default function AdminOrdersPage() {
                       </button>
                     )}
                     <button
+                      onClick={() => setDetailOpenId(isDetailOpen ? null : order.id)}
+                      style={{
+                        padding: "6px 10px", borderRadius: 8, border: "none", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+                        background: isDetailOpen ? "#0f172a" : "#f1f5f9",
+                        color: isDetailOpen ? "#ffffff" : "#0f172a",
+                      }}
+                    >
+                      {isDetailOpen ? "Скрыть" : "Детали"}
+                    </button>
+                    <button
                       onClick={() => { setEditingId(isEditing ? null : order.id); setEditStatus(order.status); }}
                       style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#ffffff", color: "#0f172a", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
                     >
@@ -387,6 +514,9 @@ export default function AdminOrdersPage() {
                     onAction={() => { void load(); setPaymentOpenId(null); }}
                   />
                 )}
+
+                {/* Detail panel */}
+                {isDetailOpen && <OrderDetailPanel orderId={order.id} />}
 
                 {/* Status edit panel */}
                 {isEditing && (

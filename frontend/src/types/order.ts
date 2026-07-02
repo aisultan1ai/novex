@@ -21,8 +21,7 @@ export type OrderDraftStatus =
   | "returned"
   | "dispatch_failed"
   | "pending_manual"
-  | "pending_manual_dispatch"
-  | "dispatched";
+  | "pending_manual_dispatch";
 
 export type ShipmentPartyRole = "sender" | "recipient";
 

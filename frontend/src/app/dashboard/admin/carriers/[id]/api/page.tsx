@@ -13,16 +13,24 @@ import {
 } from "@/lib/api/admin";
 import type { AdminCarrierDetail } from "@/types/admin";
 
-const CARRIER_DEFAULTS: Record<string, { api_url: string; extra_config: Record<string, unknown>; hint: string }> = {
+const CARRIER_DEFAULTS: Record<string, { api_url: string; extra_config: Record<string, unknown>; hint: string; no_token?: boolean }> = {
   azimuth: {
     api_url: "https://api.azimuthcargo.kz",
     extra_config: { service_type: 2, payment_type: 2, payer: 1, payer_tin: "" },
     hint: "service_type (1=Авто, 2=Авиа), payment_type, payer (1=Отправитель, 2=Получатель), payer_tin",
+    no_token: true,
   },
   exline: {
     api_url: "https://home.courierexe.ru/api/",
     extra_config: { extra: "", login: "", password: "" },
-    hint: "extra - идентификатор компании в MeaSoft, login - логин, password - пароль",
+    hint: "extra — идентификатор компании в MeaSoft, login — логин, password — пароль",
+    no_token: true,
+  },
+  cse: {
+    api_url: "http://web.cse.ru/1c/ws/Web1C.1cws",
+    extra_config: { login: "", password: "" },
+    hint: "login и password от личного кабинета CSE",
+    no_token: true,
   },
 };
 
@@ -127,7 +135,7 @@ export default function CarrierAPIPage() {
       const saved = await upsertCarrierAPICredentials(carrier.code, {
         carrier_code: carrier.code,
         api_url: form.api_url.trim(),
-        api_token: form.api_token.trim() || undefined as unknown as string,
+        api_token: form.api_token.trim(),  // "" is valid — backend re-encrypts with current key
         is_active: form.is_active,
         extra_config: extra,
       });
@@ -206,25 +214,24 @@ export default function CarrierAPIPage() {
             />
           </div>
 
-          <div style={{ marginBottom: 16 }}>
-            <label style={label}>
-              API Токен (Bearer){creds ? " - оставьте пустым, чтобы не менять" : ""}
-            </label>
-            <input
-              style={inp}
-              type="password"
-              value={form.api_token}
-              onChange={(e) => setForm((f) => ({ ...f, api_token: e.target.value }))}
-              placeholder={creds ? `Текущий: ${creds.api_token_masked}` : "Вставьте Bearer-токен"}
-              required={!creds}
-              autoComplete="off"
-            />
-            {creds && (
-              <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
-                Сохранённый токен: <span style={{ fontFamily: "monospace" }}>{creds.api_token_masked}</span>
-              </div>
-            )}
-          </div>
+          {!getCarrierDefaults(carrier.code).no_token && (
+            <div style={{ marginBottom: 16 }}>
+              <label style={label}>API Токен (Bearer)</label>
+              <input
+                style={inp}
+                type="password"
+                value={form.api_token}
+                onChange={(e) => setForm((f) => ({ ...f, api_token: e.target.value }))}
+                placeholder={creds ? `Текущий: ${creds.api_token_masked}` : "Вставьте Bearer-токен"}
+                autoComplete="off"
+              />
+              {creds && (
+                <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
+                  Сохранённый токен: <span style={{ fontFamily: "monospace" }}>{creds.api_token_masked}</span>
+                </div>
+              )}
+            </div>
+          )}
 
           <div style={{ marginBottom: 16 }}>
             <label style={label}>Дополнительные параметры (JSON)</label>

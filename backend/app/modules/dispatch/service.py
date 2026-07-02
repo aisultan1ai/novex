@@ -55,6 +55,12 @@ _PERMANENT_ERROR_KEYWORDS = (
 def _is_permanent_error(exc: Exception) -> bool:
     """Return True for errors that will not resolve on retry (auth, config)."""
     import httpx
+    try:
+        from cryptography.fernet import InvalidToken
+        if isinstance(exc, InvalidToken):
+            return True
+    except ImportError:
+        pass
     if isinstance(exc, httpx.HTTPStatusError):
         return exc.response.status_code in (401, 403)
     msg = str(exc).lower()
@@ -257,6 +263,7 @@ class DispatchWorker:
             job.status = DispatchJobStatus.QUEUED
             job.next_retry_at = None
             job.last_error = None
+            job.attempts = 0  # reset so retry gets full max_attempts budget
         else:
             job = DispatchJob(
                 order_id=order.id,
@@ -493,6 +500,14 @@ def _save_waybill_document(
         db.add(doc)
         db.flush()
         logger.info("Waybill PDF saved: order_id=%s waybill=%s", order.id, waybill_number)
+
+        # Invalidate any stale Novex-generated label the user may have downloaded
+        # before dispatch — the next GET /orders/{id}/label will serve the carrier's PDF.
+        try:
+            from app.core.redis import get_redis
+            get_redis().delete(f"pdf:label:{order.id}")
+        except Exception:
+            pass
     except Exception as exc:
         logger.warning("Failed to save waybill PDF (non-fatal): %s", exc)
 

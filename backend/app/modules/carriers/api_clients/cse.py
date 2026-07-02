@@ -566,6 +566,8 @@ class CSEAPIClient(CarrierAPIClient):
             + "<m:Properties><m:Key>DocumentType</m:Key><m:Value>Waybill</m:Value><m:ValueType>string</m:ValueType></m:Properties>"
             + "<m:Properties><m:Key>Type</m:Key><m:Value>print</m:Value><m:ValueType>string</m:ValueType></m:Properties>"
             + "<m:Properties><m:Key>Format</m:Key><m:Value>pdf</m:Value><m:ValueType>string</m:ValueType></m:Properties>"
+            # Required by CSE API for Type=print: specifies which print template to use
+            + "<m:Properties><m:Key>Name</m:Key><m:Value>Универсальная печатная форма документа НАКЛАДНАЯ</m:Value><m:ValueType>string</m:ValueType></m:Properties>"
             + "</m:parameters>"
         )
         ret = self._post("GetFormsForDocuments", inner, creds, timeout=_TIMEOUT)
@@ -690,16 +692,34 @@ class CSEAPIClient(CarrierAPIClient):
         recipient_addr = _esc(recipient.get("address") or recipient.get("address_line1", ""))
 
         declared_value = order_data.get("declared_value", 0)
-        cargo_type_guid = order_data.get("cargo_type_guid", "4aab1fc6-fc2b-473a-8728-58bcd4ff79ba")
+        cargo_type_guid = order_data.get("cargo_type_guid") or ""
+        if not cargo_type_guid:
+            try:
+                cargo_type_guid = self._cargo_type_guid(creds)
+            except Exception as exc:
+                logger.warning("CSE: TypeOfCargo GUID unavailable for create_invoice (%s), sending empty", exc)
+                cargo_type_guid = ""
         urgency_guid = _esc(recipient.get("urgency_guid", ""))
+        if not urgency_guid:
+            logger.warning(
+                "CSE SaveWaybillOffice: urgency_guid missing for order_id=%s — "
+                "CSE may reject the request. Ensure tariff engine passes urgency_guid.",
+                order_data.get("order_id"),
+            )
 
         login = _esc(self._login(creds))
         pwd = _esc(self._password(creds))
 
-        declared_xml = (
-            f"<m:DeclaredValueRate>{float(declared_value):.2f}</m:DeclaredValueRate>"
-            if declared_value else ""
-        )
+        declared_xml = ""
+        if declared_value:
+            declared_xml = (
+                f"<m:DeclaredValueRate>{float(declared_value):.2f}</m:DeclaredValueRate>"
+            )
+            if order_data.get("insurance"):
+                # CSE separates insurance value from declared value; both required for insurance
+                declared_xml += (
+                    f"<m:InsuranceRate>{float(declared_value):.2f}</m:InsuranceRate>"
+                )
         comment_xml = (
             f"<m:Comment>{_esc(description)}</m:Comment>"
             if description else ""
@@ -727,6 +747,7 @@ class CSEAPIClient(CarrierAPIClient):
             f"<m:FreeForm>true</m:FreeForm>"
             f"</m:Address>"
             f"<m:Phone>{_esc(recipient.get('phone', ''))}</m:Phone>"
+            f"<m:DeliveryOfCargo>ДоставкаДоДверей</m:DeliveryOfCargo>"
             + urgency_xml +
             f"<m:Cargo>"
             f"<m:CargoDescription>{_esc(body_desc)}</m:CargoDescription>"

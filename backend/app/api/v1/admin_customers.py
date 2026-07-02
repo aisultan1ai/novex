@@ -94,6 +94,26 @@ def create_user(
 
 # ── Stats ─────────────────────────────────────────────────────────────────────
 
+# All statuses that mean the order has been paid (including statuses that
+# come after "paid" in the lifecycle: dispatch, transit, delivery, returns).
+_PAID_AND_BEYOND_STATUSES = {
+    "paid",
+    "dispatch_queued",
+    "dispatch_failed",
+    "pending_manual",
+    "pending_manual_dispatch",
+    "sent_to_carrier",
+    "picked_up",
+    "in_transit",
+    "out_for_delivery",
+    "arrived",
+    "delivered",
+    "delivery_failed",
+    "return_requested",
+    "return_in_progress",
+    "returned",
+}
+
 
 @router.get("/stats")
 def get_stats(
@@ -106,7 +126,11 @@ def get_stats(
     )
     total_orders = db.scalar(select(func.count(OrderDraft.id))) or 0
     paid_orders = (
-        db.scalar(select(func.count(OrderDraft.id)).where(OrderDraft.status == "paid"))
+        db.scalar(
+            select(func.count(OrderDraft.id)).where(
+                OrderDraft.status.in_(_PAID_AND_BEYOND_STATUSES)
+            )
+        )
         or 0
     )
 

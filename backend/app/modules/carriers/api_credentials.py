@@ -43,7 +43,7 @@ class CarrierAPICredentials(Base):
 class CarrierAPICredentialsCreate(BaseModel):
     carrier_code: str
     api_url: str
-    api_token: str
+    api_token: str = ""  # optional — carriers using extra_config auth (Exline, CSE) leave this empty
     is_active: bool = True
     extra_config: dict[str, Any] | None = None
 
@@ -104,10 +104,26 @@ class CarrierAPICredentialsRepository:
     def upsert(
         self, db: Session, payload: CarrierAPICredentialsCreate
     ) -> CarrierAPICredentials:
-        existing = self.get_by_carrier_code(db, payload.carrier_code)
+        try:
+            existing = self.get_by_carrier_code(db, payload.carrier_code)
+        except Exception:
+            # Row exists but cannot be decrypted (key rotation / SECRET_KEY mismatch).
+            # Delete the stale row via raw SQL so we can insert a fresh one below.
+            from sqlalchemy import text
+            db.execute(
+                text("DELETE FROM carrier_api_credentials WHERE carrier_code = :code"),
+                {"code": payload.carrier_code},
+            )
+            db.flush()
+            existing = None
         if existing:
             existing.api_url = payload.api_url
-            existing.api_token = payload.api_token
+            # Only overwrite the token when a new non-empty value is provided.
+            # An empty api_token means "keep existing" — useful for carriers that
+            # authenticate via extra_config (Exline, CSE) so the user doesn't need
+            # to re-enter a token they don't use. Assigning "" re-encrypts with the
+            # current key, which is the desired behaviour for re-keying.
+            existing.api_token = payload.api_token  # "" is valid — re-encrypts with current key
             existing.is_active = payload.is_active
             if payload.extra_config is not None:
                 existing.extra_config = payload.extra_config
