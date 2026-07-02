@@ -302,6 +302,89 @@ def retry_dispatch(
     return {"ok": True, "tracking_number": tracking_number}
 
 
+@router.post("/{order_id}/refresh-waybill")
+def refresh_waybill(
+    order_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+) -> dict:
+    from app.core.carrier_gateway_client import get_gateway_client
+    from app.core.redis import get_redis
+    from app.core.storage import get_storage
+    from app.modules.carriers.api_credentials import CarrierAPICredentialsRepository
+    from app.modules.documents.models import Document, DocumentType
+
+    order = db.get(OrderDraft, order_id)
+    if not order:
+        raise HTTPException(404, "Заказ не найден")
+
+    shipment = _shipments_repo.get_by_order_id(db, order_id)
+    if not shipment or not shipment.carrier_tracking_number:
+        raise HTTPException(400, "У заказа нет трекинг-номера перевозчика")
+
+    carrier_code = order.carrier_code_snapshot
+    creds_record = CarrierAPICredentialsRepository().get_by_carrier_code(db, carrier_code)
+    if not creds_record or not creds_record.is_active:
+        raise HTTPException(400, f"Нет активных API-credentials для перевозчика '{carrier_code}'")
+
+    api_creds = {
+        "api_url": creds_record.api_url,
+        "api_token": creds_record.api_token,
+        **(creds_record.extra_config or {}),
+    }
+
+    try:
+        pdf_bytes = get_gateway_client().get_invoice_pdf(
+            carrier_code, shipment.carrier_tracking_number, api_creds
+        )
+    except Exception as exc:
+        raise HTTPException(502, f"Не удалось получить накладную от перевозчика: {exc}") from exc
+
+    storage = get_storage()
+    stale_docs = db.scalars(
+        select(Document).where(
+            Document.order_id == order_id,
+            Document.document_type == DocumentType.LABEL,
+        )
+    ).all()
+    for doc in stale_docs:
+        try:
+            storage.delete_file(doc.file_url)
+        except Exception:
+            pass
+        db.delete(doc)
+
+    get_redis().delete(f"pdf:label:{order_id}")
+
+    filename = f"waybill_{shipment.carrier_tracking_number}.pdf"
+    uploaded = storage.upload_file(
+        file_data=pdf_bytes,
+        original_name=filename,
+        mime_type="application/pdf",
+        folder=f"waybills/{order_id}",
+    )
+    db.add(Document(
+        order_id=order_id,
+        document_type=DocumentType.LABEL,
+        file_url=uploaded.object_name,
+        file_name=filename,
+        mime_type="application/pdf",
+    ))
+
+    _audit_svc.log(
+        db,
+        actor=admin,
+        action="order.refresh_waybill",
+        resource_type="order",
+        resource_id=order_id,
+        new_value={"carrier_tracking_number": shipment.carrier_tracking_number},
+    )
+    db.commit()
+
+    logger.info("Admin refreshed waybill: order_id=%s carrier=%s size=%d", order_id, carrier_code, len(pdf_bytes))
+    return {"ok": True, "waybill_pdf_size": len(pdf_bytes)}
+
+
 @router.post("/{draft_id}/mark-dispatched")
 def mark_dispatched(
     draft_id: int,

@@ -123,6 +123,15 @@ class CarrierGatewayClient:
         resp.raise_for_status()
         return resp.json()
 
+    def get_invoice_pdf(self, carrier_code: str, invoice_id: str, creds: dict) -> bytes:
+        resp = self._post_with_retry(
+            f"{self._base_url}/invoke/get-invoice-pdf",
+            json={"carrier_code": carrier_code, "invoice_id": invoice_id, "creds": creds},
+            timeout=_DISPATCH_TIMEOUT,
+        )
+        self._raise_for_carrier_error(resp)
+        return base64.b64decode(resp.json()["waybill_pdf_b64"])
+
     def cancel_invoice(self, carrier_code: str, invoice_id: str, creds: dict) -> bool:
         resp = self._post_with_retry(
             f"{self._base_url}/invoke/cancel-invoice",

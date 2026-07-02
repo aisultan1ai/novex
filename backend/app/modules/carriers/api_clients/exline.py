@@ -182,6 +182,8 @@ class ExlineAPIClient(CarrierAPIClient):
         API принимает XML с auth-тегом (те же credentials что и для создания заказа)
         и возвращает документ накладной. Авторизация — в XML, не через браузерную сессию.
         """
+        import base64
+
         xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <waybill>
   {self._auth_tag(creds)}
@@ -194,16 +196,17 @@ class ExlineAPIClient(CarrierAPIClient):
         resp = self._post_xml_raw(xml, self._api_url(creds))
         content_type = resp.headers.get("content-type", "").lower()
 
-        # Случай 1: API вернул PDF напрямую
+        # Случай 1: API вернул PDF бинарно
         if "pdf" in content_type or "octet-stream" in content_type:
             logger.info(
-                "Exline waybill: PDF получен напрямую от API, invoice_id=%s size=%d",
+                "Exline waybill: PDF получен напрямую, invoice_id=%s size=%d",
                 invoice_id, len(resp.content),
             )
             return resp.content
 
-        # Случай 2: XML-ответ с ошибкой
         body = resp.text.strip()
+
+        # Случай 2: XML-ответ с ошибкой
         if body.startswith("<") and ("error" in body.lower()):
             try:
                 root = ET.fromstring(body)
@@ -214,7 +217,21 @@ class ExlineAPIClient(CarrierAPIClient):
             except ET.ParseError:
                 pass
 
-        # Случай 3: HTML-документ накладной — конвертируем в PDF через weasyprint
+        # Случай 3: API вернул PDF как base64-строку (тело — raw base64, content-type text/*)
+        # Exline может вернуть base64 без оборачивания в XML/HTML
+        raw_b64 = body.replace("\n", "").replace("\r", "").replace(" ", "")
+        try:
+            decoded = base64.b64decode(raw_b64, validate=True)
+            if decoded[:4] == b"%PDF":
+                logger.info(
+                    "Exline waybill: PDF декодирован из base64, invoice_id=%s size=%d",
+                    invoice_id, len(decoded),
+                )
+                return decoded
+        except Exception:
+            pass
+
+        # Случай 4: HTML-документ накладной — конвертируем в PDF через weasyprint
         try:
             import weasyprint
         except ImportError as exc:

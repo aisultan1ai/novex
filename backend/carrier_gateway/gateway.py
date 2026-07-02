@@ -94,6 +94,12 @@ class CancelInvoiceRequest(BaseModel):
     creds: dict
 
 
+class GetInvoicePdfRequest(BaseModel):
+    carrier_code: str
+    invoice_id: str
+    creds: dict
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @app.get("/health")
@@ -188,6 +194,23 @@ def test_connection(req: TestConnectionRequest) -> dict:
     except Exception as exc:
         logger.warning("test_connection failed: carrier=%s error=%s", req.carrier_code, exc)
         return {"ok": False, "error": str(exc)}
+
+
+@app.post("/invoke/get-invoice-pdf", dependencies=[Depends(verify_secret)])
+def get_invoice_pdf(req: GetInvoicePdfRequest) -> dict:
+    client = get_client(req.carrier_code)
+    if client is None:
+        raise HTTPException(status_code=422, detail=f"No API client for carrier '{req.carrier_code}'")
+
+    try:
+        pdf_bytes = client.get_invoice_pdf(req.invoice_id, req.creds)
+        return {"waybill_pdf_b64": base64.b64encode(pdf_bytes).decode()}
+    except Exception as exc:
+        logger.warning(
+            "get_invoice_pdf failed: carrier=%s invoice=%s error=%s",
+            req.carrier_code, req.invoice_id, exc,
+        )
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @app.post("/invoke/cancel-invoice", dependencies=[Depends(verify_secret)])
