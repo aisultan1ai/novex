@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime
 from enum import Enum, StrEnum
 
-from sqlalchemy import Boolean, ForeignKey, String, func
+from sqlalchemy import Boolean, ForeignKey, String
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.db import Base
+from app.core.db import Base, TimestampMixin
 
 
 def enum_values(enum_cls: type[Enum]) -> list[str]:
@@ -29,17 +28,6 @@ class CustomerType(StrEnum):
 class BillingMode(StrEnum):
     PREPAID = "prepaid"
     POSTPAID = "postpaid"
-
-
-class TimestampMixin:
-    created_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(), nullable=False
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,
-    )
 
 
 class Role(Base, TimestampMixin):

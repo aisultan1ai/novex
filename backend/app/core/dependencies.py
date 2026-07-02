@@ -84,7 +84,7 @@ def get_current_user(
     if ver_in_token != get_token_version(user.id):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Сессия истекла. Пожалуйста, войдите снова.",
+            detail="Session expired. Please log in again.",
         )
 
     return user
@@ -96,7 +96,7 @@ def require_admin(current_user: User = Depends(get_current_user)) -> User:
     if current_user.role.code != RoleCode.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Доступ только для администраторов",
+            detail="Access restricted to administrators",
         )
     return current_user
 
@@ -107,7 +107,7 @@ def require_admin_or_operator(current_user: User = Depends(get_current_user)) ->
     if current_user.role.code not in (RoleCode.ADMIN, RoleCode.OPERATOR):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Доступ только для администраторов и операторов",
+            detail="Access restricted to administrators and operators",
         )
     return current_user
 
@@ -118,7 +118,7 @@ def require_carrier(current_user: User = Depends(get_current_user)) -> User:
     if current_user.role.code != RoleCode.CARRIER:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Доступ только для перевозчиков",
+            detail="Access restricted to carriers",
         )
     return current_user
 
@@ -137,6 +137,6 @@ def get_current_carrier_id(
     if not profile:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Профиль перевозчика не найден",
+            detail="Carrier profile not found",
         )
     return profile.carrier_id

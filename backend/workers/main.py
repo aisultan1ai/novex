@@ -89,9 +89,12 @@ def run() -> None:
 
     ensure_consumer_groups()
 
-    for target in (email_consumer.run, dispatch_consumer.run):
+    consumer_targets = (email_consumer.run, dispatch_consumer.run)
+    consumer_threads: list[list] = []  # [[thread, target], ...]
+    for target in consumer_targets:
         t = threading.Thread(target=target, args=(stop_event,), daemon=True, name=target.__module__)
         t.start()
+        consumer_threads.append([t, target])
         logger.info("Started consumer thread: %s", t.name)
 
     scheduler = WorkerScheduler()
@@ -105,6 +108,20 @@ def run() -> None:
 
     while not stop_event.is_set():
         scheduler.tick()
+
+        # Restart any consumer thread that exited unexpectedly.
+        for entry in consumer_threads:
+            t, target = entry
+            if not t.is_alive() and not stop_event.is_set():
+                logger.error(
+                    "Consumer thread '%s' died unexpectedly; restarting.", t.name
+                )
+                new_t = threading.Thread(
+                    target=target, args=(stop_event,), daemon=True, name=t.name
+                )
+                new_t.start()
+                entry[0] = new_t
+
         try:
             get_redis().setex(_ALIVE_KEY, _ALIVE_TTL, "1")
         except Exception:

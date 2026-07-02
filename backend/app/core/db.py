@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Generator
+from datetime import datetime
 from typing import Any
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import DateTime, create_engine, func, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
 from app.core.config import get_settings
 
@@ -15,6 +16,20 @@ settings = get_settings()
 
 class Base(DeclarativeBase):
     """Base class for all SQLAlchemy models."""
+
+
+class TimestampMixin:
+    """Adds created_at / updated_at columns to any model."""
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=False), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=False),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
 
 
 # Sync engine — used by all endpoints except the async quotes path.

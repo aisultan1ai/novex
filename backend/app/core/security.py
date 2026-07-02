@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import logging
 import os
 import secrets
 from datetime import UTC, datetime, timedelta
@@ -9,6 +10,8 @@ from typing import Any
 
 import jwt
 from jwt import ExpiredSignatureError, InvalidTokenError
+
+_logger = logging.getLogger(__name__)
 
 JWT_ALGORITHM = "HS256"
 PASSWORD_HASH_ITERATIONS = 100_000
@@ -101,13 +104,24 @@ REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 3600  # 7 days
 
 
 def get_token_version(user_id: int) -> int:
-    """Return the current token version for a user. Defaults to 0."""
+    """Return the current token version for a user. Defaults to 0.
+
+    When Redis is unavailable we return 0 (fail-open) to avoid locking out
+    users whose tokens were created at version 0. Users with revoked tokens
+    (version > 0) will be rejected because their token's ver won't match 0 —
+    this is the conservative, secure side-effect of the outage.
+    """
     try:
         from app.core.redis import get_redis
         val = get_redis().get(f"{_TOKEN_VER_PREFIX}{user_id}")  # type: ignore[union-attr]
         return int(val) if val else 0  # type: ignore[arg-type]
     except Exception:
-        return 0  # fail open — don't lock everyone out if Redis is temporarily down
+        _logger.warning(
+            "Redis unavailable — token version check skipped for user_id=%s. "
+            "Users with invalidated tokens (ver>0) will receive 401 until Redis recovers.",
+            user_id,
+        )
+        return 0
 
 
 def invalidate_user_tokens(user_id: int) -> None:

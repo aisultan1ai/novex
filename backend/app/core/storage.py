@@ -122,8 +122,11 @@ class MinioStorageService(StorageService):
                 try:
                     region = self._client._get_region(self._bucket)
                     self._presign_client._region_map[self._bucket] = region
-                except Exception as reg_exc:
-                    logger.debug("Could not seed presign client region: %s", reg_exc)
+                except Exception as reg_exc:  # noqa: BLE001 — _get_region is a private SDK method; exception type is unpredictable
+                    logger.warning(
+                        "Could not seed presign client region, using 'us-east-1' fallback: %s",
+                        reg_exc,
+                    )
                     self._presign_client._region_map[self._bucket] = "us-east-1"
             else:
                 self._presign_client = self._client
