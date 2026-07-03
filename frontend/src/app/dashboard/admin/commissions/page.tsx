@@ -186,22 +186,31 @@ export default function AdminCommissionsPage() {
   return (
     <>
       {/* ── Summary cards ─────────────────────────────────────── */}
-      <div style={{ display: "flex", gap: 16, alignItems: "stretch", marginBottom: 16 }}>
+      <div style={{ display: "flex", gap: 16, alignItems: "stretch", marginBottom: 16, flexWrap: "wrap" }}>
         {summary ? (
           <>
-            <SummaryCard label="Общий оборот" value={formatPrice(summary.total_gross, summary.currency)} sub="сумма заказов" />
+            <SummaryCard label="Оборот (клиенты)" value={formatPrice(summary.total_gross, summary.currency)} sub={`${summary.count} оплаченных заказов`} />
             <SummaryCard
-              label="Комиссия Novex"
+              label="Выплаты перевозчикам"
+              value={formatPrice(summary.total_carrier_payout, summary.currency)}
+              sub="сумма к перечислению"
+              color="#0369a1"
+            />
+            <SummaryCard
+              label="Прибыль Novex"
               value={formatPrice(summary.total_commission, summary.currency)}
-              sub={settings ? `${(Number(settings.commission_rate) * 100).toFixed(2)}% от оборота` : "от оборота"}
+              sub={
+                summary.total_gross > 0
+                  ? `${((summary.total_commission / summary.total_gross) * 100).toFixed(2)}% от оборота`
+                  : "наценка"
+              }
               color="#16a34a"
             />
-            <SummaryCard label="Транзакций" value={String(summary.count)} sub="оплаченных заказов" />
           </>
         ) : (
           <>
             {[0,1,2].map(i => (
-              <div key={i} style={{ flex: 1, background: "#f8fafc", border: "1px solid #e5e7eb", borderRadius: 14, padding: "20px 24px", minHeight: 80 }} />
+              <div key={i} style={{ flex: 1, background: "#f8fafc", border: "1px solid #e5e7eb", borderRadius: 14, padding: "20px 24px", minHeight: 80, minWidth: 220 }} />
             ))}
           </>
         )}

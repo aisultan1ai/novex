@@ -21,6 +21,7 @@ class CommissionsRepository:
         commission_rate: Decimal,
         commission_amount: Decimal,
         currency: str = "KZT",
+        carrier_payout: Decimal | None = None,
     ) -> Commission:
         c = Commission(
             order_draft_id=order_draft_id,
@@ -28,6 +29,7 @@ class CommissionsRepository:
             gross_amount=gross_amount,
             commission_rate=commission_rate,
             commission_amount=commission_amount,
+            carrier_payout=carrier_payout,
             currency=currency,
         )
         db.add(c)
@@ -77,6 +79,15 @@ class CommissionsRepository:
         stmt = select(
             func.coalesce(func.sum(Commission.gross_amount), 0).label("total_gross"),
             func.coalesce(func.sum(Commission.commission_amount), 0).label("total_commission"),
+            func.coalesce(
+                func.sum(
+                    func.coalesce(
+                        Commission.carrier_payout,
+                        Commission.gross_amount - Commission.commission_amount,
+                    )
+                ),
+                0,
+            ).label("total_carrier_payout"),
             func.count(Commission.id).label("count"),
         )
         if date_from:
@@ -89,5 +100,6 @@ class CommissionsRepository:
         return {
             "total_gross": row.total_gross,
             "total_commission": row.total_commission,
+            "total_carrier_payout": row.total_carrier_payout,
             "count": row.count,
         }

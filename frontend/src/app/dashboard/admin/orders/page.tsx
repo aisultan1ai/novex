@@ -301,6 +301,19 @@ function OrderDetailPanel({ orderId }: { orderId: number }) {
         </div>
       )}
 
+      {/* ── Финансовая разбивка ─────────────────────────────────────── */}
+      <div style={dp.section}>
+        <div style={dp.sectionTitle}>Финансовая разбивка</div>
+        <div style={dp.grid3}>
+          <dp.Field label="Оплатил клиент" value={`${detail.price.toLocaleString("ru-RU")} ${detail.currency}`} />
+          <dp.Field label="Перевозчику" value={`${detail.carrier_price.toLocaleString("ru-RU")} ${detail.currency}`} />
+          <dp.Field
+            label="Прибыль Novex"
+            value={`${detail.markup_amount.toLocaleString("ru-RU")} ${detail.currency}`}
+          />
+        </div>
+      </div>
+
       {/* ── Маршрут ─────────────────────────────────────────────────── */}
       <div style={dp.section}>
         <div style={dp.sectionTitle}>Маршрут</div>
@@ -523,7 +536,14 @@ export default function AdminOrdersPage() {
 
                   <div style={{ fontSize: 13, color: "#475569" }}>{order.carrier_name}</div>
 
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>{formatPrice(order.price, order.currency)}</div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }} title="Оплатил клиент">{formatPrice(order.price, order.currency)}</div>
+                    {order.markup_amount > 0 && (
+                      <div style={{ fontSize: 11, color: "#94a3b8" }} title={`Перевозчику ${formatPrice(order.carrier_price, order.currency)} · Наценка ${formatPrice(order.markup_amount, order.currency)}`}>
+                        {formatPrice(order.carrier_price, order.currency)} + {formatPrice(order.markup_amount, order.currency)}
+                      </div>
+                    )}
+                  </div>
 
                   <StatusBadge status={order.status} />
 

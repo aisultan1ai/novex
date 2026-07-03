@@ -11,6 +11,7 @@ class CommissionResponse(BaseModel):
     order_draft_id: int
     carrier_code: str
     gross_amount: Decimal
+    carrier_payout: Decimal | None = None
     commission_rate: Decimal
     commission_amount: Decimal
     currency: str
@@ -20,7 +21,8 @@ class CommissionResponse(BaseModel):
 
 
 class CommissionSummary(BaseModel):
-    total_gross: Decimal
-    total_commission: Decimal
+    total_gross: Decimal            # what customers paid (turnover)
+    total_carrier_payout: Decimal   # what perevozchiks are owed
+    total_commission: Decimal       # Novex profit / markup
     currency: str
     count: int

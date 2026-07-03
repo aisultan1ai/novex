@@ -50,15 +50,18 @@ function validateQuoteForm(form: FormState): string | null {
   if (qty > 999) return "Количество не может превышать 999.";
 
   if (form.shipmentType !== "document") {
-    // Dimensions are optional for parcels — used for volumetric weight if provided
-    const width = form.widthCm.trim() ? Number(form.widthCm) : 0;
-    const height = form.heightCm.trim() ? Number(form.heightCm) : 0;
-    const depth = form.depthCm.trim() ? Number(form.depthCm) : 0;
-    if (form.widthCm.trim() && (isNaN(width) || width <= 0))
+    // Dimensions are required for parcels — used for volumetric weight (Azimuth
+    // tariff table) and mandatory in CSE SaveWaybillOffice (Length/Width/Height).
+    // Making them required here avoids a surprise validation error at the order
+    // step where they are always required.
+    const width = Number(form.widthCm);
+    const height = Number(form.heightCm);
+    const depth = Number(form.depthCm);
+    if (!form.widthCm.trim() || isNaN(width) || width <= 0)
       return "Введите корректную ширину (> 0).";
-    if (form.heightCm.trim() && (isNaN(height) || height <= 0))
+    if (!form.heightCm.trim() || isNaN(height) || height <= 0)
       return "Введите корректную высоту (> 0).";
-    if (form.depthCm.trim() && (isNaN(depth) || depth <= 0))
+    if (!form.depthCm.trim() || isNaN(depth) || depth <= 0)
       return "Введите корректную глубину (> 0).";
     if (width > 500 || height > 500 || depth > 500)
       return "Размеры не могут превышать 500 см.";
@@ -281,10 +284,8 @@ export default function HomePage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (form.fromCity.trim() === form.toCity.trim()) {
-      setError("Город отправления и город назначения должны различаться.");
-      return;
-    }
+    // Intracity delivery is supported (zone 0 in tariff_engine) — do not block
+    // same-city quotes here.
     const numericError = validateQuoteForm(form);
     if (numericError) { setError(numericError); return; }
 
@@ -502,9 +503,9 @@ export default function HomePage() {
                 <InputField label="Кол-во" value={form.quantity} onChange={(v) => setField("quantity", v)} placeholder="1" />
                 {form.shipmentType !== "document" && (
                   <>
-                    <InputField label="Ширина, см (необяз.)" value={form.widthCm} onChange={(v) => setField("widthCm", v)} placeholder="20" required={false} />
-                    <InputField label="Высота, см (необяз.)" value={form.heightCm} onChange={(v) => setField("heightCm", v)} placeholder="15" required={false} />
-                    <InputField label="Глубина, см (необяз.)" value={form.depthCm} onChange={(v) => setField("depthCm", v)} placeholder="10" required={false} />
+                    <InputField label="Ширина, см" value={form.widthCm} onChange={(v) => setField("widthCm", v)} placeholder="20" required />
+                    <InputField label="Высота, см" value={form.heightCm} onChange={(v) => setField("heightCm", v)} placeholder="15" required />
+                    <InputField label="Глубина, см" value={form.depthCm} onChange={(v) => setField("depthCm", v)} placeholder="10" required />
                   </>
                 )}
 

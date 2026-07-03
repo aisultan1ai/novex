@@ -13,6 +13,7 @@ from app.core.exceptions import NotFoundError
 from app.modules.carriers.tariff_engine import (
     calculate_quotes_async as _engine_quotes_async,
 )
+from app.modules.commissions.markup import build_markup_calculator_async
 from app.modules.quotes.models import QuoteSession, RateQuote
 from app.modules.quotes.schemas import (
     CarrierServiceItem,
@@ -66,15 +67,27 @@ class QuotesService:
         db.add(quote_session)
         await db.flush()
 
-        cheapest = min(quotes, key=lambda q: q.price, default=None)
-        fastest_quote = min(quotes, key=lambda q: q.eta_days_min, default=None)
+        # Apply Novex markup on top of each carrier's raw price BEFORE picking
+        # cheapest/fastest — the customer-facing amount is what drives badges.
+        markup_calc = await build_markup_calculator_async(
+            db, [q.carrier_code for q in quotes]
+        )
+        computed_rows: list[tuple] = []  # [(carrier_price, markup, customer_price, q), ...]
+        for q in quotes:
+            carrier_price = Decimal(str(q.price))
+            markup = markup_calc.markup_for(q.carrier_code, carrier_price)
+            customer_price = (carrier_price + markup).quantize(Decimal("0.01"))
+            computed_rows.append((carrier_price, markup, customer_price, q))
+
+        cheapest_idx = min(range(len(computed_rows)), key=lambda i: computed_rows[i][2], default=None)
+        fastest_idx = min(range(len(computed_rows)), key=lambda i: computed_rows[i][3].eta_days_min, default=None)
 
         rate_rows: list[RateQuote] = []
-        for q in quotes:
+        for i, (carrier_price, markup, customer_price, q) in enumerate(computed_rows):
             badge = None
-            if cheapest and q.tariff_code == cheapest.tariff_code:
+            if i == cheapest_idx:
                 badge = "best_value"
-            elif fastest_quote and q.tariff_code == fastest_quote.tariff_code:
+            elif i == fastest_idx:
                 badge = "fastest"
 
             rq = RateQuote(
@@ -82,7 +95,12 @@ class QuotesService:
                 carrier_code=q.carrier_code,
                 carrier_name=q.carrier_name,
                 tariff_name=q.tariff_name,
-                price=q.price,
+                # Store customer-facing price in `price` (unchanged contract for
+                # order creation and payments) and the raw carrier amount +
+                # markup in the new columns.
+                price=customer_price,
+                carrier_price=carrier_price,
+                markup_amount=markup,
                 currency=q.currency,
                 eta_days_min=q.eta_days_min,
                 eta_days_max=q.eta_days_max,

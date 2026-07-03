@@ -32,51 +32,73 @@ class CommissionsService:
         gross_amount: Decimal,
         currency: str = "KZT",
         rate: Decimal = DEFAULT_COMMISSION_RATE,
+        precomputed_markup: Decimal | None = None,
+        carrier_payout: Decimal | None = None,
     ) -> CommissionResponse:
-        config = db.scalar(
-            select(CarrierCommissionConfig).where(
-                CarrierCommissionConfig.carrier_code == carrier_code
-            )
-        )
+        """Persist a commission row for an order that just got paid.
 
-        if config is not None:
-            commission_amount = self._calculate(
-                gross_amount=gross_amount,
-                commission_type=config.commission_type,
-                commission_rate=Decimal(str(config.commission_rate))
-                if config.commission_rate
-                else Decimal("0"),
-                fixed_amount=Decimal(str(config.fixed_amount))
-                if config.fixed_amount
-                else Decimal("0"),
-            )
+        `precomputed_markup` — the markup already stored on the order at quote
+        time. When provided we skip re-reading commission configs and just
+        record the exact amounts the customer was quoted. This prevents drift
+        if admin edits the rate between quote and payment.
+        `carrier_payout` — what perevozchik receives (gross_amount - markup).
+        """
+        if precomputed_markup is not None:
+            commission_amount = Decimal(str(precomputed_markup)).quantize(Decimal("0.01"))
             effective_rate = (
-                Decimal(str(config.commission_rate))
-                if config.commission_rate
-                else Decimal("0")
+                (commission_amount / gross_amount).quantize(Decimal("0.0001"))
+                if gross_amount and gross_amount > 0 else Decimal("0")
             )
         else:
-            # No carrier-specific config — fall back to global platform rate.
-            global_rate_raw = _settings_repo.get(db, "commission_rate", default="")
-            if global_rate_raw:
-                try:
-                    effective_rate = Decimal(global_rate_raw)
-                except InvalidOperation:
-                    logger.warning(
-                        "Invalid global commission_rate value '%s'; using 0", global_rate_raw
-                    )
-                    effective_rate = rate
-            else:
-                effective_rate = rate  # DEFAULT_COMMISSION_RATE = 0.00
-            if effective_rate == Decimal("0"):
-                logger.warning(
-                    "Commission recorded with rate=0 for carrier '%s' order_id=%s — "
-                    "configure a CarrierCommissionConfig or set the global 'commission_rate' "
-                    "in platform settings.",
-                    carrier_code,
-                    order_draft_id,
+            # Fallback path: order predates markup capture (migration 032) or
+            # caller didn't supply it. Recompute from live config.
+            config = db.scalar(
+                select(CarrierCommissionConfig).where(
+                    CarrierCommissionConfig.carrier_code == carrier_code
                 )
-            commission_amount = (gross_amount * effective_rate).quantize(Decimal("0.01"))
+            )
+
+            if config is not None:
+                commission_amount = self._calculate(
+                    gross_amount=gross_amount,
+                    commission_type=config.commission_type,
+                    commission_rate=Decimal(str(config.commission_rate))
+                    if config.commission_rate
+                    else Decimal("0"),
+                    fixed_amount=Decimal(str(config.fixed_amount))
+                    if config.fixed_amount
+                    else Decimal("0"),
+                )
+                effective_rate = (
+                    Decimal(str(config.commission_rate))
+                    if config.commission_rate
+                    else Decimal("0")
+                )
+            else:
+                global_rate_raw = _settings_repo.get(db, "commission_rate", default="")
+                if global_rate_raw:
+                    try:
+                        effective_rate = Decimal(global_rate_raw)
+                    except InvalidOperation:
+                        logger.warning(
+                            "Invalid global commission_rate value '%s'; using 0", global_rate_raw
+                        )
+                        effective_rate = rate
+                else:
+                    effective_rate = rate
+                if effective_rate == Decimal("0"):
+                    logger.warning(
+                        "Commission recorded with rate=0 for carrier '%s' order_id=%s — "
+                        "configure a CarrierCommissionConfig or set the global 'commission_rate' "
+                        "in platform settings.",
+                        carrier_code,
+                        order_draft_id,
+                    )
+                commission_amount = (gross_amount * effective_rate).quantize(Decimal("0.01"))
+
+        # Default carrier_payout so the payouts view has no NULLs on new rows.
+        if carrier_payout is None:
+            carrier_payout = (gross_amount - commission_amount).quantize(Decimal("0.01"))
 
         c = self.repo.create(
             db,
@@ -86,10 +108,12 @@ class CommissionsService:
             commission_rate=effective_rate,
             commission_amount=commission_amount,
             currency=currency,
+            carrier_payout=carrier_payout,
         )
         logger.info(
-            "Commission recorded: order_id=%s amount=%s carrier=%s",
+            "Commission recorded: order_id=%s payout=%s profit=%s carrier=%s",
             order_draft_id,
+            carrier_payout,
             commission_amount,
             carrier_code,
         )
@@ -155,6 +179,7 @@ class CommissionsService:
         data = self.repo.summary(db, date_from=date_from, date_to=date_to, carrier_code=carrier_code)
         return CommissionSummary(
             total_gross=Decimal(str(data["total_gross"])),
+            total_carrier_payout=Decimal(str(data["total_carrier_payout"])),
             total_commission=Decimal(str(data["total_commission"])),
             currency="KZT",
             count=data["count"],

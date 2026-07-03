@@ -34,7 +34,9 @@ export interface AdminOrderRow {
   carrier_name: string;
   carrier_code: string | null;
   tariff_name: string;
-  price: number;
+  price: number;              // Customer-facing total (carrier_price + markup)
+  carrier_price: number;      // What perevozchik is owed
+  markup_amount: number;      // Novex profit for this order
   currency: string;
   created_at: string;
   tracking_number: string | null;
@@ -105,8 +107,9 @@ export interface AdminCommission {
 }
 
 export interface CommissionSummary {
-  total_gross: number;
-  total_commission: number;
+  total_gross: number;            // Turnover: what customers paid
+  total_carrier_payout: number;   // What Novex owes perevozchiks
+  total_commission: number;       // Novex profit / markup
   currency: string;
   count: number;
 }

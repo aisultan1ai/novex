@@ -63,7 +63,16 @@ class RateQuote(Base):
     carrier_name: Mapped[str] = mapped_column(String(100), nullable=False)
     tariff_name: Mapped[str] = mapped_column(String(100), nullable=False)
 
+    # price = customer-facing total (carrier_price + markup). This is the value
+    # shown on /quote/results and paid at checkout.
     price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    # carrier_price = raw amount from the carrier's API / tariff table before
+    # Novex markup is applied. Nullable for backwards compatibility with rows
+    # written before migration 032; new quotes always populate it.
+    carrier_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    # markup_amount = price - carrier_price. Stored explicitly so accounting
+    # does not have to reconstruct the arithmetic later.
+    markup_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="KZT")
 
     eta_days_min: Mapped[int] = mapped_column(Integer, nullable=False)

@@ -94,6 +94,8 @@ class OrdersRepository:
         to_city_snapshot: str,
         shipment_type_snapshot: str,
         status: str = "draft",
+        carrier_price_snapshot: Decimal | None = None,
+        markup_amount_snapshot: Decimal | None = None,
     ) -> OrderDraft:
         order_draft = OrderDraft(
             user_id=user_id,
@@ -104,6 +106,8 @@ class OrdersRepository:
             carrier_name_snapshot=carrier_name_snapshot,
             tariff_name_snapshot=tariff_name_snapshot,
             price_snapshot=price_snapshot,
+            carrier_price_snapshot=carrier_price_snapshot,
+            markup_amount_snapshot=markup_amount_snapshot,
             currency_snapshot=currency_snapshot,
             eta_days_min_snapshot=eta_days_min_snapshot,
             eta_days_max_snapshot=eta_days_max_snapshot,
@@ -135,12 +139,16 @@ class OrdersRepository:
         to_country_snapshot: str,
         to_city_snapshot: str,
         shipment_type_snapshot: str,
+        carrier_price_snapshot: Decimal | None = None,
+        markup_amount_snapshot: Decimal | None = None,
     ) -> OrderDraft:
         order_draft.selected_rate_quote_id = selected_rate_quote_id
         order_draft.carrier_code_snapshot = carrier_code_snapshot
         order_draft.carrier_name_snapshot = carrier_name_snapshot
         order_draft.tariff_name_snapshot = tariff_name_snapshot
         order_draft.price_snapshot = price_snapshot
+        order_draft.carrier_price_snapshot = carrier_price_snapshot
+        order_draft.markup_amount_snapshot = markup_amount_snapshot
         order_draft.currency_snapshot = currency_snapshot
         order_draft.eta_days_min_snapshot = eta_days_min_snapshot
         order_draft.eta_days_max_snapshot = eta_days_max_snapshot

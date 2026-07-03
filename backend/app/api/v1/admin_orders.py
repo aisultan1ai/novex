@@ -155,6 +155,10 @@ def list_all_orders(
             "carrier_code": o.carrier_code_snapshot,
             "tariff_name": o.tariff_name_snapshot,
             "price": float(o.price_snapshot),
+            # carrier_price: what perevozchik receives. Falls back to price for
+            # legacy rows created before migration 032 introduced the split.
+            "carrier_price": float(o.carrier_price_snapshot) if o.carrier_price_snapshot is not None else float(o.price_snapshot),
+            "markup_amount": float(o.markup_amount_snapshot) if o.markup_amount_snapshot is not None else 0.0,
             "currency": o.currency_snapshot,
             "created_at": o.created_at.isoformat(),
             "tracking_number": shipments_map[o.id].tracking_number if o.id in shipments_map else None,
@@ -201,6 +205,8 @@ def get_order(
         "carrier_name": order.carrier_name_snapshot,
         "tariff_name": order.tariff_name_snapshot,
         "price": float(order.price_snapshot),
+        "carrier_price": float(order.carrier_price_snapshot) if order.carrier_price_snapshot is not None else float(order.price_snapshot),
+        "markup_amount": float(order.markup_amount_snapshot) if order.markup_amount_snapshot is not None else 0.0,
         "currency": order.currency_snapshot,
         "eta_days_min": order.eta_days_min_snapshot,
         "eta_days_max": order.eta_days_max_snapshot,

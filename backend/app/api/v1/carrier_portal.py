@@ -194,12 +194,22 @@ def _order_to_dict(
     packages: list,
     shipment: "Shipment | None" = None,
 ) -> dict:
+    # Perevozchik sees only their side of the transaction: carrier_price_snapshot
+    # (what Novex owes them) — never the customer-facing price that includes
+    # the Novex markup. Fall back to price_snapshot for orders created before
+    # migration 032, where the customer paid the raw carrier amount and there
+    # is no separate carrier value.
+    carrier_payout = (
+        float(order.carrier_price_snapshot)
+        if order.carrier_price_snapshot is not None
+        else float(order.price_snapshot)
+    )
     return {
         "id": order.id,
         "status": order.status,
         "carrier_code": order.carrier_code_snapshot,
         "tariff_name": order.tariff_name_snapshot,
-        "price": float(order.price_snapshot),
+        "price": carrier_payout,
         "currency": order.currency_snapshot,
         "from_city": order.from_city_snapshot,
         "to_city": order.to_city_snapshot,

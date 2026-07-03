@@ -281,6 +281,11 @@ class PaymentService:
                 carrier_code=order.carrier_code_snapshot,
                 gross_amount=tx.amount,
                 currency=tx.currency,
+                # Reuse the markup captured at quote time so the customer sees
+                # exactly what they were quoted, even if admin edits the rate
+                # after quoting but before payment.
+                precomputed_markup=order.markup_amount_snapshot,
+                carrier_payout=order.carrier_price_snapshot,
             )
             # Create internal shipment record immediately so customer sees tracking number
             _shipments_svc.create_for_order(
@@ -435,6 +440,11 @@ class PaymentService:
                 carrier_code=order.carrier_code_snapshot,
                 gross_amount=tx.amount,
                 currency=tx.currency,
+                # Reuse the markup captured at quote time so the customer sees
+                # exactly what they were quoted, even if admin edits the rate
+                # after quoting but before payment.
+                precomputed_markup=order.markup_amount_snapshot,
+                carrier_payout=order.carrier_price_snapshot,
             )
             _shipments_svc.create_for_order(
                 db,

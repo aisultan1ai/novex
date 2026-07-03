@@ -56,7 +56,13 @@ class OrderDraft(Base, TimestampMixin):
     carrier_name_snapshot: Mapped[str] = mapped_column(String(100), nullable=False)
     tariff_name_snapshot: Mapped[str] = mapped_column(String(100), nullable=False)
 
+    # price_snapshot = customer-facing total = what the customer is charged.
     price_snapshot: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    # carrier_price_snapshot = carrier-side amount (what perevozchik receives).
+    # markup_amount_snapshot = the Novex commission / markup on top.
+    # Both are nullable so orders created before migration 032 remain valid.
+    carrier_price_snapshot: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    markup_amount_snapshot: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     currency_snapshot: Mapped[str] = mapped_column(String(3), nullable=False)
 
     eta_days_min_snapshot: Mapped[int] = mapped_column(Integer, nullable=False)
