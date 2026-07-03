@@ -16,7 +16,6 @@ from app.modules.dispatch.models import OrderStatusHistory
 from app.modules.dispatch.service import create_dispatch_job
 from app.modules.notifications.service import NotificationsService
 from app.modules.orders.models import OrderDraft
-from app.modules.shipments.service import ShipmentsService
 from app.modules.payments.providers.manual_bank_transfer import (
     ManualBankTransferProvider,
 )
@@ -30,6 +29,7 @@ from app.modules.payments.transaction_models import (
     TxStatus,
 )
 from app.modules.platform_settings.repository import PlatformSettingsRepository
+from app.modules.shipments.service import ShipmentsService
 
 logger = logging.getLogger(__name__)
 _notifications_svc = NotificationsService()

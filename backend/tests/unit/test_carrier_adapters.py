@@ -16,11 +16,10 @@ import xml.etree.ElementTree as ET
 from unittest.mock import MagicMock, patch
 
 from app.modules.carriers.api_clients.cse import (
-    _tracking_events_from,
     CSEAPIClient,
+    _tracking_events_from,
 )
 from app.modules.carriers.api_clients.exline import ExlineAPIClient
-
 
 # ---------------------------------------------------------------------------
 # Exline
@@ -167,7 +166,7 @@ class TestCSETrackingParsing:
     def test_parses_order_level_events_from_direct_list_children(self):
         """Per CSE docs (page 137–145), status events are direct <m:List> children
         of the document List, not inside <m:Tables>."""
-        return_inner = f"""
+        return_inner = """
         <m:Key>Tracking</m:Key>
         <m:List>
           <m:Key>888-0000111636</m:Key>

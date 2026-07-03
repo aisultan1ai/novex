@@ -43,6 +43,17 @@ _cargo_type_guid_cache: dict[str, str] = {}
 # XML helpers (also imported by tariff_engine for async calls)
 # ---------------------------------------------------------------------------
 
+def _prop(key: str, value: str) -> str:
+    """Build a <m:Properties> element with string ValueType."""
+    return (
+        "<m:Properties>"
+        f"<m:Key>{key}</m:Key>"
+        f"<m:Value>{value}</m:Value>"
+        "<m:ValueType>string</m:ValueType>"
+        "</m:Properties>"
+    )
+
+
 def _esc(s: str) -> str:
     return (
         s.replace("&", "&amp;")
@@ -580,11 +591,11 @@ class CSEAPIClient(CarrierAPIClient):
             + "<m:Key>parameters</m:Key>"
             + "<m:List>"
             + "<m:Key>parameters</m:Key>"
-            + "<m:Properties><m:Key>DocumentType</m:Key><m:Value>Order</m:Value><m:ValueType>string</m:ValueType></m:Properties>"
-            + f"<m:Properties><m:Key>Number</m:Key><m:Value>{_esc(waybill_number)}</m:Value><m:ValueType>string</m:ValueType></m:Properties>"
-            + f"<m:Properties><m:Key>Reason</m:Key><m:Value>{_esc(reason)}</m:Value><m:ValueType>string</m:ValueType></m:Properties>"
-            + f"<m:Properties><m:Key>ClientContact</m:Key><m:Value>{_esc(contact)}</m:Value><m:ValueType>string</m:ValueType></m:Properties>"
-            + f"<m:Properties><m:Key>Phone</m:Key><m:Value>{_esc(phone)}</m:Value><m:ValueType>string</m:ValueType></m:Properties>"
+            + _prop("DocumentType", "Order")
+            + _prop("Number", _esc(waybill_number))
+            + _prop("Reason", _esc(reason))
+            + _prop("ClientContact", _esc(contact))
+            + _prop("Phone", _esc(phone))
             + "</m:List>"
             + "</m:parameters>"
         )
@@ -842,8 +853,8 @@ class CSEAPIClient(CarrierAPIClient):
             f"<m:TypeOfPayer>0</m:TypeOfPayer>"
             f"<m:WayOfPayment>1</m:WayOfPayment>"
             + comment_xml +
-            f"</m:OrderData>"
-            f"<m:Office/>"
+            "</m:OrderData>"
+            "<m:Office/>"
         )
         resp_xml = httpx.post(
             self._url(creds),

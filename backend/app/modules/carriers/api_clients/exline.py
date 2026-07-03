@@ -315,9 +315,12 @@ class ExlineAPIClient(CarrierAPIClient):
         )
         root = self._post_xml(xml, self._api_url(creds))
         cities = []
+        def _town_val(t: ET.Element, k: str) -> str:
+            child = t.find(k)
+            return t.attrib.get(k) or (child.text if child is not None else "") or ""
+
         for town in root.findall("town"):
-            cities.append({k: (town.attrib.get(k) or (town.find(k).text if town.find(k) is not None else ""))
-                           for k in ("name", "code", "region", "district", "type")})
+            cities.append({k: _town_val(town, k) for k in ("name", "code", "region", "district", "type")})
         return cities
 
     def test_connection(self, creds: dict) -> bool:

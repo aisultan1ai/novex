@@ -10,7 +10,6 @@ from app.core.exceptions import ForbiddenError, NotFoundError, ValidationError
 from app.modules.address_book.repository import AddressBookRepository
 from app.modules.orders.models import OrderDraft, ShipmentPackage, ShipmentParty
 from app.modules.orders.repository import OrdersRepository
-from app.modules.shipments.models import Shipment
 from app.modules.orders.schemas import (
     CreateDraftFromQuoteRequest,
     OrderDraftListResponse,
@@ -21,6 +20,7 @@ from app.modules.orders.schemas import (
     UpdateShipmentDetailsRequest,
 )
 from app.modules.quotes.models import QuoteSession
+from app.modules.shipments.models import Shipment
 
 logger = logging.getLogger(__name__)
 

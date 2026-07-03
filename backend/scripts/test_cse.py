@@ -15,7 +15,6 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
 import httpx
 
 from app.modules.carriers.api_clients.cse import (
-    DEFAULT_API_URL,
     CSEAPIClient,
     build_envelope,
 )

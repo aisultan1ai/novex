@@ -71,7 +71,9 @@ ignore = ["B008", "UP046", "B904"]
 # workers/main.py imports ORM models after sentinel constants (intentional ordering).
 "workers/main.py" = ["E402"]
 # One-off scripts use sys.path manipulation before imports.
-"scripts/*.py" = ["E402"]
+"scripts/*.py" = ["E402", "E501"]
+# Carrier tariff engine contains static data dicts with long note strings.
+"app/modules/carriers/tariff_engine.py" = ["E501"]
 
 [tool.mypy]
 python_version = "3.12"

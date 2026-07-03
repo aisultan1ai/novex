@@ -192,7 +192,7 @@ def _order_to_dict(
     order: OrderDraft,
     parties: list,
     packages: list,
-    shipment: "Shipment | None" = None,
+    shipment: Shipment | None = None,
 ) -> dict:
     # Perevozchik sees only their side of the transaction: carrier_price_snapshot
     # (what Novex owes them) — never the customer-facing price that includes

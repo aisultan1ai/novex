@@ -9,8 +9,8 @@ requirement: if any carrier has a config, others still fall back to the global.
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from decimal import Decimal, InvalidOperation
-from typing import Iterable
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -117,7 +117,7 @@ async def build_markup_calculator_async(
         from app.core.redis import get_redis
         cached = get_redis().get("pset:commission_rate")
         if cached is not None:
-            raw_rate = cached if isinstance(cached, str) else cached.decode()
+            raw_rate = cached if isinstance(cached, str) else cached.decode()  # type: ignore[union-attr]
     except Exception:
         pass
     if not raw_rate:

@@ -50,7 +50,7 @@ def _get_creds(db: Session, carrier_code: str) -> dict:
         from app.core.redis import get_redis
         cached = get_redis().get(cache_key)
         if cached:
-            return json.loads(cached)
+            return json.loads(cached)  # type: ignore[arg-type]
     except Exception as exc:
         logger.debug("Creds cache read failed for %s: %s", carrier_code, exc)
 

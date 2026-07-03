@@ -127,7 +127,7 @@ class QuotesService:
             public_token=quote_session.public_token,
             quotes=[
                 self._to_item(rq, q.available_services)
-                for rq, q in zip(rate_rows, quotes)
+                for rq, q in zip(rate_rows, quotes, strict=False)
             ],
         )
 

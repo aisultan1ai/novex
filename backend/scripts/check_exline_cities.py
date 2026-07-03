@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Получает список городов Exline через API справочник (townlist).
 Если справочник пустой — тестирует каждый город через калькулятор.
@@ -129,7 +128,7 @@ def main() -> None:
         print("    Pример: EXLINE_EXTRA=447 EXLINE_LOGIN=test EXLINE_PASSWORD=test123 python scripts/check_exline_cities.py")
         sys.exit(1)
 
-    print(f"Zapros spravoчnika gorodov (townlist)...\n")
+    print("Zapros spravoчnika gorodov (townlist)...\n")
     try:
         cities = fetch_townlist()
     except Exception as e:
