@@ -441,7 +441,22 @@ function ShipmentPageInner() {
 
   function loadSavedForm(): ShipmentFormState | null {
     if (!storageKey) return null;
-    try { const raw = sessionStorage.getItem(storageKey); return raw ? JSON.parse(raw) : null; } catch { return null; }
+    try {
+      const raw = sessionStorage.getItem(storageKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as Partial<ShipmentFormState>;
+      // Backfill fields that may be missing from forms cached before their addition.
+      // Without this, sessionStorage from an older build silently strips fields.
+      return {
+        sender: parsed.sender ?? emptyParty(),
+        recipient: parsed.recipient ?? emptyParty(),
+        packageItem: parsed.packageItem ?? emptyPackage(),
+        call_before_delivery: parsed.call_before_delivery ?? false,
+        insurance: parsed.insurance ?? false,
+        fragile: parsed.fragile ?? false,
+        declared_value: parsed.declared_value ?? "",
+      };
+    } catch { return null; }
   }
   function saveForm(f: ShipmentFormState) {
     if (!storageKey) return;

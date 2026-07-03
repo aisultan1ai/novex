@@ -283,6 +283,24 @@ function OrderDetailPanel({ orderId }: { orderId: number }) {
         </div>
       )}
 
+      {/* ── Данные перевозчика ───────────────────────────────────────── */}
+      {(detail.carrier_barcode || detail.carrier_tracking_number) && (
+        <div style={dp.section}>
+          <div style={dp.sectionTitle}>Данные перевозчика (ответ API)</div>
+          <div style={dp.grid3}>
+            {detail.carrier_code && (
+              <dp.Field label="Перевозчик" value={detail.carrier_code} />
+            )}
+            {detail.carrier_tracking_number && (
+              <dp.Field label="Номер заказа (наш orderno)" value={detail.carrier_tracking_number} mono />
+            )}
+            {detail.carrier_barcode && (
+              <dp.Field label="Штрих-код (barcode)" value={detail.carrier_barcode} mono />
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── Маршрут ─────────────────────────────────────────────────── */}
       <div style={dp.section}>
         <div style={dp.sectionTitle}>Маршрут</div>
@@ -362,6 +380,8 @@ export default function AdminOrdersPage() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("");
+  const [barcodeQuery, setBarcodeQuery] = useState("");
+  const [barcodeInput, setBarcodeInput] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -376,11 +396,16 @@ export default function AdminOrdersPage() {
 
   const load = useCallback(() => {
     setIsLoading(true);
-    listAdminOrders({ page, size: SIZE, status: statusFilter || undefined })
+    listAdminOrders({
+      page,
+      size: SIZE,
+      status: statusFilter || undefined,
+      barcode: barcodeQuery.trim() || undefined,
+    })
       .then((res) => { setOrders(res.items); setTotal(res.total); })
       .catch((e: Error) => setError(e.message))
       .finally(() => setIsLoading(false));
-  }, [page, statusFilter]);
+  }, [page, statusFilter, barcodeQuery]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -406,16 +431,40 @@ export default function AdminOrdersPage() {
           <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0f172a" }}>Заказы</h2>
           <p style={{ margin: "4px 0 0", fontSize: 14, color: "#64748b" }}>Все заказы платформы · {total} всего</p>
         </div>
-        <select
-          value={statusFilter}
-          onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#ffffff", fontSize: 14, cursor: "pointer", fontFamily: "inherit", color: "#0f172a" }}
-        >
-          <option value="">Все статусы</option>
-          {ALL_STATUSES.map((s) => (
-            <option key={s} value={s}>{STATUS_LABELS[s]}</option>
-          ))}
-        </select>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <form
+            onSubmit={(e) => { e.preventDefault(); setBarcodeQuery(barcodeInput); setPage(1); }}
+            style={{ display: "flex", gap: 6 }}
+          >
+            <input
+              type="text"
+              placeholder="Поиск по ШК / трек-номеру"
+              value={barcodeInput}
+              onChange={(e) => setBarcodeInput(e.target.value)}
+              style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#ffffff", fontSize: 14, fontFamily: "inherit", color: "#0f172a", minWidth: 240, outline: "none" }}
+            />
+            {barcodeQuery && (
+              <button
+                type="button"
+                onClick={() => { setBarcodeInput(""); setBarcodeQuery(""); setPage(1); }}
+                style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#ffffff", fontSize: 14, cursor: "pointer", fontFamily: "inherit", color: "#64748b" }}
+                title="Сбросить поиск"
+              >
+                ×
+              </button>
+            )}
+          </form>
+          <select
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+            style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#ffffff", fontSize: 14, cursor: "pointer", fontFamily: "inherit", color: "#0f172a" }}
+          >
+            <option value="">Все статусы</option>
+            {ALL_STATUSES.map((s) => (
+              <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {error && <div style={{ padding: "12px 16px", borderRadius: 10, background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c", fontSize: 14, marginBottom: 20 }}>{error}</div>}
@@ -466,6 +515,9 @@ export default function AdminOrdersPage() {
                     <div style={{ fontSize: 11, color: "#94a3b8" }}>{new Date(order.created_at).toLocaleDateString("ru-RU")}</div>
                     {order.tracking_number && (
                       <div style={{ fontSize: 11, color: "#1d4ed8", fontFamily: "monospace", marginTop: 2 }}>{order.tracking_number}</div>
+                    )}
+                    {order.carrier_barcode && order.carrier_barcode !== order.carrier_tracking_number && (
+                      <div style={{ fontSize: 11, color: "#94a3b8", fontFamily: "monospace" }} title="Штрих-код перевозчика">ШК: {order.carrier_barcode}</div>
                     )}
                   </div>
 

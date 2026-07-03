@@ -19,6 +19,7 @@ from app.modules.documents.models import Document, DocumentType
 from app.modules.identity.models import User
 from app.modules.notifications.repository import NotificationsRepository
 from app.modules.orders.models import OrderDraft, ShipmentPackage, ShipmentParty
+from app.modules.shipments.models import Shipment
 from app.modules.tracking.models import TrackingEvent
 
 router = APIRouter(prefix="/carrier", tags=["carrier-portal"])
@@ -187,7 +188,12 @@ def _get_order_for_carrier(db: Session, order_id: int, carrier_code: str) -> Ord
     return order
 
 
-def _order_to_dict(order: OrderDraft, parties: list, packages: list) -> dict:
+def _order_to_dict(
+    order: OrderDraft,
+    parties: list,
+    packages: list,
+    shipment: "Shipment | None" = None,
+) -> dict:
     return {
         "id": order.id,
         "status": order.status,
@@ -200,6 +206,11 @@ def _order_to_dict(order: OrderDraft, parties: list, packages: list) -> dict:
         "eta_days_min": order.eta_days_min_snapshot,
         "eta_days_max": order.eta_days_max_snapshot,
         "created_at": order.created_at.isoformat(),
+        # Carrier-side identifiers — shown to the carrier operator so they can
+        # match Novex orders to entries in their own back-office / physical shipments.
+        "tracking_number": shipment.tracking_number if shipment else None,
+        "carrier_tracking_number": shipment.carrier_tracking_number if shipment else None,
+        "carrier_barcode": shipment.carrier_barcode if shipment else None,
         "parties": [
             {
                 "role": p.role,
@@ -260,7 +271,19 @@ def list_orders(
         .limit(size)
     ).all()
 
-    items = [_order_to_dict(order, list(order.parties), list(order.packages)) for order in orders]
+    order_ids = [o.id for o in orders]
+    shipments_map: dict[int, Shipment] = {}
+    if order_ids:
+        shps = db.scalars(select(Shipment).where(Shipment.order_draft_id.in_(order_ids))).all()
+        shipments_map = {s.order_draft_id: s for s in shps}
+
+    items = [
+        _order_to_dict(
+            order, list(order.parties), list(order.packages),
+            shipment=shipments_map.get(order.id),
+        )
+        for order in orders
+    ]
 
     return {"items": items, "total": total or 0, "page": page, "size": size}
 
@@ -293,7 +316,8 @@ def get_order(
         .order_by(TrackingEvent.occurred_at.desc())
     ).all()
 
-    result = _order_to_dict(order, list(parties), list(packages))
+    shipment = db.scalar(select(Shipment).where(Shipment.order_draft_id == order.id))
+    result = _order_to_dict(order, list(parties), list(packages), shipment=shipment)
     result["proof_of_delivery"] = [
         {
             "id": d.id,

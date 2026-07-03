@@ -100,14 +100,28 @@ def list_all_orders(
     size: int = Query(default=20, ge=1, le=100),
     status: str | None = Query(default=None),
     user_id: int | None = Query(default=None),
+    barcode: str | None = Query(default=None, description="Substring match on carrier barcode / tracking numbers"),
     db: Session = Depends(get_db),
     _=Depends(require_admin_or_operator),
 ) -> dict:
+    from app.modules.shipments.models import Shipment as _Shipment
+
     stmt = select(OrderDraft).order_by(OrderDraft.created_at.desc())
     if status:
         stmt = stmt.where(OrderDraft.status == status)
     if user_id:
         stmt = stmt.where(OrderDraft.user_id == user_id)
+    if barcode:
+        # Match any of the three identifiers admin might scan / type:
+        #  · Novex tracking_number (CSE-ABC123..., customer-facing)
+        #  · carrier_tracking_number (Exline orderno / CSE order number)
+        #  · carrier_barcode (physical scannable code on package)
+        needle = f"%{barcode.strip()}%"
+        stmt = stmt.join(_Shipment, _Shipment.order_draft_id == OrderDraft.id).where(
+            (_Shipment.tracking_number.ilike(needle))
+            | (_Shipment.carrier_tracking_number.ilike(needle))
+            | (_Shipment.carrier_barcode.ilike(needle))
+        )
 
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     orders = db.scalars(stmt.offset((page - 1) * size).limit(size)).all()
@@ -118,12 +132,11 @@ def list_all_orders(
         users = db.scalars(select(User).where(User.id.in_(user_ids))).all()
         users_map = {u.id: u for u in users}
 
-    from app.modules.shipments.models import Shipment as _Shipment
     order_ids = [o.id for o in orders]
-    shipments_map: dict[int, str] = {}
+    shipments_map: dict[int, _Shipment] = {}
     if order_ids:
         shps = db.scalars(select(_Shipment).where(_Shipment.order_draft_id.in_(order_ids))).all()
-        shipments_map = {s.order_draft_id: s.tracking_number for s in shps}
+        shipments_map = {s.order_draft_id: s for s in shps}
 
     items = [
         {
@@ -139,11 +152,14 @@ def list_all_orders(
             "from_city": o.from_city_snapshot,
             "to_city": o.to_city_snapshot,
             "carrier_name": o.carrier_name_snapshot,
+            "carrier_code": o.carrier_code_snapshot,
             "tariff_name": o.tariff_name_snapshot,
             "price": float(o.price_snapshot),
             "currency": o.currency_snapshot,
             "created_at": o.created_at.isoformat(),
-            "tracking_number": shipments_map.get(o.id),
+            "tracking_number": shipments_map[o.id].tracking_number if o.id in shipments_map else None,
+            "carrier_tracking_number": shipments_map[o.id].carrier_tracking_number if o.id in shipments_map else None,
+            "carrier_barcode": shipments_map[o.id].carrier_barcode if o.id in shipments_map else None,
         }
         for o in orders
     ]
@@ -189,8 +205,10 @@ def get_order(
         "eta_days_min": order.eta_days_min_snapshot,
         "eta_days_max": order.eta_days_max_snapshot,
         "shipment_type": order.shipment_type_snapshot,
+        "carrier_code": order.carrier_code_snapshot,
         "tracking_number": shipment.tracking_number if shipment else None,
         "carrier_tracking_number": shipment.carrier_tracking_number if shipment else None,
+        "carrier_barcode": shipment.carrier_barcode if shipment else None,
         "created_at": order.created_at.isoformat(),
         "updated_at": order.updated_at.isoformat(),
         "parties": [

@@ -167,6 +167,33 @@ export default function CarrierOrderDetailPage() {
         </div>
       )}
 
+      {/* Carrier IDs — orderno / barcode returned by carrier API */}
+      {(order.carrier_tracking_number || order.carrier_barcode) && (
+        <div style={styles.card}>
+          <div style={styles.cardTitle}>Идентификаторы</div>
+          <div style={styles.row}>
+            {order.carrier_tracking_number && (
+              <div style={styles.col}>
+                <div style={styles.label}>Номер заказа</div>
+                <div style={{ ...styles.value, fontFamily: "monospace" }}>{order.carrier_tracking_number}</div>
+              </div>
+            )}
+            {order.carrier_barcode && (
+              <div style={styles.col}>
+                <div style={styles.label}>Штрих-код</div>
+                <div style={{ ...styles.value, fontFamily: "monospace" }}>{order.carrier_barcode}</div>
+              </div>
+            )}
+            {order.tracking_number && (
+              <div style={styles.col}>
+                <div style={styles.label}>Внутренний ID Novex</div>
+                <div style={{ ...styles.value, fontFamily: "monospace" }}>{order.tracking_number}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Route + info */}
       <div style={styles.card}>
         <div style={styles.cardTitle}>Маршрут и тариф</div>

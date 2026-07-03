@@ -55,6 +55,10 @@ export interface CarrierOrderItem {
   packages: CarrierOrderPackage[];
   proof_of_delivery?: CarrierOrderPod[];
   tracking_events?: { status: string; description: string | null; location: string | null; occurred_at: string }[];
+  // Carrier-side identifiers (from carrier API response after dispatch)
+  tracking_number: string | null;
+  carrier_tracking_number: string | null;
+  carrier_barcode: string | null;
 }
 
 export interface CarrierOrdersResponse {

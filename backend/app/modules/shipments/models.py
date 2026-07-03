@@ -21,8 +21,18 @@ class Shipment(Base):
     tracking_number: Mapped[str] = mapped_column(
         String(100), nullable=False, unique=True, index=True
     )
+    # Carrier's own order identifier — the value we submit to statusreq / Tracking
+    # to query carrier status. For Exline this is the client-side orderno
+    # (NOVEX-000042); for CSE the SaveWaybillOffice order number.
     carrier_tracking_number: Mapped[str | None] = mapped_column(
         String(100), nullable=True
+    )
+    # Physical barcode / awb printed on the package. Distinct from
+    # carrier_tracking_number for carriers that separate internal orderno from
+    # scannable code (Exline: KAZ000088138). None if the carrier does not issue one.
+    # Indexed to support admin search by scanning a package.
+    carrier_barcode: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, index=True
     )
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="created")
     created_at: Mapped[datetime] = mapped_column(

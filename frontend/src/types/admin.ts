@@ -32,18 +32,20 @@ export interface AdminOrderRow {
   from_city: string;
   to_city: string;
   carrier_name: string;
+  carrier_code: string | null;
   tariff_name: string;
   price: number;
   currency: string;
   created_at: string;
   tracking_number: string | null;
+  carrier_tracking_number: string | null;
+  carrier_barcode: string | null;
 }
 
 export interface AdminOrderDetail extends AdminOrderRow {
   eta_days_min: number;
   eta_days_max: number;
   shipment_type: string;
-  carrier_tracking_number: string | null;
   updated_at: string;
   parties: { role: string; full_name: string; phone: string; city: string; address_line1: string }[];
   packages: { quantity: number; weight_kg: number; description: string }[];

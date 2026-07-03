@@ -58,12 +58,13 @@ export const createAdminUser = (body: AdminUserCreatePayload): Promise<{ id: num
   req("/admin/users", { method: "POST", body: JSON.stringify(body) });
 
 // ── Orders ────────────────────────────────────────────────────────────────────
-export const listAdminOrders = (params: { page?: number; size?: number; status?: string; user_id?: number } = {}): Promise<PaginatedResponse<AdminOrderRow>> => {
+export const listAdminOrders = (params: { page?: number; size?: number; status?: string; user_id?: number; barcode?: string } = {}): Promise<PaginatedResponse<AdminOrderRow>> => {
   const q = new URLSearchParams();
   if (params.page) q.set("page", String(params.page));
   if (params.size) q.set("size", String(params.size));
   if (params.status) q.set("status", params.status);
   if (params.user_id) q.set("user_id", String(params.user_id));
+  if (params.barcode) q.set("barcode", params.barcode);
   return req(`/admin/orders?${q}`);
 };
 

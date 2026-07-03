@@ -6,6 +6,7 @@ import json
 import logging
 import time
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -40,6 +41,13 @@ _shipments_repo = ShipmentsRepository()
 _integration_log = IntegrationLogRepository()
 
 RETRY_DELAYS_SECONDS = [60, 300, 900]
+
+@dataclass
+class _DispatchOutcome:
+    """Values captured from a successful dispatch, to persist on the Shipment."""
+    tracking_number: str | None       # carrier's order ID (statusreq/Tracking lookup key)
+    barcode: str | None               # physical barcode printed on package (may equal tracking_number)
+
 
 _PERMANENT_ERROR_KEYWORDS = (
     "авторизаци",  # CSE/Exline auth failure messages
@@ -180,7 +188,7 @@ class DispatchWorker:
             return
 
         try:
-            tracking_number = self._dispatch_to_carrier(db, order)
+            outcome = self._dispatch_to_carrier(db, order)
 
             _shipments_svc.create_for_order(
                 db,
@@ -188,8 +196,13 @@ class DispatchWorker:
                 carrier_code=order.carrier_code_snapshot,
             )
             shipment = _shipments_repo.get_by_order_id(db, order.id)
-            if shipment and tracking_number:
-                shipment.carrier_tracking_number = tracking_number
+            if shipment and outcome.tracking_number:
+                shipment.carrier_tracking_number = outcome.tracking_number
+                # Persist physical barcode separately — Exline returns a
+                # scannable code distinct from orderno. When carrier does not
+                # issue a distinct barcode (CSE), we fall back to the order
+                # number so admin search still resolves.
+                shipment.carrier_barcode = outcome.barcode or outcome.tracking_number
                 shipment.status = "dispatched"
 
             record_order_status(
@@ -300,7 +313,7 @@ class DispatchWorker:
             return shipment.carrier_tracking_number if shipment else None
         return None
 
-    def _dispatch_to_carrier(self, db: Session, order: OrderDraft) -> str | None:
+    def _dispatch_to_carrier(self, db: Session, order: OrderDraft) -> _DispatchOutcome:
         carrier_code = order.carrier_code_snapshot
 
         # ── Priority 1: carrier API via carrier-gateway ──────────────────────
@@ -332,7 +345,10 @@ class DispatchWorker:
                     db, carrier_code=carrier_code, direction="outbound",
                     event_type="dispatch", order_id=order.id,
                     payload=json.dumps(mask_pii(order_data)),
-                    response=json.dumps({"waybill_number": result.waybill_number}),
+                    response=json.dumps({
+                        "waybill_number": result.waybill_number,
+                        "carrier_invoice_id": result.carrier_invoice_id,
+                    }),
                     duration_ms=duration_ms, status="success",
                 )
             except Exception as exc:
@@ -350,7 +366,10 @@ class DispatchWorker:
 
             if result.waybill_pdf_bytes:
                 _save_waybill_document(db, order, result.waybill_number, result.waybill_pdf_bytes)
-            return result.waybill_number
+            return _DispatchOutcome(
+                tracking_number=result.waybill_number,
+                barcode=result.carrier_invoice_id,
+            )
 
         # ── Priority 2: webhook push (Generic Webhook Dispatcher) ───────────
         cfg = _webhook_repo.get_by_carrier_code(db, carrier_code)
@@ -397,7 +416,12 @@ class DispatchWorker:
                 http_status=resp.status_code,
                 duration_ms=duration_ms, status="success",
             )
-            return resp.json().get("tracking_number")
+            # Generic webhook path: separate barcode field if the carrier sends one.
+            body = resp.json() if resp.text else {}
+            return _DispatchOutcome(
+                tracking_number=body.get("tracking_number"),
+                barcode=body.get("barcode") or body.get("carrier_invoice_id"),
+            )
         except Exception as exc:
             duration_ms = int((time.monotonic() - t0) * 1000)
             http_status = getattr(getattr(exc, "response", None), "status_code", None)
