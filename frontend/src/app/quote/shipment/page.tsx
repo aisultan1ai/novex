@@ -34,6 +34,10 @@ type ShipmentFormState = {
   sender: PartyFormState; recipient: PartyFormState;
   packageItem: PackageFormState;
   call_before_delivery: boolean; insurance: boolean; fragile: boolean;
+  // Filled only when insurance=true. Backend stores it on package[0].declared_value
+  // and forwards to Exline as <inshprice> / to CSE as DeclaredValueRate. Sending
+  // insurance without a real value gets silently ignored by both carriers.
+  declared_value: string;
 };
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
@@ -63,20 +67,28 @@ function mapPartyFormToPayload(party: PartyFormState): ShipmentPartyInput {
   };
 }
 
-function mapPackageFormToPayload(pkg: PackageFormState): ShipmentPackageInput {
+function mapPackageFormToPayload(
+  pkg: PackageFormState,
+  declaredValue: number | null,
+): ShipmentPackageInput {
   return {
     description: pkg.description.trim(), quantity: Number(pkg.quantity),
     weight_kg: Number(pkg.weight_kg), width_cm: Number(pkg.width_cm),
     height_cm: Number(pkg.height_cm), depth_cm: Number(pkg.depth_cm),
-    declared_value: null, declared_value_currency: null,
+    declared_value: declaredValue,
+    declared_value_currency: declaredValue !== null ? "KZT" : null,
   };
 }
 
 function buildShipmentPayload(form: ShipmentFormState): UpdateShipmentDetailsRequest {
+  const parsedDeclared = form.insurance ? Number(form.declared_value) : NaN;
+  const declaredValue = Number.isFinite(parsedDeclared) && parsedDeclared > 0
+    ? parsedDeclared
+    : null;
   return {
     sender: mapPartyFormToPayload(form.sender),
     recipient: mapPartyFormToPayload(form.recipient),
-    packages: [mapPackageFormToPayload(form.packageItem)],
+    packages: [mapPackageFormToPayload(form.packageItem, declaredValue)],
     call_before_delivery: form.call_before_delivery,
     insurance: form.insurance,
     fragile: form.fragile,
@@ -109,6 +121,7 @@ function mapDraftToForm(draft: OrderDraftResponse, user: ProfileResponse | null)
     call_before_delivery: draft.call_before_delivery ?? false,
     insurance: draft.insurance ?? false,
     fragile: draft.fragile ?? false,
+    declared_value: draft.packages[0]?.declared_value != null ? String(draft.packages[0].declared_value) : "",
   };
 }
 
@@ -440,7 +453,7 @@ function ShipmentPageInner() {
   }
 
   const [form, setForm] = useState<ShipmentFormState>(
-    () => loadSavedForm() ?? { sender: emptyParty(), recipient: emptyParty(), packageItem: emptyPackage(), call_before_delivery: false, insurance: false, fragile: false },
+    () => loadSavedForm() ?? { sender: emptyParty(), recipient: emptyParty(), packageItem: emptyPackage(), call_before_delivery: false, insurance: false, fragile: false, declared_value: "" },
   );
 
   const [draft, setDraft] = useState<OrderDraftResponse | null>(null);
@@ -504,7 +517,20 @@ function ShipmentPageInner() {
     updateForm((prev) => ({ ...prev, [role]: { ...prev[role], save_to_address_book: val } }));
   }
   function toggleService(key: "call_before_delivery" | "insurance" | "fragile", val: boolean) {
-    updateForm((prev) => ({ ...prev, [key]: val }));
+    updateForm((prev) => {
+      const next = { ...prev, [key]: val };
+      // Reset declared_value when insurance is turned off so a stale amount
+      // does not silently persist in sessionStorage / draft.
+      if (key === "insurance" && !val) next.declared_value = "";
+      return next;
+    });
+  }
+  function updateDeclaredValue(value: string) {
+    // Allow only digits and one decimal separator.
+    const cleaned = value.replace(",", ".").replace(/[^\d.]/g, "");
+    const parts = cleaned.split(".");
+    const normalized = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join("")}` : cleaned;
+    updateForm((prev) => ({ ...prev, declared_value: normalized }));
   }
   function updatePackageField(key: keyof PackageFormState, value: string) {
     updateForm((prev) => ({ ...prev, packageItem: { ...prev.packageItem, [key]: value } }));
@@ -522,6 +548,12 @@ function ShipmentPageInner() {
       if (!p.width_cm || isNaN(wd) || wd <= 0) return "Укажите ширину.";
       if (!p.height_cm || isNaN(h) || h <= 0) return "Укажите высоту.";
       if (!p.depth_cm || isNaN(d) || d <= 0) return "Укажите глубину.";
+      if (form.insurance) {
+        const dv = Number(form.declared_value);
+        if (!form.declared_value || isNaN(dv) || dv <= 0) {
+          return "Укажите объявленную ценность для страхования.";
+        }
+      }
     }
     if (step === 1) {
       const s = form.sender;
@@ -694,6 +726,20 @@ function ShipmentPageInner() {
                           {label}
                         </label>
                       ))}
+                      {form.insurance && (
+                        <div style={{ marginTop: 4, paddingTop: 12, borderTop: "1px dashed #E5E7EB" }}>
+                          <FormField
+                            label="Объявленная ценность, ₸"
+                            value={form.declared_value}
+                            onChange={updateDeclaredValue}
+                            required
+                            inputMode="decimal"
+                          />
+                          <div style={{ marginTop: 6, font: "400 12px/1.4 Inter Variable, sans-serif", color: "#6B7280" }}>
+                            Сумма, на которую будет застрахован груз. Передаётся перевозчику при отправке.
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </SectionCard>
                 </>

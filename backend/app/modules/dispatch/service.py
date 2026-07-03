@@ -460,10 +460,10 @@ def _build_api_order_data(order: OrderDraft, creds: dict | None = None, urgency_
             }
             for p in order.packages
         ],
-        "declared_value": (
-            sum(float(p.declared_value or 0) for p in order.packages)
-            or float(order.price_snapshot or 0)
-        ),
+        # Declared value = sum of package.declared_value only. Never fall back to
+        # price_snapshot (that's shipping cost, not goods value — carriers reject or
+        # mis-tariff insurance if we mix them).
+        "declared_value": sum(float(p.declared_value or 0) for p in order.packages),
         "currency": order.currency_snapshot,
         "fragile": order.fragile,
         "call_before_delivery": order.call_before_delivery,

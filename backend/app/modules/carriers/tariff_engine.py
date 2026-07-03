@@ -821,9 +821,12 @@ async def _calculate_exline_live_async(
 _CSE_TIMEOUT = 10  # seconds
 
 
+# CSE TypeOfCargo GUIDs. The "parcel" value matches CSE's own reference registry
+# and is used in their SaveWaybillOffice/Calc/SaveDocuments examples (Web API doc,
+# pages 129, 175, 179). Override via env for non-standard installs.
 _CSE_CARGO_TYPE_GUIDS: dict[str, str] = {
-    "document": "81dd8a13-8235-494f-84fd-9c04c51d50ec",
-    "parcel":   "4aab1fc6-fc2b-473a-8728-58bcd4ff79ba",
+    "document": os.getenv("CSE_CARGO_GUID_DOCUMENT", "81dd8a13-8235-494f-84fd-9c04c51d50ec"),
+    "parcel":   os.getenv("CSE_CARGO_GUID_PARCEL",   "4aab1fc6-fc2b-473a-8728-58bcd4ff79ba"),
 }
 
 
@@ -970,6 +973,11 @@ async def _calculate_cse_live_async(
         _call_cse_calc_async(from_geo, to_geo, kg, login, password, api_url, cargo_type_guid),
         _get_cse_delivery_services_async(from_geo, to_geo, login, password, api_url),
     )
+    # Fallback: if hardcoded GUID yielded no tariffs, retry without it so CSE picks
+    # its instance default. Prevents empty quote list when the target CSE install
+    # uses different GUIDs than the standard reference.
+    if not results and cargo_type_guid:
+        results = await _call_cse_calc_async(from_geo, to_geo, kg, login, password, api_url, "")
     for r in results:
         r.available_services = services
     return results

@@ -187,6 +187,43 @@ def props_of(el: ET.Element) -> list[ET.Element]:
     return el.findall(f"{_NM}Properties")
 
 
+def _tracking_events_from(status_item: ET.Element) -> list[dict]:
+    """Extract a single tracking event from an <m:List> node.
+
+    Per CSE Tracking response format: the event's <m:Key> is the status name
+    (Russian, e.g. "Заказ создан"), and its <m:Properties> children carry the
+    metadata (GUID, Comment, RecorderGUID, RecorderName, DateTime, etc.).
+
+    Returns [] for nodes that look like metadata (no DateTime property) so that
+    the caller can iterate every List child without filtering upfront.
+    """
+    status_name = find_text(status_item, "Key")
+    props: dict[str, str] = {}
+    for prop in props_of(status_item):
+        key_el = prop.find(f"{_NM}Key")
+        val_el = prop.find(f"{_NM}Value")
+        if key_el is None:
+            continue
+        key = (key_el.text or "").strip()
+        value = (val_el.text or "").strip() if val_el is not None else ""
+        if key:
+            props[key] = value
+
+    occurred_at = props.get("DateTime") or props.get("DeliveryDateTime") or ""
+    if not occurred_at:
+        return []
+
+    return [{
+        "guid": props.get("GUID", ""),
+        "status": status_name,
+        "occurred_at": occurred_at,
+        "location": props.get("Location", ""),
+        "comment": props.get("Comment", ""),
+        "recipient": props.get("Recipient", ""),
+        "recorder": props.get("RecorderName", ""),
+    }]
+
+
 def parse_calc_response(ret: ET.Element) -> list[dict]:
     """
     Parse the <return> element from a Calc SOAP response.
@@ -530,23 +567,41 @@ class CSEAPIClient(CarrierAPIClient):
         phone: str,
         creds: dict,
     ) -> bool:
-        """Cancel a waybill. Returns True on success."""
+        """Cancel an Order. Returns True on success.
+
+        Per CSE Web API docs (DeleteDocuments, pages 230–233): parameters live
+        inside a <m:List Key="parameters"> wrapper with <m:Properties> children
+        for DocumentType/Number/Reason/ClientContact/Phone. DocumentType is
+        "Order" or "Waybill"; SaveWaybillOffice yields an Order number.
+        """
         inner = (
             self._auth(creds)
             + "<m:parameters>"
-            + "<m:Key>Parameters</m:Key>"
-            + "<m:Fields><m:Key>DocumentType</m:Key><m:Value>Waybill</m:Value></m:Fields>"
-            + f"<m:Fields><m:Key>Number</m:Key><m:Value>{_esc(waybill_number)}</m:Value></m:Fields>"
-            + f"<m:Fields><m:Key>Reason</m:Key><m:Value>{_esc(reason)}</m:Value></m:Fields>"
-            + f"<m:Fields><m:Key>ClientContact</m:Key><m:Value>{_esc(contact)}</m:Value></m:Fields>"
-            + f"<m:Fields><m:Key>Phone</m:Key><m:Value>{_esc(phone)}</m:Value></m:Fields>"
+            + "<m:Key>parameters</m:Key>"
+            + "<m:List>"
+            + "<m:Key>parameters</m:Key>"
+            + "<m:Properties><m:Key>DocumentType</m:Key><m:Value>Order</m:Value><m:ValueType>string</m:ValueType></m:Properties>"
+            + f"<m:Properties><m:Key>Number</m:Key><m:Value>{_esc(waybill_number)}</m:Value><m:ValueType>string</m:ValueType></m:Properties>"
+            + f"<m:Properties><m:Key>Reason</m:Key><m:Value>{_esc(reason)}</m:Value><m:ValueType>string</m:ValueType></m:Properties>"
+            + f"<m:Properties><m:Key>ClientContact</m:Key><m:Value>{_esc(contact)}</m:Value><m:ValueType>string</m:ValueType></m:Properties>"
+            + f"<m:Properties><m:Key>Phone</m:Key><m:Value>{_esc(phone)}</m:Value><m:ValueType>string</m:ValueType></m:Properties>"
+            + "</m:List>"
             + "</m:parameters>"
         )
         try:
             ret = self._post("DeleteDocuments", inner, creds)
-            f = fields_of(ret)
-            error = f.get("Error", f.get("ErrorCode", ""))
-            return str(error) in ("", "0")
+            # Response: <m:return><m:List><m:Properties>...</m:Properties>...
+            # An Error=true Properties block signals failure.
+            for list_item in list_items(ret):
+                for prop in props_of(list_item):
+                    key_el = prop.find(f"{_NM}Key")
+                    val_el = prop.find(f"{_NM}Value")
+                    if key_el is None or val_el is None:
+                        continue
+                    if (key_el.text or "").strip() == "Error":
+                        if (val_el.text or "").strip().lower() in ("true", "1"):
+                            return False
+            return True
         except Exception as exc:
             logger.warning("CSE delete_document failed (waybill=%s): %s", waybill_number, exc)
             return False
@@ -554,7 +609,15 @@ class CSEAPIClient(CarrierAPIClient):
     # ── GetFormsForDocuments ──────────────────────────────────────────────────
 
     def get_print_form(self, waybill_number: str, creds: dict) -> bytes:
-        """Download PDF print form of a waybill. Returns raw PDF bytes."""
+        """Download PDF print form of an Order. Returns raw PDF bytes.
+
+        Per CSE Web API docs (GetFormsForDocuments, pages 189–195):
+          - <m:parameters> children are <m:List> (Key/Value/ValueType), NOT
+            <m:Properties>. Using Properties here silently returns no BData.
+          - DocumentType is "order" (the object SaveWaybillOffice produced) or
+            "waybill" (an internal delivery leg). For customer print forms we
+            want the Order document.
+        """
         inner = (
             self._auth(creds)
             + "<m:documents>"
@@ -563,11 +626,9 @@ class CSEAPIClient(CarrierAPIClient):
             + "</m:documents>"
             + "<m:parameters>"
             + "<m:Key>Parameters</m:Key>"
-            + "<m:Properties><m:Key>DocumentType</m:Key><m:Value>Waybill</m:Value><m:ValueType>string</m:ValueType></m:Properties>"
-            + "<m:Properties><m:Key>Type</m:Key><m:Value>print</m:Value><m:ValueType>string</m:ValueType></m:Properties>"
-            + "<m:Properties><m:Key>Format</m:Key><m:Value>pdf</m:Value><m:ValueType>string</m:ValueType></m:Properties>"
-            # Required by CSE API for Type=print: specifies which print template to use
-            + "<m:Properties><m:Key>Name</m:Key><m:Value>Универсальная печатная форма документа НАКЛАДНАЯ</m:Value><m:ValueType>string</m:ValueType></m:Properties>"
+            + "<m:List><m:Key>DocumentType</m:Key><m:Value>order</m:Value><m:ValueType>string</m:ValueType></m:List>"
+            + "<m:List><m:Key>Type</m:Key><m:Value>print</m:Value><m:ValueType>string</m:ValueType></m:List>"
+            + "<m:List><m:Key>Format</m:Key><m:Value>pdf</m:Value><m:ValueType>string</m:ValueType></m:List>"
             + "</m:parameters>"
         )
         ret = self._post("GetFormsForDocuments", inner, creds, timeout=_TIMEOUT)
@@ -583,43 +644,54 @@ class CSEAPIClient(CarrierAPIClient):
     # ── Tracking ──────────────────────────────────────────────────────────────
 
     def tracking(self, waybill_number: str, creds: dict) -> list[dict]:
-        """Get status event history for a waybill."""
+        """Get status event history for an Order.
+
+        Per CSE Web API docs (Tracking method, page 137–145):
+          - Request: DocumentType="Order" and OnlySelectedType=true, with the
+            order number in <m:List><m:Key>{number}</m:Key></m:List>.
+          - Response: each order's <m:List> contains metadata <m:Properties>
+            children plus one <m:List> per status event. The event's <m:Key>
+            holds the status name (Russian), and <m:Properties> children carry
+            GUID / Comment / RecorderGUID / RecorderName / DateTime /
+            DeliveryDateTime / Recipient.
+          - A trailing <m:Tables Key="Waybills"> contains waybill-level events
+            (delivery legs); we merge them into the same event list so the
+            customer sees the full timeline.
+        """
         inner = (
             self._auth(creds)
             + "<m:documents>"
             + "<m:Key>Documents</m:Key>"
             + "<m:Properties>"
             + "<m:Key>DocumentType</m:Key>"
-            + "<m:Value>Waybill</m:Value>"
+            + "<m:Value>Order</m:Value>"
             + "<m:ValueType>string</m:ValueType>"
+            + "</m:Properties>"
+            + "<m:Properties>"
+            + "<m:Key>OnlySelectedType</m:Key>"
+            + "<m:Value>true</m:Value>"
+            + "<m:ValueType>boolean</m:ValueType>"
             + "</m:Properties>"
             + f"<m:List><m:Key>{_esc(waybill_number)}</m:Key></m:List>"
             + "</m:documents>"
             + "<m:parameters><m:Key>Parameters</m:Key></m:parameters>"
         )
         ret = self._post("Tracking", inner, creds)
+
         events: list[dict] = []
         for doc_item in list_items(ret):
-            # Status events are in Tables > List > List
-            tables_el = doc_item.find(f"{_NM}Tables")
-            if tables_el is not None:
-                for table_item in list_items(tables_el):
-                    for status_item in list_items(table_item):
-                        p = {
-                            (prop.find(f"{_NM}Key").text or "").strip(): (
-                                prop.find(f"{_NM}Value").text or ""
-                            ).strip()
-                            for prop in props_of(status_item)
-                            if prop.find(f"{_NM}Key") is not None
-                        }
-                        events.append({
-                            "guid": p.get("GUID", ""),
-                            "status": p.get("StatusName") or p.get("Status", ""),
-                            "occurred_at": p.get("DateTime") or p.get("Date", ""),
-                            "location": p.get("Location", ""),
-                            "comment": p.get("Comment", ""),
-                            "recipient": p.get("Recipient", ""),
-                        })
+            # 1) Order-level events: direct <m:List> children of the document.
+            for status_item in list_items(doc_item):
+                events.extend(_tracking_events_from(status_item))
+
+            # 2) Waybill-level events: inside <m:Tables Key="Waybills">/<m:List>.
+            for tables_el in doc_item.findall(f"{_NM}Tables"):
+                for waybill_item in list_items(tables_el):
+                    for status_item in list_items(waybill_item):
+                        events.extend(_tracking_events_from(status_item))
+
+        # Sort by occurred_at ascending so caller sees chronological order.
+        events.sort(key=lambda e: e.get("occurred_at", ""))
         return events
 
     # ── Calc ──────────────────────────────────────────────────────────────────

@@ -103,10 +103,15 @@ class ExlineAPIClient(CarrierAPIClient):
         all_parts = service_markers + descriptions
         enclosure = _esc("; ".join(all_parts) if all_parts else "Посылка")
 
-        declared_value = order_data.get("declared_value", 0)
+        # inshprice (Объявленная ценность) — send only when insurance is explicitly
+        # requested AND we have a real declared value. Exline validates inshprice
+        # against account rules; sending it for a non-insured shipment triggers
+        # error 11 or silently upcharges the order.
+        declared_value = float(order_data.get("declared_value") or 0)
+        wants_insurance = bool(order_data.get("insurance"))
         inshprice_tag = (
-            f"    <inshprice>{float(declared_value):.2f}</inshprice>\n"
-            if declared_value
+            f"    <inshprice>{declared_value:.2f}</inshprice>\n"
+            if wants_insurance and declared_value > 0
             else ""
         )
 
@@ -170,9 +175,12 @@ class ExlineAPIClient(CarrierAPIClient):
         except Exception as exc:
             logger.warning("Exline: could not fetch waybill PDF for orderno=%s: %s", orderno, exc)
 
+        # waybill_number stores the identifier used for statusreq/cancelorder/waybill API calls.
+        # Exline statusreq <orderno> requires the client-submitted orderno (e.g. NOVEX-000001),
+        # NOT the internal barcode. carrier_invoice_id holds the barcode for reference/display.
         return InvoiceResult(
-            waybill_number=barcode or orderno,
-            carrier_invoice_id=orderno,
+            waybill_number=orderno,
+            carrier_invoice_id=barcode or orderno,
             waybill_pdf_bytes=pdf_bytes,
         )
 
@@ -313,16 +321,19 @@ class ExlineAPIClient(CarrierAPIClient):
         return cities
 
     def test_connection(self, creds: dict) -> bool:
+        # statusreq with a same-day range is the cheapest auth probe: it hits the
+        # authenticated endpoint but does not require an existing order. Exline
+        # replies with error="1" for bad credentials, error="0" otherwise.
         today = date.today().isoformat()
         xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <statusreq>
   {self._auth_tag(creds)}
   <datefrom>{today}</datefrom>
   <dateto>{today}</dateto>
-  <limit>1</limit>
 </statusreq>"""
         root = self._post_xml(xml, self._api_url(creds))
         error = root.attrib.get("error", "0")
         if error == "1":
-            raise RuntimeError("Exline: ошибка авторизации (error=1)")
+            errmsg = root.attrib.get("errormsg") or root.attrib.get("errormsgru") or "authorization error"
+            raise RuntimeError(f"Exline: {errmsg}")
         return True
