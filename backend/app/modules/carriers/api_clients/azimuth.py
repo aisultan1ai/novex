@@ -152,16 +152,24 @@ class AzimuthAPIClient(CarrierAPIClient):
     def test_connection(self, creds: dict) -> bool:
         """POST /api/integration/invoices with an empty body — Azimuth returns
         422 when auth is OK but body is invalid, and 401 when the token is bad.
-        We accept 422 as "token works", since it means the request reached the
-        endpoint but validation failed (which is expected for an empty payload).
+
+        Azimuth is built on Laravel and misconfigures API auth: when the token
+        is missing/invalid, Laravel tries to redirect to a `login` route that
+        doesn't exist and returns HTTP 500 with body
+        `{"message":"Route [login] not defined."}`. We detect that pattern and
+        surface it as an auth failure.
         """
         api_url = creds["api_url"].rstrip("/")
-        token = creds["api_token"]
+        token = (creds.get("api_token") or "").strip()
+        if not token:
+            raise RuntimeError("Bearer-токен пустой. Вставьте токен в поле 'API Токен'.")
+
         resp = httpx.post(
             f"{api_url}/api/integration/invoices",
             headers={
                 "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json",
+                "Accept": "application/json",
             },
             json={},
             timeout=10,
@@ -174,5 +182,10 @@ class AzimuthAPIClient(CarrierAPIClient):
             raise RuntimeError("Токен недействителен (401 Unauthorized)")
         if resp.status_code == 403:
             raise RuntimeError("Нет прав на API (403 Forbidden)")
+        if resp.status_code == 500 and "Route [login] not defined" in resp.text:
+            raise RuntimeError(
+                "Токен не принят (Azimuth редиректит на login). "
+                "Проверьте что вставили корректный Bearer-токен от Azimuth."
+            )
         resp.raise_for_status()
         return True
