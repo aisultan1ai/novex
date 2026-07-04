@@ -142,6 +142,10 @@ services:
       CSE_LOGIN: ${CSE_LOGIN:-}
       CSE_PASSWORD: ${CSE_PASSWORD:-}
       CSE_API_URL: ${CSE_API_URL:-http://web.cse.ru/1c/ws/Web1C.1cws}
+      EXLINE_EXTRA: ${EXLINE_EXTRA:-}
+      EXLINE_LOGIN: ${EXLINE_LOGIN:-}
+      EXLINE_PASSWORD: ${EXLINE_PASSWORD:-}
+      EXLINE_API_URL: ${EXLINE_API_URL:-https://home.courierexe.ru/api/}
     # CMD is defined in Dockerfile: uvicorn --workers 4 (no --reload)
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
