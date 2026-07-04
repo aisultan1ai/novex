@@ -113,11 +113,13 @@ class MinioStorageService(StorageService):
             # client never needs to make a network request to the public endpoint
             # (which isn't reachable from inside the Docker container).
             if self._public_endpoint != self._internal_endpoint:
+                # Public presign client uses its own `secure` flag so the
+                # generated URLs use https even when internal minio talks http.
                 self._presign_client = Minio(
                     self._public_endpoint,
                     access_key=settings.minio_access_key,
                     secret_key=settings.minio_secret_key,
-                    secure=settings.minio_secure,
+                    secure=settings.minio_public_secure,
                 )
                 try:
                     region = self._client._get_region(self._bucket)

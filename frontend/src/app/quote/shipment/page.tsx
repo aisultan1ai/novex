@@ -67,20 +67,28 @@ function mapPartyFormToPayload(party: PartyFormState): ShipmentPartyInput {
   };
 }
 
+// Standard envelope dimensions used when shipment_type is "document" — carriers
+// still require positive dimensions on their APIs even for docs.
+const DOCUMENT_ENVELOPE_CM = { width: 32, height: 22, depth: 1 };
+
 function mapPackageFormToPayload(
   pkg: PackageFormState,
   declaredValue: number | null,
+  isDocument: boolean,
 ): ShipmentPackageInput {
+  const width = isDocument ? DOCUMENT_ENVELOPE_CM.width : Number(pkg.width_cm);
+  const height = isDocument ? DOCUMENT_ENVELOPE_CM.height : Number(pkg.height_cm);
+  const depth = isDocument ? DOCUMENT_ENVELOPE_CM.depth : Number(pkg.depth_cm);
   return {
     description: pkg.description.trim(), quantity: Number(pkg.quantity),
-    weight_kg: Number(pkg.weight_kg), width_cm: Number(pkg.width_cm),
-    height_cm: Number(pkg.height_cm), depth_cm: Number(pkg.depth_cm),
+    weight_kg: Number(pkg.weight_kg),
+    width_cm: width, height_cm: height, depth_cm: depth,
     declared_value: declaredValue,
     declared_value_currency: declaredValue !== null ? "KZT" : null,
   };
 }
 
-function buildShipmentPayload(form: ShipmentFormState): UpdateShipmentDetailsRequest {
+function buildShipmentPayload(form: ShipmentFormState, isDocument: boolean): UpdateShipmentDetailsRequest {
   const parsedDeclared = form.insurance ? Number(form.declared_value) : NaN;
   const declaredValue = Number.isFinite(parsedDeclared) && parsedDeclared > 0
     ? parsedDeclared
@@ -88,7 +96,7 @@ function buildShipmentPayload(form: ShipmentFormState): UpdateShipmentDetailsReq
   return {
     sender: mapPartyFormToPayload(form.sender),
     recipient: mapPartyFormToPayload(form.recipient),
-    packages: [mapPackageFormToPayload(form.packageItem, declaredValue)],
+    packages: [mapPackageFormToPayload(form.packageItem, declaredValue, isDocument)],
     call_before_delivery: form.call_before_delivery,
     insurance: form.insurance,
     fragile: form.fragile,
@@ -410,19 +418,23 @@ function PartySection({ title, values, onChange, onToggleSave }: {
 
 /* ─── Package section ────────────────────────────────────────────────────── */
 
-function PackageSection({ values, onChange }: {
+function PackageSection({ values, onChange, isDocument }: {
   values: PackageFormState;
   onChange: (key: keyof PackageFormState, value: string) => void;
+  isDocument: boolean;
 }) {
   const isMobile = useIsMobile();
-  const fields: { key: keyof PackageFormState; label: string; mode?: React.HTMLAttributes<HTMLInputElement>["inputMode"] }[] = [
+  const baseFields: { key: keyof PackageFormState; label: string; mode?: React.HTMLAttributes<HTMLInputElement>["inputMode"] }[] = [
     { key: "description", label: "Описание содержимого" },
     { key: "quantity", label: "Количество мест", mode: "numeric" },
     { key: "weight_kg", label: "Вес, кг", mode: "decimal" },
+  ];
+  const dimensionFields: { key: keyof PackageFormState; label: string; mode?: React.HTMLAttributes<HTMLInputElement>["inputMode"] }[] = [
     { key: "width_cm", label: "Ширина, см", mode: "decimal" },
     { key: "height_cm", label: "Высота, см", mode: "decimal" },
     { key: "depth_cm", label: "Глубина, см", mode: "decimal" },
   ];
+  const fields = isDocument ? baseFields : [...baseFields, ...dimensionFields];
 
   return (
     <SectionCard title="Параметры отправления">
@@ -438,6 +450,19 @@ function PackageSection({ values, onChange }: {
           />
         ))}
       </div>
+      {isDocument && (
+        <div style={{
+          marginTop: 12,
+          padding: "10px 14px",
+          background: "#F0F9FF",
+          border: "1px solid #BAE6FD",
+          borderRadius: 10,
+          font: "400 12px/1.4 Inter Variable, sans-serif",
+          color: "#0369A1",
+        }}>
+          Для документов используется стандартный размер конверта (32×22×1 см).
+        </div>
+      )}
     </SectionCard>
   );
 }
@@ -589,10 +614,13 @@ function ShipmentPageInner() {
       if (!p.quantity || isNaN(qty) || qty <= 0 || !Number.isInteger(qty)) return "Укажите корректное количество мест.";
       const w = Number(p.weight_kg);
       if (!p.weight_kg || isNaN(w) || w <= 0) return "Укажите корректный вес.";
-      const wd = Number(p.width_cm), h = Number(p.height_cm), d = Number(p.depth_cm);
-      if (!p.width_cm || isNaN(wd) || wd <= 0) return "Укажите ширину.";
-      if (!p.height_cm || isNaN(h) || h <= 0) return "Укажите высоту.";
-      if (!p.depth_cm || isNaN(d) || d <= 0) return "Укажите глубину.";
+      const isDocument = (draft?.shipment_type_snapshot ?? "").toLowerCase() === "document";
+      if (!isDocument) {
+        const wd = Number(p.width_cm), h = Number(p.height_cm), d = Number(p.depth_cm);
+        if (!p.width_cm || isNaN(wd) || wd <= 0) return "Укажите ширину.";
+        if (!p.height_cm || isNaN(h) || h <= 0) return "Укажите высоту.";
+        if (!p.depth_cm || isNaN(d) || d <= 0) return "Укажите глубину.";
+      }
       if (form.insurance) {
         const dv = Number(form.declared_value);
         if (!form.declared_value || isNaN(dv) || dv <= 0) {
@@ -639,7 +667,8 @@ function ShipmentPageInner() {
     setError(null);
     setIsSubmitting(true);
     try {
-      await updateOrderDraftShipment(draft.draft_id, buildShipmentPayload(form));
+      const isDocument = (draft.shipment_type_snapshot ?? "").toLowerCase() === "document";
+      await updateOrderDraftShipment(draft.draft_id, buildShipmentPayload(form, isDocument));
       clearSavedForm();
       router.push(`/checkout?draftId=${draft.draft_id}`);
     } catch (err) {
@@ -770,7 +799,11 @@ function ShipmentPageInner() {
               {/* ── Step 0: Данные отправления ── */}
               {currentStep === 0 && (
                 <>
-                  <PackageSection values={form.packageItem} onChange={updatePackageField} />
+                  <PackageSection
+                    values={form.packageItem}
+                    onChange={updatePackageField}
+                    isDocument={(draft?.shipment_type_snapshot ?? "").toLowerCase() === "document"}
+                  />
                   <SectionCard title="Дополнительные услуги">
                     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                       {(

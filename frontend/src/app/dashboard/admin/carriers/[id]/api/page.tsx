@@ -18,7 +18,6 @@ const CARRIER_DEFAULTS: Record<string, { api_url: string; extra_config: Record<s
     api_url: "https://api.azimuthcargo.kz",
     extra_config: { service_type: 2, payment_type: 2, payer: 1, payer_tin: "" },
     hint: "service_type (1=Авто, 2=Авиа), payment_type, payer (1=Отправитель, 2=Получатель), payer_tin",
-    no_token: true,
   },
   exline: {
     api_url: "https://home.courierexe.ru/api/",

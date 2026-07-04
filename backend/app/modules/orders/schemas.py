@@ -58,9 +58,23 @@ class ShipmentPartyInput(BaseModel):
     def normalize_country(cls, value: str) -> str:
         return value.strip().upper()
 
+    @field_validator("phone")
+    @classmethod
+    def validate_party_phone(cls, value: str) -> str:
+        import re
+        digits_only = re.sub(r"[\s\-\(\)]", "", value.strip())
+        if not re.match(r"^(\+?7|8)[0-9]{10}$", digits_only):
+            raise ValueError(
+                "Укажите номер телефона в формате +7XXXXXXXXXX или 8XXXXXXXXXX"
+            )
+        if digits_only.startswith("8"):
+            digits_only = "+7" + digits_only[1:]
+        elif digits_only.startswith("7"):
+            digits_only = "+" + digits_only
+        return digits_only
+
     @field_validator(
         "full_name",
-        "phone",
         "email",
         "company_name",
         "city",

@@ -44,6 +44,7 @@ class Settings(BaseSettings):
 
     minio_endpoint: str = "minio:9000"
     minio_public_endpoint: str = ""  # public hostname for presigned URLs; defaults to minio_endpoint
+    minio_public_secure: bool = True  # whether presigned URLs use https (independent of internal minio_secure)
     minio_access_key: str = "minio"
     minio_secret_key: str = "minio12345"
     minio_bucket: str = "novex-dev"
