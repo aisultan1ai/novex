@@ -206,6 +206,11 @@ export const testCarrierAPIConnection = (carrierCode: string): Promise<{ ok: boo
 export const listSupportedCarrierAPIs = (): Promise<{ carrier_codes: string[] }> =>
   req("/admin/carrier-api/supported");
 
+// ── Order operations ─────────────────────────────────────────────────────────
+
+export const refreshOrderWaybill = (orderId: number): Promise<{ ok: boolean; waybill_pdf_size: number }> =>
+  req(`/admin/orders/${orderId}/refresh-waybill`, { method: "POST" });
+
 // ── Carrier integration settings ──────────────────────────────────────────────
 
 export interface CarrierIntegrationConfig {

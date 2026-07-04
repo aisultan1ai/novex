@@ -150,13 +150,29 @@ class AzimuthAPIClient(CarrierAPIClient):
         ]
 
     def test_connection(self, creds: dict) -> bool:
-        """GET /api/integration/invoices (list) as a connectivity check."""
+        """POST /api/integration/invoices with an empty body — Azimuth returns
+        422 when auth is OK but body is invalid, and 401 when the token is bad.
+        We accept 422 as "token works", since it means the request reached the
+        endpoint but validation failed (which is expected for an empty payload).
+        """
         api_url = creds["api_url"].rstrip("/")
         token = creds["api_token"]
-        resp = httpx.get(
+        resp = httpx.post(
             f"{api_url}/api/integration/invoices",
-            headers={"Authorization": f"Bearer {token}"},
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            },
+            json={},
             timeout=10,
         )
+        # 422 = validation error → token is valid
+        # 200/201 = accepted (shouldn't happen with empty body but just in case)
+        if resp.status_code in (200, 201, 422):
+            return True
+        if resp.status_code == 401:
+            raise RuntimeError("Токен недействителен (401 Unauthorized)")
+        if resp.status_code == 403:
+            raise RuntimeError("Нет прав на API (403 Forbidden)")
         resp.raise_for_status()
         return True
