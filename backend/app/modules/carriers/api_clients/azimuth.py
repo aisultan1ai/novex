@@ -176,16 +176,26 @@ class AzimuthAPIClient(CarrierAPIClient):
         )
         # 422 = validation error → token is valid
         # 200/201 = accepted (shouldn't happen with empty body but just in case)
+        logger.info(
+            "Azimuth test_connection: status=%s body=%s",
+            resp.status_code, resp.text[:300],
+        )
         if resp.status_code in (200, 201, 422):
             return True
         if resp.status_code == 401:
             raise RuntimeError("Токен недействителен (401 Unauthorized)")
         if resp.status_code == 403:
             raise RuntimeError("Нет прав на API (403 Forbidden)")
-        if resp.status_code == 500 and "Route [login] not defined" in resp.text:
+        if resp.status_code == 500:
+            body_lower = resp.text.lower()
+            if "login" in body_lower or "unauthenticated" in body_lower or "route" in body_lower:
+                raise RuntimeError(
+                    "Токен не принят Azimuth (auth-редирект). "
+                    "Свяжитесь с Azimuth за корректным Bearer-токеном для API интеграции."
+                )
             raise RuntimeError(
-                "Токен не принят (Azimuth редиректит на login). "
-                "Проверьте что вставили корректный Bearer-токен от Azimuth."
+                f"Azimuth вернул 500. Ответ: {resp.text[:200]}"
             )
-        resp.raise_for_status()
-        return True
+        raise RuntimeError(
+            f"Azimuth вернул {resp.status_code}. Ответ: {resp.text[:200]}"
+        )
