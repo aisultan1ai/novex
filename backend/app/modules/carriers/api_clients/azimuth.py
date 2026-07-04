@@ -188,11 +188,21 @@ class AzimuthAPIClient(CarrierAPIClient):
             raise RuntimeError("Нет прав на API (403 Forbidden)")
         if resp.status_code == 500:
             body_lower = resp.text.lower()
-            if "login" in body_lower or "unauthenticated" in body_lower or "route" in body_lower:
+            # Auth failure: Laravel redirects to `login` route which isn't defined
+            if "route [login]" in body_lower or "unauthenticated" in body_lower:
                 raise RuntimeError(
-                    "Токен не принят Azimuth (auth-редирект). "
+                    "Токен не принят Azimuth. "
                     "Свяжитесь с Azimuth за корректным Bearer-токеном для API интеграции."
                 )
+            # Validation errors: Azimuth uses HTTP 500 for validation failures.
+            # "field is required" / "must be" / "field must be a" etc. → auth is OK
+            if (
+                "field is required" in body_lower
+                or "field must" in body_lower
+                or "must be" in body_lower
+                or "and" in body_lower and "errors" in body_lower
+            ):
+                return True
             raise RuntimeError(
                 f"Azimuth вернул 500. Ответ: {resp.text[:200]}"
             )
