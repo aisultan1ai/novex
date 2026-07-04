@@ -52,6 +52,26 @@ class AzimuthAPIClient(CarrierAPIClient):
         # declared_value must be an integer (tenge), not decimal.
         declared_value_tenge = int(round(float(order_data.get("declared_value", 0) or 0)))
 
+        # Map platform tariff → Azimuth service_type. Azimuth values:
+        # 1=Стандарт, 2=Экспресс, 3=Экспресс-пакет.
+        # Priority: order's tariff_name > shipment_type > creds default.
+        tariff_name_lower = (order_data.get("tariff_name") or "").lower()
+        shipment_type_lower = (order_data.get("shipment_type") or "").lower()
+        service_type_from_tariff: int | None = None
+        if "экспресс-пакет" in tariff_name_lower or "express-package" in tariff_name_lower:
+            service_type_from_tariff = 3
+        elif "экспресс" in tariff_name_lower or "express" in tariff_name_lower:
+            service_type_from_tariff = 2
+        elif "стандарт" in tariff_name_lower or "standard" in tariff_name_lower:
+            service_type_from_tariff = 1
+        elif "эконом" in tariff_name_lower or "economy" in tariff_name_lower:
+            # Azimuth has no "economy" — fall back to Стандарт (cheapest available).
+            service_type_from_tariff = 1
+        elif shipment_type_lower == "document":
+            # Documents typically go via Экспресс-пакет at Azimuth.
+            service_type_from_tariff = 3
+        service_type = service_type_from_tariff or int(creds.get("service_type", 2))
+
         body = {
             "waybill_number": waybill_number,
             "sender_name": sender.get("full_name", "")[:255],
@@ -62,7 +82,7 @@ class AzimuthAPIClient(CarrierAPIClient):
             "receiver_city": recipient.get("city", "")[:255],
             "receiver_address": recipient.get("address", "")[:255],
             "receiver_phone": recipient.get("phone", "")[:20],
-            "service_type": int(creds.get("service_type", 2)),
+            "service_type": service_type,
             "payment_type": int(creds.get("payment_type", 2)),
             "payer": int(creds.get("payer", 1)),
             "quantity": clamped_qty,

@@ -606,6 +606,11 @@ function ShipmentPageInner() {
     updateForm((prev) => ({ ...prev, packageItem: { ...prev.packageItem, [key]: value } }));
   }
 
+  function isValidKzPhone(raw: string): boolean {
+    const digits = raw.replace(/[\s\-()]/g, "");
+    return /^(\+?7|8)[0-9]{10}$/.test(digits);
+  }
+
   function validateStep(step: number): string | null {
     if (step === 0) {
       const p = form.packageItem;
@@ -632,6 +637,7 @@ function ShipmentPageInner() {
       const s = form.sender;
       if (!s.full_name.trim()) return "Укажите ФИО отправителя.";
       if (!s.phone.trim()) return "Укажите телефон отправителя.";
+      if (!isValidKzPhone(s.phone)) return "Телефон отправителя: формат +7XXXXXXXXXX или 8XXXXXXXXXX.";
       if (!s.country.trim() || s.country.trim().length !== 2) return "Код страны - 2 буквы (например KZ).";
       if (!s.city.trim()) return "Укажите город отправителя.";
       if (!s.address_line1.trim()) return "Укажите адрес отправителя.";
@@ -640,6 +646,7 @@ function ShipmentPageInner() {
       const r = form.recipient;
       if (!r.full_name.trim()) return "Укажите ФИО получателя.";
       if (!r.phone.trim()) return "Укажите телефон получателя.";
+      if (!isValidKzPhone(r.phone)) return "Телефон получателя: формат +7XXXXXXXXXX или 8XXXXXXXXXX.";
       if (!r.country.trim() || r.country.trim().length !== 2) return "Код страны - 2 буквы (например KZ).";
       if (!r.city.trim()) return "Укажите город получателя.";
       if (!r.address_line1.trim()) return "Укажите адрес получателя.";

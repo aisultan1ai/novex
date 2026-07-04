@@ -7,7 +7,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { ApiError, deleteOrderDraft, downloadOrderLabel, getOrderDraft } from "@/lib/api/orders";
-import { refreshOrderWaybill, retryOrderDispatch } from "@/lib/api/admin";
+import { retryOrderDispatch } from "@/lib/api/admin";
 import type { OrderDraftResponse } from "@/types/order";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -117,7 +117,6 @@ export default function OrderDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [isRefreshingWaybill, setIsRefreshingWaybill] = useState(false);
   const [isRetryingDispatch, setIsRetryingDispatch] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -178,20 +177,6 @@ export default function OrderDetailPage() {
       setError(err instanceof ApiError ? err.detail : "Не удалось скачать накладную.");
     } finally {
       setIsDownloading(false);
-    }
-  }
-
-  async function handleRefreshWaybill() {
-    if (!confirm("Запросить свежую накладную у перевозчика по API? Локальная копия будет заменена.")) return;
-    setIsRefreshingWaybill(true);
-    setError(null);
-    try {
-      const res = await refreshOrderWaybill(draftId);
-      alert(`Накладная обновлена. Размер PDF: ${res.waybill_pdf_size} байт.`);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.detail : "Не удалось обновить накладную.");
-    } finally {
-      setIsRefreshingWaybill(false);
     }
   }
 
@@ -278,16 +263,6 @@ export default function OrderDetailPage() {
                   style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", color: "#111827", fontSize: 14, fontWeight: 600, cursor: isDownloading ? "not-allowed" : "pointer", opacity: isDownloading ? 0.6 : 1, fontFamily: "inherit" }}
                 >
                   {isDownloading ? "Скачиваем…" : "Скачать накладную"}
-                </button>
-              )}
-              {isAdmin && order.tracking_number && (
-                <button
-                  onClick={() => void handleRefreshWaybill()}
-                  disabled={isRefreshingWaybill}
-                  title="Запросить актуальную накладную по API перевозчика"
-                  style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid #d97706", background: "#fff", color: "#d97706", fontSize: 14, fontWeight: 600, cursor: isRefreshingWaybill ? "not-allowed" : "pointer", opacity: isRefreshingWaybill ? 0.6 : 1, fontFamily: "inherit" }}
-                >
-                  {isRefreshingWaybill ? "Запрашиваем…" : "Обновить через API"}
                 </button>
               )}
               {isAdmin && !order.tracking_number && (

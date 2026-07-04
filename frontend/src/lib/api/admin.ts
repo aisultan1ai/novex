@@ -208,9 +208,6 @@ export const listSupportedCarrierAPIs = (): Promise<{ carrier_codes: string[] }>
 
 // ── Order operations ─────────────────────────────────────────────────────────
 
-export const refreshOrderWaybill = (orderId: number): Promise<{ ok: boolean; waybill_pdf_size: number }> =>
-  req(`/admin/orders/${orderId}/refresh-waybill`, { method: "POST" });
-
 export const retryOrderDispatch = (draftId: number): Promise<{ ok: boolean; message?: string }> =>
   req(`/admin/orders/${draftId}/retry-dispatch`, { method: "POST" });
 

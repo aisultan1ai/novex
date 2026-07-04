@@ -459,6 +459,8 @@ def _build_api_order_data(order: OrderDraft, creds: dict | None = None, urgency_
     return {
         "order_id": order.id,
         "order_reference": f"NOVEX-{order.id:06d}",
+        "tariff_name": order.tariff_name_snapshot or "",
+        "shipment_type": order.shipment_type_snapshot or "",
         "sender": {
             "full_name": sender.full_name if sender else "",
             "phone": sender.phone if sender else "",
