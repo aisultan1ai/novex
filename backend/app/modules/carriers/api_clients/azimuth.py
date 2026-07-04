@@ -41,10 +41,15 @@ class AzimuthAPIClient(CarrierAPIClient):
         if service_flags:
             notes_parts = service_flags + notes_parts
 
-        # Azimuth requires waybill_number of EXACTLY 12 characters.
-        # Format: NX + 4-digit zero-padded order_id + 6 random hex chars = 12 chars
+        # Azimuth requires waybill_number of EXACTLY 12 characters, digits only.
+        # Format: 4-digit order_id + 8 random digits derived from timestamp+rand
+        import time
         order_id = order_data.get("order_id", 0)
-        waybill_number = f"NX{order_id % 10000:04d}{secrets.token_hex(3).upper()}"
+        # Take last 8 digits of (ms timestamp XOR secrets number) — always 8 digits
+        ts_part = int(time.time() * 1000) % 100_000_000
+        rand_part = secrets.randbelow(100_000_000)
+        suffix = f"{(ts_part ^ rand_part) % 100_000_000:08d}"
+        waybill_number = f"{order_id % 10000:04d}{suffix}"
 
         body = {
             "waybill_number": waybill_number,
@@ -77,6 +82,9 @@ class AzimuthAPIClient(CarrierAPIClient):
                 "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json",
                 "Accept": "application/json",
+                # Force Laravel to return the full errors map instead of the
+                # abbreviated "(and N more errors)" fallback message.
+                "X-Requested-With": "XMLHttpRequest",
             },
             timeout=_TIMEOUT,
         )
