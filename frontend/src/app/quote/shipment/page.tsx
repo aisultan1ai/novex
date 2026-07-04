@@ -243,17 +243,22 @@ function FormField({
 /* ─── Section card ───────────────────────────────────────────────────────── */
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+  const isMobile = useIsMobile();
   return (
     <div
       style={{
         background: "#ffffff",
         border: "1px solid #E5E7EB",
         borderRadius: 16,
-        padding: "24px",
+        padding: isMobile ? "18px" : "24px",
         boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
       }}
     >
-      <h2 style={{ font: "600 18px/1.2 Inter Variable, sans-serif", color: "#111827", margin: "0 0 20px" }}>
+      <h2 style={{
+        font: `600 ${isMobile ? 16 : 18}px/1.2 Inter Variable, sans-serif`,
+        color: "#111827",
+        margin: `0 0 ${isMobile ? 16 : 20}px`,
+      }}>
         {title}
       </h2>
       {children}
@@ -264,39 +269,61 @@ function SectionCard({ title, children }: { title: string; children: React.React
 /* ─── Tariff summary card ────────────────────────────────────────────────── */
 
 function TariffSummary({ draft, onChangeTariff }: { draft: OrderDraftResponse; onChangeTariff: () => void }) {
+  const isMobile = useIsMobile();
   return (
     <div
       style={{
         background: "#EFF6FF",
         border: "1.5px solid #2563EB",
         borderRadius: 16,
-        padding: "20px 24px",
+        padding: isMobile ? "16px" : "20px 24px",
         display: "flex",
+        flexDirection: isMobile ? "column" : "row",
         justifyContent: "space-between",
-        alignItems: "center",
-        flexWrap: "wrap",
-        gap: 16,
-        marginBottom: 28,
+        alignItems: isMobile ? "stretch" : "center",
+        gap: isMobile ? 14 : 16,
+        marginBottom: isMobile ? 20 : 28,
         boxShadow: "0 4px 16px rgba(37,99,235,0.10)",
       }}
     >
-      <div>
-        <div style={{ font: "500 11px/1 Inter Variable, sans-serif", textTransform: "uppercase", letterSpacing: "0.08em", color: "#2563EB", marginBottom: 8 }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ font: "500 11px/1 Inter Variable, sans-serif", textTransform: "uppercase", letterSpacing: "0.08em", color: "#2563EB", marginBottom: 6 }}>
           Выбранный тариф
         </div>
-        <div style={{ font: "700 18px/1.2 Inter Variable, sans-serif", color: "#111827", marginBottom: 4 }}>
-          {draft.carrier_name_snapshot} - {draft.tariff_name_snapshot}
+        <div style={{
+          font: `700 ${isMobile ? 16 : 18}px/1.2 Inter Variable, sans-serif`,
+          color: "#111827", marginBottom: 4,
+        }}>
+          {draft.carrier_name_snapshot} · {draft.tariff_name_snapshot}
         </div>
-        <div style={{ font: "400 14px/1 Inter Variable, sans-serif", color: "#6B7280" }}>
+        <div style={{ font: `400 ${isMobile ? 13 : 14}px/1.3 Inter Variable, sans-serif`, color: "#6B7280" }}>
           {draft.from_city_snapshot} → {draft.to_city_snapshot} · {draft.shipment_type_snapshot}
         </div>
       </div>
-      <div style={{ textAlign: "right" }}>
-        <div style={{ font: "700 26px/1 Inter Variable, sans-serif", color: "#111827", marginBottom: 4 }}>
-          {formatPrice(draft.price_snapshot, draft.currency_snapshot)}
-        </div>
-        <div style={{ font: "600 13px/1 Inter Variable, sans-serif", color: "#2563EB", marginBottom: 12 }}>
-          {draft.eta_days_min_snapshot}–{draft.eta_days_max_snapshot} дн.
+      <div style={{
+        display: "flex",
+        flexDirection: isMobile ? "row" : "column",
+        alignItems: isMobile ? "center" : "flex-end",
+        justifyContent: isMobile ? "space-between" : "flex-start",
+        gap: isMobile ? 12 : 4,
+        paddingTop: isMobile ? 12 : 0,
+        borderTop: isMobile ? "1px solid rgba(37,99,235,0.2)" : "none",
+      }}>
+        <div>
+          <div style={{
+            font: `700 ${isMobile ? 22 : 26}px/1 Inter Variable, sans-serif`,
+            color: "#111827", marginBottom: 4,
+            whiteSpace: "nowrap",
+          }}>
+            {formatPrice(draft.price_snapshot, draft.currency_snapshot)}
+          </div>
+          <div style={{
+            font: `600 ${isMobile ? 12 : 13}px/1 Inter Variable, sans-serif`,
+            color: "#2563EB",
+            marginBottom: isMobile ? 0 : 12,
+          }}>
+            {draft.eta_days_min_snapshot}–{draft.eta_days_max_snapshot} дн.
+          </div>
         </div>
         <button
           onClick={onChangeTariff}
@@ -305,16 +332,18 @@ function TariffSummary({ draft, onChangeTariff }: { draft: OrderDraftResponse; o
             background: "#ffffff",
             color: "#2563EB",
             borderRadius: 8,
-            padding: "7px 14px",
+            padding: isMobile ? "8px 14px" : "7px 14px",
             font: "600 13px/1 Inter Variable, sans-serif",
             cursor: "pointer",
             fontFamily: "inherit",
             transition: "all 0.15s",
+            whiteSpace: "nowrap",
+            flexShrink: 0,
           }}
           onMouseEnter={(e) => { e.currentTarget.style.background = "#EFF6FF"; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = "#ffffff"; }}
         >
-          Изменить тариф
+          Изменить
         </button>
       </div>
     </div>
@@ -419,6 +448,7 @@ function ShipmentPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { currentUser, isAuthenticated, isLoading, logout } = useAuth();
+  const isMobile = useIsMobile();
 
   const quoteSessionId = useMemo(() => {
     const raw = searchParams.get("quoteSessionId");
@@ -653,11 +683,23 @@ function ShipmentPageInner() {
     <div style={{ minHeight: "100vh", background: "#FAFAFA" }}>
       <Navbar />
 
-      <main style={{ maxWidth: 860, margin: "0 auto", padding: "40px 20px 80px" }}>
+      <main style={{
+        maxWidth: 860, margin: "0 auto",
+        padding: isMobile ? "20px 16px 40px" : "40px 20px 80px",
+      }}>
         {/* Page title */}
-        <div style={{ marginBottom: 32 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 32 }}>
-            <h1 style={{ font: "700 28px/1.2 Inter Variable, sans-serif", letterSpacing: "-0.02em", color: "#111827", margin: 0 }}>
+        <div style={{ marginBottom: isMobile ? 20 : 32 }}>
+          <div style={{
+            display: "flex", justifyContent: "space-between",
+            alignItems: "center", flexWrap: "wrap",
+            gap: isMobile ? 10 : 12,
+            marginBottom: isMobile ? 20 : 32,
+          }}>
+            <h1 style={{
+              font: `700 ${isMobile ? 20 : 28}px/1.2 Inter Variable, sans-serif`,
+              letterSpacing: "-0.02em", color: "#111827", margin: 0,
+              flex: 1, minWidth: 0,
+            }}>
               Оформление отправления
             </h1>
             <button
@@ -670,16 +712,18 @@ function ShipmentPageInner() {
                 background: "#ffffff",
                 color: "#111827",
                 borderRadius: 10,
-                padding: "10px 18px",
-                font: "600 14px/1 Inter Variable, sans-serif",
+                padding: isMobile ? "8px 14px" : "10px 18px",
+                font: `600 ${isMobile ? 13 : 14}px/1 Inter Variable, sans-serif`,
                 cursor: "pointer",
                 fontFamily: "inherit",
                 transition: "background 0.15s",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
               }}
               onMouseEnter={(e) => (e.currentTarget.style.background = "#F9FAFB")}
               onMouseLeave={(e) => (e.currentTarget.style.background = "#ffffff")}
             >
-              ← Назад к тарифам
+              ← Назад
             </button>
           </div>
 
@@ -781,18 +825,27 @@ function ShipmentPageInner() {
               )}
 
               {/* Navigation */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginTop: 8 }}>
+              <div style={{
+                display: "flex",
+                flexDirection: isMobile ? "column-reverse" : "row",
+                justifyContent: "space-between",
+                alignItems: isMobile ? "stretch" : "center",
+                gap: isMobile ? 10 : 12,
+                marginTop: 8,
+              }}>
                 <button
                   type="button"
                   onClick={currentStep === 0 ? () => router.push("/") : handlePrevStep}
                   style={{
-                    background: "none",
-                    border: "none",
+                    background: isMobile ? "#ffffff" : "none",
+                    border: isMobile ? "1px solid #E5E7EB" : "none",
+                    borderRadius: isMobile ? 10 : 0,
                     color: "#6B7280",
                     font: "500 14px/1 Inter Variable, sans-serif",
                     cursor: "pointer",
                     fontFamily: "inherit",
-                    padding: 0,
+                    padding: isMobile ? "12px 20px" : 0,
+                    width: isMobile ? "100%" : "auto",
                   }}
                 >
                   {currentStep === 0 ? "На главную" : "← Назад"}
@@ -807,11 +860,12 @@ function ShipmentPageInner() {
                       color: "#ffffff",
                       border: "none",
                       borderRadius: 10,
-                      padding: "14px 32px",
+                      padding: isMobile ? "14px 24px" : "14px 32px",
                       font: "600 15px/1 Inter Variable, sans-serif",
                       cursor: "pointer",
                       fontFamily: "inherit",
                       transition: "background 0.15s",
+                      width: isMobile ? "100%" : "auto",
                     }}
                     onMouseEnter={(e) => { e.currentTarget.style.background = "#1D4ED8"; }}
                     onMouseLeave={(e) => { e.currentTarget.style.background = "#2563EB"; }}
@@ -827,11 +881,12 @@ function ShipmentPageInner() {
                       color: "#ffffff",
                       border: "none",
                       borderRadius: 10,
-                      padding: "14px 32px",
+                      padding: isMobile ? "14px 24px" : "14px 32px",
                       font: "600 15px/1 Inter Variable, sans-serif",
                       cursor: isSubmitting ? "not-allowed" : "pointer",
                       fontFamily: "inherit",
                       transition: "background 0.15s",
+                      width: isMobile ? "100%" : "auto",
                     }}
                     onMouseEnter={(e) => { if (!isSubmitting) e.currentTarget.style.background = "#1D4ED8"; }}
                     onMouseLeave={(e) => { if (!isSubmitting) e.currentTarget.style.background = "#2563EB"; }}

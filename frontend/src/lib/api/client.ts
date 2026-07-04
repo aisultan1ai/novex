@@ -23,6 +23,31 @@ async function parseJsonSafely(response: Response): Promise<unknown> {
   }
 }
 
+// FastAPI/Pydantic returns `detail` as either a plain string OR an array of
+// validation errors: [{loc: ["body","phone"], msg: "Value error, ...", type: "..."}].
+// Extract a user-facing message that keeps the actual field-level messages.
+function extractErrorDetail(data: unknown, status: number): string {
+  if (typeof data === "object" && data !== null && "detail" in data) {
+    const detail = (data as { detail?: unknown }).detail;
+
+    if (typeof detail === "string") return detail;
+
+    if (Array.isArray(detail)) {
+      const messages = detail
+        .map((item: unknown) => {
+          if (typeof item !== "object" || item === null) return null;
+          const msg = (item as { msg?: unknown }).msg;
+          if (typeof msg !== "string") return null;
+          // Pydantic prefixes user errors with "Value error, " — strip it
+          return msg.replace(/^Value error,\s*/, "");
+        })
+        .filter((m): m is string => !!m);
+      if (messages.length > 0) return messages.join(". ");
+    }
+  }
+  return `Request failed with status ${status}`;
+}
+
 export async function apiRequest<T>(
   path: string,
   init?: RequestInit,
@@ -40,14 +65,7 @@ export async function apiRequest<T>(
   const data = await parseJsonSafely(response);
 
   if (!response.ok) {
-    const detail =
-      typeof data === "object" &&
-      data !== null &&
-      "detail" in data &&
-      typeof (data as { detail?: unknown }).detail === "string"
-        ? (data as { detail: string }).detail
-        : `Request failed with status ${response.status}`;
-    throw new ApiError(response.status, detail);
+    throw new ApiError(response.status, extractErrorDetail(data, response.status));
   }
 
   return data as T;
@@ -67,14 +85,7 @@ export async function apiFormDataRequest<T>(
   const data = await parseJsonSafely(response);
 
   if (!response.ok) {
-    const detail =
-      typeof data === "object" &&
-      data !== null &&
-      "detail" in data &&
-      typeof (data as { detail?: unknown }).detail === "string"
-        ? (data as { detail: string }).detail
-        : `Request failed with status ${response.status}`;
-    throw new ApiError(response.status, detail);
+    throw new ApiError(response.status, extractErrorDetail(data, response.status));
   }
 
   return data as T;

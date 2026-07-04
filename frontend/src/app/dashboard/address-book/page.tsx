@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/providers/auth-provider";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import { createAddress, deleteAddress, listAddresses } from "@/lib/api/address_book";
 import type { AddressEntry, AddressEntryCreate } from "@/types/address_book";
 
@@ -66,6 +67,7 @@ function IconPlus() {
 export default function AddressBookPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
+  const isMobile = useIsMobile();
 
   const [addresses, setAddresses] = useState<AddressEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -138,10 +140,10 @@ export default function AddressBookPage() {
 
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: isMobile ? 16 : 24, flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "#111827" }}>Адресная книга</h1>
-          <p style={{ margin: "4px 0 0", fontSize: 14, color: "#64748b" }}>
+          <h1 style={{ margin: 0, fontSize: isMobile ? 22 : 28, fontWeight: 800, color: "#111827" }}>Адресная книга</h1>
+          <p style={{ margin: "4px 0 0", fontSize: isMobile ? 13 : 14, color: "#64748b" }}>
             Сохранённые адреса отправителя и получателя
           </p>
         </div>
@@ -151,18 +153,18 @@ export default function AddressBookPage() {
             display: "inline-flex",
             alignItems: "center",
             gap: 6,
-            padding: "9px 18px",
+            padding: isMobile ? "8px 14px" : "9px 18px",
             borderRadius: 10,
             border: "none",
             background: "#111827",
             color: "#fff",
-            fontSize: 14,
+            fontSize: isMobile ? 13 : 14,
             fontWeight: 600,
             cursor: "pointer",
             fontFamily: "inherit",
           }}
         >
-          <IconPlus /> Добавить адрес
+          <IconPlus /> {isMobile ? "Добавить" : "Добавить адрес"}
         </button>
       </div>
 
@@ -174,12 +176,12 @@ export default function AddressBookPage() {
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: 28, marginBottom: 24 }}>
-          <h2 style={{ margin: "0 0 20px", fontSize: 16, fontWeight: 700, color: "#111827" }}>
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: isMobile ? 18 : 28, marginBottom: 20 }}>
+          <h2 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#111827" }}>
             Новый адрес
           </h2>
           <form onSubmit={(e) => void handleSubmit(e)}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? 12 : 16, marginBottom: 16 }}>
               <div>
                 <label style={lbl}>Метка (необязательно)</label>
                 <input style={inp} placeholder="Офис / Склад / Дом" value={form.label ?? ""} onChange={(e) => setField("label", e.target.value)}
@@ -313,7 +315,7 @@ export default function AddressBookPage() {
           </button>
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(320px, 1fr))", gap: isMobile ? 12 : 16 }}>
           {addresses.map((addr) => {
             const isDeleting = deletingId === addr.id;
             const isConfirming = confirmDeleteId === addr.id;

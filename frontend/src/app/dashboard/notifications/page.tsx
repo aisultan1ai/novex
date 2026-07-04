@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/providers/auth-provider";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import {
   listNotifications,
   markAllNotificationsRead,
@@ -35,6 +36,7 @@ const TYPE_ICONS: Record<string, string> = {
 export default function NotificationsPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
+  const isMobile = useIsMobile();
 
   const [items, setItems] = useState<Notification[]>([]);
   const [unread, setUnread] = useState(0);
@@ -81,9 +83,9 @@ export default function NotificationsPage() {
 
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "#111827" }}>
+          <h1 style={{ margin: 0, fontSize: isMobile ? 22 : 28, fontWeight: 800, color: "#111827" }}>
             Уведомления
           </h1>
           {unread > 0 && (
@@ -97,19 +99,19 @@ export default function NotificationsPage() {
             onClick={() => void handleMarkAll()}
             disabled={markingAll}
             style={{
-              padding: "9px 18px",
+              padding: isMobile ? "8px 14px" : "9px 18px",
               borderRadius: 10,
               border: "1px solid #e5e7eb",
               background: "#ffffff",
               color: "#475569",
-              fontSize: 13,
+              fontSize: isMobile ? 12 : 13,
               fontWeight: 500,
               cursor: markingAll ? "not-allowed" : "pointer",
               opacity: markingAll ? 0.6 : 1,
               fontFamily: "inherit",
             }}
           >
-            {markingAll ? "Обновляем…" : "Отметить все прочитанными"}
+            {markingAll ? "Обновляем…" : isMobile ? "Прочитать все" : "Отметить все прочитанными"}
           </button>
         )}
       </div>
@@ -145,8 +147,8 @@ export default function NotificationsPage() {
                 style={{
                   display: "flex",
                   alignItems: "flex-start",
-                  gap: 16,
-                  padding: "18px 24px",
+                  gap: isMobile ? 12 : 16,
+                  padding: isMobile ? "14px 16px" : "18px 24px",
                   borderBottom: isLast ? "none" : "1px solid #f1f5f9",
                   background: n.is_read ? "#ffffff" : "#f8faff",
                   cursor: n.is_read ? "default" : "pointer",

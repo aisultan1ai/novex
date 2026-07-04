@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/providers/auth-provider";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import { saveAuthSession } from "@/lib/auth/session";
 import { ApiError, changePassword, getProfile, updateProfile } from "@/lib/api/auth";
 import type { ProfileResponse } from "@/types/auth";
@@ -66,6 +67,7 @@ const lbl: React.CSSProperties = {
 export default function ProfilePage() {
   const { isAuthenticated, isLoading: authLoading, currentUser, refreshSession } = useAuth();
   const router = useRouter();
+  const isMobile = useIsMobile();
 
   const [profile, setProfile] = useState<ProfileResponse | null>(currentUser);
   const [isFetching, setIsFetching] = useState(!currentUser);
@@ -170,9 +172,9 @@ export default function ProfilePage() {
 
   return (
     <>
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "#111827" }}>Профиль</h1>
-        <p style={{ margin: "4px 0 0", fontSize: 14, color: "#64748b" }}>
+      <div style={{ marginBottom: isMobile ? 20 : 28 }}>
+        <h1 style={{ margin: 0, fontSize: isMobile ? 22 : 28, fontWeight: 800, color: "#111827" }}>Профиль</h1>
+        <p style={{ margin: "4px 0 0", fontSize: isMobile ? 13 : 14, color: "#64748b" }}>
           Ваши данные и настройки аккаунта
         </p>
       </div>
@@ -182,31 +184,49 @@ export default function ProfilePage() {
           Загружаем профиль…
         </div>
       ) : (
-        <div style={{ display: "flex", gap: 20, alignItems: "flex-start", maxWidth: 900 }}>
+        <div style={{
+          display: "flex",
+          flexDirection: isMobile ? "column" : "row",
+          gap: isMobile ? 12 : 20,
+          alignItems: "stretch",
+          maxWidth: 900,
+        }}>
 
           {/* ── Main profile card ──────────────────────────────── */}
-          <div style={{ flex: 1, minWidth: 0, background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, padding: 32 }}>
+          <div style={{ flex: 1, minWidth: 0, background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, padding: isMobile ? 20 : 32 }}>
             {/* Avatar + name */}
-            <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 32 }}>
-              <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#111827", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 800, color: "#ffffff", flexShrink: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 14 : 20, marginBottom: isMobile ? 20 : 32 }}>
+              <div style={{
+                width: isMobile ? 56 : 72,
+                height: isMobile ? 56 : 72,
+                borderRadius: "50%",
+                background: "#111827",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: isMobile ? 22 : 28, fontWeight: 800, color: "#ffffff",
+                flexShrink: 0,
+              }}>
                 {initials}
               </div>
-              <div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: "#111827", marginBottom: 4 }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{
+                  fontSize: isMobile ? 17 : 22, fontWeight: 700, color: "#111827",
+                  marginBottom: 4,
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                }}>
                   {dp?.full_name || dp?.email || "-"}
                 </div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600, background: "#ede9fe", color: "#5b21b6" }}>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 11, fontWeight: 600, background: "#ede9fe", color: "#5b21b6" }}>
                     {ROLE_LABELS[dp?.role ?? ""] ?? dp?.role}
                   </span>
-                  <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600, background: "#dbeafe", color: "#1e40af" }}>
+                  <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 11, fontWeight: 600, background: "#dbeafe", color: "#1e40af" }}>
                     {CUSTOMER_TYPE_LABELS[dp?.customer_type ?? ""] ?? dp?.customer_type}
                   </span>
-                  <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600, background: dp?.is_active ? "#dcfce7" : "#fee2e2", color: dp?.is_active ? "#166534" : "#991b1b" }}>
+                  <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 11, fontWeight: 600, background: dp?.is_active ? "#dcfce7" : "#fee2e2", color: dp?.is_active ? "#166534" : "#991b1b" }}>
                     {dp?.is_active ? "Активен" : "Заблокирован"}
                   </span>
                 </div>
-                <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 8 }}>
+                <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 8 }}>
                   ID: <span style={{ fontFamily: "monospace", color: "#475569", fontWeight: 600 }}>#{dp?.user_id}</span>
                   {" · "}
                   {BILLING_LABELS[dp?.billing_mode ?? ""] ?? dp?.billing_mode}
@@ -214,15 +234,20 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            <hr style={{ border: "none", borderTop: "1px solid #f1f5f9", margin: "0 0 24px" }} />
+            <hr style={{ border: "none", borderTop: "1px solid #f1f5f9", margin: "0 0 20px" }} />
 
-            <h2 style={{ margin: "0 0 20px", fontSize: 16, fontWeight: 700, color: "#111827" }}>
+            <h2 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#111827" }}>
               Редактировать данные
             </h2>
 
             <form onSubmit={handleSubmit}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
-                <div style={{ gridColumn: "1 / -1" }}>
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+                gap: isMobile ? 14 : 20,
+                marginBottom: 20,
+              }}>
+                <div style={{ gridColumn: isMobile ? undefined : "1 / -1" }}>
                   <label style={lbl}>Эл. почта</label>
                   <input style={inpDisabled} value={dp?.email ?? ""} disabled readOnly />
                 </div>
@@ -260,7 +285,15 @@ export default function ProfilePage() {
 
               <button
                 type="submit" disabled={isSaving}
-                style={{ background: "#111827", color: "#ffffff", border: "none", borderRadius: 10, padding: "12px 32px", fontWeight: 600, fontSize: 15, cursor: isSaving ? "not-allowed" : "pointer", opacity: isSaving ? 0.7 : 1, fontFamily: "inherit" }}
+                style={{
+                  background: "#111827", color: "#ffffff", border: "none",
+                  borderRadius: 10,
+                  padding: isMobile ? "12px 24px" : "12px 32px",
+                  fontWeight: 600, fontSize: 15,
+                  cursor: isSaving ? "not-allowed" : "pointer",
+                  opacity: isSaving ? 0.7 : 1, fontFamily: "inherit",
+                  width: isMobile ? "100%" : "auto",
+                }}
               >
                 {isSaving ? "Сохраняем…" : "Сохранить"}
               </button>
@@ -279,26 +312,44 @@ export default function ProfilePage() {
           </div>
 
           {/* ── Password card ──────────────────────────────────── */}
-          <div style={{ width: 240, flexShrink: 0, background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, padding: 24, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 16 }}>
-            <div style={{ width: 52, height: 52, borderRadius: 14, background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{
+            width: isMobile ? "100%" : 240,
+            flexShrink: 0,
+            background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16,
+            padding: isMobile ? 20 : 24,
+            display: "flex",
+            flexDirection: isMobile ? "row" : "column",
+            alignItems: "center",
+            textAlign: isMobile ? "left" : "center",
+            gap: isMobile ? 14 : 16,
+            boxSizing: "border-box",
+          }}>
+            <div style={{ width: 52, height: 52, borderRadius: 14, background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                 <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
               </svg>
             </div>
-            <div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", marginBottom: 6 }}>Сменить пароль</div>
+            <div style={{ flex: isMobile ? 1 : "none", minWidth: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", marginBottom: 4 }}>Сменить пароль</div>
               <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.5 }}>
                 Рекомендуем использовать надёжный пароль
               </div>
             </div>
             <button
               onClick={openPwModal}
-              style={{ width: "100%", padding: "11px 0", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", color: "#111827", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "background 0.15s" }}
+              style={{
+                width: isMobile ? "auto" : "100%",
+                padding: isMobile ? "10px 16px" : "11px 0",
+                borderRadius: 10, border: "1px solid #e5e7eb",
+                background: "#fff", color: "#111827", fontSize: 14, fontWeight: 600,
+                cursor: "pointer", fontFamily: "inherit", transition: "background 0.15s",
+                whiteSpace: "nowrap", flexShrink: 0,
+              }}
               onMouseEnter={(e) => { e.currentTarget.style.background = "#f8fafc"; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = "#fff"; }}
             >
-              Изменить пароль
+              Изменить
             </button>
           </div>
         </div>
@@ -308,9 +359,25 @@ export default function ProfilePage() {
       {showPwModal && (
         <div
           onClick={(e) => { if (e.target === e.currentTarget) setShowPwModal(false); }}
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center" }}
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
+            zIndex: 50, display: "flex",
+            alignItems: isMobile ? "flex-end" : "center",
+            justifyContent: "center",
+            padding: isMobile ? 0 : 16,
+          }}
         >
-          <div style={{ background: "#fff", borderRadius: 20, padding: "36px 40px", width: 420, boxShadow: "0 24px 64px rgba(0,0,0,0.16)" }}>
+          <div style={{
+            background: "#fff",
+            borderRadius: isMobile ? "20px 20px 0 0" : 20,
+            padding: isMobile ? "24px 20px 32px" : "36px 40px",
+            width: isMobile ? "100%" : 420,
+            maxWidth: "100%",
+            boxSizing: "border-box",
+            boxShadow: "0 24px 64px rgba(0,0,0,0.16)",
+            maxHeight: isMobile ? "92vh" : "auto",
+            overflowY: "auto",
+          }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 26 }}>
               <div>
                 <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#111827" }}>Сменить пароль</h2>

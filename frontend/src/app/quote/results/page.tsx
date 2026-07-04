@@ -5,6 +5,7 @@ import { flushSync } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import Navbar from "@/components/layout/Navbar";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import { ApiError, getShippingQuote, selectShippingQuote } from "@/lib/api/shipping";
 import type { RateQuoteItem, ShippingQuoteResponse } from "@/types/quote";
 
@@ -49,6 +50,7 @@ function SkeletonCard() {
 function QuoteResultsPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const isMobile = useIsMobile();
 
   const quoteSessionId = useMemo(() => {
     const raw = searchParams.get("quoteSessionId");
@@ -127,33 +129,36 @@ function QuoteResultsPageInner() {
     <div style={{ minHeight: "100vh", background: "#FAFAFA" }}>
       <Navbar />
 
-      <main style={{ maxWidth: 900, margin: "0 auto", padding: "40px 20px 80px" }}>
+      <main style={{
+        maxWidth: 900, margin: "0 auto",
+        padding: isMobile ? "24px 16px 40px" : "40px 20px 80px",
+      }}>
         {/* Header */}
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
-            alignItems: "center",
+            alignItems: isMobile ? "flex-start" : "center",
             flexWrap: "wrap",
-            gap: 16,
-            marginBottom: 32,
+            gap: isMobile ? 12 : 16,
+            marginBottom: isMobile ? 20 : 32,
           }}
         >
-          <div>
+          <div style={{ minWidth: 0, flex: 1 }}>
             <div
               style={{
-                font: "500 13px/1 Inter Variable, sans-serif",
+                font: `500 ${isMobile ? 11 : 13}px/1 Inter Variable, sans-serif`,
                 textTransform: "uppercase",
                 letterSpacing: "0.05em",
                 color: "#2563EB",
-                marginBottom: 10,
+                marginBottom: 8,
               }}
             >
-              Шаг 2 из 4 - Выбор тарифа
+              Шаг 2 из 4 · Выбор тарифа
             </div>
             <h1
               style={{
-                font: "700 28px/1.2 Inter Variable, sans-serif",
+                font: `700 ${isMobile ? 22 : 28}px/1.2 Inter Variable, sans-serif`,
                 letterSpacing: "-0.02em",
                 color: "#111827",
                 margin: 0,
@@ -169,16 +174,18 @@ function QuoteResultsPageInner() {
               background: "#ffffff",
               color: "#111827",
               borderRadius: 10,
-              padding: "10px 18px",
-              font: "600 14px/1 Inter Variable, sans-serif",
+              padding: isMobile ? "8px 14px" : "10px 18px",
+              font: `600 ${isMobile ? 13 : 14}px/1 Inter Variable, sans-serif`,
               cursor: "pointer",
               fontFamily: "inherit",
               transition: "background 0.15s",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
             }}
             onMouseEnter={(e) => (e.currentTarget.style.background = "#F9FAFB")}
             onMouseLeave={(e) => (e.currentTarget.style.background = "#ffffff")}
           >
-            ← Назад к форме
+            ← Назад
           </button>
         </div>
 
@@ -278,11 +285,12 @@ function QuoteResultsPageInner() {
                       background: isSelected ? "#EFF6FF" : "#ffffff",
                       borderRadius: 16,
                       border: `1.5px solid ${isSelected ? "#2563EB" : isBest ? "#2563EB" : "#E5E7EB"}`,
-                      padding: "20px 24px",
+                      padding: isMobile ? "16px" : "20px 24px",
                       display: "flex",
-                      alignItems: "center",
+                      flexDirection: isMobile ? "column" : "row",
+                      alignItems: isMobile ? "stretch" : "center",
                       justifyContent: "space-between",
-                      gap: 16,
+                      gap: isMobile ? 14 : 16,
                       cursor: isSelected ? "default" : "pointer",
                       boxShadow: isBest || isSelected
                         ? "0 4px 16px rgba(37,99,235,0.10)"
@@ -290,14 +298,14 @@ function QuoteResultsPageInner() {
                       transition: "all 0.15s ease",
                     }}
                     onMouseEnter={(e) => {
-                      if (!isSelected) {
+                      if (!isSelected && !isMobile) {
                         e.currentTarget.style.boxShadow = "0 4px 16px rgba(37,99,235,0.10)";
                         e.currentTarget.style.transform = "translateY(-2px)";
                         e.currentTarget.style.borderColor = "#2563EB";
                       }
                     }}
                     onMouseLeave={(e) => {
-                      if (!isSelected) {
+                      if (!isSelected && !isMobile) {
                         e.currentTarget.style.boxShadow = isBest
                           ? "0 4px 16px rgba(37,99,235,0.10)"
                           : "0 1px 3px rgba(0,0,0,0.06)";
@@ -306,27 +314,35 @@ function QuoteResultsPageInner() {
                       }
                     }}
                   >
-                    {/* Left */}
+                    {/* Left: carrier info */}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+                      <div style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: isMobile ? 10 : 12,
+                        marginBottom: 8,
+                      }}>
                         <div
                           style={{
-                            width: 48,
-                            height: 48,
+                            width: isMobile ? 40 : 48,
+                            height: isMobile ? 40 : 48,
                             borderRadius: 10,
                             background: "#EFF6FF",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
-                            font: "700 20px/1 Inter Variable, sans-serif",
+                            font: `700 ${isMobile ? 16 : 20}px/1 Inter Variable, sans-serif`,
                             color: "#2563EB",
                             flexShrink: 0,
                           }}
                         >
                           {rate.carrier_name[0]}
                         </div>
-                        <div>
-                          <span style={{ font: "600 16px/1 Inter Variable, sans-serif", color: "#111827", marginRight: 8 }}>
+                        <div style={{ minWidth: 0, flex: 1, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
+                          <span style={{
+                            font: `600 ${isMobile ? 15 : 16}px/1.2 Inter Variable, sans-serif`,
+                            color: "#111827",
+                          }}>
                             {rate.carrier_name}
                           </span>
                           <TariffBadge name={rate.tariff_name} />
@@ -337,8 +353,7 @@ function QuoteResultsPageInner() {
                                 color: "#1D4ED8",
                                 padding: "3px 10px",
                                 borderRadius: 999,
-                                font: "600 12px/1 Inter Variable, sans-serif",
-                                marginLeft: 6,
+                                font: "600 11px/1 Inter Variable, sans-serif",
                               }}
                             >
                               {badgeLabel}
@@ -351,8 +366,7 @@ function QuoteResultsPageInner() {
                                 color: "#065F46",
                                 padding: "3px 10px",
                                 borderRadius: 999,
-                                font: "600 12px/1 Inter Variable, sans-serif",
-                                marginLeft: 6,
+                                font: "600 11px/1 Inter Variable, sans-serif",
                               }}
                             >
                               Выбран ✓
@@ -360,7 +374,14 @@ function QuoteResultsPageInner() {
                           )}
                         </div>
                       </div>
-                      <div style={{ font: "400 13px/1 Inter Variable, sans-serif", color: "#6B7280", display: "flex", gap: 16, flexWrap: "wrap" }}>
+                      <div style={{
+                        font: "400 13px/1.3 Inter Variable, sans-serif",
+                        color: "#6B7280",
+                        display: "flex",
+                        gap: 16,
+                        flexWrap: "wrap",
+                        paddingLeft: isMobile ? 50 : 60,
+                      }}>
                         <span>Срок: {rate.eta_days_min}–{rate.eta_days_max} дн.</span>
                         {/эконом|econom/i.test(rate.tariff_name) && (
                           <span style={{ color: "#F59E0B" }}>мин. 10 кг</span>
@@ -368,13 +389,32 @@ function QuoteResultsPageInner() {
                       </div>
                     </div>
 
-                    {/* Right */}
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0 }}>
-                      <div>
-                        <div style={{ font: "700 24px/1 Inter Variable, sans-serif", color: "#111827", textAlign: "right" }}>
+                    {/* Right: price + button */}
+                    <div style={{
+                      display: "flex",
+                      flexDirection: isMobile ? "row" : "column",
+                      alignItems: isMobile ? "center" : "flex-end",
+                      justifyContent: isMobile ? "space-between" : "flex-start",
+                      gap: isMobile ? 12 : 8,
+                      flexShrink: 0,
+                      paddingTop: isMobile ? 10 : 0,
+                      borderTop: isMobile ? "1px solid #f1f5f9" : "none",
+                    }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{
+                          font: `700 ${isMobile ? 22 : 24}px/1 Inter Variable, sans-serif`,
+                          color: "#111827",
+                          textAlign: isMobile ? "left" : "right",
+                          whiteSpace: "nowrap",
+                        }}>
                           {formatPrice(rate.price, rate.currency)}
                         </div>
-                        <div style={{ font: "400 12px/1 Inter Variable, sans-serif", color: "#9CA3AF", textAlign: "right", marginTop: 4 }}>
+                        <div style={{
+                          font: "400 12px/1 Inter Variable, sans-serif",
+                          color: "#9CA3AF",
+                          textAlign: isMobile ? "left" : "right",
+                          marginTop: 4,
+                        }}>
                           с НДС
                         </div>
                       </div>
@@ -386,22 +426,24 @@ function QuoteResultsPageInner() {
                           background: isSelected ? "#2563EB" : "#ffffff",
                           color: isSelected ? "#ffffff" : "#111827",
                           borderRadius: 10,
-                          padding: "8px 18px",
+                          padding: isMobile ? "10px 20px" : "8px 18px",
                           font: "600 14px/1 Inter Variable, sans-serif",
                           cursor: isSelected || selectingId === rate.id ? "not-allowed" : "pointer",
                           fontFamily: "inherit",
                           opacity: selectingId === rate.id ? 0.6 : 1,
                           transition: "all 0.15s",
+                          whiteSpace: "nowrap",
+                          flexShrink: 0,
                         }}
                         onMouseEnter={(e) => {
-                          if (!isSelected && selectingId !== rate.id) {
+                          if (!isSelected && selectingId !== rate.id && !isMobile) {
                             e.currentTarget.style.background = "#2563EB";
                             e.currentTarget.style.color = "#ffffff";
                             e.currentTarget.style.borderColor = "#2563EB";
                           }
                         }}
                         onMouseLeave={(e) => {
-                          if (!isSelected && selectingId !== rate.id) {
+                          if (!isSelected && selectingId !== rate.id && !isMobile) {
                             e.currentTarget.style.background = "#ffffff";
                             e.currentTarget.style.color = "#111827";
                             e.currentTarget.style.borderColor = "#E5E7EB";
@@ -422,7 +464,11 @@ function QuoteResultsPageInner() {
             </p>
 
             {/* Continue button */}
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <div style={{
+              display: "flex",
+              justifyContent: isMobile ? "stretch" : "flex-end",
+              marginTop: 20,
+            }}>
               <button
                 onClick={handleContinue}
                 disabled={!selectedQuote}
@@ -431,11 +477,12 @@ function QuoteResultsPageInner() {
                   color: selectedQuote ? "#ffffff" : "#9CA3AF",
                   border: "none",
                   borderRadius: 10,
-                  padding: "14px 32px",
+                  padding: isMobile ? "14px 24px" : "14px 32px",
                   font: "600 15px/1 Inter Variable, sans-serif",
                   cursor: selectedQuote ? "pointer" : "not-allowed",
                   fontFamily: "inherit",
                   transition: "background 0.15s",
+                  width: isMobile ? "100%" : "auto",
                 }}
                 onMouseEnter={(e) => {
                   if (selectedQuote) e.currentTarget.style.background = "#1D4ED8";
