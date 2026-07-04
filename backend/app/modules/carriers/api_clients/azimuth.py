@@ -41,15 +41,13 @@ class AzimuthAPIClient(CarrierAPIClient):
         if service_flags:
             notes_parts = service_flags + notes_parts
 
-        # Azimuth requires waybill_number of EXACTLY 12 characters, digits only.
-        # Format: 4-digit order_id + 8 random digits derived from timestamp+rand
-        import time
-        order_id = order_data.get("order_id", 0)
-        # Take last 8 digits of (ms timestamp XOR secrets number) — always 8 digits
-        ts_part = int(time.time() * 1000) % 100_000_000
-        rand_part = secrets.randbelow(100_000_000)
-        suffix = f"{(ts_part ^ rand_part) % 100_000_000:08d}"
-        waybill_number = f"{order_id % 10000:04d}{suffix}"
+        # Azimuth waybill_number: exactly 12 chars, format from their sample
+        # "123456RS7890" = 6 digits + 2 uppercase letters + 4 digits.
+        import string
+        digits1 = f"{secrets.randbelow(1_000_000):06d}"
+        letters = "".join(secrets.choice(string.ascii_uppercase) for _ in range(2))
+        digits2 = f"{secrets.randbelow(10_000):04d}"
+        waybill_number = f"{digits1}{letters}{digits2}"
 
         body = {
             "waybill_number": waybill_number,
@@ -107,8 +105,8 @@ class AzimuthAPIClient(CarrierAPIClient):
             except Exception:
                 errors_summary = body_preview
             logger.warning(
-                "Azimuth create_invoice failed: status=%s body=%s",
-                resp.status_code, body_preview,
+                "Azimuth create_invoice failed: status=%s FULL_BODY=%s SENT_WAYBILL=%s",
+                resp.status_code, resp.text, waybill_number,
             )
             raise RuntimeError(
                 f"Azimuth API вернул {resp.status_code}: {errors_summary}"
