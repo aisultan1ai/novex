@@ -282,7 +282,7 @@ services:
       - "443:443"
     volumes:
       - certbot_www:/var/www/certbot:ro
-      - certbot_certs:/etc/letsencrypt:ro
+      - certbot_certs:/etc/letsencrypt
       - ./nginx-prod.conf:/etc/nginx/templates/default.conf.template:ro
 
   certbot:
