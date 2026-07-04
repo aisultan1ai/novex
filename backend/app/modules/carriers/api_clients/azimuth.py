@@ -15,6 +15,8 @@ class AzimuthAPIClient(CarrierAPIClient):
     carrier_code = "azimuth"
 
     def create_invoice(self, order_data: dict, creds: dict) -> InvoiceResult:
+        import secrets
+
         api_url = creds["api_url"].rstrip("/")
         token = creds["api_token"]
 
@@ -39,7 +41,13 @@ class AzimuthAPIClient(CarrierAPIClient):
         if service_flags:
             notes_parts = service_flags + notes_parts
 
+        # Azimuth requires a waybill_number in the request — we generate it
+        # (their sample uses format like "123456RS7890"). Format: NX{order_id}{6 hex chars}
+        order_id = order_data.get("order_id", 0)
+        waybill_number = f"NX{order_id}{secrets.token_hex(3).upper()}"
+
         body = {
+            "waybill_number": waybill_number,
             "sender_name": sender.get("full_name", ""),
             "sender_city": sender.get("city", ""),
             "sender_address": sender.get("address", ""),
@@ -65,10 +73,24 @@ class AzimuthAPIClient(CarrierAPIClient):
         resp = httpx.post(
             f"{api_url}/api/integration/invoices",
             json=body,
-            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
             timeout=_TIMEOUT,
         )
-        resp.raise_for_status()
+        # Azimuth uses HTTP 500 for validation errors — surface the body so it's
+        # obvious which field is wrong instead of a generic 500.
+        if resp.status_code >= 400:
+            body_preview = resp.text[:400] if resp.text else "<empty>"
+            logger.warning(
+                "Azimuth create_invoice failed: status=%s body=%s",
+                resp.status_code, body_preview,
+            )
+            raise RuntimeError(
+                f"Azimuth API вернул {resp.status_code}: {body_preview}"
+            )
         data = resp.json()
 
         # Azimuth may return waybill_number / invoice_number / id — handle variants
