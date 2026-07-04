@@ -41,37 +41,48 @@ class AzimuthAPIClient(CarrierAPIClient):
         if service_flags:
             notes_parts = service_flags + notes_parts
 
-        # Azimuth waybill_number: exactly 12 chars, format from their sample
-        # "123456RS7890" = 6 digits + 2 uppercase letters + 4 digits.
-        import string
-        digits1 = f"{secrets.randbelow(1_000_000):06d}"
-        letters = "".join(secrets.choice(string.ascii_uppercase) for _ in range(2))
-        digits2 = f"{secrets.randbelow(10_000):04d}"
-        waybill_number = f"{digits1}{letters}{digits2}"
+        # Azimuth waybill_number regex: ^\d*RS\d*$ + size:12
+        # Must contain exactly one "RS", rest digits, total 12 chars.
+        # Format: 10 random digits + "RS" at the end (any position works).
+        digits = f"{secrets.randbelow(10**10):010d}"
+        waybill_number = f"{digits}RS"
+
+        # Azimuth caps quantity at 4 per invoice.
+        clamped_qty = max(1, min(4, total_qty))
+        # declared_value must be an integer (tenge), not decimal.
+        declared_value_tenge = int(round(float(order_data.get("declared_value", 0) or 0)))
 
         body = {
             "waybill_number": waybill_number,
-            "sender_name": sender.get("full_name", ""),
-            "sender_city": sender.get("city", ""),
-            "sender_address": sender.get("address", ""),
-            "sender_phone": sender.get("phone", ""),
-            "receiver_name": recipient.get("full_name", ""),
-            "receiver_city": recipient.get("city", ""),
-            "receiver_address": recipient.get("address", ""),
-            "receiver_phone": recipient.get("phone", ""),
+            "sender_name": sender.get("full_name", "")[:255],
+            "sender_city": sender.get("city", "")[:255],
+            "sender_address": sender.get("address", "")[:255],
+            "sender_phone": sender.get("phone", "")[:20],
+            "receiver_name": recipient.get("full_name", "")[:255],
+            "receiver_city": recipient.get("city", "")[:255],
+            "receiver_address": recipient.get("address", "")[:255],
+            "receiver_phone": recipient.get("phone", "")[:20],
             "service_type": int(creds.get("service_type", 2)),
             "payment_type": int(creds.get("payment_type", 2)),
             "payer": int(creds.get("payer", 1)),
-            "quantity": total_qty,
+            "quantity": clamped_qty,
             "weight": round(float(total_weight), 3),
-            "declared_value": float(order_data.get("declared_value", 0)),
+            "declared_value": declared_value_tenge,
             "cod": None,
-            "notes": "; ".join(notes_parts) if notes_parts else None,
+            "notes": ("; ".join(notes_parts) if notes_parts else None) or None,
         }
+        if body["notes"]:
+            body["notes"] = body["notes"][:255]
 
-        payer_tin = creds.get("payer_tin", "")
-        if payer_tin:
-            body["payer_tin"] = payer_tin
+        # payer_tin is REQUIRED per Azimuth spec: exactly 12 digits.
+        payer_tin = str(creds.get("payer_tin", "")).strip()
+        if not payer_tin or not payer_tin.isdigit() or len(payer_tin) != 12:
+            raise RuntimeError(
+                "Не заполнен payer_tin (ИИН/БИН плательщика — 12 цифр) "
+                "в настройках Azimuth API. Admin → Carriers → Azimuth → API → "
+                "Дополнительные параметры → payer_tin."
+            )
+        body["payer_tin"] = payer_tin
 
         resp = httpx.post(
             f"{api_url}/api/integration/invoices",
