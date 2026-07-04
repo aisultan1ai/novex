@@ -118,12 +118,12 @@ class CarrierAPICredentialsRepository:
             existing = None
         if existing:
             existing.api_url = payload.api_url
-            # Only overwrite the token when a new non-empty value is provided.
-            # An empty api_token means "keep existing" — useful for carriers that
-            # authenticate via extra_config (Exline, CSE) so the user doesn't need
-            # to re-enter a token they don't use. Assigning "" re-encrypts with the
-            # current key, which is the desired behaviour for re-keying.
-            existing.api_token = payload.api_token  # "" is valid — re-encrypts with current key
+            # Preserve the existing token when the caller sends an empty string —
+            # the UI leaves the token field blank when the admin only wants to
+            # tweak extra_config or api_url. Overwriting with "" would silently
+            # break the integration; the admin must retype the token to change it.
+            if payload.api_token:
+                existing.api_token = payload.api_token
             existing.is_active = payload.is_active
             if payload.extra_config is not None:
                 existing.extra_config = payload.extra_config

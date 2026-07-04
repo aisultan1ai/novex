@@ -144,16 +144,21 @@ class AzimuthAPIClient(CarrierAPIClient):
             )
         data = resp.json()
 
-        # Azimuth may return waybill_number / invoice_number / id — handle variants
+        # Azimuth wraps the invoice in a `data` object and returns:
+        # - `id`: their internal numeric invoice id (e.g. 73228)
+        # - `bill`: the waybill number we sent back to us (e.g. "4376006623RS")
+        # Older variants used `waybill_number` / `invoice_number` at the top level.
+        inner = data.get("data") if isinstance(data.get("data"), dict) else data
         waybill_number = (
-            data.get("waybill_number")
-            or data.get("invoice_number")
-            or str(data.get("id", ""))
+            inner.get("bill")
+            or inner.get("waybill_number")
+            or inner.get("invoice_number")
+            or str(inner.get("id", ""))
         )
         if not waybill_number:
             raise RuntimeError(f"Azimuth API did not return a waybill number. Response: {data}")
 
-        carrier_invoice_id = str(data.get("id") or waybill_number)
+        carrier_invoice_id = str(inner.get("id") or waybill_number)
         logger.info(
             "Azimuth invoice created: waybill=%s invoice_id=%s order=%s",
             waybill_number,
@@ -161,10 +166,11 @@ class AzimuthAPIClient(CarrierAPIClient):
             order_data.get("order_id"),
         )
 
-        # Immediately fetch the PDF
+        # Immediately fetch the PDF — use the numeric invoice id (Azimuth's
+        # route-model-binding uses id by default, not the bill/waybill string).
         pdf_bytes: bytes | None = None
         try:
-            pdf_bytes = self.get_invoice_pdf(waybill_number, creds)
+            pdf_bytes = self.get_invoice_pdf(carrier_invoice_id, creds)
         except Exception as exc:
             logger.warning("Azimuth PDF fetch failed (non-fatal): %s", exc)
 
