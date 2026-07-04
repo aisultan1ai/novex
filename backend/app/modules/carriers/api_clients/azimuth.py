@@ -41,10 +41,10 @@ class AzimuthAPIClient(CarrierAPIClient):
         if service_flags:
             notes_parts = service_flags + notes_parts
 
-        # Azimuth requires a waybill_number in the request — we generate it
-        # (their sample uses format like "123456RS7890"). Format: NX{order_id}{6 hex chars}
+        # Azimuth requires waybill_number of EXACTLY 12 characters.
+        # Format: NX + 4-digit zero-padded order_id + 6 random hex chars = 12 chars
         order_id = order_data.get("order_id", 0)
-        waybill_number = f"NX{order_id}{secrets.token_hex(3).upper()}"
+        waybill_number = f"NX{order_id % 10000:04d}{secrets.token_hex(3).upper()}"
 
         body = {
             "waybill_number": waybill_number,
@@ -80,16 +80,30 @@ class AzimuthAPIClient(CarrierAPIClient):
             },
             timeout=_TIMEOUT,
         )
-        # Azimuth uses HTTP 500 for validation errors — surface the body so it's
-        # obvious which field is wrong instead of a generic 500.
+        # Azimuth uses HTTP 500 for validation errors — surface all field errors
+        # instead of a generic 500. Try to parse `errors` map if Laravel returned it.
         if resp.status_code >= 400:
-            body_preview = resp.text[:400] if resp.text else "<empty>"
+            body_preview = resp.text[:800] if resp.text else "<empty>"
+            errors_summary: str
+            try:
+                jbody = resp.json()
+                if isinstance(jbody.get("errors"), dict):
+                    errors_summary = "; ".join(
+                        f"{field}: {', '.join(msgs) if isinstance(msgs, list) else msgs}"
+                        for field, msgs in jbody["errors"].items()
+                    )
+                elif isinstance(jbody.get("message"), str):
+                    errors_summary = jbody["message"]
+                else:
+                    errors_summary = body_preview
+            except Exception:
+                errors_summary = body_preview
             logger.warning(
                 "Azimuth create_invoice failed: status=%s body=%s",
                 resp.status_code, body_preview,
             )
             raise RuntimeError(
-                f"Azimuth API вернул {resp.status_code}: {body_preview}"
+                f"Azimuth API вернул {resp.status_code}: {errors_summary}"
             )
         data = resp.json()
 
