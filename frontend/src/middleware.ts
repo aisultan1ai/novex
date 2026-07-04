@@ -100,5 +100,10 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon\\.ico).*)"],
+  // Skip Next.js internals and any static asset (by extension) so the middleware
+  // never redirects e.g. /carriers/azimuth.png to /login. Auth is enforced only
+  // on real page routes.
+  matcher: [
+    "/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|avif|woff|woff2|ttf|otf|css|js|map|txt|xml)).*)",
+  ],
 };
