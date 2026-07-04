@@ -231,6 +231,7 @@ services:
       ENVIRONMENT: production
       SECRET_KEY: ${SECRET_KEY}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       CARRIER_GATEWAY_URL: http://carrier-gateway:8100
