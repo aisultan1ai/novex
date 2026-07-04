@@ -75,7 +75,18 @@ export async function downloadOrderLabel(draftId: number): Promise<Blob> {
     cache: "no-store",
   });
   if (!response.ok) {
-    throw new ApiError(response.status, `Не удалось скачать накладную (${response.status})`);
+    // Try to extract backend's detail message (e.g. "Накладная ещё формируется у перевозчика.").
+    let detail = `Не удалось скачать накладную (${response.status})`;
+    try {
+      const ct = response.headers.get("content-type") ?? "";
+      if (ct.includes("application/json")) {
+        const body = await response.json();
+        if (typeof body?.detail === "string") detail = body.detail;
+      }
+    } catch {
+      // fall back to default
+    }
+    throw new ApiError(response.status, detail);
   }
   return response.blob();
 }

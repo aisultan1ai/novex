@@ -7,7 +7,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { ApiError, deleteOrderDraft, downloadOrderLabel, getOrderDraft } from "@/lib/api/orders";
-import { refreshOrderWaybill } from "@/lib/api/admin";
+import { refreshOrderWaybill, retryOrderDispatch } from "@/lib/api/admin";
 import type { OrderDraftResponse } from "@/types/order";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -118,6 +118,7 @@ export default function OrderDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isRefreshingWaybill, setIsRefreshingWaybill] = useState(false);
+  const [isRetryingDispatch, setIsRetryingDispatch] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -164,16 +165,17 @@ export default function OrderDetailPage() {
 
   async function handleDownloadLabel() {
     setIsDownloading(true);
+    setError(null);
     try {
       const blob = await downloadOrderLabel(draftId);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `novex_label_${draftId}.pdf`;
+      a.download = `waybill_${draftId}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch {
-      setError("Не удалось скачать накладную.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : "Не удалось скачать накладную.");
     } finally {
       setIsDownloading(false);
     }
@@ -190,6 +192,20 @@ export default function OrderDetailPage() {
       setError(err instanceof ApiError ? err.detail : "Не удалось обновить накладную.");
     } finally {
       setIsRefreshingWaybill(false);
+    }
+  }
+
+  async function handleRetryDispatch() {
+    if (!confirm("Повторно отправить заказ перевозчику по API? Будет создана накладная у Azimuth и получен трекинг-номер.")) return;
+    setIsRetryingDispatch(true);
+    setError(null);
+    try {
+      await retryOrderDispatch(draftId);
+      alert("Заказ отправлен на dispatch. Обновите страницу через 10 секунд.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : "Не удалось отправить заказ.");
+    } finally {
+      setIsRetryingDispatch(false);
     }
   }
 
@@ -272,6 +288,16 @@ export default function OrderDetailPage() {
                   style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid #d97706", background: "#fff", color: "#d97706", fontSize: 14, fontWeight: 600, cursor: isRefreshingWaybill ? "not-allowed" : "pointer", opacity: isRefreshingWaybill ? 0.6 : 1, fontFamily: "inherit" }}
                 >
                   {isRefreshingWaybill ? "Запрашиваем…" : "Обновить через API"}
+                </button>
+              )}
+              {isAdmin && !order.tracking_number && (
+                <button
+                  onClick={() => void handleRetryDispatch()}
+                  disabled={isRetryingDispatch}
+                  title="Отправить заказ перевозчику по API (создаст накладную и трекинг)"
+                  style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid #d97706", background: "#fff", color: "#d97706", fontSize: 14, fontWeight: 600, cursor: isRetryingDispatch ? "not-allowed" : "pointer", opacity: isRetryingDispatch ? 0.6 : 1, fontFamily: "inherit" }}
+                >
+                  {isRetryingDispatch ? "Отправляем…" : "Отправить в Azimuth"}
                 </button>
               )}
               {order.status === "draft" && !pendingDelete && (
