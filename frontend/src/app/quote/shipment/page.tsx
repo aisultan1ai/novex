@@ -361,33 +361,14 @@ function TariffSummary({
   livePrice?: { price: number; currency: string } | null;
   isRecalculating?: boolean;
 }) {
+  const isMobile = useIsMobile();
   const displayPrice = livePrice?.price ?? draft.price_snapshot;
   const displayCurrency = livePrice?.currency ?? draft.currency_snapshot;
   const basePrice = draft.price_snapshot;
   const deltaPositive = livePrice && livePrice.price > basePrice;
   const deltaNegative = livePrice && livePrice.price < basePrice;
+  const deltaSign = deltaPositive ? "+" : deltaNegative ? "−" : "";
   const delta = livePrice ? Math.abs(livePrice.price - basePrice) : 0;
-  return _TariffSummaryImpl({
-    draft, onChangeTariff,
-    displayPrice, displayCurrency, isRecalculating,
-    deltaSign: deltaPositive ? "+" : deltaNegative ? "−" : "",
-    delta,
-  });
-}
-
-function _TariffSummaryImpl({
-  draft, onChangeTariff, displayPrice, displayCurrency,
-  isRecalculating, deltaSign, delta,
-}: {
-  draft: OrderDraftResponse;
-  onChangeTariff: () => void;
-  displayPrice: number;
-  displayCurrency: string;
-  isRecalculating?: boolean;
-  deltaSign: string;
-  delta: number;
-}) {
-  const isMobile = useIsMobile();
   return (
     <div
       style={{
