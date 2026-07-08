@@ -245,13 +245,19 @@ _CSE_SERVICE_GUIDS: dict[str, str] = {
 
 
 # CSE Currencies reference GUIDs → ISO 4217 code.
-# Populated from GetReferenceData:Currencies on the CSE test endpoint.
-# Only used as fallback if Calc omits CurrencyName; RUB stays the safe default.
+# CSE (1C) uses "RUR" internally — we normalise to modern ISO 4217 "RUB".
+# GetReferenceData:Currencies on test endpoint returns only EUR/RUR/USD (no KZT).
+# KZT GUID is known from production accounts; included as fallback.
 _CSE_CURRENCY_GUID_TO_ISO: dict[str, str] = {
-    "ff3f7c38-4430-11dc-9497-0015170f8c09": "RUB",
+    "ff3f7c38-4430-11dc-9497-0015170f8c09": "RUB",  # 1C stores as "RUR" → normalised to RUB
     "d3a2419e-e7e9-11e8-80c1-7cd30aec6901": "KZT",
     "e6853795-4421-11dc-9497-0015170f8c09": "USD",
     "e6853796-4421-11dc-9497-0015170f8c09": "EUR",
+}
+
+# CSE returns "RUR" (legacy 1C code) instead of ISO 4217 "RUB". Normalise on ingest.
+_CSE_CURRENCY_NAME_NORMALISE: dict[str, str] = {
+    "RUR": "RUB",
 }
 
 
@@ -289,13 +295,20 @@ def parse_calc_response(ret: ET.Element) -> list[dict]:
             )
             min_period = f.get("MinPeriod") or f.get("MinDays") or f.get("PeriodMin")
             max_period = f.get("MaxPeriod") or f.get("MaxDays") or f.get("PeriodMax")
-            # Currency: Calc returns both GUID (Currency field) and ISO code
-            # (CurrencyName). Prefer CurrencyName. GUID→ISO mapping via
-            # GetReferenceData:Currencies is only a fallback if CurrencyName
-            # is ever absent (default "RUB" matches CSE's default currency).
-            currency = f.get("CurrencyName") or _CSE_CURRENCY_GUID_TO_ISO.get(
-                (f.get("Currency") or "").strip(), "RUB"
+            # Currency: Calc returns both GUID (Currency field) and a name string
+            # (CurrencyName). CSE 1C returns "RUR" (legacy code) instead of ISO
+            # "RUB" — we normalise via _CSE_CURRENCY_NAME_NORMALISE. GUID→ISO
+            # mapping is a fallback if CurrencyName is absent.
+            currency_name_raw = (f.get("CurrencyName") or "").strip()
+            currency_guid_raw = (f.get("Currency") or "").strip()
+            logger.debug(
+                "CSE Calc currency fields: CurrencyName=%r Currency(GUID)=%r",
+                currency_name_raw, currency_guid_raw,
             )
+            if currency_name_raw:
+                currency = _CSE_CURRENCY_NAME_NORMALISE.get(currency_name_raw, currency_name_raw)
+            else:
+                currency = _CSE_CURRENCY_GUID_TO_ISO.get(currency_guid_raw, "KZT")
 
             if total is None:
                 continue

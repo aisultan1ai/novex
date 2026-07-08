@@ -138,6 +138,7 @@ function PaymentPanel({ orderId, onAction }: PaymentPanelProps) {
     }
   }
 
+
   if (loading) return <div style={ps.wrap}><span style={{ color: "#64748b", fontSize: 13 }}>Загружаем платёж…</span></div>;
   if (error) return <div style={ps.wrap}><span style={{ color: "#dc2626", fontSize: 13 }}>{error}</span></div>;
   if (!detail) return <div style={ps.wrap}><span style={{ color: "#94a3b8", fontSize: 13 }}>Платёж не найден</span></div>;

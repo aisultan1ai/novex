@@ -100,6 +100,11 @@ class Settings(BaseSettings):
     sentry_dsn: str = ""
     sentry_traces_sample_rate: float = 0.1
 
+    # CSE (Courier Service Express) carrier
+    cse_login: str = ""
+    cse_password: str = ""
+    cse_api_url: str = "http://web.cse.ru/1c/ws/Web1C.1cws"
+
     # Internal carrier gateway service
     carrier_gateway_url: str = "http://carrier-gateway:8100"
     gateway_secret: str = ""

@@ -194,7 +194,7 @@ class PaymentService:
         )
 
         order = db.get(OrderDraft, order_id)
-        if order and order.status == "awaiting_payment":
+        if order and order.status in ("awaiting_payment", "payment_rejected"):
             old_order_status = order.status
             transition_order(old_order_status, "payment_under_review")
             order.status = "payment_under_review"
@@ -353,13 +353,13 @@ class PaymentService:
         order = db.get(OrderDraft, tx.order_id)
         if order:
             old_order_status = order.status
-            transition_order(old_order_status, "awaiting_payment")
-            order.status = "awaiting_payment"
+            transition_order(old_order_status, "payment_rejected")
+            order.status = "payment_rejected"
             db.add(
                 OrderStatusHistory(
                     order_id=order.id,
                     old_status=old_order_status,
-                    new_status="awaiting_payment",
+                    new_status="payment_rejected",
                     changed_by_user_id=admin_id,
                     source="admin",
                     comment=f"Payment rejected: {reject_reason}",

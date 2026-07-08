@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING
 
 import httpx
 
+from app.core.config import get_settings
 from app.modules.carriers.cse_geography import city_to_postcode_geo, get_city_guid
 from app.modules.carriers.zone_mapper import get_zone, is_known_city
 
@@ -885,7 +886,7 @@ async def _call_cse_calc_async(
             tariff_code=t.get("tariff_guid", "cse_tariff"),
             tariff_name=t["service_name"],
             price=Decimal(str(round(t["price"], 2))),
-            currency=t.get("currency", "RUB"),
+            currency=t.get("currency", "KZT"),
             eta_days_min=t["min_days"],
             eta_days_max=t["max_days"],
             zone=zone,
@@ -975,9 +976,10 @@ async def _calculate_cse_live_async(
     depth_cm: float = 0.0,
     quantity: int = 1,
 ) -> list[QuoteResult]:
-    login = os.getenv("CSE_LOGIN", "")
-    password = os.getenv("CSE_PASSWORD", "")
-    api_url = os.getenv("CSE_API_URL", "http://web.cse.ru/1c/ws/Web1C.1cws")
+    _s = get_settings()
+    login = _s.cse_login
+    password = _s.cse_password
+    api_url = _s.cse_api_url
 
     if not login:
         return []
