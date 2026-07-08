@@ -52,6 +52,15 @@ class OrderDraft(Base, TimestampMixin):
     insurance: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     fragile: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
+    # CSE DeliveryType. One of: door_to_door, warehouse_to_door,
+    # door_to_warehouse, warehouse_to_warehouse. PVZ GUIDs are only set for
+    # legs that terminate at a CSE PVZ.
+    delivery_type: Mapped[str] = mapped_column(
+        String(30), nullable=False, default="door_to_door"
+    )
+    sender_pvz_guid: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    recipient_pvz_guid: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
     carrier_code_snapshot: Mapped[str] = mapped_column(String(50), nullable=False)
     carrier_name_snapshot: Mapped[str] = mapped_column(String(100), nullable=False)
     tariff_name_snapshot: Mapped[str] = mapped_column(String(100), nullable=False)

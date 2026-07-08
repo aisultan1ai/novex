@@ -12,6 +12,8 @@ from app.modules.orders.models import OrderDraft, ShipmentPackage, ShipmentParty
 from app.modules.orders.repository import OrdersRepository
 from app.modules.orders.schemas import (
     CreateDraftFromQuoteRequest,
+    CseRecalcRequest,
+    CseRecalcResponse,
     OrderDraftListResponse,
     OrderDraftResponse,
     ShipmentPackageResponse,
@@ -273,6 +275,35 @@ class OrdersService:
                 "Sender, recipient and at least one package are required"
             )
 
+        # Final CSE recalc at the payment gate. The customer may have toggled
+        # insurance / delivery type on the form; we source the truth from the
+        # persisted draft (update_shipment_details ran before us) so what the
+        # payment gateway charges equals what CSE will bill. Non-CSE drafts
+        # and any recalc failure fall back to the existing snapshots — no
+        # silent price change ever.
+        declared_total = sum(
+            float(p.declared_value or 0) for p in order_draft.packages
+        )
+        recalc = self._run_cse_recalc(
+            db, order_draft,
+            delivery_type=order_draft.delivery_type,
+            insurance=order_draft.insurance,
+            declared_value=declared_total,
+        )
+        if recalc is not None:
+            from decimal import Decimal
+            carrier_price, price, currency = recalc
+            old_price = order_draft.price_snapshot
+            markup = (price - carrier_price).quantize(Decimal("0.01"))
+            order_draft.carrier_price_snapshot = carrier_price
+            order_draft.markup_amount_snapshot = markup
+            order_draft.price_snapshot = price
+            order_draft.currency_snapshot = currency
+            logger.info(
+                "CSE recalc persisted at checkout: draft_id=%s %s → %s %s",
+                draft_id, old_price, price, currency,
+            )
+
         self.repository.update_order_draft_status(
             db, order_draft=order_draft, status="ready_for_checkout"
         )
@@ -420,6 +451,10 @@ class OrdersService:
         order_draft.insurance = payload.insurance
         order_draft.fragile = payload.fragile
 
+        order_draft.delivery_type = payload.delivery_type
+        order_draft.sender_pvz_guid = payload.sender_pvz_guid
+        order_draft.recipient_pvz_guid = payload.recipient_pvz_guid
+
         if payload.sender.save_to_address_book:
             self._save_address_book(db, user_id=user_id, party=payload.sender)
         if payload.recipient.save_to_address_book:
@@ -444,6 +479,152 @@ class OrdersService:
             len(payload.packages),
         )
         return self._build_order_draft_response(refreshed_draft)
+
+    def cse_recalc(
+        self,
+        db: Session,
+        *,
+        user_id: int,
+        draft_id: int,
+        payload: CseRecalcRequest,
+    ) -> CseRecalcResponse:
+        """Second Calc for a CSE draft including add-on services.
+
+        Idempotent, no DB writes. Returns fully-loaded customer-facing price
+        for the currently selected urgency. On any resolution failure or if
+        the carrier is not CSE, echoes the draft's current price_snapshot so
+        the FE can call this endpoint unconditionally without branching.
+        """
+        order_draft = self.repository.get_order_draft_by_id(db, draft_id)
+        if order_draft is None:
+            raise NotFoundError("Order draft not found")
+        if order_draft.user_id != user_id:
+            raise ForbiddenError("Order draft does not belong to the current user")
+
+        result = self._run_cse_recalc(
+            db,
+            order_draft,
+            delivery_type=payload.delivery_type,
+            insurance=payload.insurance,
+            declared_value=float(payload.declared_value or 0),
+        )
+        if result is None:
+            return CseRecalcResponse(
+                price=order_draft.price_snapshot,
+                carrier_price=order_draft.carrier_price_snapshot or order_draft.price_snapshot,
+                currency=order_draft.currency_snapshot,
+                recalculated=False,
+            )
+        carrier_price, price, currency = result
+        return CseRecalcResponse(
+            price=price, carrier_price=carrier_price,
+            currency=currency, recalculated=True,
+        )
+
+    def _run_cse_recalc(
+        self,
+        db: Session,
+        order_draft: OrderDraft,
+        *,
+        delivery_type: str,
+        insurance: bool,
+        declared_value: float,
+    ):
+        """Shared helper for the preview endpoint + the persist step at
+        checkout. Returns (carrier_price, price_with_markup, currency) on
+        success or None on any failure / non-CSE carrier.
+        """
+        from decimal import Decimal
+
+        if (order_draft.carrier_code_snapshot or "").lower() != "cse":
+            return None
+
+        from app.modules.quotes.models import RateQuote
+        rq = db.get(RateQuote, order_draft.selected_rate_quote_id)
+        if rq is None or not rq.urgency_guid:
+            logger.warning(
+                "CSE recalc: missing rate_quote or urgency_guid (draft=%s)",
+                order_draft.id,
+            )
+            return None
+        quote_session = db.get(QuoteSession, order_draft.quote_session_id)
+        if quote_session is None:
+            return None
+
+        try:
+            from app.modules.carriers.api_credentials import CarrierAPICredentialsRepository
+            creds_row = CarrierAPICredentialsRepository().get_by_carrier_code(db, "cse")
+            if not creds_row or not creds_row.is_active:
+                raise RuntimeError("CSE creds inactive")
+            creds = {
+                "api_url": creds_row.api_url or "",
+                "api_token": creds_row.api_token or "",
+                **(creds_row.extra_config or {}),
+            }
+        except Exception as exc:
+            logger.warning("CSE recalc: creds unavailable: %s", exc)
+            return None
+
+        try:
+            from app.modules.carriers.cse_geography import get_city_guid
+            from_guid = get_city_guid(order_draft.from_city_snapshot, creds)
+            to_guid = get_city_guid(order_draft.to_city_snapshot, creds)
+        except Exception as exc:
+            logger.warning("CSE recalc: geography lookup failed: %s", exc)
+            return None
+        if not from_guid or not to_guid:
+            return None
+
+        weight_kg = float(quote_session.weight_kg) * int(quote_session.quantity or 1)
+        vol = 0.0
+        w = float(quote_session.width_cm or 0)
+        h = float(quote_session.height_cm or 0)
+        d = float(quote_session.depth_cm or 0)
+        if w > 0 and h > 0 and d > 0:
+            vol = (w * h * d / 5000.0) * int(quote_session.quantity or 1)
+
+        _DELIVERY_MAP = {
+            "door_to_door":           "ДоставкаДоДверей",
+            "warehouse_to_door":      "СкладДверь",
+            "door_to_warehouse":      "Самовывоз",
+            "warehouse_to_warehouse": "СкладСклад",
+        }
+        cse_delivery = _DELIVERY_MAP.get(delivery_type, "")
+
+        # Services are mutually exclusive per CSE error 05021.
+        from app.modules.carriers.api_clients.cse import (
+            CSEAPIClient, _CSE_SERVICE_GUIDS,
+        )
+        service_guids: list[str] = []
+        if insurance:
+            service_guids.append(_CSE_SERVICE_GUIDS["insurance"])
+        elif declared_value > 0:
+            service_guids.append(_CSE_SERVICE_GUIDS["declared_value"])
+
+        try:
+            tariff = CSEAPIClient().recalc_with_extras(
+                from_guid, to_guid, weight_kg, 1, creds,
+                urgency_guid=rq.urgency_guid,
+                volume_weight=vol,
+                delivery_of_cargo=cse_delivery,
+                declared_value=declared_value,
+                insurance_rate=declared_value if insurance else 0.0,
+                additional_service_guids=service_guids or None,
+            )
+        except Exception as exc:
+            logger.warning("CSE recalc: Calc call failed: %s", exc)
+            return None
+
+        if not tariff:
+            return None
+
+        from app.modules.commissions.markup import build_markup_calculator
+        markup_calc = build_markup_calculator(db, ["cse"])
+        carrier_price = Decimal(str(round(float(tariff["price"]), 2)))
+        markup = markup_calc.markup_for("cse", carrier_price)
+        price = (carrier_price + markup).quantize(Decimal("0.01"))
+        currency = str(tariff.get("currency") or order_draft.currency_snapshot)
+        return carrier_price, price, currency
 
     def _ensure_prefill_package(
         self,
@@ -553,6 +734,9 @@ class OrdersService:
             call_before_delivery=order_draft.call_before_delivery,
             insurance=order_draft.insurance,
             fragile=order_draft.fragile,
+            delivery_type=order_draft.delivery_type,  # type: ignore[arg-type]
+            sender_pvz_guid=order_draft.sender_pvz_guid,
+            recipient_pvz_guid=order_draft.recipient_pvz_guid,
             created_at=order_draft.created_at,
             sender=self._map_party(sender) if sender else None,
             recipient=self._map_party(recipient) if recipient else None,

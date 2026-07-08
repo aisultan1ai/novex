@@ -70,11 +70,13 @@ function BellButton({ unread, onClick }: { unread: number; onClick: () => void }
   );
 }
 
-const BASE_TABS = [
-  { label: "Заказы",          href: "/dashboard/orders",        admin: false },
-  { label: "Адресная книга",  href: "/dashboard/address-book",  admin: false },
-  { label: "Уведомления",     href: "/dashboard/notifications", admin: false },
-  { label: "Профиль",         href: "/dashboard/profile",       admin: false },
+type NavTab = { label: string; href: string; variant: "base" | "admin" | "carrier" };
+
+const BASE_TABS: NavTab[] = [
+  { label: "Заказы",          href: "/dashboard/orders",        variant: "base" },
+  { label: "Адресная книга",  href: "/dashboard/address-book",  variant: "base" },
+  { label: "Уведомления",     href: "/dashboard/notifications", variant: "base" },
+  { label: "Профиль",         href: "/dashboard/profile",       variant: "base" },
 ];
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
@@ -92,12 +94,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }, [isAuthenticated, pathname]);
 
   const isAdminOrOperator = currentUser?.role === "admin" || currentUser?.role === "operator";
+  const isCarrier = currentUser?.role === "carrier";
   const adminTabLabel = currentUser?.role === "operator" ? "Оператор" : "Админ";
 
-  const navTabs = [
+  const navTabs: NavTab[] = [
     ...BASE_TABS,
     ...(isAdminOrOperator
-      ? [{ label: adminTabLabel, href: "/dashboard/admin", admin: true }]
+      ? [{ label: adminTabLabel, href: "/dashboard/admin", variant: "admin" as const }]
+      : []),
+    ...(isCarrier
+      ? [{ label: "Перевозчик", href: "/dashboard/carrier", variant: "carrier" as const }]
       : []),
   ];
 
@@ -196,11 +202,17 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           WebkitOverflowScrolling: "touch",
         } as React.CSSProperties}
       >
-        {navTabs.map(({ label, href, admin }) => {
+        {navTabs.map(({ label, href, variant }) => {
           const active = pathname.startsWith(href);
-          const activeColor = admin ? "#d97706" : "#2563EB";
-          const activeBorder = admin ? "#d97706" : "#2563EB";
-          const idleColor = admin ? "#b45309" : "#6B7280";
+          const activeColor =
+            variant === "admin" ? "#d97706" :
+            variant === "carrier" ? "#4338ca" :
+            "#2563EB";
+          const activeBorder = activeColor;
+          const idleColor =
+            variant === "admin" ? "#b45309" :
+            variant === "carrier" ? "#4f46e5" :
+            "#6B7280";
           const showDot = href === "/dashboard/notifications" && unreadCount > 0 && !active;
           return (
             <Link

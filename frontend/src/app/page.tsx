@@ -254,8 +254,19 @@ export default function HomePage() {
 
   const resultsRef = useRef<HTMLDivElement>(null);
 
+  // Fields that carry a decimal number typed by the user. Russian keyboards
+  // put "," on the decimal key by default, so both "0,5" and "0.5" must work.
+  // We normalize the comma to a dot at write time so parsing/validation stays
+  // dot-only downstream.
+  const _NUMERIC_FIELDS: ReadonlySet<keyof FormState> = new Set([
+    "weightKg", "quantity", "widthCm", "heightCm", "depthCm",
+  ] as (keyof FormState)[]);
   function setField<K extends keyof FormState>(key: K, val: FormState[K]) {
-    setForm((prev) => ({ ...prev, [key]: val }));
+    const normalized: FormState[K] =
+      typeof val === "string" && _NUMERIC_FIELDS.has(key)
+        ? (val.replace(",", ".") as FormState[K])
+        : val;
+    setForm((prev) => ({ ...prev, [key]: normalized }));
   }
 
   useEffect(() => {

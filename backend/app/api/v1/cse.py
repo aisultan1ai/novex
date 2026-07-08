@@ -122,12 +122,31 @@ def search_geography(
 @router.get("/pvz", response_model=list[PvzItem], summary="List CSE pickup/delivery points")
 def list_pvz(
     city_guid: str | None = Query(default=None, description="Filter by CSE city GUID"),
+    city: str | None = Query(
+        default=None,
+        description="City name; server resolves it to a GUID (ignored if city_guid is given)",
+    ),
     db: Session = Depends(get_db),
 ) -> list[PvzItem]:
-    """Return all CSE pickup/delivery points, optionally filtered by city GUID."""
+    """Return CSE pickup/delivery points, optionally filtered by city.
+
+    Accepts either the raw city GUID or a city name (server does the geography
+    lookup and reuses the Redis GUID cache). If both are given, `city_guid`
+    wins.
+    """
     creds = _get_cse_creds(db)
+
+    resolved_guid = city_guid
+    if not resolved_guid and city:
+        from app.modules.carriers.cse_geography import get_city_guid
+        resolved_guid = get_city_guid(city, creds)
+        if not resolved_guid:
+            # Unknown city — return empty list rather than surfacing all PVZs
+            # (which would let the UI silently pick a PVZ in the wrong city).
+            return []
+
     try:
-        results = _client.get_pvz(creds, geography_guid=city_guid)
+        results = _client.get_pvz(creds, geography_guid=resolved_guid)
     except Exception as exc:
         logger.warning("CSE pvz list failed: %s", exc)
         raise HTTPException(status_code=502, detail=f"CSE API error: {exc}") from exc

@@ -298,7 +298,7 @@ export default function RegisterPage() {
                 label="ФИО"
                 value={form.full_name}
                 onChange={(v) => set("full_name", v)}
-                placeholder="Иванов Иван"
+                placeholder="Ваше имя"
               />
               <Field
                 label="Телефон"

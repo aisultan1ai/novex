@@ -195,6 +195,11 @@ def get_city_guid(city: str, creds: dict) -> str | None:
         if not results and postcode_geo:
             # Fallback to city name search
             results = client.search_geography(city, creds)
+        if not results and city and not city.lower().endswith(" г"):
+            # CSE stores KZ cities with a trailing "г" ("Алматы г").
+            # search_geography already retries with " г" internally, but the
+            # postcode-based first attempt bypasses that retry — do it here too.
+            results = client.search_geography(f"{city} г", creds)
 
         if not results:
             logger.warning("CSE: Geography lookup returned no results for city=%s", city)

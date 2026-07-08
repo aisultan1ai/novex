@@ -27,7 +27,7 @@ from typing import TYPE_CHECKING
 
 import httpx
 
-from app.modules.carriers.cse_geography import city_to_postcode_geo
+from app.modules.carriers.cse_geography import city_to_postcode_geo, get_city_guid
 from app.modules.carriers.zone_mapper import get_zone, is_known_city
 
 if TYPE_CHECKING:
@@ -312,7 +312,10 @@ async def calculate_quotes_async(
     if not any(r.carrier_code == "exline" for r in results):
         live_tasks.append(_calculate_exline_live_async(from_city, to_city, kg))
     if not any(r.carrier_code == "cse" for r in results):
-        live_tasks.append(_calculate_cse_live_async(from_city, to_city, kg, shipment_type))
+        live_tasks.append(_calculate_cse_live_async(
+            from_city, to_city, kg, shipment_type,
+            width_cm=width_cm, height_cm=height_cm, depth_cm=depth_cm, quantity=quantity,
+        ))
 
     if live_tasks:
         live_lists = await asyncio.gather(*live_tasks, return_exceptions=True)
@@ -838,7 +841,12 @@ async def _call_cse_calc_async(
     password: str,
     api_url: str,
     cargo_type_guid: str = "",
-) -> list[QuoteResult]:
+    volume_weight: float = 0.0,
+) -> tuple[list[QuoteResult], bool]:
+    """Returns (quotes, cod_available). cod_available is the OR across all
+    parsed tariffs' COD flags — a route offers COD if at least one urgency
+    tariff supports it. Callers avoid a second HTTP call to deliveryinfo for
+    COD (Calc already carries this per-tariff)."""
     from app.modules.carriers.api_clients.cse import (
         _NS_M,
         _build_calc_inner,
@@ -847,7 +855,9 @@ async def _call_cse_calc_async(
         parse_calc_response,
     )
 
-    inner = _build_calc_inner(login, password, from_geo, to_geo, kg, 1, cargo_type_guid)
+    inner = _build_calc_inner(
+        login, password, from_geo, to_geo, kg, 1, cargo_type_guid, volume_weight,
+    )
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.post(
@@ -864,7 +874,7 @@ async def _call_cse_calc_async(
         tariffs = parse_calc_response(ret)
     except Exception as exc:
         logger.warning("CSE calc failed (%s→%s): %s", from_geo, to_geo, exc)
-        return []
+        return [], False
 
     zone = get_zone(from_geo, to_geo)
     results: list[QuoteResult] = []
@@ -883,18 +893,26 @@ async def _call_cse_calc_async(
             urgency_guid=t.get("urgency_guid") or None,
         ))
 
-    logger.debug("CSE async: %d quotes for %s→%s kg=%.2f", len(results), from_geo, to_geo, kg)
-    return results
+    cod_available = any(t.get("cod") is True for t in tariffs)
+    logger.debug("CSE async: %d quotes for %s→%s kg=%.2f cod=%s",
+                 len(results), from_geo, to_geo, kg, cod_available)
+    return results, cod_available
 
 
-async def _get_cse_delivery_services_async(
+async def _get_cse_card_availability_async(
     from_geo: str,
     to_geo: str,
     login: str,
     password: str,
     api_url: str,
-) -> list[dict]:
-    """Fetch COD/card availability for a CSE route and return a full service list."""
+) -> bool:
+    """Fetch card-payment (PaymentByRecipient) availability for a route.
+
+    COD is now taken from Calc's per-tariff flag (see parse_calc_response); this
+    call is only needed for card_payment which Calc does not expose. If the
+    request fails or CSE returns no info, we default to False (safer than
+    claiming card is available when it isn't).
+    """
     from app.modules.carriers.api_clients.cse import (
         _esc,
         _ref_params,
@@ -914,7 +932,6 @@ async def _get_cse_delivery_services_async(
         )
     )
 
-    cod_available = False
     card_available = False
     try:
         async with httpx.AsyncClient() as client:
@@ -928,18 +945,21 @@ async def _get_cse_delivery_services_async(
         ret = extract_return(resp.text, "GetReferenceData")
         for item in list_items(ret):
             f = fields_of(item)
-            if f.get("COD") is not None:
-                cod_available = bool(f.get("COD"))
             if f.get("PaymentByRecipient") is not None:
                 card_available = bool(f.get("PaymentByRecipient"))
     except Exception as exc:
-        logger.debug("CSE delivery info fetch failed (services unknown): %s", exc)
+        logger.debug("CSE deliveryinfo fetch failed (card availability unknown): %s", exc)
+    return card_available
 
+
+def _build_cse_service_list(cod_available: bool, card_available: bool) -> list[dict]:
+    """Static per-carrier service list, with dynamic COD/card flags injected."""
     return [
         {"code": "fragile", "name": "Хрупкий груз", "available": True, "price": None, "currency": "KZT", "note": "Отмечается в описании вложения"},
-        {"code": "insurance", "name": "Страхование (объявленная ценность)", "available": True, "price": None, "currency": "KZT", "note": "Стоимость уточняется индивидуально"},
+        {"code": "declared_value", "name": "Объявленная стоимость", "available": True, "price": None, "currency": "KZT", "note": "Задекларированная стоимость груза (лимит компенсации при потере)"},
+        {"code": "insurance", "name": "Страхование", "available": True, "price": None, "currency": "KZT", "note": "Требует указания объявленной стоимости"},
         {"code": "call_before_delivery", "name": "Звонок перед доставкой", "available": True, "price": None, "currency": "KZT", "note": "Включено в тариф"},
-        {"code": "cod", "name": "Наложенный платёж (COD)", "available": cod_available, "price": None, "currency": "KZT", "note": "Доступность зависит от маршрута"},
+        {"code": "cod", "name": "Наложенный платёж (COD)", "available": cod_available, "price": None, "currency": "KZT", "note": "Доступность зависит от тарифа"},
         {"code": "card_payment", "name": "Оплата картой при получении", "available": card_available, "price": None, "currency": "KZT", "note": "Доступность зависит от маршрута"},
     ]
 
@@ -949,6 +969,11 @@ async def _calculate_cse_live_async(
     to_city: str,
     kg: float,
     shipment_type: str = "parcel",
+    *,
+    width_cm: float = 0.0,
+    height_cm: float = 0.0,
+    depth_cm: float = 0.0,
+    quantity: int = 1,
 ) -> list[QuoteResult]:
     login = os.getenv("CSE_LOGIN", "")
     password = os.getenv("CSE_PASSWORD", "")
@@ -957,27 +982,56 @@ async def _calculate_cse_live_async(
     if not login:
         return []
 
-    from_geo = city_to_postcode_geo(from_city)
-    to_geo = city_to_postcode_geo(to_city)
+    # CSE курьерская divisor = 5000 (ShippingMethods.DimensionalWeightFactor).
+    # Our engine's chargeable_weight() uses 6000 (Azimuth), so the vol weight we
+    # pass to CSE must be recomputed on their divisor — otherwise CSE would
+    # never see the higher-of-two and could underquote bulky-light shipments.
+    _CSE_VOL_DIVISOR = 5000.0
+    volume_weight = 0.0
+    if width_cm > 0 and height_cm > 0 and depth_cm > 0:
+        volume_weight = (width_cm * height_cm * depth_cm / _CSE_VOL_DIVISOR) * max(1, quantity)
 
-    if not from_geo or not to_geo:
-        logger.debug(
-            "CSE: skipping %s→%s — no postcode mapping available", from_city, to_city
+    # CSE Calc only accepts Geography GUIDs — postcode-KZ-* silently returns
+    # zero tariffs. Resolve GUIDs first (cached in Redis 24h), fall back to
+    # postcode only for delivery-info (which does accept postcodes).
+    creds = {"login": login, "password": password, "api_url": api_url}
+    from_guid, to_guid = await asyncio.gather(
+        asyncio.to_thread(get_city_guid, from_city, creds),
+        asyncio.to_thread(get_city_guid, to_city, creds),
+    )
+    if not from_guid or not to_guid:
+        logger.info(
+            "CSE: skipping %s→%s — could not resolve Geography GUIDs "
+            "(from=%s to=%s)",
+            from_city, to_city, from_guid, to_guid,
         )
         return []
 
+    # Delivery-info (COD/card flags) still uses postcode-KZ where available,
+    # since that path doesn't need a GUID.
+    from_pc = city_to_postcode_geo(from_city) or from_guid
+    to_pc = city_to_postcode_geo(to_city) or to_guid
+
     cargo_type_guid = _CSE_CARGO_TYPE_GUIDS.get(shipment_type, "")
 
-    # Fetch tariffs and delivery-info (COD/card flags) concurrently
-    results, services = await asyncio.gather(
-        _call_cse_calc_async(from_geo, to_geo, kg, login, password, api_url, cargo_type_guid),
-        _get_cse_delivery_services_async(from_geo, to_geo, login, password, api_url),
+    # Fetch tariffs (GUID-based) + card availability concurrently.
+    # COD now comes from Calc's per-tariff flag — deliveryinfo is only kept
+    # for card_payment which Calc doesn't return.
+    (results, cod_available), card_available = await asyncio.gather(
+        _call_cse_calc_async(
+            from_guid, to_guid, kg, login, password, api_url,
+            cargo_type_guid, volume_weight,
+        ),
+        _get_cse_card_availability_async(from_pc, to_pc, login, password, api_url),
     )
     # Fallback: if hardcoded GUID yielded no tariffs, retry without it so CSE picks
     # its instance default. Prevents empty quote list when the target CSE install
     # uses different GUIDs than the standard reference.
     if not results and cargo_type_guid:
-        results = await _call_cse_calc_async(from_geo, to_geo, kg, login, password, api_url, "")
+        results, cod_available = await _call_cse_calc_async(
+            from_guid, to_guid, kg, login, password, api_url, "", volume_weight,
+        )
+    services = _build_cse_service_list(cod_available, card_available)
     for r in results:
         r.available_services = services
     return results

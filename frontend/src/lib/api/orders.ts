@@ -1,10 +1,36 @@
 import { apiRequest, ApiError } from "./client";
 import type {
   CreateDraftFromQuoteRequest,
+  DeliveryType,
   OrderDraftResponse,
   UpdateShipmentDetailsRequest,
   OrderDraftListResponse,
 } from "@/types/order";
+
+export interface CseRecalcRequest {
+  delivery_type: DeliveryType;
+  insurance: boolean;
+  declared_value?: number | null;
+}
+
+export interface CseRecalcResponse {
+  price: number;          // customer-facing (with markup)
+  carrier_price: number;
+  currency: string;
+  recalculated: boolean;  // false for non-CSE drafts
+}
+
+export async function cseRecalcDraft(
+  draftId: number,
+  payload: CseRecalcRequest,
+  signal?: AbortSignal,
+): Promise<CseRecalcResponse> {
+  return apiRequest<CseRecalcResponse>(`/orders/drafts/${draftId}/cse-recalc`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+    signal,
+  });
+}
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") ?? "/api/v1";

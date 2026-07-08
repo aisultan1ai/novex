@@ -8,9 +8,11 @@ import { Check } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useIsMobile } from "@/hooks/use-is-mobile";
-import { ApiError, createDraftFromQuote, updateOrderDraftShipment } from "@/lib/api/orders";
+import { ApiError, createDraftFromQuote, cseRecalcDraft, updateOrderDraftShipment } from "@/lib/api/orders";
+import { fetchCsePvzByCity, type CsePvzItem } from "@/lib/api/cse";
 import type { ProfileResponse } from "@/types/auth";
 import type {
+  DeliveryType,
   OrderDraftResponse,
   ShipmentPackageInput,
   ShipmentPartyInput,
@@ -38,7 +40,19 @@ type ShipmentFormState = {
   // and forwards to Exline as <inshprice> / to CSE as DeclaredValueRate. Sending
   // insurance without a real value gets silently ignored by both carriers.
   declared_value: string;
+  // CSE-only: chosen delivery type + PVZ GUIDs for warehouse legs. For other
+  // carriers the backend ignores these and defaults to door_to_door.
+  delivery_type: DeliveryType;
+  sender_pvz_guid: string;
+  recipient_pvz_guid: string;
 };
+
+const DELIVERY_TYPE_OPTIONS: { value: DeliveryType; label: string; hint: string }[] = [
+  { value: "door_to_door",           label: "Курьер до двери",              hint: "Курьер заберёт у отправителя и привезёт получателю" },
+  { value: "door_to_warehouse",      label: "Получатель заберёт из ПВЗ",    hint: "Курьер заберёт у отправителя, получатель забирает из ПВЗ CSE" },
+  { value: "warehouse_to_door",      label: "Отправитель сдаст в ПВЗ",      hint: "Отправитель сам сдаёт в ПВЗ CSE, курьер привезёт получателю" },
+  { value: "warehouse_to_warehouse", label: "ПВЗ → ПВЗ (оба самовывоз)",    hint: "Отправитель сдаёт в ПВЗ CSE, получатель забирает из ПВЗ CSE" },
+];
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
 
@@ -93,6 +107,8 @@ function buildShipmentPayload(form: ShipmentFormState, isDocument: boolean): Upd
   const declaredValue = Number.isFinite(parsedDeclared) && parsedDeclared > 0
     ? parsedDeclared
     : null;
+  const senderWh = form.delivery_type === "warehouse_to_door" || form.delivery_type === "warehouse_to_warehouse";
+  const recipientWh = form.delivery_type === "door_to_warehouse" || form.delivery_type === "warehouse_to_warehouse";
   return {
     sender: mapPartyFormToPayload(form.sender),
     recipient: mapPartyFormToPayload(form.recipient),
@@ -100,6 +116,9 @@ function buildShipmentPayload(form: ShipmentFormState, isDocument: boolean): Upd
     call_before_delivery: form.call_before_delivery,
     insurance: form.insurance,
     fragile: form.fragile,
+    delivery_type: form.delivery_type,
+    sender_pvz_guid: senderWh ? (form.sender_pvz_guid || null) : null,
+    recipient_pvz_guid: recipientWh ? (form.recipient_pvz_guid || null) : null,
   };
 }
 
@@ -130,6 +149,9 @@ function mapDraftToForm(draft: OrderDraftResponse, user: ProfileResponse | null)
     insurance: draft.insurance ?? false,
     fragile: draft.fragile ?? false,
     declared_value: draft.packages[0]?.declared_value != null ? String(draft.packages[0].declared_value) : "",
+    delivery_type: draft.delivery_type ?? "door_to_door",
+    sender_pvz_guid: draft.sender_pvz_guid ?? "",
+    recipient_pvz_guid: draft.recipient_pvz_guid ?? "",
   };
 }
 
@@ -274,9 +296,97 @@ function SectionCard({ title, children }: { title: string; children: React.React
   );
 }
 
+/* ─── CSE PVZ picker ─────────────────────────────────────────────────────── */
+
+function PvzPickerSection({
+  title, city, list, loading, value, onChange,
+}: {
+  title: string;
+  city: string;
+  list: CsePvzItem[];
+  loading: boolean;
+  value: string;
+  onChange: (guid: string) => void;
+}) {
+  const selectStyle: React.CSSProperties = {
+    width: "100%",
+    padding: "12px 14px",
+    border: "1px solid #E5E7EB",
+    borderRadius: 10,
+    background: "#ffffff",
+    font: "400 14px/1.2 Inter Variable, sans-serif",
+    color: "#111827",
+    cursor: "pointer",
+  };
+  const hint = !city.trim()
+    ? "Введите город выше — тогда покажем список ПВЗ."
+    : loading
+    ? "Загружаем список ПВЗ…"
+    : list.length === 0
+    ? "Для этого города нет доступных ПВЗ CSE."
+    : "";
+  return (
+    <SectionCard title={title}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={loading || list.length === 0}
+          style={selectStyle}
+        >
+          <option value="">— Выберите ПВЗ —</option>
+          {list.map((p) => (
+            <option key={p.guid} value={p.guid}>
+              {p.address}{p.schedule ? `  •  ${p.schedule}` : ""}
+            </option>
+          ))}
+        </select>
+        {hint && (
+          <div style={{ font: "400 12px/1.4 Inter Variable, sans-serif", color: "#6B7280" }}>
+            {hint}
+          </div>
+        )}
+      </div>
+    </SectionCard>
+  );
+}
+
 /* ─── Tariff summary card ────────────────────────────────────────────────── */
 
-function TariffSummary({ draft, onChangeTariff }: { draft: OrderDraftResponse; onChangeTariff: () => void }) {
+function TariffSummary({
+  draft, onChangeTariff, livePrice, isRecalculating,
+}: {
+  draft: OrderDraftResponse;
+  onChangeTariff: () => void;
+  livePrice?: { price: number; currency: string } | null;
+  isRecalculating?: boolean;
+}) {
+  const displayPrice = livePrice?.price ?? draft.price_snapshot;
+  const displayCurrency = livePrice?.currency ?? draft.currency_snapshot;
+  const basePrice = draft.price_snapshot;
+  const deltaPositive = livePrice && livePrice.price > basePrice;
+  const deltaNegative = livePrice && livePrice.price < basePrice;
+  const delta = livePrice ? Math.abs(livePrice.price - basePrice) : 0;
+  return _TariffSummaryImpl({
+    draft, onChangeTariff,
+    displayPrice, displayCurrency, isRecalculating,
+    deltaSign: deltaPositive ? "+" : deltaNegative ? "−" : "",
+    delta,
+  });
+}
+
+function _TariffSummaryImpl({
+  draft, onChangeTariff, displayPrice, displayCurrency,
+  isRecalculating, deltaSign, delta,
+}: {
+  draft: OrderDraftResponse;
+  onChangeTariff: () => void;
+  displayPrice: number;
+  displayCurrency: string;
+  isRecalculating?: boolean;
+  deltaSign: string;
+  delta: number;
+}) {
   const isMobile = useIsMobile();
   return (
     <div
@@ -322,9 +432,20 @@ function TariffSummary({ draft, onChangeTariff }: { draft: OrderDraftResponse; o
             font: `700 ${isMobile ? 22 : 26}px/1 Inter Variable, sans-serif`,
             color: "#111827", marginBottom: 4,
             whiteSpace: "nowrap",
+            opacity: isRecalculating ? 0.5 : 1,
+            transition: "opacity 0.2s",
           }}>
-            {formatPrice(draft.price_snapshot, draft.currency_snapshot)}
+            {formatPrice(displayPrice, displayCurrency)}
           </div>
+          {delta > 0 && !isRecalculating && (
+            <div style={{
+              font: `500 ${isMobile ? 11 : 12}px/1 Inter Variable, sans-serif`,
+              color: deltaSign === "+" ? "#B45309" : "#059669",
+              marginBottom: 4,
+            }}>
+              {deltaSign}{formatPrice(delta, displayCurrency)} к базовой
+            </div>
+          )}
           <div style={{
             font: `600 ${isMobile ? 12 : 13}px/1 Inter Variable, sans-serif`,
             color: "#2563EB",
@@ -510,6 +631,9 @@ function ShipmentPageInner() {
         insurance: parsed.insurance ?? false,
         fragile: parsed.fragile ?? false,
         declared_value: parsed.declared_value ?? "",
+        delivery_type: parsed.delivery_type ?? "door_to_door",
+        sender_pvz_guid: parsed.sender_pvz_guid ?? "",
+        recipient_pvz_guid: parsed.recipient_pvz_guid ?? "",
       };
     } catch { return null; }
   }
@@ -523,7 +647,7 @@ function ShipmentPageInner() {
   }
 
   const [form, setForm] = useState<ShipmentFormState>(
-    () => loadSavedForm() ?? { sender: emptyParty(), recipient: emptyParty(), packageItem: emptyPackage(), call_before_delivery: false, insurance: false, fragile: false, declared_value: "" },
+    () => loadSavedForm() ?? { sender: emptyParty(), recipient: emptyParty(), packageItem: emptyPackage(), call_before_delivery: false, insurance: false, fragile: false, declared_value: "", delivery_type: "door_to_door", sender_pvz_guid: "", recipient_pvz_guid: "" },
   );
 
   const [draft, setDraft] = useState<OrderDraftResponse | null>(null);
@@ -531,6 +655,21 @@ function ShipmentPageInner() {
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
+
+  // Cached PVZ lists per side; keyed by (side, city) so switching city refreshes.
+  const [senderPvzList, setSenderPvzList] = useState<CsePvzItem[]>([]);
+  const [recipientPvzList, setRecipientPvzList] = useState<CsePvzItem[]>([]);
+  const [pvzLoading, setPvzLoading] = useState<{ sender: boolean; recipient: boolean }>({ sender: false, recipient: false });
+
+  // Live recalc: whenever the customer toggles insurance / delivery_type /
+  // declared_value, ask the backend for the fully-loaded final price so the
+  // number shown next to "Продолжить к оплате" matches CSE billing.
+  const [livePrice, setLivePrice] = useState<{ price: number; currency: string } | null>(null);
+  const [isRecalculating, setIsRecalculating] = useState(false);
+
+  const isCse = (draft?.carrier_code_snapshot ?? "").toLowerCase() === "cse";
+  const senderLegWh = form.delivery_type === "warehouse_to_door" || form.delivery_type === "warehouse_to_warehouse";
+  const recipientLegWh = form.delivery_type === "door_to_warehouse" || form.delivery_type === "warehouse_to_warehouse";
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -542,6 +681,76 @@ function ShipmentPageInner() {
     if (!currentUser) return;
     setForm((prev) => ({ ...prev, sender: mergeSenderWithCurrentUser(prev.sender, currentUser) }));
   }, [currentUser]);
+
+  // Fetch sender-side PVZ list when it's needed and the city is known.
+  useEffect(() => {
+    if (!isCse || !senderLegWh) { setSenderPvzList([]); return; }
+    const city = form.sender.city.trim();
+    if (!city) { setSenderPvzList([]); return; }
+    const ac = new AbortController();
+    setPvzLoading((p) => ({ ...p, sender: true }));
+    fetchCsePvzByCity(city, ac.signal)
+      .then((list) => setSenderPvzList(list))
+      .catch(() => { /* network error → keep list empty; UI will show hint */ })
+      .finally(() => setPvzLoading((p) => ({ ...p, sender: false })));
+    return () => ac.abort();
+  }, [isCse, senderLegWh, form.sender.city]);
+
+  useEffect(() => {
+    if (!isCse || !recipientLegWh) { setRecipientPvzList([]); return; }
+    const city = form.recipient.city.trim();
+    if (!city) { setRecipientPvzList([]); return; }
+    const ac = new AbortController();
+    setPvzLoading((p) => ({ ...p, recipient: true }));
+    fetchCsePvzByCity(city, ac.signal)
+      .then((list) => setRecipientPvzList(list))
+      .catch(() => { /* keep empty */ })
+      .finally(() => setPvzLoading((p) => ({ ...p, recipient: false })));
+    return () => ac.abort();
+  }, [isCse, recipientLegWh, form.recipient.city]);
+
+  // Clear stale PVZ selections when the user switches delivery type away from
+  // a leg that needed a PVZ. Prevents sending an unrelated GUID to backend.
+  useEffect(() => {
+    if (!senderLegWh && form.sender_pvz_guid) {
+      updateForm((prev) => ({ ...prev, sender_pvz_guid: "" }));
+    }
+    if (!recipientLegWh && form.recipient_pvz_guid) {
+      updateForm((prev) => ({ ...prev, recipient_pvz_guid: "" }));
+    }
+    // Only reacts to delivery_type change; ignore linter's dependency nag.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.delivery_type]);
+
+  // Debounced recalc — asks CSE for the final price including add-on services.
+  // Only fires when the draft is CSE and at least one price-affecting option
+  // is set. 500ms debounce so we don't hammer CSE while the user is typing.
+  useEffect(() => {
+    if (!draft) return;
+    if (!isCse) { setLivePrice(null); return; }
+    const rawDeclared = form.insurance ? Number(form.declared_value) : NaN;
+    const declaredValue = Number.isFinite(rawDeclared) && rawDeclared > 0 ? rawDeclared : null;
+    // If nothing that affects price is set, just clear the override.
+    const hasExtras = form.delivery_type !== "door_to_door" || form.insurance || (declaredValue !== null);
+    if (!hasExtras) { setLivePrice(null); return; }
+
+    const ac = new AbortController();
+    const timer = setTimeout(() => {
+      setIsRecalculating(true);
+      cseRecalcDraft(draft.draft_id, {
+        delivery_type: form.delivery_type,
+        insurance: form.insurance,
+        declared_value: declaredValue,
+      }, ac.signal)
+        .then((r) => {
+          if (r.recalculated) setLivePrice({ price: Number(r.price), currency: r.currency });
+        })
+        .catch(() => { /* silent — TariffSummary falls back to draft.price_snapshot */ })
+        .finally(() => setIsRecalculating(false));
+    }, 500);
+
+    return () => { clearTimeout(timer); ac.abort(); };
+  }, [draft, isCse, form.delivery_type, form.insurance, form.declared_value]);
 
   useEffect(() => {
     if (isLoading || !isAuthenticated) return;
@@ -603,7 +812,13 @@ function ShipmentPageInner() {
     updateForm((prev) => ({ ...prev, declared_value: normalized }));
   }
   function updatePackageField(key: keyof PackageFormState, value: string) {
-    updateForm((prev) => ({ ...prev, packageItem: { ...prev.packageItem, [key]: value } }));
+    // Russian keyboards default to "," on the decimal key. Normalize to "."
+    // for weight/dimension fields so users can type either separator.
+    const numericKeys: readonly (keyof PackageFormState)[] = [
+      "weight_kg", "width_cm", "height_cm", "depth_cm",
+    ];
+    const normalized = numericKeys.includes(key) ? value.replace(",", ".") : value;
+    updateForm((prev) => ({ ...prev, packageItem: { ...prev.packageItem, [key]: normalized } }));
   }
 
   function isValidKzPhone(raw: string): boolean {
@@ -641,6 +856,9 @@ function ShipmentPageInner() {
       if (!s.country.trim() || s.country.trim().length !== 2) return "Код страны - 2 буквы (например KZ).";
       if (!s.city.trim()) return "Укажите город отправителя.";
       if (!s.address_line1.trim()) return "Укажите адрес отправителя.";
+      if (isCse && senderLegWh && !form.sender_pvz_guid) {
+        return "Выберите ПВЗ отправителя (для выбранного типа доставки).";
+      }
     }
     if (step === 2) {
       const r = form.recipient;
@@ -650,6 +868,9 @@ function ShipmentPageInner() {
       if (!r.country.trim() || r.country.trim().length !== 2) return "Код страны - 2 буквы (например KZ).";
       if (!r.city.trim()) return "Укажите город получателя.";
       if (!r.address_line1.trim()) return "Укажите адрес получателя.";
+      if (isCse && recipientLegWh && !form.recipient_pvz_guid) {
+        return "Выберите ПВЗ получателя (для выбранного типа доставки).";
+      }
     }
     return null;
   }
@@ -798,6 +1019,8 @@ function ShipmentPageInner() {
               onChangeTariff={() =>
                 router.push(quoteSessionId ? `/quote/results?quoteSessionId=${quoteSessionId}` : "/")
               }
+              livePrice={livePrice}
+              isRecalculating={isRecalculating}
             />
 
             {/* Shipment form */}
@@ -811,6 +1034,33 @@ function ShipmentPageInner() {
                     onChange={updatePackageField}
                     isDocument={(draft?.shipment_type_snapshot ?? "").toLowerCase() === "document"}
                   />
+                  {isCse && (
+                    <SectionCard title="Тип доставки">
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                        {DELIVERY_TYPE_OPTIONS.map((opt) => (
+                          <label key={opt.value} style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
+                            <input
+                              type="radio"
+                              name="delivery_type"
+                              value={opt.value}
+                              checked={form.delivery_type === opt.value}
+                              onChange={() => updateForm((prev) => ({ ...prev, delivery_type: opt.value }))}
+                              style={{ marginTop: 3, width: 16, height: 16, cursor: "pointer", accentColor: "#2563EB" }}
+                            />
+                            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                              <span style={{ font: "500 14px/1.3 Inter Variable, sans-serif", color: "#111827" }}>{opt.label}</span>
+                              <span style={{ font: "400 12px/1.4 Inter Variable, sans-serif", color: "#6B7280" }}>{opt.hint}</span>
+                            </div>
+                          </label>
+                        ))}
+                        {(senderLegWh || recipientLegWh) && (
+                          <div style={{ marginTop: 4, padding: 10, background: "#F3F4F6", borderRadius: 8, font: "400 12px/1.4 Inter Variable, sans-serif", color: "#6B7280" }}>
+                            ПВЗ выбирается на следующих шагах, после заполнения города{senderLegWh && recipientLegWh ? " отправителя и получателя" : senderLegWh ? " отправителя" : " получателя"}.
+                          </div>
+                        )}
+                      </div>
+                    </SectionCard>
+                  )}
                   <SectionCard title="Дополнительные услуги">
                     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                       {(
@@ -846,22 +1096,46 @@ function ShipmentPageInner() {
 
               {/* ── Step 1: Отправитель ── */}
               {currentStep === 1 && (
-                <PartySection
-                  title="Отправитель"
-                  values={form.sender}
-                  onChange={(key, val) => updatePartyField("sender", key, val)}
-                  onToggleSave={(val) => toggleSaveAddress("sender", val)}
-                />
+                <>
+                  <PartySection
+                    title="Отправитель"
+                    values={form.sender}
+                    onChange={(key, val) => updatePartyField("sender", key, val)}
+                    onToggleSave={(val) => toggleSaveAddress("sender", val)}
+                  />
+                  {isCse && senderLegWh && (
+                    <PvzPickerSection
+                      title="ПВЗ отправителя (CSE)"
+                      city={form.sender.city}
+                      list={senderPvzList}
+                      loading={pvzLoading.sender}
+                      value={form.sender_pvz_guid}
+                      onChange={(guid) => updateForm((prev) => ({ ...prev, sender_pvz_guid: guid }))}
+                    />
+                  )}
+                </>
               )}
 
               {/* ── Step 2: Получатель ── */}
               {currentStep === 2 && (
-                <PartySection
-                  title="Получатель"
-                  values={form.recipient}
-                  onChange={(key, val) => updatePartyField("recipient", key, val)}
-                  onToggleSave={(val) => toggleSaveAddress("recipient", val)}
-                />
+                <>
+                  <PartySection
+                    title="Получатель"
+                    values={form.recipient}
+                    onChange={(key, val) => updatePartyField("recipient", key, val)}
+                    onToggleSave={(val) => toggleSaveAddress("recipient", val)}
+                  />
+                  {isCse && recipientLegWh && (
+                    <PvzPickerSection
+                      title="ПВЗ получателя (CSE)"
+                      city={form.recipient.city}
+                      list={recipientPvzList}
+                      loading={pvzLoading.recipient}
+                      value={form.recipient_pvz_guid}
+                      onChange={(guid) => updateForm((prev) => ({ ...prev, recipient_pvz_guid: guid }))}
+                    />
+                  )}
+                </>
               )}
 
               {/* Navigation */}

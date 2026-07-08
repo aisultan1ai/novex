@@ -184,7 +184,7 @@ def fields_of(el: ET.Element) -> dict[str, Any]:
                 v = float(v)
             except ValueError:
                 pass
-        elif vtype == "bool" and v:
+        elif vtype in ("bool", "boolean") and v:
             v = v.lower() in ("true", "1", "да")
         result[k] = v
     return result
@@ -235,6 +235,26 @@ def _tracking_events_from(status_item: ET.Element) -> list[dict]:
     }]
 
 
+# CSE Services reference GUIDs — the subset we currently expose to the user.
+# CSE bills / applies these only when passed via <AdditionalServices><Items>.
+# Discovered live via GetReferenceData:Services (see cse_geography audit).
+_CSE_SERVICE_GUIDS: dict[str, str] = {
+    "insurance":      "cc03d9ad-61f4-11dc-bda1-0015170f8c09",  # Страхование
+    "declared_value": "6da21fe7-4f13-11dc-bda1-0015170f8c09",  # Объявленная стоимость
+}
+
+
+# CSE Currencies reference GUIDs → ISO 4217 code.
+# Populated from GetReferenceData:Currencies on the CSE test endpoint.
+# Only used as fallback if Calc omits CurrencyName; RUB stays the safe default.
+_CSE_CURRENCY_GUID_TO_ISO: dict[str, str] = {
+    "ff3f7c38-4430-11dc-9497-0015170f8c09": "RUB",
+    "d3a2419e-e7e9-11e8-80c1-7cd30aec6901": "KZT",
+    "e6853795-4421-11dc-9497-0015170f8c09": "USD",
+    "e6853796-4421-11dc-9497-0015170f8c09": "EUR",
+}
+
+
 def parse_calc_response(ret: ET.Element) -> list[dict]:
     """
     Parse the <return> element from a Calc SOAP response.
@@ -246,14 +266,36 @@ def parse_calc_response(ret: ET.Element) -> list[dict]:
     for dest_item in list_items(ret):
         for tariff_item in list_items(dest_item):
             f = fields_of(tariff_item)
+
+            # AdditionalService=true rows are add-on services (Страхование fee,
+            # etc.), not base delivery tariffs — do not show them as tariff
+            # options in the quote card.
+            if f.get("AdditionalService") is True:
+                continue
+
             tariff_guid = find_text(tariff_item, "Value")  # Key="Tariff" (constant); GUID is in Value
             total = f.get("Total") or f.get("Price") or f.get("Summa")
+            # UrgencyName is the actual service level shown to the user
+            # ("Срочная", "Стандартная", "Эконом доставка", …). "Service" in
+            # Calc response is a Services-reference classification (e.g.
+            # "Частичный выкуп") that is the same across all urgencies of one
+            # contract — using it would collapse all rows to a single name.
             service_name = (
-                f.get("Service") or f.get("ServiceName") or f.get("TariffName") or "CSE"
+                f.get("UrgencyName")
+                or f.get("ServiceName")
+                or f.get("TariffName")
+                or f.get("Service")
+                or "CSE"
             )
             min_period = f.get("MinPeriod") or f.get("MinDays") or f.get("PeriodMin")
             max_period = f.get("MaxPeriod") or f.get("MaxDays") or f.get("PeriodMax")
-            currency = f.get("CurrencyName") or f.get("Currency") or "RUB"
+            # Currency: Calc returns both GUID (Currency field) and ISO code
+            # (CurrencyName). Prefer CurrencyName. GUID→ISO mapping via
+            # GetReferenceData:Currencies is only a fallback if CurrencyName
+            # is ever absent (default "RUB" matches CSE's default currency).
+            currency = f.get("CurrencyName") or _CSE_CURRENCY_GUID_TO_ISO.get(
+                (f.get("Currency") or "").strip(), "RUB"
+            )
 
             if total is None:
                 continue
@@ -274,6 +316,12 @@ def parse_calc_response(ret: ET.Element) -> list[dict]:
                 "min_days": int(min_period) if min_period is not None else 3,
                 "max_days": int(max_period) if max_period is not None else 10,
                 "urgency_guid": urgency_guid,
+                # Per-tariff flags from Calc — reused by the tariff engine
+                # to fill service availability without a second HTTP call.
+                "cod": bool(f.get("COD")) if f.get("COD") is not None else None,
+                "return_available": bool(f.get("Return")) if f.get("Return") is not None else None,
+                "agent_delivery": bool(f.get("Agent")) if f.get("Agent") is not None else None,
+                "urgency_description": (f.get("UrgencyDescription") or "").strip(),
             })
     return tariffs
 
@@ -367,36 +415,56 @@ class CSEAPIClient(CarrierAPIClient):
         search: str,
         creds: dict,
         country_code: str = "KZ",
+        in_group: str = "",
     ) -> list[dict]:
         """Search CSE Geography by name / postcode.
 
         country_code: ISO 3166-1 alpha-2 code passed to the API and used for
         client-side filtering (default 'KZ' — Kazakhstan only).
         Pass None or '' to return all countries without filtering.
-        """
-        # Geography reference only accepts: Reference, Search, InGroup
-        # CountryCode is NOT a supported parameter — use postcode-KZ- prefix in search
-        # to scope results to Kazakhstan (e.g. search="postcode-KZ-050000").
-        extras: list[tuple[str, str, str]] = [("Search", search, "string")]
 
-        inner = self._auth(creds) + _ref_params("Geography", *extras)
-        ret = self._post("GetReferenceData", inner, creds)
+        in_group: optional GUID of a parent geography group. Passing
+        Kazakhstan's country GUID ("d5d451af-442d-11dc-9497-0015170f8c09")
+        scopes results to KZ entries only — the only way to enumerate all
+        KZ cities via the Geography reference.
+        """
+        # KZ cities in CSE are stored with a trailing " г" suffix
+        # ("Алматы г", "Астана г"). A plain "Алматы" search returns nothing,
+        # so we retry with the suffix if the first pass is empty.
+        def _do_search(term: str) -> ET.Element:
+            extras: list[tuple[str, str, str]] = [("Search", term, "string")]
+            if in_group:
+                extras.append(("InGroup", in_group, "string"))
+            inner = self._auth(creds) + _ref_params("Geography", *extras)
+            return self._post("GetReferenceData", inner, creds)
+
+        ret = _do_search(search)
+        raw_items = list(list_items(ret))
+        if not raw_items and search and not search.lower().endswith(" г"):
+            ret = _do_search(f"{search} г")
+            raw_items = list(list_items(ret))
+
+        # KZ entries carry a null-GUID FIAS ("00000000-…"), not empty string.
+        # Only skip when there is a real (non-null) FIAS.
+        NULL_FIAS = "00000000-0000-0000-0000-000000000000"
 
         results = []
-        for item in list_items(ret):
+        for item in raw_items:
             f = fields_of(item)
             parent = f.get("ParentName", "")
             fias = f.get("FIAS", "")
 
             if country_code and country_code.upper() == "KZ":
-                # Geography response has no CountryCode/Country fields.
-                # KZ entries never have a FIAS code (FIAS is Russia-only).
-                if fias:
+                if fias and fias != NULL_FIAS:
                     continue
+
+            raw_name = find_text(item, "Value")
+            # Strip trailing " г" suffix so the client card shows a clean name.
+            display_name = raw_name[:-2].rstrip() if raw_name.lower().endswith(" г") else raw_name
 
             results.append({
                 "guid": find_text(item, "Key"),
-                "name": find_text(item, "Value"),
+                "name": display_name,
                 "parent": parent,
                 "type": f.get("Type", ""),
                 "fias": fias,
@@ -629,6 +697,10 @@ class CSEAPIClient(CarrierAPIClient):
             "waybill" (an internal delivery leg). For customer print forms we
             want the Order document.
         """
+        # <Name> pins the specific print form. Without it CSE returns whichever
+        # form is set as default in the account settings — could change any day
+        # to a "Марка ГМХ" (parcel label) or a variant. "Универсальная печатная
+        # форма документа ЗАКАЗ" is the canonical customer-facing order print.
         inner = (
             self._auth(creds)
             + "<m:documents>"
@@ -639,6 +711,7 @@ class CSEAPIClient(CarrierAPIClient):
             + "<m:Key>Parameters</m:Key>"
             + "<m:List><m:Key>DocumentType</m:Key><m:Value>order</m:Value><m:ValueType>string</m:ValueType></m:List>"
             + "<m:List><m:Key>Type</m:Key><m:Value>print</m:Value><m:ValueType>string</m:ValueType></m:List>"
+            + "<m:List><m:Key>Name</m:Key><m:Value>Универсальная печатная форма документа ЗАКАЗ</m:Value><m:ValueType>string</m:ValueType></m:List>"
             + "<m:List><m:Key>Format</m:Key><m:Value>pdf</m:Value><m:ValueType>string</m:ValueType></m:List>"
             + "</m:parameters>"
         )
@@ -730,6 +803,56 @@ class CSEAPIClient(CarrierAPIClient):
         ret = self._post("Calc", inner, creds, timeout=_CALC_TIMEOUT)
         return parse_calc_response(ret)
 
+    def recalc_with_extras(
+        self,
+        from_geo: str,
+        to_geo: str,
+        weight: float,
+        qty: int,
+        creds: dict,
+        *,
+        urgency_guid: str,
+        cargo_type_guid: str | None = None,
+        volume_weight: float = 0.0,
+        delivery_of_cargo: str = "",
+        declared_value: float = 0.0,
+        insurance_rate: float = 0.0,
+        additional_service_guids: list[str] | None = None,
+    ) -> dict | None:
+        """Second-Calc for a specific urgency including add-on services.
+
+        Used by the checkout flow: after the user picks Страхование / declared
+        value / Самовывоз, we ask CSE for the fully-loaded final price so what
+        the customer clicks "Pay" for matches CSE billing.
+
+        Returns a single tariff dict for the requested urgency (or None if CSE
+        returned no matching row).
+        """
+        if not cargo_type_guid:
+            try:
+                cargo_type_guid = self._cargo_type_guid(creds)
+            except Exception as exc:
+                logger.warning("CSE: cargo type GUID unavailable (%s)", exc)
+                cargo_type_guid = ""
+        inner = _build_calc_inner(
+            self._login(creds), self._password(creds),
+            from_geo, to_geo, weight, qty, cargo_type_guid,
+            volume_weight,
+            urgency_guid=urgency_guid,
+            delivery_of_cargo=delivery_of_cargo,
+            declared_value=declared_value,
+            insurance_rate=insurance_rate,
+            additional_service_guids=additional_service_guids,
+        )
+        ret = self._post("Calc", inner, creds, timeout=_CALC_TIMEOUT)
+        tariffs = parse_calc_response(ret)
+        # Even when Urgency is passed some installs still return every urgency;
+        # explicitly pick the one requested.
+        for t in tariffs:
+            if t.get("urgency_guid") == urgency_guid:
+                return t
+        return tariffs[0] if tariffs else None
+
     # ── SaveWaybillOffice ─────────────────────────────────────────────────────
 
     def create_waybill(self, order_data: dict, creds: dict) -> str:
@@ -754,13 +877,15 @@ class CSEAPIClient(CarrierAPIClient):
         total_qty = sum(p.get("quantity", 1) for p in packages)
         desc_parts = [p["description"] for p in packages if p.get("description")]
 
+        # Handling markers that CSE has no dedicated Services GUID for —
+        # kept in the free-form description so the courier sees them on the
+        # printed label. Insurance / declared value are NOT listed here: they
+        # are properly sent via <AdditionalServices> + Cargo amount fields.
         service_markers: list[str] = []
         if order_data.get("fragile"):
             service_markers.append("ХРУПКИЙ")
         if order_data.get("call_before_delivery"):
             service_markers.append("ПОЗВОНИТЬ ПЕРЕД ДОСТАВКОЙ")
-        if order_data.get("insurance"):
-            service_markers.append("СТРАХОВАНИЕ")
         prefix = "; ".join(service_markers)
         body_desc = "; ".join(desc_parts) if desc_parts else "Посылка"
         description = f"{prefix}; {body_desc}" if prefix else body_desc
@@ -793,6 +918,27 @@ class CSEAPIClient(CarrierAPIClient):
         login = _esc(self._login(creds))
         pwd = _esc(self._password(creds))
 
+        # DeliveryType mapping. Internal enum → CSE's NameOfdeliverytype value
+        # (see GetReferenceData:DeliveryType in CSE Web API docs).
+        _DELIVERY_TYPE_MAP = {
+            "door_to_door":           "ДоставкаДоДверей",
+            "warehouse_to_door":      "СкладДверь",
+            "door_to_warehouse":      "Самовывоз",
+            "warehouse_to_warehouse": "СкладСклад",
+        }
+        delivery_type = order_data.get("delivery_type", "door_to_door")
+        cse_delivery = _DELIVERY_TYPE_MAP.get(delivery_type, "ДоставкаДоДверей")
+
+        # PVZ blocks. Per CSE SaveWaybillOffice docs the element is named
+        # <PVZ> and lives INSIDE the <Sender> / <Recipient> blocks (after
+        # Cargo for the recipient, at the end of Sender). "SenderPVZ" /
+        # "RecipientPVZ" are silently dropped by the API. If PVZ is set,
+        # CSE ignores the address/geography of that side.
+        sender_pvz = _esc(sender.get("pvz_guid", ""))
+        recipient_pvz = _esc(recipient.get("pvz_guid", ""))
+        sender_pvz_xml = f"<m:PVZ>{sender_pvz}</m:PVZ>" if sender_pvz else ""
+        recipient_pvz_xml = f"<m:PVZ>{recipient_pvz}</m:PVZ>" if recipient_pvz else ""
+
         declared_xml = ""
         if declared_value:
             declared_xml = (
@@ -812,6 +958,109 @@ class CSEAPIClient(CarrierAPIClient):
             if urgency_guid else ""
         )
 
+        # <AdditionalServices> at OrderData level. Страхование and
+        # Объявленная стоимость are MUTUALLY EXCLUSIVE per CSE:
+        #   error 05021: "Выбор услуги 'Страхование' не доступен совместно
+        #                 с услугой 'Объявленная стоимость'."
+        # When the customer picks insurance, insurance already implies the
+        # declared value amount (sent via <DeclaredValueRate> in Cargo), and
+        # we only bill for the insurance service. Otherwise (declared value
+        # only) we bill the declared-value service alone.
+        service_guids: list[str] = []
+        if order_data.get("insurance"):
+            service_guids.append(_CSE_SERVICE_GUIDS["insurance"])
+        elif float(declared_value or 0) > 0:
+            service_guids.append(_CSE_SERVICE_GUIDS["declared_value"])
+        additional_services_xml = ""
+        if service_guids:
+            items = "".join(f"<m:Items>{_esc(g)}</m:Items>" for g in service_guids)
+            additional_services_xml = f"<m:AdditionalServices>{items}</m:AdditionalServices>"
+
+        # ── Dimensions + VolumeWeight ─────────────────────────────────────
+        # CSE курьерская uses a 5000 divisor (from GetReferenceData:ShippingMethods
+        # DimensionalWeightFactor). Volumetric weight in kg = L·W·H(cm) / 5000
+        # per one piece; multiplied by the row's quantity for the aggregate.
+        _VOL_DIVISOR = 5000.0
+        first_pkg = packages[0] if packages else {}
+        cargo_dims_xml = ""
+        if first_pkg.get("width_cm") and first_pkg.get("height_cm") and first_pkg.get("depth_cm"):
+            cargo_dims_xml = (
+                f"<m:Length>{float(first_pkg.get('depth_cm', 0)):g}</m:Length>"
+                f"<m:Width>{float(first_pkg.get('width_cm', 0)):g}</m:Width>"
+                f"<m:Height>{float(first_pkg.get('height_cm', 0)):g}</m:Height>"
+            )
+        total_vol_weight = 0.0
+        for p in packages:
+            w = float(p.get("width_cm") or 0)
+            h = float(p.get("height_cm") or 0)
+            d = float(p.get("depth_cm") or 0)
+            if w > 0 and h > 0 and d > 0:
+                total_vol_weight += (w * h * d / _VOL_DIVISOR) * int(p.get("quantity", 1))
+        vol_weight_xml = (
+            f"<m:VolumeWeight>{round(total_vol_weight, 3)}</m:VolumeWeight>"
+            if total_vol_weight > 0 else ""
+        )
+
+        # <CargoPackages> — one entry per package row (repeats for row.quantity>1
+        # collapsed into a single element with PackageQty). Only emit when we
+        # actually have per-row dimensions; otherwise Cargo aggregates suffice.
+        cargo_packages_xml_parts: list[str] = []
+        if len(packages) > 1 or (packages and cargo_dims_xml):
+            for p in packages:
+                w = float(p.get("width_cm") or 0)
+                h = float(p.get("height_cm") or 0)
+                d = float(p.get("depth_cm") or 0)
+                if not (w > 0 and h > 0 and d > 0):
+                    continue
+                cargo_packages_xml_parts.append(
+                    "<m:CargoPackages>"
+                    f"<m:Length>{d:g}</m:Length>"
+                    f"<m:Width>{w:g}</m:Width>"
+                    f"<m:Height>{h:g}</m:Height>"
+                    f"<m:Weight>{float(p.get('weight_kg', 0)):g}</m:Weight>"
+                    f"<m:PackageQty>{int(p.get('quantity', 1))}</m:PackageQty>"
+                    "</m:CargoPackages>"
+                )
+        cargo_packages_xml = "".join(cargo_packages_xml_parts)
+
+        # ── Party-level extra fields (Official / EMail / Info) ────────────
+        # Official = contact person: use company_name as Client when present,
+        # then full_name becomes the contact (Official). Falls back to just
+        # the full_name as Client when no company is set.
+        def _party_client_official(party: dict) -> tuple[str, str]:
+            company = (party.get("company") or "").strip()
+            full = (party.get("full_name") or "").strip()
+            if company:
+                return company, full
+            return full, ""
+
+        s_client, s_official = _party_client_official(sender)
+        r_client, r_official = _party_client_official(recipient)
+
+        def _party_extras_xml(party: dict) -> str:
+            xml = ""
+            email = (party.get("email") or "").strip()
+            info = (party.get("comment") or "").strip()
+            if email:
+                xml += f"<m:EMail>{_esc(email)}</m:EMail>"
+            if info:
+                xml += f"<m:Info>{_esc(info)}</m:Info>"
+            return xml
+
+        sender_official_xml = f"<m:Official>{_esc(s_official)}</m:Official>" if s_official else ""
+        recipient_official_xml = f"<m:Official>{_esc(r_official)}</m:Official>" if r_official else ""
+
+        # ── Notification channels for CSE (SMS + email to the sender) ─────
+        reply_email = (sender.get("email") or "").strip()
+        reply_phone = (sender.get("phone") or "").strip()
+        reply_email_xml = f"<m:ReplyEMail>{_esc(reply_email)}</m:ReplyEMail>" if reply_email else ""
+        reply_sms_xml = f"<m:ReplySMSPhone>{_esc(reply_phone)}</m:ReplySMSPhone>" if reply_phone else ""
+
+        # <ClientNumber> = our internal order reference (max 20 chars per CSE
+        # spec). CSE stores + echoes this back in ErrorInfo and its own UI,
+        # giving us two-way traceability: their waybill number ↔ our order.id.
+        client_number = _esc((order_data.get("order_reference") or "")[:20])
+
         # SaveWaybillOffice uses typed XML elements (not Element Key/Value/Fields).
         # TypeOfPayer: 0 = заказчик; WayOfPayment: 1 = безнал.
         inner = (
@@ -820,39 +1069,51 @@ class CSEAPIClient(CarrierAPIClient):
             f"<m:Password>{pwd}</m:Password>"
             f"<m:Company/>"
             f"<m:Number/>"
-            f"<m:ClientNumber/>"
+            f"<m:ClientNumber>{client_number}</m:ClientNumber>"
             f"<m:OrderData>"
             f"<m:Recipient>"
-            f"<m:Client>{_esc(recipient.get('full_name', ''))}</m:Client>"
+            f"<m:Client>{_esc(r_client)}</m:Client>"
+            + recipient_official_xml +
             f"<m:Address>"
             f"<m:Geography>{recipient_geo}</m:Geography>"
             f"<m:Info>{recipient_addr}</m:Info>"
             f"<m:FreeForm>true</m:FreeForm>"
             f"</m:Address>"
             f"<m:Phone>{_esc(recipient.get('phone', ''))}</m:Phone>"
-            f"<m:DeliveryOfCargo>ДоставкаДоДверей</m:DeliveryOfCargo>"
-            + urgency_xml +
+            + _party_extras_xml(recipient) +
+            urgency_xml +
             f"<m:Cargo>"
             f"<m:CargoDescription>{_esc(body_desc)}</m:CargoDescription>"
             f"<m:CargoPackageQty>{int(total_qty)}</m:CargoPackageQty>"
             f"<m:Weight>{round(float(total_weight), 3)}</m:Weight>"
-            + declared_xml +
+            + vol_weight_xml +
+            cargo_dims_xml +
+            declared_xml +
+            cargo_packages_xml +
             f"</m:Cargo>"
+            + recipient_pvz_xml +
             f"</m:Recipient>"
             f"<m:Sender>"
-            f"<m:Client>{_esc(sender.get('full_name', ''))}</m:Client>"
+            f"<m:Client>{_esc(s_client)}</m:Client>"
+            + sender_official_xml +
             f"<m:Address>"
             f"<m:Geography>{sender_geo}</m:Geography>"
             f"<m:Info>{sender_addr}</m:Info>"
             f"<m:FreeForm>true</m:FreeForm>"
             f"</m:Address>"
             f"<m:Phone>{_esc(sender.get('phone', ''))}</m:Phone>"
+            + _party_extras_xml(sender) +
+            sender_pvz_xml +
             f"</m:Sender>"
+            + reply_email_xml +
+            reply_sms_xml +
             f"<m:TakeDate>{_esc(take_date)}</m:TakeDate>"
             f"<m:TypeOfCargo>{_esc(cargo_type_guid)}</m:TypeOfCargo>"
             f"<m:TypeOfPayer>0</m:TypeOfPayer>"
             f"<m:WayOfPayment>1</m:WayOfPayment>"
             + comment_xml +
+            f"<m:DeliveryOfCargo>{_esc(cse_delivery)}</m:DeliveryOfCargo>"
+            + additional_services_xml +
             "</m:OrderData>"
             "<m:Office/>"
         )
@@ -924,11 +1185,24 @@ class CSEAPIClient(CarrierAPIClient):
                 available=True,
                 note="Отмечается в описании вложения",
             ),
+            # CSE Services reference GUIDs (used later when we migrate the dispatch
+            # call to SaveDocuments/AdditionalServices):
+            #   declared_value -> 6da21fe7-4f13-11dc-bda1-0015170f8c09
+            #   insurance      -> cc03d9ad-61f4-11dc-bda1-0015170f8c09
+            # Both are wired today via typed XML elements in SaveWaybillOffice:
+            #   declared_value -> <m:DeclaredValueRate>
+            #   insurance      -> <m:InsuranceRate>  (also requires declared value)
+            CarrierServiceOption(
+                code="declared_value",
+                name="Объявленная стоимость",
+                available=True,
+                note="Задекларированная стоимость груза (лимит компенсации при потере)",
+            ),
             CarrierServiceOption(
                 code="insurance",
-                name="Страхование (объявленная ценность)",
+                name="Страхование",
                 available=True,
-                note="Стоимость уточняется индивидуально",
+                note="Требует указания объявленной стоимости; стоимость уточняется индивидуально",
             ),
             CarrierServiceOption(
                 code="call_before_delivery",
@@ -1038,7 +1312,74 @@ def _build_calc_inner(
     weight: float,
     qty: int,
     cargo_type_guid: str,
+    volume_weight: float = 0.0,
+    *,
+    urgency_guid: str = "",
+    delivery_of_cargo: str = "",
+    declared_value: float = 0.0,
+    insurance_rate: float = 0.0,
+    additional_service_guids: list[str] | None = None,
 ) -> str:
+    """Build the SOAP body for a CSE Calc request.
+
+    volume_weight — volumetric weight in kg (CSE курьерская divisor = 5000, from
+    ShippingMethods.DimensionalWeightFactor). Formula: sum((L·W·H(cm) / 5000) × qty).
+    If > 0 we emit <VolumeWeight>; CSE bills by max(Weight, VolumeWeight).
+    Omitting it underquotes bulky-light shipments.
+
+    Optional (Phase 2 — recalc-after-services flow):
+      urgency_guid            — scope the calc to a single tariff (else all 6).
+      delivery_of_cargo       — CSE NameOfdeliverytype string ("ДоставкаДоДверей",
+                                "Самовывоз", "СкладДверь", "СкладСклад").
+      declared_value          — <DeclaredValueRate> amount.
+      insurance_rate          — <InsuranceRate> amount (usually = declared_value).
+      additional_service_guids — Services reference GUIDs to bill with the
+                                shipment (Страхование, Объявленная стоимость, …).
+                                Emitted via <Tables><Key>AdditionalServices</Key>.
+    """
+    vol_field = ""
+    if volume_weight and volume_weight > 0:
+        vol_field = (
+            f"<m:Fields><m:Key>VolumeWeight</m:Key><m:Value>{volume_weight:.3f}</m:Value>"
+            "<m:ValueType>float</m:ValueType></m:Fields>"
+        )
+    urgency_field = ""
+    if urgency_guid:
+        urgency_field = (
+            f"<m:Fields><m:Key>Urgency</m:Key><m:Value>{_esc(urgency_guid)}</m:Value>"
+            "<m:ValueType>string</m:ValueType></m:Fields>"
+        )
+    delivery_field = ""
+    if delivery_of_cargo:
+        delivery_field = (
+            f"<m:Fields><m:Key>DeliveryType</m:Key><m:Value>{_esc(delivery_of_cargo)}</m:Value>"
+            "<m:ValueType>string</m:ValueType></m:Fields>"
+        )
+    declared_field = ""
+    if declared_value and declared_value > 0:
+        declared_field = (
+            f"<m:Fields><m:Key>DeclaredValueRate</m:Key><m:Value>{float(declared_value):.2f}</m:Value>"
+            "<m:ValueType>float</m:ValueType></m:Fields>"
+        )
+    insurance_field = ""
+    if insurance_rate and insurance_rate > 0:
+        insurance_field = (
+            f"<m:Fields><m:Key>InsuranceRate</m:Key><m:Value>{float(insurance_rate):.2f}</m:Value>"
+            "<m:ValueType>float</m:ValueType></m:Fields>"
+        )
+    services_block = ""
+    if additional_service_guids:
+        items = "".join(
+            f"<m:List><m:Key>Service</m:Key><m:Value>{_esc(g)}</m:Value>"
+            "<m:ValueType>string</m:ValueType></m:List>"
+            for g in additional_service_guids if g
+        )
+        if items:
+            services_block = (
+                "<m:Tables><m:Key>AdditionalServices</m:Key>"
+                + items +
+                "</m:Tables>"
+            )
     return (
         f"<m:login>{_esc(login)}</m:login>"
         f"<m:password>{_esc(password)}</m:password>"
@@ -1054,8 +1395,14 @@ def _build_calc_inner(
         "<m:ValueType>string</m:ValueType></m:Fields>"
         f"<m:Fields><m:Key>Weight</m:Key><m:Value>{weight:.3f}</m:Value>"
         "<m:ValueType>float</m:ValueType></m:Fields>"
+        + vol_field
+        + urgency_field
+        + delivery_field
+        + declared_field
+        + insurance_field +
         f"<m:Fields><m:Key>Qty</m:Key><m:Value>{qty}</m:Value>"
         "<m:ValueType>int</m:ValueType></m:Fields>"
+        + services_block +
         "</m:List>"
         "</m:data>"
         "<m:parameters><m:Key>Parameters</m:Key></m:parameters>"

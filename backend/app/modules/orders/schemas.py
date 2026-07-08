@@ -4,7 +4,14 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+DeliveryType = Literal[
+    "door_to_door",           # CSE: ДоставкаДоДверей
+    "warehouse_to_door",      # CSE: СкладДверь (sender drops at PVZ)
+    "door_to_warehouse",      # CSE: Самовывоз (recipient picks up from PVZ)
+    "warehouse_to_warehouse", # CSE: СкладСклад (both sides via PVZ)
+]
 
 OrderDraftStatus = Literal[
     "draft",
@@ -127,6 +134,36 @@ class UpdateShipmentDetailsRequest(BaseModel):
     insurance: bool = False
     fragile: bool = False
 
+    delivery_type: DeliveryType = "door_to_door"
+    # PVZ GUIDs are required only for the corresponding warehouse legs
+    # (validated below). Carrier-agnostic today but consumed only by CSE.
+    sender_pvz_guid: str | None = Field(default=None, max_length=50)
+    recipient_pvz_guid: str | None = Field(default=None, max_length=50)
+
+    @model_validator(mode="after")
+    def _validate_pvz_for_delivery_type(self) -> "UpdateShipmentDetailsRequest":
+        sender_leg_wh = self.delivery_type in (
+            "warehouse_to_door", "warehouse_to_warehouse"
+        )
+        recipient_leg_wh = self.delivery_type in (
+            "door_to_warehouse", "warehouse_to_warehouse"
+        )
+        if sender_leg_wh and not self.sender_pvz_guid:
+            raise ValueError(
+                "sender_pvz_guid обязателен для выбранного типа доставки"
+            )
+        if recipient_leg_wh and not self.recipient_pvz_guid:
+            raise ValueError(
+                "recipient_pvz_guid обязателен для выбранного типа доставки"
+            )
+        # Clear stale PVZ GUIDs on legs that don't use them, so the DB never
+        # carries orphan data for a leg the customer later switched away from.
+        if not sender_leg_wh:
+            self.sender_pvz_guid = None
+        if not recipient_leg_wh:
+            self.recipient_pvz_guid = None
+        return self
+
 
 class ShipmentPartyResponse(BaseModel):
     id: int
@@ -185,6 +222,10 @@ class OrderDraftResponse(BaseModel):
     insurance: bool = False
     fragile: bool = False
 
+    delivery_type: DeliveryType = "door_to_door"
+    sender_pvz_guid: str | None = None
+    recipient_pvz_guid: str | None = None
+
     sender: ShipmentPartyResponse | None = None
     recipient: ShipmentPartyResponse | None = None
     packages: list[ShipmentPackageResponse]
@@ -198,3 +239,21 @@ class OrderDraftListResponse(BaseModel):
     page: int
     size: int
     pages: int
+
+
+class CseRecalcRequest(BaseModel):
+    """Recalculate CSE quote after the customer picks add-on services.
+
+    Sent in real time from the checkout form; CSE returns the fully-loaded
+    tariff so the price shown at the "Pay" button matches what CSE will bill.
+    """
+    delivery_type: DeliveryType = "door_to_door"
+    insurance: bool = False
+    declared_value: Decimal | None = Field(default=None, ge=0)
+
+
+class CseRecalcResponse(BaseModel):
+    price: Decimal          # customer-facing total (carrier_price + markup)
+    carrier_price: Decimal  # raw CSE amount
+    currency: str
+    recalculated: bool      # False for non-CSE drafts (silent no-op)

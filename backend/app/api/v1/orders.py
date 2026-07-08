@@ -8,6 +8,8 @@ from app.core.db import get_db
 from app.core.dependencies import get_current_user_id
 from app.modules.orders.schemas import (
     CreateDraftFromQuoteRequest,
+    CseRecalcRequest,
+    CseRecalcResponse,
     OrderDraftListResponse,
     OrderDraftResponse,
     UpdateShipmentDetailsRequest,
@@ -137,4 +139,27 @@ def update_order_draft_shipment(
         user_id=current_user_id,
         draft_id=draft_id,
         payload=payload,
+    )
+
+
+@router.post(
+    "/drafts/{draft_id}/cse-recalc",
+    response_model=CseRecalcResponse,
+    status_code=200,
+    summary="Recalc CSE quote with add-on services",
+)
+def cse_recalc_draft(
+    draft_id: int,
+    payload: CseRecalcRequest,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> CseRecalcResponse:
+    """FE calls this from the checkout form (debounced) whenever the customer
+    toggles insurance / delivery type / declared value. Returns the fully
+    loaded final price for the currently-selected urgency. For non-CSE
+    drafts it silently echoes the current price so the FE can call it
+    unconditionally.
+    """
+    return orders_service.cse_recalc(
+        db, user_id=current_user_id, draft_id=draft_id, payload=payload,
     )

@@ -463,26 +463,37 @@ def _build_api_order_data(order: OrderDraft, creds: dict | None = None, urgency_
         "shipment_type": order.shipment_type_snapshot or "",
         "sender": {
             "full_name": sender.full_name if sender else "",
+            "company": sender.company_name if sender else "",
             "phone": sender.phone if sender else "",
+            "email": (sender.email if sender else "") or "",
             "city": sender_city,
             "address": sender.address_line1 if sender else "",
+            "comment": (sender.comment if sender else "") or "",
             **({"geography_guid": sender_geo_guid} if sender_geo_guid else {}),
+            **({"pvz_guid": order.sender_pvz_guid} if order.sender_pvz_guid else {}),
         },
         "recipient": {
             "full_name": recipient.full_name if recipient else "",
             "company": recipient.company_name if recipient else "",
             "phone": recipient.phone if recipient else "",
+            "email": (recipient.email if recipient else "") or "",
             "city": recipient_city,
             "address": recipient.address_line1 if recipient else "",
+            "comment": (recipient.comment if recipient else "") or "",
             **({"geography_guid": recipient_geo_guid} if recipient_geo_guid else {}),
             **({"urgency_guid": urgency_guid} if urgency_guid else {}),
+            **({"pvz_guid": order.recipient_pvz_guid} if order.recipient_pvz_guid else {}),
         },
+        "delivery_type": order.delivery_type,
         "packages": [
             {
                 "weight_kg": float(p.weight_kg),
                 "quantity": p.quantity,
                 "description": p.description or "",
                 "declared_value": float(p.declared_value) if p.declared_value else None,
+                "width_cm": float(p.width_cm),
+                "height_cm": float(p.height_cm),
+                "depth_cm": float(p.depth_cm),
             }
             for p in order.packages
         ],

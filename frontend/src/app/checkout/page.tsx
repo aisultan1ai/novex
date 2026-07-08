@@ -148,6 +148,7 @@ function CheckoutPageInner() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -232,7 +233,7 @@ function CheckoutPageInner() {
 
   const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const file = fileInputRef.current?.files?.[0];
+    const file = selectedFile ?? fileInputRef.current?.files?.[0];
     if (!file || !paymentData) return;
     if (file.size > MAX_FILE_SIZE_BYTES) {
       setUploadError("Файл слишком большой. Максимальный размер: 5 МБ.");
@@ -291,7 +292,7 @@ function CheckoutPageInner() {
               Чек успешно загружен
             </div>
             <p style={{ font: "400 14px/1.6 Inter Variable, sans-serif", color: "#6B7280", margin: "0 0 28px" }}>
-              Оплата отправлена на проверку оператором. Обычно подтверждение занимает до 24 часов в рабочие дни.
+              Оплата отправлена на проверку оператором.
             </p>
             <button
               onClick={() => router.push("/dashboard/orders")}
@@ -512,19 +513,95 @@ function CheckoutPageInner() {
                   <li>Переведите точную сумму по реквизитам выше.</li>
                   <li>В назначении платежа укажите номер заказа.</li>
                   <li>Сохраните скриншот или PDF-квитанцию из банка.</li>
-                  <li>Загрузите файл ниже — оператор проверит оплату в течение 24 ч.</li>
+                  <li>Загрузите файл ниже — оператор проверит оплату.</li>
                 </ol>
                 <p style={{ font: "400 12px/1 Inter Variable, sans-serif", color: "#9CA3AF", marginBottom: 16 }}>
                   Принимаются: JPEG, PNG, PDF. Максимальный размер: 5 МБ.
                 </p>
                 <form onSubmit={(e) => void handleUpload(e)} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {/* Hidden native input — controlled via the styled label below. */}
                   <input
                     ref={fileInputRef}
                     type="file"
                     accept="image/jpeg,image/png,application/pdf"
                     required
-                    style={{ font: "400 14px/1 Inter Variable, sans-serif", color: "#374151" }}
+                    style={{ display: "none" }}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0] ?? null;
+                      if (f && f.size > MAX_FILE_SIZE_BYTES) {
+                        setUploadError("Файл слишком большой. Максимальный размер: 5 МБ.");
+                        setSelectedFile(null);
+                        if (fileInputRef.current) fileInputRef.current.value = "";
+                        return;
+                      }
+                      setSelectedFile(f);
+                      setUploadError(null);
+                    }}
                   />
+                  {!selectedFile ? (
+                    <label
+                      htmlFor="__none"
+                      onClick={() => fileInputRef.current?.click()}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 10,
+                        padding: "18px 16px",
+                        border: "2px dashed #CBD5E1",
+                        borderRadius: 12,
+                        background: "#F8FAFC",
+                        cursor: "pointer",
+                        color: "#475569",
+                        font: "500 14px/1.2 Inter Variable, sans-serif",
+                        transition: "background 0.15s, border-color 0.15s",
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = "#F1F5F9"; e.currentTarget.style.borderColor = "#94A3B8"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = "#F8FAFC"; e.currentTarget.style.borderColor = "#CBD5E1"; }}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="17 8 12 3 7 8" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                      </svg>
+                      Выбрать файл
+                    </label>
+                  ) : (
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: 10,
+                      padding: "12px 14px",
+                      border: "1px solid #BBF7D0",
+                      background: "#F0FDF4",
+                      borderRadius: 12,
+                    }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ font: "600 13px/1.3 Inter Variable, sans-serif", color: "#166534", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {selectedFile.name}
+                        </div>
+                        <div style={{ font: "400 11px/1.3 Inter Variable, sans-serif", color: "#4B5563", marginTop: 2 }}>
+                          {(selectedFile.size / 1024).toFixed(0)} КБ · готов к отправке
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedFile(null);
+                          if (fileInputRef.current) fileInputRef.current.value = "";
+                        }}
+                        style={{
+                          background: "transparent", border: "none", color: "#64748b",
+                          cursor: "pointer", padding: 4, fontFamily: "inherit",
+                          font: "500 12px/1 Inter Variable, sans-serif",
+                          flexShrink: 0,
+                        }}
+                      >
+                        Заменить
+                      </button>
+                    </div>
+                  )}
                   {uploadError && (
                     <div style={{ padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10, font: "400 13px/1.4 Inter Variable, sans-serif", color: "#B91C1C" }}>
                       {uploadError}
@@ -532,21 +609,21 @@ function CheckoutPageInner() {
                   )}
                   <button
                     type="submit"
-                    disabled={uploading}
+                    disabled={uploading || !selectedFile}
                     style={{
-                      background: uploading ? "#93C5FD" : "#2563EB",
-                      color: "#fff",
+                      background: uploading ? "#93C5FD" : !selectedFile ? "#E5E7EB" : "#2563EB",
+                      color: !selectedFile && !uploading ? "#9CA3AF" : "#fff",
                       padding: "13px 24px",
                       border: "none",
                       borderRadius: 12,
                       font: "600 15px/1 Inter Variable, sans-serif",
-                      cursor: uploading ? "not-allowed" : "pointer",
+                      cursor: (uploading || !selectedFile) ? "not-allowed" : "pointer",
                       fontFamily: "inherit",
                       transition: "background 0.15s",
                       marginTop: 4,
                     }}
-                    onMouseEnter={(e) => { if (!uploading) e.currentTarget.style.background = "#1D4ED8"; }}
-                    onMouseLeave={(e) => { if (!uploading) e.currentTarget.style.background = "#2563EB"; }}
+                    onMouseEnter={(e) => { if (!uploading && selectedFile) e.currentTarget.style.background = "#1D4ED8"; }}
+                    onMouseLeave={(e) => { if (!uploading && selectedFile) e.currentTarget.style.background = "#2563EB"; }}
                   >
                     {uploading ? "Загрузка..." : "Я оплатил — загрузить чек"}
                   </button>

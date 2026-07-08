@@ -25,6 +25,14 @@ export type OrderDraftStatus =
 
 export type ShipmentPartyRole = "sender" | "recipient";
 
+// Maps to CSE NameOfdeliverytype. Non-CSE carriers ignore this field (backend
+// falls back to door_to_door behaviour).
+export type DeliveryType =
+  | "door_to_door"           // CSE: ДоставкаДоДверей
+  | "warehouse_to_door"      // CSE: СкладДверь
+  | "door_to_warehouse"      // CSE: Самовывоз
+  | "warehouse_to_warehouse"; // CSE: СкладСклад
+
 export interface CreateDraftFromQuoteRequest {
   quote_session_id: number;
   public_token?: string | null;
@@ -62,6 +70,9 @@ export interface UpdateShipmentDetailsRequest {
   call_before_delivery?: boolean;
   insurance?: boolean;
   fragile?: boolean;
+  delivery_type?: DeliveryType;
+  sender_pvz_guid?: string | null;
+  recipient_pvz_guid?: string | null;
 }
 
 export type ShipmentPartyResponse = {
@@ -114,6 +125,10 @@ export type OrderDraftResponse = {
   call_before_delivery: boolean;
   insurance: boolean;
   fragile: boolean;
+
+  delivery_type: DeliveryType;
+  sender_pvz_guid: string | null;
+  recipient_pvz_guid: string | null;
 
   sender: ShipmentPartyResponse | null;
   recipient: ShipmentPartyResponse | null;
