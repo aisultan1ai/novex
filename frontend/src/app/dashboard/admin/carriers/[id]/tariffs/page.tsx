@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import {
   createAdminService, deleteAdminRate, getAdminCarrier,
-  listAdminRates, uploadTariffGrid,
+  listAdminRates, updateAdminRate, uploadTariffGrid,
 } from "@/lib/api/admin";
 import type { AdminCarrierService, AdminTariffRate } from "@/types/admin";
 
@@ -49,6 +49,10 @@ export default function AdminCarrierTariffsPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
 
   function load() {
     setIsLoading(true);
@@ -105,6 +109,48 @@ export default function AdminCarrierTariffsPage() {
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  function startEdit(rate: AdminTariffRate) {
+    setEditingId(rate.id);
+    setEditDraft({
+      zone: String(rate.zone),
+      weight_from_kg: String(rate.weight_from_kg),
+      weight_to_kg: rate.weight_to_kg != null ? String(rate.weight_to_kg) : "",
+      base_price: String(rate.base_price),
+      per_unit_price: rate.per_unit_price != null ? String(rate.per_unit_price) : "",
+      eta_days_min: rate.eta_days_min != null ? String(rate.eta_days_min) : "",
+      eta_days_max: rate.eta_days_max != null ? String(rate.eta_days_max) : "",
+    });
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditDraft({});
+  }
+
+  async function handleSaveEdit() {
+    if (!selectedService || editingId == null) return;
+    setSaving(true);
+    try {
+      const body: Record<string, number | null> = {
+        zone: Number(editDraft.zone),
+        weight_from_kg: Number(editDraft.weight_from_kg),
+        weight_to_kg: editDraft.weight_to_kg !== "" ? Number(editDraft.weight_to_kg) : null,
+        base_price: Number(editDraft.base_price),
+        per_unit_price: editDraft.per_unit_price !== "" ? Number(editDraft.per_unit_price) : null,
+        eta_days_min: editDraft.eta_days_min !== "" ? Number(editDraft.eta_days_min) : null,
+        eta_days_max: editDraft.eta_days_max !== "" ? Number(editDraft.eta_days_max) : null,
+      };
+      await updateAdminRate(carrierId, selectedService.id, editingId, body);
+      setEditingId(null);
+      setEditDraft({});
+      loadRates(selectedService);
+    } catch (err: unknown) {
+      alert((err as Error).message);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -209,24 +255,47 @@ export default function AdminCarrierTariffsPage() {
               </div>
             ) : (
               <>
-                <div style={{ display: "grid", gridTemplateColumns: "50px 80px 80px 100px 80px 80px 80px 80px 40px", gap: 8, padding: "10px 20px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "50px 70px 70px 90px 80px 70px 70px 70px 76px", gap: 8, padding: "10px 20px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                   <span>ID</span><span>Зона</span><span>От, кг</span><span>До, кг</span><span>Базовая</span><span>Доп/ед</span><span>Срок мин</span><span>Срок макс</span><span></span>
                 </div>
-                {rates.map((rate, idx) => (
-                  <div key={rate.id} style={{ display: "grid", gridTemplateColumns: "50px 80px 80px 100px 80px 80px 80px 80px 40px", gap: 8, padding: "11px 20px", borderBottom: idx < rates.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center", fontSize: 13 }}>
-                    <span style={{ fontFamily: "monospace", color: "#94a3b8" }}>#{rate.id}</span>
-                    <span style={{ fontWeight: 700, color: "#0f172a" }}>Зона {rate.zone}</span>
-                    <span style={{ color: "#475569" }}>{rate.weight_from_kg}</span>
-                    <span style={{ color: "#475569" }}>{rate.weight_to_kg ?? "∞"}</span>
-                    <span style={{ fontWeight: 600, color: "#0f172a" }}>{Number(rate.base_price).toLocaleString("ru-RU")}</span>
-                    <span style={{ color: "#64748b" }}>{rate.per_unit_price ? Number(rate.per_unit_price).toLocaleString("ru-RU") : "-"}</span>
-                    <span style={{ color: "#64748b" }}>{rate.eta_days_min ?? "-"}</span>
-                    <span style={{ color: "#64748b" }}>{rate.eta_days_max ?? "-"}</span>
-                    <button onClick={() => void handleDeleteRate(rate.id)} style={{ width: 28, height: 28, borderRadius: 6, border: "1px solid #fecaca", background: "#fff", color: "#ef4444", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, padding: 0 }}>
-                      ×
-                    </button>
-                  </div>
-                ))}
+                {rates.map((rate, idx) => {
+                  const isEditing = editingId === rate.id;
+                  const cellInp: React.CSSProperties = { border: "1px solid #cbd5e1", borderRadius: 5, padding: "3px 6px", fontSize: 12, width: "100%", boxSizing: "border-box", fontFamily: "inherit", outline: "none", background: "#fff" };
+                  return (
+                    <div key={rate.id} style={{ display: "grid", gridTemplateColumns: "50px 70px 70px 90px 80px 70px 70px 70px 76px", gap: 8, padding: isEditing ? "8px 20px" : "11px 20px", borderBottom: idx < rates.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center", fontSize: 13, background: isEditing ? "#f8fafc" : undefined }}>
+                      <span style={{ fontFamily: "monospace", color: "#94a3b8" }}>#{rate.id}</span>
+                      {isEditing ? (
+                        <>
+                          <input style={cellInp} value={editDraft.zone} onChange={(e) => setEditDraft((d) => ({ ...d, zone: e.target.value }))} />
+                          <input style={cellInp} value={editDraft.weight_from_kg} onChange={(e) => setEditDraft((d) => ({ ...d, weight_from_kg: e.target.value }))} />
+                          <input style={cellInp} value={editDraft.weight_to_kg} onChange={(e) => setEditDraft((d) => ({ ...d, weight_to_kg: e.target.value }))} placeholder="∞" />
+                          <input style={cellInp} value={editDraft.base_price} onChange={(e) => setEditDraft((d) => ({ ...d, base_price: e.target.value }))} />
+                          <input style={cellInp} value={editDraft.per_unit_price} onChange={(e) => setEditDraft((d) => ({ ...d, per_unit_price: e.target.value }))} placeholder="-" />
+                          <input style={cellInp} value={editDraft.eta_days_min} onChange={(e) => setEditDraft((d) => ({ ...d, eta_days_min: e.target.value }))} placeholder="-" />
+                          <input style={cellInp} value={editDraft.eta_days_max} onChange={(e) => setEditDraft((d) => ({ ...d, eta_days_max: e.target.value }))} placeholder="-" />
+                          <div style={{ display: "flex", gap: 4 }}>
+                            <button onClick={() => void handleSaveEdit()} disabled={saving} style={{ flex: 1, height: 28, borderRadius: 6, border: "1px solid #bbf7d0", background: "#f0fdf4", color: "#166534", cursor: "pointer", fontSize: 13, padding: 0 }}>✓</button>
+                            <button onClick={cancelEdit} style={{ flex: 1, height: 28, borderRadius: 6, border: "1px solid #e5e7eb", background: "#fff", color: "#64748b", cursor: "pointer", fontSize: 13, padding: 0 }}>✕</button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <span style={{ fontWeight: 700, color: "#0f172a" }}>Зона {rate.zone}</span>
+                          <span style={{ color: "#475569" }}>{rate.weight_from_kg}</span>
+                          <span style={{ color: "#475569" }}>{rate.weight_to_kg ?? "∞"}</span>
+                          <span style={{ fontWeight: 600, color: "#0f172a" }}>{Number(rate.base_price).toLocaleString("ru-RU")}</span>
+                          <span style={{ color: "#64748b" }}>{rate.per_unit_price ? Number(rate.per_unit_price).toLocaleString("ru-RU") : "-"}</span>
+                          <span style={{ color: "#64748b" }}>{rate.eta_days_min ?? "-"}</span>
+                          <span style={{ color: "#64748b" }}>{rate.eta_days_max ?? "-"}</span>
+                          <div style={{ display: "flex", gap: 4 }}>
+                            <button onClick={() => startEdit(rate)} style={{ flex: 1, height: 28, borderRadius: 6, border: "1px solid #e2e8f0", background: "#fff", color: "#475569", cursor: "pointer", fontSize: 13, padding: 0 }}>✎</button>
+                            <button onClick={() => void handleDeleteRate(rate.id)} style={{ flex: 1, height: 28, borderRadius: 6, border: "1px solid #fecaca", background: "#fff", color: "#ef4444", cursor: "pointer", fontSize: 14, padding: 0 }}>×</button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
               </>
             )}
           </div>

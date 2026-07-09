@@ -95,6 +95,14 @@ export const createAdminService = (carrierId: number, body: { code: string; name
 export const listAdminRates = (carrierId: number, serviceId: number, page = 1, size = 50): Promise<PaginatedResponse<AdminTariffRate>> =>
   req(`/admin/carriers/${carrierId}/services/${serviceId}/rates?page=${page}&size=${size}`);
 
+export const updateAdminRate = (
+  carrierId: number,
+  serviceId: number,
+  rateId: number,
+  body: Partial<Omit<AdminTariffRate, "id" | "is_active">>,
+): Promise<AdminTariffRate> =>
+  req(`/admin/carriers/${carrierId}/services/${serviceId}/rates/${rateId}`, { method: "PATCH", body: JSON.stringify(body) });
+
 export const deleteAdminRate = (carrierId: number, serviceId: number, rateId: number): Promise<void> =>
   req(`/admin/carriers/${carrierId}/services/${serviceId}/rates/${rateId}`, { method: "DELETE" });
 

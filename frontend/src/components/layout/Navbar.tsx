@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useIsMobile } from "@/hooks/use-is-mobile";
@@ -15,6 +15,7 @@ const NAV_LINKS = [
 
 export default function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { isAuthenticated, isLoading, currentUser } = useAuth();
   const isMobile = useIsMobile();
   const [scrolled, setScrolled] = useState(false);
@@ -58,6 +59,15 @@ export default function Navbar() {
         {/* Logo */}
         <Link
           href="/"
+          onClick={(e) => {
+            if (pathname === "/") {
+              e.preventDefault();
+              window.dispatchEvent(new CustomEvent("novex:resetHome"));
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            } else {
+              router.push("/");
+            }
+          }}
           style={{
             display: "flex",
             alignItems: "center",

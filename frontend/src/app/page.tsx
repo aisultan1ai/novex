@@ -278,6 +278,16 @@ export default function HomePage() {
   }, [results]);
 
   useEffect(() => {
+    const handler = () => {
+      setResults(null);
+      setSelectedRate(null);
+      setError(null);
+    };
+    window.addEventListener("novex:resetHome", handler);
+    return () => window.removeEventListener("novex:resetHome", handler);
+  }, []);
+
+  useEffect(() => {
     if (!selectedRate) return;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };

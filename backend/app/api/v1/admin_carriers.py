@@ -80,6 +80,18 @@ class RateRow(BaseModel):
     eta_days_max: int | None = None
 
 
+class RateRowPatch(BaseModel):
+    zone: int | None = None
+    weight_from_kg: float | None = None
+    weight_to_kg: float | None = None
+    base_price: float | None = None
+    per_unit_price: float | None = None
+    per_unit_weight_kg: float | None = None
+    currency: str | None = None
+    eta_days_min: int | None = None
+    eta_days_max: int | None = None
+
+
 class ZoneCityCreate(BaseModel):
     city_name: str
     zone: int
@@ -293,6 +305,25 @@ def add_rate(
         **payload.model_dump(),
     )
     db.add(rate)
+    db.commit()
+    db.refresh(rate)
+    return _rate_dict(rate)
+
+
+@router.patch("/{carrier_id}/services/{service_id}/rates/{rate_id}")
+def update_rate(
+    carrier_id: int,
+    service_id: int,
+    rate_id: int,
+    payload: RateRowPatch,
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+) -> dict:
+    rate = db.get(CarrierTariffRate, rate_id)
+    if not rate or rate.service_id != service_id:
+        raise HTTPException(404, "Строка не найдена")
+    for field, value in payload.model_dump(exclude_none=True).items():
+        setattr(rate, field, value)
     db.commit()
     db.refresh(rate)
     return _rate_dict(rate)
