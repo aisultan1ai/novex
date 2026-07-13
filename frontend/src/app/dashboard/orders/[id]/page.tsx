@@ -6,7 +6,14 @@ import { useParams, useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/providers/auth-provider";
 import { useIsMobile } from "@/hooks/use-is-mobile";
-import { ApiError, deleteOrderDraft, downloadOrderLabel, getOrderDraft } from "@/lib/api/orders";
+import {
+  ApiError,
+  CANCELLABLE_STATUSES,
+  cancelOrder,
+  deleteOrderDraft,
+  downloadOrderLabel,
+  getOrderDraft,
+} from "@/lib/api/orders";
 import { retryOrderDispatch } from "@/lib/api/admin";
 import type { OrderDraftResponse } from "@/types/order";
 
@@ -121,6 +128,10 @@ export default function OrderDetailPage() {
   const [pendingDelete, setPendingDelete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -177,6 +188,26 @@ export default function OrderDetailPage() {
       setError(err instanceof ApiError ? err.detail : "Не удалось скачать накладную.");
     } finally {
       setIsDownloading(false);
+    }
+  }
+
+  async function handleConfirmCancel() {
+    const trimmed = cancelReason.trim();
+    if (trimmed.length < 3) {
+      setCancelError("Укажите причину (минимум 3 символа)");
+      return;
+    }
+    setIsCancelling(true);
+    setCancelError(null);
+    try {
+      const updated = await cancelOrder(draftId, trimmed);
+      setOrder(updated);
+      setShowCancelModal(false);
+      setCancelReason("");
+    } catch (err) {
+      setCancelError(err instanceof ApiError ? err.detail : "Не удалось отменить заказ.");
+    } finally {
+      setIsCancelling(false);
     }
   }
 
@@ -282,6 +313,14 @@ export default function OrderDetailPage() {
                   style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid #fecaca", background: "#fff", color: "#ef4444", fontSize: 14, fontWeight: 600, cursor: isDeleting ? "not-allowed" : "pointer", opacity: isDeleting ? 0.5 : 1, fontFamily: "inherit" }}
                 >
                   Удалить черновик
+                </button>
+              )}
+              {CANCELLABLE_STATUSES.includes(order.status) && (
+                <button
+                  onClick={() => { setCancelError(null); setShowCancelModal(true); }}
+                  style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid #fecaca", background: "#fff", color: "#ef4444", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                >
+                  Отменить заявку
                 </button>
               )}
             </div>
@@ -430,6 +469,66 @@ export default function OrderDetailPage() {
           )}
         </div>
       ) : null}
+
+      {showCancelModal && order && (
+        <div
+          onClick={() => { if (!isCancelling) setShowCancelModal(false); }}
+          style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 100 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 480, padding: "24px 28px", boxShadow: "0 20px 40px rgba(15,23,42,0.25)" }}
+          >
+            <h2 style={{ margin: "0 0 8px", fontSize: 20, fontWeight: 800, color: "#111827" }}>
+              Отменить заказ #{order.draft_id}?
+            </h2>
+            <p style={{ margin: "0 0 16px", fontSize: 13, color: "#64748b", lineHeight: 1.5 }}>
+              {order.status === "sent_to_carrier"
+                ? "Мы попробуем отменить заказ у перевозчика. Если он уже в пути — отмена не сработает."
+                : "Заказ будет отменён. Возврат средств оформит администратор — обычно 3–5 рабочих дней."}
+            </p>
+
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6 }}>
+              Причина отмены <span style={{ color: "#ef4444" }}>*</span>
+            </label>
+            <textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              rows={4}
+              placeholder="Например: передумал отправлять, ошибся в адресе, изменились планы…"
+              maxLength={500}
+              disabled={isCancelling}
+              style={{ width: "100%", padding: "10px 12px", border: "1px solid #e5e7eb", borderRadius: 10, fontSize: 14, fontFamily: "inherit", outline: "none", resize: "vertical", boxSizing: "border-box", color: "#111827", background: "#fff" }}
+            />
+            <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4, textAlign: "right" }}>
+              {cancelReason.length} / 500
+            </div>
+
+            {cancelError && (
+              <div style={{ marginTop: 12, padding: "10px 14px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, fontSize: 13, color: "#b91c1c" }}>
+                {cancelError}
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
+              <button
+                onClick={() => { setShowCancelModal(false); setCancelReason(""); setCancelError(null); }}
+                disabled={isCancelling}
+                style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", color: "#374151", fontSize: 14, fontWeight: 600, cursor: isCancelling ? "not-allowed" : "pointer", fontFamily: "inherit" }}
+              >
+                Не отменять
+              </button>
+              <button
+                onClick={() => void handleConfirmCancel()}
+                disabled={isCancelling || cancelReason.trim().length < 3}
+                style={{ padding: "10px 20px", borderRadius: 10, border: "none", background: "#ef4444", color: "#fff", fontSize: 14, fontWeight: 600, cursor: (isCancelling || cancelReason.trim().length < 3) ? "not-allowed" : "pointer", opacity: (isCancelling || cancelReason.trim().length < 3) ? 0.6 : 1, fontFamily: "inherit" }}
+              >
+                {isCancelling ? "Отменяем…" : "Отменить заявку"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

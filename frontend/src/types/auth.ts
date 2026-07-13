@@ -10,6 +10,7 @@ export interface RegisterRequest {
   customer_type: CustomerType;
   company_name?: string | null;
   billing_mode?: BillingMode | null;
+  tax_id: string;
 }
 
 export interface LoginRequest {
@@ -26,6 +27,7 @@ export interface ProfileResponse {
   role: RoleCode;
   customer_type: CustomerType | null;
   company_name: string | null;
+  tax_id: string | null;
   billing_mode: BillingMode | null;
   carrier_id: number | null;
 }

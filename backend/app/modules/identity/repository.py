@@ -82,12 +82,14 @@ class IdentityRepository:
         customer_type: CustomerType,
         company_name: str | None,
         billing_mode: BillingMode,
+        tax_id: str | None = None,
     ) -> CustomerProfile:
         profile = CustomerProfile(
             user_id=user_id,
             customer_type=customer_type,
             company_name=company_name,
             billing_mode=billing_mode,
+            tax_id=tax_id,
         )
         db.add(profile)
         db.flush()
@@ -116,10 +118,13 @@ class IdentityRepository:
         profile: CustomerProfile,
         company_name: str | None = None,
         billing_mode: BillingMode | None = None,
+        tax_id: str | None = None,
     ) -> CustomerProfile:
         profile.company_name = company_name
         if billing_mode is not None:
             profile.billing_mode = billing_mode
+        if tax_id is not None:
+            profile.tax_id = tax_id
         db.add(profile)
         db.flush()
         return profile

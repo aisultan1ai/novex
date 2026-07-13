@@ -259,6 +259,13 @@ services:
     build:
       context: ../..
       dockerfile: infra/docker/frontend.Dockerfile
+      # NEXT_PUBLIC_* переменные вшиваются в клиентский бандл на build-time.
+      # После правки .env — пересобрать: docker compose build frontend
+      args:
+        NEXT_PUBLIC_SUPPORT_EMAIL: ${NEXT_PUBLIC_SUPPORT_EMAIL:-support@novex.kz}
+        NEXT_PUBLIC_SUPPORT_PHONE: ${NEXT_PUBLIC_SUPPORT_PHONE:-+7 (727) 000-00-00}
+        NEXT_PUBLIC_PARTNERS_EMAIL: ${NEXT_PUBLIC_PARTNERS_EMAIL:-partners@novex.kz}
+        NEXT_PUBLIC_OFFICE_ADDRESS: ${NEXT_PUBLIC_OFFICE_ADDRESS:-Алматы, Казахстан}
     container_name: novex-frontend
     restart: unless-stopped
     depends_on:

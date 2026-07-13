@@ -42,6 +42,7 @@ class TxStatus(StrEnum):
     PAYMENT_UNDER_REVIEW = "payment_under_review"
     PAID = "paid"
     PAYMENT_REJECTED = "payment_rejected"
+    REFUND_PENDING = "refund_pending"
     REFUNDED = "refunded"
     CANCELLED = "cancelled"
     EXPIRED = "expired"

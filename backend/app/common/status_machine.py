@@ -7,10 +7,11 @@ ALLOWED_ORDER_TRANSITIONS: dict[str, list[str]] = {
     "awaiting_payment": ["payment_under_review", "cancelled"],
     "payment_under_review": ["paid", "payment_rejected", "cancelled"],
     "paid": ["dispatch_queued", "cancelled"],
-    "dispatch_queued": ["sent_to_carrier", "dispatch_failed"],
+    "dispatch_queued": ["sent_to_carrier", "dispatch_failed", "cancelled"],
     "sent_to_carrier": [
         "picked_up", "out_for_delivery", "in_transit",
         "delivered", "return_requested", "delivery_failed", "customs_hold",
+        "cancelled",
     ],
     "picked_up": ["out_for_delivery", "in_transit", "delivered", "return_requested", "delivery_failed", "customs_hold"],
     "in_transit": ["arrived", "out_for_delivery", "delivered", "return_requested", "delivery_failed", "customs_hold"],

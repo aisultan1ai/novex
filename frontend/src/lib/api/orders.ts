@@ -11,6 +11,11 @@ export interface CseRecalcRequest {
   delivery_type: DeliveryType;
   insurance: boolean;
   declared_value?: number | null;
+  weight_kg?: number | null;
+  width_cm?: number | null;
+  height_cm?: number | null;
+  depth_cm?: number | null;
+  quantity?: number | null;
 }
 
 export interface CseRecalcResponse {
@@ -83,6 +88,25 @@ export async function mockPayOrderDraft(
 export async function deleteOrderDraft(draftId: number): Promise<void> {
   await apiRequest<null>(`/orders/drafts/${draftId}`, { method: "DELETE" });
 }
+
+export async function cancelOrder(
+  orderId: number,
+  reason: string,
+): Promise<OrderDraftResponse> {
+  return apiRequest<OrderDraftResponse>(`/orders/${orderId}/cancel`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export const CANCELLABLE_STATUSES: readonly string[] = [
+  "paid",
+  "dispatch_queued",
+  "dispatch_failed",
+  "pending_manual",
+  "pending_manual_dispatch",
+  "sent_to_carrier",
+];
 
 export async function listOrders(
   page = 1,

@@ -78,6 +78,7 @@ export default function ProfilePage() {
   const [fullName, setFullName] = useState(currentUser?.full_name ?? "");
   const [phone, setPhone] = useState(currentUser?.phone ?? "");
   const [companyName, setCompanyName] = useState(currentUser?.company_name ?? "");
+  const [taxId, setTaxId] = useState(currentUser?.tax_id ?? "");
 
   // Password modal
   const [showPwModal, setShowPwModal] = useState(false);
@@ -104,6 +105,7 @@ export default function ProfilePage() {
         setFullName(data.full_name ?? "");
         setPhone(data.phone ?? "");
         setCompanyName(data.company_name ?? "");
+        setTaxId(data.tax_id ?? "");
       } catch (err) {
         if (!currentUser) setError(err instanceof ApiError ? err.detail : "Не удалось загрузить профиль.");
       } finally {
@@ -118,12 +120,18 @@ export default function ProfilePage() {
     e.preventDefault();
     setError(null);
     setSuccessMsg(null);
+    const taxCleaned = taxId.trim();
+    if (taxCleaned && !/^\d{12}$/.test(taxCleaned)) {
+      setError("ИИН / БИН должен состоять ровно из 12 цифр.");
+      return;
+    }
     setIsSaving(true);
     try {
       const updated = await updateProfile({
         full_name: fullName.trim() || null,
         phone: phone.trim() || null,
         company_name: companyName.trim() || null,
+        tax_id: taxCleaned || null,
       });
       setProfile(updated);
       saveAuthSession(updated);
@@ -277,6 +285,17 @@ export default function ProfilePage() {
                     style={inp} value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
                     placeholder="ТОО «Компания»"
+                    onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.background = "#ffffff"; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
+                  />
+                </div>
+                <div>
+                  <label style={lbl}>ИИН / БИН</label>
+                  <input
+                    style={inp} value={taxId}
+                    onChange={(e) => setTaxId(e.target.value.replace(/\D/g, "").slice(0, 12))}
+                    placeholder="12 цифр"
+                    inputMode="numeric"
                     onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.background = "#ffffff"; }}
                     onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
                   />

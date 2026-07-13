@@ -32,6 +32,7 @@ const PUBLIC_PATHS = [
   "/reset-password",
   "/tracking",
   "/quote",
+  "/partners",
   "/api",
   "/_next",
   "/favicon",

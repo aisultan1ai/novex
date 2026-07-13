@@ -85,6 +85,9 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_from: str = ""
     smtp_tls: bool = True
+    # Partner-application inbox. Comma-separated list is accepted so ops can
+    # route the alert to multiple mailboxes without touching code.
+    partners_email: str = "partners@novex.kz"
 
     # Kaspi Pay (disabled until merchant onboarding is complete)
     kaspi_merchant_id: str = ""

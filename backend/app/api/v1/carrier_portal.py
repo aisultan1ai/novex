@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import secrets
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
@@ -9,7 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.core.db import get_db
 from app.core.dependencies import get_current_carrier_id, require_carrier
 from app.core.storage import MAX_FILE_SIZE, get_storage
-from app.modules.carriers.models import Carrier
+from app.modules.carriers.models import Carrier, CarrierService, CarrierTariffRate
 from app.modules.carriers.webhook_config import (
     CarrierWebhookConfig,
     CarrierWebhookRepository,
@@ -169,6 +170,77 @@ def regenerate_secret(
     return {
         "webhook_secret": new_secret,
         "warning": "Store this secret securely — it will not be shown again in full.",
+    }
+
+
+# ── Tariffs (read-only) ───────────────────────────────────────────────────────
+
+
+def _service_dict(s: CarrierService) -> dict:
+    return {
+        "id": s.id,
+        "code": s.code,
+        "name": s.name,
+        "shipment_type": s.shipment_type,
+        "is_active": s.is_active,
+    }
+
+
+def _rate_dict(r: CarrierTariffRate) -> dict:
+    return {
+        "id": r.id,
+        "zone": r.zone,
+        "weight_from_kg": float(r.weight_from_kg),
+        "weight_to_kg": float(r.weight_to_kg) if r.weight_to_kg is not None else None,
+        "base_price": float(r.base_price),
+        "per_unit_price": float(r.per_unit_price) if r.per_unit_price is not None else None,
+        "per_unit_weight_kg": float(r.per_unit_weight_kg) if r.per_unit_weight_kg is not None else None,
+        "currency": r.currency,
+        "eta_days_min": r.eta_days_min,
+        "eta_days_max": r.eta_days_max,
+        "is_active": r.is_active,
+    }
+
+
+@router.get("/services", summary="Список услуг перевозчика (read-only)")
+def list_own_services(
+    db: Session = Depends(get_db),
+    carrier_id: int = Depends(get_current_carrier_id),
+) -> list[dict]:
+    services = db.scalars(
+        select(CarrierService)
+        .where(CarrierService.carrier_id == carrier_id)
+        .order_by(CarrierService.code)
+    ).all()
+    return [_service_dict(s) for s in services]
+
+
+@router.get("/services/{service_id}/rates", summary="Тарифная сетка услуги (read-only)")
+def list_own_rates(
+    service_id: int,
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=200, ge=1, le=500),
+    db: Session = Depends(get_db),
+    carrier_id: int = Depends(get_current_carrier_id),
+) -> dict:
+    service = db.get(CarrierService, service_id)
+    if not service or service.carrier_id != carrier_id:
+        raise HTTPException(404, "Услуга не найдена")
+
+    base = (
+        select(CarrierTariffRate)
+        .where(CarrierTariffRate.service_id == service_id)
+        .order_by(CarrierTariffRate.zone, CarrierTariffRate.weight_from_kg)
+    )
+    total = db.scalar(select(func.count()).select_from(base.subquery())) or 0
+    rates = db.scalars(base.offset((page - 1) * size).limit(size)).all()
+    pages = math.ceil(total / size) if total > 0 else 1
+    return {
+        "items": [_rate_dict(r) for r in rates],
+        "total": total,
+        "page": page,
+        "size": size,
+        "pages": pages,
     }
 
 

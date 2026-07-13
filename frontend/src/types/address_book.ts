@@ -6,6 +6,7 @@ export interface AddressEntry {
   phone: string;
   email: string | null;
   company_name: string | null;
+  tax_id: string | null;
   country: string;
   city: string;
   address_line1: string;
@@ -21,6 +22,7 @@ export interface AddressEntryCreate {
   phone: string;
   email?: string | null;
   company_name?: string | null;
+  tax_id?: string | null;
   country: string;
   city: string;
   address_line1: string;

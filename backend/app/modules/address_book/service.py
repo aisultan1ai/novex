@@ -30,6 +30,7 @@ class AddressBookService:
             phone=payload.phone,
             email=payload.email,
             company_name=payload.company_name,
+            tax_id=payload.tax_id,
             country=payload.country.upper(),
             city=payload.city,
             address_line1=payload.address_line1,

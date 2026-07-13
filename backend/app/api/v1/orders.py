@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.common.pagination import PageParams
 from app.core.db import get_db
 from app.core.dependencies import get_current_user_id
+from app.core.limiter import limiter
 from app.modules.orders.schemas import (
     CreateDraftFromQuoteRequest,
     CseRecalcRequest,
@@ -121,6 +123,38 @@ def delete_order_draft(
     db: Session = Depends(get_db),
 ) -> None:
     orders_service.delete_draft(db, user_id=current_user_id, draft_id=draft_id)
+
+
+class CancelOrderRequest(BaseModel):
+    reason: str = Field(..., min_length=3, max_length=500)
+
+
+@router.post(
+    "/{order_id}/cancel",
+    response_model=OrderDraftResponse,
+    status_code=200,
+    summary="Отменить заказ (клиент)",
+)
+@limiter.limit("5/minute")
+def cancel_order(
+    order_id: int,
+    payload: CancelOrderRequest,
+    request: Request,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> OrderDraftResponse:
+    """Отменить заказ по инициативе клиента.
+
+    Допустимые статусы для отмены: paid, dispatch_queued, dispatch_failed,
+    pending_manual, pending_manual_dispatch, sent_to_carrier. Если заказ уже
+    отправлен перевозчику — пробуем отменить у него по API, иначе 409.
+    """
+    return orders_service.cancel_order(
+        db,
+        user_id=current_user_id,
+        order_id=order_id,
+        reason=payload.reason,
+    )
 
 
 @router.patch(

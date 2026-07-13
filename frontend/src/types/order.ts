@@ -43,6 +43,7 @@ export interface ShipmentPartyInput {
   phone: string;
   email?: string | null;
   company_name?: string | null;
+  tax_id: string;
   country: string;
   city: string;
   address_line1: string;
@@ -82,6 +83,7 @@ export type ShipmentPartyResponse = {
   phone: string;
   email: string | null;
   company_name: string | null;
+  tax_id: string | null;
   country: string;
   city: string;
   address_line1: string;

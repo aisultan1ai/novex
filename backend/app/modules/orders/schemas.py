@@ -51,6 +51,7 @@ class ShipmentPartyInput(BaseModel):
     phone: str = Field(min_length=1, max_length=50)
     email: str | None = Field(default=None, max_length=255)
     company_name: str | None = Field(default=None, max_length=255)
+    tax_id: str = Field(min_length=12, max_length=12, description="ИИН / БИН — 12 цифр")
 
     country: str = Field(min_length=2, max_length=2)
     city: str = Field(min_length=1, max_length=100)
@@ -64,6 +65,14 @@ class ShipmentPartyInput(BaseModel):
     @classmethod
     def normalize_country(cls, value: str) -> str:
         return value.strip().upper()
+
+    @field_validator("tax_id")
+    @classmethod
+    def validate_tax_id(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned.isdigit() or len(cleaned) != 12:
+            raise ValueError("ИИН / БИН должен состоять ровно из 12 цифр")
+        return cleaned
 
     @field_validator("phone")
     @classmethod
@@ -173,6 +182,7 @@ class ShipmentPartyResponse(BaseModel):
     phone: str
     email: str | None
     company_name: str | None
+    tax_id: str | None
 
     country: str
     city: str
@@ -242,18 +252,27 @@ class OrderDraftListResponse(BaseModel):
 
 
 class CseRecalcRequest(BaseModel):
-    """Recalculate CSE quote after the customer picks add-on services.
+    """Recalculate a draft's price for the current carrier/tariff.
 
-    Sent in real time from the checkout form; CSE returns the fully-loaded
-    tariff so the price shown at the "Pay" button matches what CSE will bill.
+    Sent live from the shipment/checkout form. CSE drafts re-hit the CSE Calc
+    API for a fully-loaded amount (services + declared value). Other carriers
+    fall back to the tariff engine using the (optionally overridden) package
+    weight/dimensions/quantity so the "Pay" price reflects the actual parcel.
     """
     delivery_type: DeliveryType = "door_to_door"
     insurance: bool = False
     declared_value: Decimal | None = Field(default=None, ge=0)
+    # Optional per-package overrides. When present, they replace the
+    # quote_session weight/dims for this recalc (does not persist).
+    weight_kg: Decimal | None = Field(default=None, gt=0)
+    width_cm: Decimal | None = Field(default=None, gt=0)
+    height_cm: Decimal | None = Field(default=None, gt=0)
+    depth_cm: Decimal | None = Field(default=None, gt=0)
+    quantity: int | None = Field(default=None, ge=1)
 
 
 class CseRecalcResponse(BaseModel):
     price: Decimal          # customer-facing total (carrier_price + markup)
-    carrier_price: Decimal  # raw CSE amount
+    carrier_price: Decimal  # raw carrier amount
     currency: str
-    recalculated: bool      # False for non-CSE drafts (silent no-op)
+    recalculated: bool      # True if the engine produced a fresh number

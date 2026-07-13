@@ -34,6 +34,20 @@ _DISPOSABLE_DOMAINS: frozenset[str] = frozenset({
 })
 
 _PHONE_RE = re.compile(r"^(\+?7|8)[0-9]{10}$")
+_TAX_ID_RE = re.compile(r"^\d{12}$")
+
+
+def validate_tax_id(value: str | None) -> str | None:
+    """ИИН / БИН — ровно 12 цифр. Пустая строка → None для совместимости
+    с 'опустошающими' PATCH-запросами."""
+    if value is None:
+        return None
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    if not _TAX_ID_RE.match(cleaned):
+        raise ValueError("ИИН / БИН должен состоять ровно из 12 цифр")
+    return cleaned
 
 
 def _validate_phone(value: str | None) -> str | None:
@@ -62,6 +76,7 @@ class RegisterRequest(BaseModel):
     customer_type: CustomerType = CustomerType.INDIVIDUAL
     company_name: str | None = Field(default=None, max_length=255)
     billing_mode: BillingMode | None = None
+    tax_id: str = Field(min_length=12, max_length=12, description="ИИН / БИН — 12 цифр")
 
     @field_validator("email")
     @classmethod
@@ -83,6 +98,14 @@ class RegisterRequest(BaseModel):
     @classmethod
     def validate_phone(cls, value: str | None) -> str | None:
         return _validate_phone(value)
+
+    @field_validator("tax_id")
+    @classmethod
+    def _validate_tax_id(cls, value: str) -> str:
+        result = validate_tax_id(value)
+        if result is None:
+            raise ValueError("ИИН / БИН обязателен")
+        return result
 
     @model_validator(mode="after")
     def validate_company_fields(self) -> RegisterRequest:
@@ -116,6 +139,7 @@ class ProfileResponse(BaseModel):
     role: RoleCode
     customer_type: CustomerType | None = None
     company_name: str | None = None
+    tax_id: str | None = None
     billing_mode: BillingMode | None = None
     carrier_id: int | None = None
 
@@ -124,7 +148,13 @@ class ProfileUpdateRequest(BaseModel):
     full_name: str | None = Field(default=None, max_length=255)
     phone: str | None = Field(default=None, max_length=50)
     company_name: str | None = Field(default=None, max_length=255)
+    tax_id: str | None = Field(default=None, max_length=12)
     billing_mode: BillingMode | None = None
+
+    @field_validator("tax_id")
+    @classmethod
+    def _validate_tax_id(cls, value: str | None) -> str | None:
+        return validate_tax_id(value)
 
     @field_validator("full_name", "company_name")
     @classmethod

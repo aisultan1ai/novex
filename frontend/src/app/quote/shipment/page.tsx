@@ -23,6 +23,7 @@ import type {
 
 type PartyFormState = {
   full_name: string; phone: string; email: string; company_name: string;
+  tax_id: string;
   country: string; city: string; address_line1: string; address_line2: string;
   postal_code: string; comment: string; save_to_address_book: boolean;
 };
@@ -57,7 +58,7 @@ const DELIVERY_TYPE_OPTIONS: { value: DeliveryType; label: string; hint: string 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
 
 const emptyParty = (): PartyFormState => ({
-  full_name: "", phone: "", email: "", company_name: "", country: "KZ",
+  full_name: "", phone: "", email: "", company_name: "", tax_id: "", country: "KZ",
   city: "", address_line1: "", address_line2: "", postal_code: "",
   comment: "", save_to_address_book: false,
 });
@@ -74,6 +75,7 @@ function mapPartyFormToPayload(party: PartyFormState): ShipmentPartyInput {
   return {
     full_name: party.full_name.trim(), phone: party.phone.trim(),
     email: party.email.trim() || null, company_name: party.company_name.trim() || null,
+    tax_id: party.tax_id.trim(),
     country: party.country.trim().toUpperCase(), city: party.city.trim(),
     address_line1: party.address_line1.trim(), address_line2: party.address_line2.trim() || null,
     postal_code: party.postal_code.trim() || null, comment: party.comment.trim() || null,
@@ -129,18 +131,19 @@ function mergeSenderWithCurrentUser(sender: PartyFormState, user: ProfileRespons
     phone: sender.phone || user?.phone || "",
     email: sender.email || user?.email || "",
     company_name: sender.company_name || user?.company_name || "",
+    tax_id: sender.tax_id || user?.tax_id || "",
   };
 }
 
 function mapDraftToForm(draft: OrderDraftResponse, user: ProfileResponse | null): ShipmentFormState {
   const baseSender = draft.sender
-    ? { full_name: draft.sender.full_name, phone: draft.sender.phone, email: draft.sender.email || "", company_name: draft.sender.company_name || "", country: draft.sender.country, city: draft.sender.city, address_line1: draft.sender.address_line1, address_line2: draft.sender.address_line2 || "", postal_code: draft.sender.postal_code || "", comment: draft.sender.comment || "", save_to_address_book: false }
+    ? { full_name: draft.sender.full_name, phone: draft.sender.phone, email: draft.sender.email || "", company_name: draft.sender.company_name || "", tax_id: draft.sender.tax_id || "", country: draft.sender.country, city: draft.sender.city, address_line1: draft.sender.address_line1, address_line2: draft.sender.address_line2 || "", postal_code: draft.sender.postal_code || "", comment: draft.sender.comment || "", save_to_address_book: false }
     : { ...emptyParty(), country: draft.from_country_snapshot || "KZ", city: draft.from_city_snapshot || "" };
 
   return {
     sender: mergeSenderWithCurrentUser(baseSender, user),
     recipient: draft.recipient
-      ? { full_name: draft.recipient.full_name, phone: draft.recipient.phone, email: draft.recipient.email || "", company_name: draft.recipient.company_name || "", country: draft.recipient.country, city: draft.recipient.city, address_line1: draft.recipient.address_line1, address_line2: draft.recipient.address_line2 || "", postal_code: draft.recipient.postal_code || "", comment: draft.recipient.comment || "", save_to_address_book: false }
+      ? { full_name: draft.recipient.full_name, phone: draft.recipient.phone, email: draft.recipient.email || "", company_name: draft.recipient.company_name || "", tax_id: draft.recipient.tax_id || "", country: draft.recipient.country, city: draft.recipient.city, address_line1: draft.recipient.address_line1, address_line2: draft.recipient.address_line2 || "", postal_code: draft.recipient.postal_code || "", comment: draft.recipient.comment || "", save_to_address_book: false }
       : { ...emptyParty(), country: draft.to_country_snapshot || "KZ", city: draft.to_city_snapshot || "" },
     packageItem: draft.packages[0]
       ? { description: draft.packages[0].description, quantity: String(draft.packages[0].quantity), weight_kg: String(draft.packages[0].weight_kg), width_cm: String(draft.packages[0].width_cm), height_cm: String(draft.packages[0].height_cm), depth_cm: String(draft.packages[0].depth_cm) }
@@ -469,11 +472,12 @@ function PartySection({ title, values, onChange, onToggleSave }: {
   onToggleSave: (val: boolean) => void;
 }) {
   const isMobile = useIsMobile();
-  const fields: { key: keyof PartyFormState; label: string; required?: boolean }[] = [
+  const fields: { key: keyof PartyFormState; label: string; required?: boolean; inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"]; digitsOnly?: boolean; maxLength?: number }[] = [
     { key: "full_name", label: "ФИО", required: true },
     { key: "phone", label: "Телефон", required: true },
     { key: "email", label: "Email" },
     { key: "company_name", label: "Компания" },
+    { key: "tax_id", label: "ИИН / БИН (12 цифр)", required: true, inputMode: "numeric", digitsOnly: true, maxLength: 12 },
     { key: "country", label: "Код страны (2 буквы)", required: true },
     { key: "city", label: "Город", required: true },
     { key: "address_line1", label: "Адрес", required: true },
@@ -485,13 +489,19 @@ function PartySection({ title, values, onChange, onToggleSave }: {
   return (
     <SectionCard title={title}>
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))", gap: 14 }}>
-        {fields.map(({ key, label, required }) => (
+        {fields.map(({ key, label, required, inputMode, digitsOnly, maxLength }) => (
           <FormField
             key={key as string}
             label={label}
             value={values[key] as string}
-            onChange={(v) => onChange(key, v)}
+            onChange={(v) => {
+              let next = v;
+              if (digitsOnly) next = next.replace(/\D/g, "");
+              if (maxLength !== undefined) next = next.slice(0, maxLength);
+              onChange(key, next);
+            }}
             required={required}
+            inputMode={inputMode}
           />
         ))}
       </div>
@@ -565,7 +575,84 @@ function PackageSection({ values, onChange, isDocument }: {
           Для документов используется стандартный размер конверта (32×22×1 см).
         </div>
       )}
+      <ProhibitedItemsAccordion />
     </SectionCard>
+  );
+}
+
+const PROHIBITED_ITEMS: readonly string[] = [
+  "Оружие и взрывоопасные материалы",
+  "Легковоспламеняющиеся и радиоактивные вещества",
+  "Аэрозоли, спреи и товары с маркировкой «огнеопасно»",
+  "Наркотические вещества",
+  "БАДы, запрещённые в стране отправления или получения",
+  "Медикаменты без рецепта",
+  "Алкоголь",
+  "Сигареты и табачные изделия",
+  "Деньги",
+  "Документы (например, паспорт)",
+  "Растения",
+  "Животные",
+  "Мясные изделия",
+  "Скоропортящиеся продукты",
+  "Домашние соленья и варенье",
+  "Любая продукция без фирменной упаковки и маркировки",
+];
+
+function ProhibitedItemsAccordion() {
+  const [open, setOpen] = useState(false);
+  const isMobile = useIsMobile();
+  return (
+    <div style={{ marginTop: 12, border: "1px solid #FED7AA", borderRadius: 10, background: "#FFF7ED", overflow: "hidden" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+          width: "100%", padding: "10px 14px", border: "none", background: "transparent",
+          cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+          fontSize: 13, fontWeight: 600, color: "#9A3412",
+        }}
+      >
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+            <line x1="12" y1="9" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+          Что нельзя отправлять
+        </span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} aria-hidden="true">
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+      {open && (
+        <div style={{ padding: "6px 14px 14px", borderTop: "1px solid #FED7AA" }}>
+          <ul
+            style={{
+              margin: "10px 0 0",
+              padding: 0,
+              listStyle: "none",
+              display: "grid",
+              gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))",
+              columnGap: 20,
+              rowGap: 4,
+              fontSize: 13,
+              color: "#7C2D12",
+              lineHeight: 1.55,
+            }}
+          >
+            {PROHIBITED_ITEMS.map((item) => (
+              <li key={item} style={{ display: "flex", gap: 8 }}>
+                <span aria-hidden="true" style={{ color: "#EA580C", flexShrink: 0 }}>•</span>
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -703,17 +790,34 @@ function ShipmentPageInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.delivery_type]);
 
-  // Debounced recalc — asks CSE for the final price including add-on services.
-  // Only fires when the draft is CSE and at least one price-affecting option
-  // is set. 500ms debounce so we don't hammer CSE while the user is typing.
+  // Debounced live recalc. Fires on every field that can shift the price:
+  //   weight / dims / quantity (any carrier), delivery type, insurance,
+  //   declared value (CSE only in practice). 500ms debounce so we don't
+  //   hammer the tariff engine / CSE API while the user is typing.
   useEffect(() => {
     if (!draft) return;
-    if (!isCse) { setLivePrice(null); return; }
     const rawDeclared = form.insurance ? Number(form.declared_value) : NaN;
     const declaredValue = Number.isFinite(rawDeclared) && rawDeclared > 0 ? rawDeclared : null;
-    // If nothing that affects price is set, just clear the override.
-    const hasExtras = form.delivery_type !== "door_to_door" || form.insurance || (declaredValue !== null);
-    if (!hasExtras) { setLivePrice(null); return; }
+
+    const pkg = form.packageItem;
+    const wKg = Number(pkg.weight_kg);
+    const qty = Number(pkg.quantity);
+    const w = Number(pkg.width_cm);
+    const h = Number(pkg.height_cm);
+    const d = Number(pkg.depth_cm);
+    const weightOverride = Number.isFinite(wKg) && wKg > 0 ? wKg : null;
+    const qtyOverride = Number.isFinite(qty) && qty > 0 ? qty : null;
+    const widthOverride = Number.isFinite(w) && w > 0 ? w : null;
+    const heightOverride = Number.isFinite(h) && h > 0 ? h : null;
+    const depthOverride = Number.isFinite(d) && d > 0 ? d : null;
+
+    // If neither dims/weight nor CSE add-ons are set, don't override —
+    // the TariffSummary will show the original price_snapshot.
+    const hasDimOverride =
+      weightOverride !== null || widthOverride !== null ||
+      heightOverride !== null || depthOverride !== null || qtyOverride !== null;
+    const hasCseExtras = isCse && (form.delivery_type !== "door_to_door" || form.insurance || declaredValue !== null);
+    if (!hasDimOverride && !hasCseExtras) { setLivePrice(null); return; }
 
     const ac = new AbortController();
     const timer = setTimeout(() => {
@@ -722,16 +826,28 @@ function ShipmentPageInner() {
         delivery_type: form.delivery_type,
         insurance: form.insurance,
         declared_value: declaredValue,
+        weight_kg: weightOverride,
+        width_cm: widthOverride,
+        height_cm: heightOverride,
+        depth_cm: depthOverride,
+        quantity: qtyOverride,
       }, ac.signal)
         .then((r) => {
           if (r.recalculated) setLivePrice({ price: Number(r.price), currency: r.currency });
+          else setLivePrice(null);
         })
         .catch(() => { /* silent — TariffSummary falls back to draft.price_snapshot */ })
         .finally(() => setIsRecalculating(false));
     }, 500);
 
     return () => { clearTimeout(timer); ac.abort(); };
-  }, [draft, isCse, form.delivery_type, form.insurance, form.declared_value]);
+  }, [
+    draft, isCse,
+    form.delivery_type, form.insurance, form.declared_value,
+    form.packageItem.weight_kg, form.packageItem.width_cm,
+    form.packageItem.height_cm, form.packageItem.depth_cm,
+    form.packageItem.quantity,
+  ]);
 
   useEffect(() => {
     if (isLoading || !isAuthenticated) return;
@@ -834,6 +950,7 @@ function ShipmentPageInner() {
       if (!s.full_name.trim()) return "Укажите ФИО отправителя.";
       if (!s.phone.trim()) return "Укажите телефон отправителя.";
       if (!isValidKzPhone(s.phone)) return "Телефон отправителя: формат +7XXXXXXXXXX или 8XXXXXXXXXX.";
+      if (!/^\d{12}$/.test(s.tax_id.trim())) return "ИИН / БИН отправителя должен состоять ровно из 12 цифр.";
       if (!s.country.trim() || s.country.trim().length !== 2) return "Код страны - 2 буквы (например KZ).";
       if (!s.city.trim()) return "Укажите город отправителя.";
       if (!s.address_line1.trim()) return "Укажите адрес отправителя.";
@@ -846,6 +963,7 @@ function ShipmentPageInner() {
       if (!r.full_name.trim()) return "Укажите ФИО получателя.";
       if (!r.phone.trim()) return "Укажите телефон получателя.";
       if (!isValidKzPhone(r.phone)) return "Телефон получателя: формат +7XXXXXXXXXX или 8XXXXXXXXXX.";
+      if (!/^\d{12}$/.test(r.tax_id.trim())) return "ИИН / БИН получателя должен состоять ровно из 12 цифр.";
       if (!r.country.trim() || r.country.trim().length !== 2) return "Код страны - 2 буквы (например KZ).";
       if (!r.city.trim()) return "Укажите город получателя.";
       if (!r.address_line1.trim()) return "Укажите адрес получателя.";

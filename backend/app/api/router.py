@@ -21,6 +21,7 @@ from app.api.v1.documents import router as documents_router
 from app.api.v1.health import router as health_router
 from app.api.v1.notifications import router as notifications_router
 from app.api.v1.orders import router as orders_router
+from app.api.v1.partners import router as partners_router
 from app.api.v1.payments import router as payments_router
 from app.api.v1.profile import router as profile_router
 from app.api.v1.public_tracking import router as public_tracking_router
@@ -55,3 +56,4 @@ api_router.include_router(admin_carrier_api_router)
 api_router.include_router(admin_audit_router)
 api_router.include_router(cse_router)
 api_router.include_router(public_tracking_router)
+api_router.include_router(partners_router)

@@ -109,6 +109,8 @@ class ShipmentParty(Base, TimestampMixin):
     phone: Mapped[str] = mapped_column(String(50), nullable=False)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     company_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # ИИН / БИН отправителя или получателя (12 цифр).
+    tax_id: Mapped[str | None] = mapped_column(String(12), nullable=True)
 
     country: Mapped[str] = mapped_column(String(2), nullable=False)
     city: Mapped[str] = mapped_column(String(100), nullable=False)

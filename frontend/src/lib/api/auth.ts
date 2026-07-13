@@ -36,6 +36,7 @@ export async function updateProfile(payload: {
   full_name?: string | null;
   phone?: string | null;
   company_name?: string | null;
+  tax_id?: string | null;
 }): Promise<ProfileResponse> {
   return apiRequest<ProfileResponse>("/auth/profile", {
     method: "PATCH",

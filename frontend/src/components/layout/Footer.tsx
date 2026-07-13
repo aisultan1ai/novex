@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useIsMobile } from "@/hooks/use-is-mobile";
+import { CONTACTS, phoneHref } from "@/lib/config/contacts";
 
 const FOOTER_COLS = [
   {
@@ -9,23 +10,23 @@ const FOOTER_COLS = [
     links: [
       { label: "Рассчитать доставку", href: "/" },
       { label: "Отслеживание", href: "/tracking" },
-      { label: "Партнёрам", href: "mailto:partners@novex.kz" },
+      { label: "Партнёрам", href: "/partners" },
     ],
   },
   {
     title: "Поддержка",
     links: [
       { label: "Часто задаваемые вопросы", href: "/#help" },
-      { label: "Написать в поддержку", href: "mailto:support@novex.kz" },
+      { label: "Написать в поддержку", href: `mailto:${CONTACTS.supportEmail}` },
       { label: "Условия доставки", href: "/terms" },
     ],
   },
   {
     title: "Контакты",
     links: [
-      { label: "support@novex.kz", href: "mailto:support@novex.kz" },
-      { label: "+7 (727) 000-00-00", href: "tel:+77270000000" },
-      { label: "Алматы, Казахстан", href: "#" },
+      { label: CONTACTS.supportEmail, href: `mailto:${CONTACTS.supportEmail}` },
+      { label: CONTACTS.supportPhone, href: phoneHref(CONTACTS.supportPhone) },
+      { label: CONTACTS.officeAddress, href: "#" },
     ],
   },
 ];

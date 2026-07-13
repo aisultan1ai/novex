@@ -10,6 +10,7 @@ import { useIsMobile } from "@/hooks/use-is-mobile";
 const NAV_LINKS = [
   { label: "Доставка",      href: "/" },
   { label: "Отслеживание",  href: "/tracking" },
+  { label: "Партнёрам",     href: "/partners" },
   { label: "Помощь",        href: "/#help" },
 ];
 

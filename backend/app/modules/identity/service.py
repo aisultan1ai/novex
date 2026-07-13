@@ -87,6 +87,7 @@ class IdentityService:
             customer_type=payload.customer_type,
             company_name=payload.company_name,
             billing_mode=billing_mode,
+            tax_id=payload.tax_id,
         )
 
         db.commit()
@@ -163,6 +164,7 @@ class IdentityService:
             profile=profile,
             company_name=payload.company_name,
             billing_mode=payload.billing_mode,
+            tax_id=payload.tax_id,
         )
 
         db.commit()
@@ -352,5 +354,6 @@ class IdentityService:
             role=role_code,
             customer_type=profile.customer_type,
             company_name=profile.company_name,
+            tax_id=profile.tax_id,
             billing_mode=profile.billing_mode,
         )

@@ -22,6 +22,7 @@ class AddressBookEntry(Base):
     phone: Mapped[str] = mapped_column(String(50), nullable=False)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     company_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    tax_id: Mapped[str | None] = mapped_column(String(12), nullable=True)
     country: Mapped[str] = mapped_column(String(2), nullable=False)
     city: Mapped[str] = mapped_column(String(100), nullable=False)
     address_line1: Mapped[str] = mapped_column(String(255), nullable=False)

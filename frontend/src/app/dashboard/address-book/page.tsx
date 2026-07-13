@@ -36,6 +36,7 @@ const EMPTY: AddressEntryCreate = {
   phone: "",
   email: "",
   company_name: "",
+  tax_id: "",
   country: "KZ",
   city: "",
   address_line1: "",
@@ -98,6 +99,11 @@ export default function AddressBookPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setFormError(null);
+    const taxCleaned = (form.tax_id ?? "").trim();
+    if (taxCleaned && !/^\d{12}$/.test(taxCleaned)) {
+      setFormError("ИИН / БИН должен состоять ровно из 12 цифр");
+      return;
+    }
     setSaving(true);
     try {
       const payload: AddressEntryCreate = {
@@ -105,6 +111,7 @@ export default function AddressBookPage() {
         label: form.label?.trim() || null,
         email: form.email?.trim() || null,
         company_name: form.company_name?.trim() || null,
+        tax_id: taxCleaned || null,
         address_line2: form.address_line2?.trim() || null,
         postal_code: form.postal_code?.trim() || null,
         country: (form.country || "KZ").toUpperCase(),
@@ -213,6 +220,13 @@ export default function AddressBookPage() {
               <div>
                 <label style={lbl}>Компания</label>
                 <input style={inp} placeholder="ТОО «Компания»" value={form.company_name ?? ""} onChange={(e) => setField("company_name", e.target.value)}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.background = "#fff"; }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
+                />
+              </div>
+              <div>
+                <label style={lbl}>ИИН / БИН</label>
+                <input style={inp} inputMode="numeric" placeholder="12 цифр" value={form.tax_id ?? ""} onChange={(e) => setField("tax_id", e.target.value.replace(/\D/g, "").slice(0, 12))}
                   onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.background = "#fff"; }}
                   onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
                 />

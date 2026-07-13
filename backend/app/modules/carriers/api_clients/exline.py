@@ -100,7 +100,17 @@ class ExlineAPIClient(CarrierAPIClient):
             service_markers.append("ПОЗВОНИТЬ ПЕРЕД ДОСТАВКОЙ")
         if order_data.get("insurance"):
             service_markers.append("СТРАХОВАНИЕ")
-        all_parts = service_markers + descriptions
+        # Exline XML has no dedicated tax-id field. Stamp ИИН / БИН into the
+        # enclosure so it shows up on the printed waybill, which is what KZ
+        # accountants need for reconciliation.
+        tax_markers: list[str] = []
+        s_tax = str(sender.get("tax_id", "")).strip()
+        r_tax = str(recipient.get("tax_id", "")).strip()
+        if s_tax:
+            tax_markers.append(f"ИИН/БИН отпр.: {s_tax}")
+        if r_tax:
+            tax_markers.append(f"ИИН/БИН пол.: {r_tax}")
+        all_parts = service_markers + tax_markers + descriptions
         enclosure = _esc("; ".join(all_parts) if all_parts else "Посылка")
 
         # inshprice (Объявленная ценность) — send only when insurance is explicitly

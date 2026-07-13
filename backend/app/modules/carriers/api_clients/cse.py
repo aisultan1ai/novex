@@ -1053,11 +1053,17 @@ class CSEAPIClient(CarrierAPIClient):
         def _party_extras_xml(party: dict) -> str:
             xml = ""
             email = (party.get("email") or "").strip()
+            info_parts: list[str] = []
+            tax_id = (party.get("tax_id") or "").strip()
+            if tax_id:
+                info_parts.append(f"ИИН/БИН: {tax_id}")
             info = (party.get("comment") or "").strip()
+            if info:
+                info_parts.append(info)
             if email:
                 xml += f"<m:EMail>{_esc(email)}</m:EMail>"
-            if info:
-                xml += f"<m:Info>{_esc(info)}</m:Info>"
+            if info_parts:
+                xml += f"<m:Info>{_esc('; '.join(info_parts))}</m:Info>"
             return xml
 
         sender_official_xml = f"<m:Official>{_esc(s_official)}</m:Official>" if s_official else ""

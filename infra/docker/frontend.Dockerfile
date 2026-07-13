@@ -14,8 +14,20 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY frontend/ .
 
+# NEXT_PUBLIC_* переменные вшиваются в клиентский бандл на build-time.
+# Compose пробрасывает их через build.args → они доступны в этом стадии как ENV,
+# и Next.js подхватывает их в момент `npm run build`.
+ARG NEXT_PUBLIC_SUPPORT_EMAIL
+ARG NEXT_PUBLIC_SUPPORT_PHONE
+ARG NEXT_PUBLIC_PARTNERS_EMAIL
+ARG NEXT_PUBLIC_OFFICE_ADDRESS
+
 ENV NEXT_TELEMETRY_DISABLED=1 \
-    NODE_ENV=production
+    NODE_ENV=production \
+    NEXT_PUBLIC_SUPPORT_EMAIL=${NEXT_PUBLIC_SUPPORT_EMAIL} \
+    NEXT_PUBLIC_SUPPORT_PHONE=${NEXT_PUBLIC_SUPPORT_PHONE} \
+    NEXT_PUBLIC_PARTNERS_EMAIL=${NEXT_PUBLIC_PARTNERS_EMAIL} \
+    NEXT_PUBLIC_OFFICE_ADDRESS=${NEXT_PUBLIC_OFFICE_ADDRESS}
 
 RUN npm run build
 

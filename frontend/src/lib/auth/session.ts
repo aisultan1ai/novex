@@ -49,6 +49,7 @@ export function getStoredCurrentUser(): ProfileResponse | null {
       role: stored.role as ProfileResponse["role"],
       customer_type: null,
       company_name: null,
+      tax_id: null,
       billing_mode: null,
       carrier_id: stored.carrier_id ?? null,
     };

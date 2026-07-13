@@ -96,6 +96,9 @@ class CustomerProfile(Base, TimestampMixin):
         default=CustomerType.INDIVIDUAL,
     )
     company_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # ИИН (physical) / БИН (company) — Kazakhstan tax id, 12 digits. Nullable
+    # in DB so legacy rows survive; API enforces required on new records.
+    tax_id: Mapped[str | None] = mapped_column(String(12), nullable=True)
     billing_mode: Mapped[BillingMode] = mapped_column(
         SqlEnum(
             BillingMode,

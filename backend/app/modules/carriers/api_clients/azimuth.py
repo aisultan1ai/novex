@@ -94,13 +94,17 @@ class AzimuthAPIClient(CarrierAPIClient):
         if body["notes"]:
             body["notes"] = body["notes"][:255]
 
-        # payer_tin is REQUIRED per Azimuth spec: exactly 12 digits.
-        payer_tin = str(creds.get("payer_tin", "")).strip()
+        # payer_tin (Azimuth spec — exactly 12 digits) — the shipper's own
+        # tax id. Take it from the sender party of the order (populated from
+        # the customer profile). The admin-level `creds["payer_tin"]` is kept
+        # only as a last-resort fallback for legacy orders where the sender
+        # party pre-dates the tax_id field.
+        sender_tax_id = str(sender.get("tax_id", "")).strip()
+        payer_tin = sender_tax_id or str(creds.get("payer_tin", "")).strip()
         if not payer_tin or not payer_tin.isdigit() or len(payer_tin) != 12:
             raise RuntimeError(
-                "Не заполнен payer_tin (ИИН/БИН плательщика — 12 цифр) "
-                "в настройках Azimuth API. Admin → Carriers → Azimuth → API → "
-                "Дополнительные параметры → payer_tin."
+                "Не указан ИИН / БИН отправителя (12 цифр). "
+                "Проверьте профиль клиента или карточку отправителя в заказе."
             )
         body["payer_tin"] = payer_tin
 

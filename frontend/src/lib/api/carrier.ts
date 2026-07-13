@@ -1,5 +1,10 @@
 import { apiRequest } from "./client";
-import type { CarrierMeResponse, IntegrationConfig } from "@/types/carrier";
+import type {
+  CarrierMeResponse,
+  CarrierRatesResponse,
+  CarrierServiceItem,
+  IntegrationConfig,
+} from "@/types/carrier";
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") ?? "/api/v1";
 
@@ -8,6 +13,12 @@ export const getCarrierMe = (): Promise<CarrierMeResponse> =>
 
 export const getIntegrationConfig = (): Promise<IntegrationConfig> =>
   apiRequest("/carrier/integration-config");
+
+export const listCarrierServices = (): Promise<CarrierServiceItem[]> =>
+  apiRequest("/carrier/services");
+
+export const listCarrierRates = (serviceId: number, page = 1, size = 200): Promise<CarrierRatesResponse> =>
+  apiRequest(`/carrier/services/${serviceId}/rates?page=${page}&size=${size}`);
 
 export interface CarrierOrderParty {
   role: string;

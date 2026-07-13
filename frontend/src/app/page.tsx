@@ -9,6 +9,7 @@ import { useAuth } from "@/components/providers/auth-provider";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
+import { CONTACTS } from "@/lib/config/contacts";
 import CitySelect from "@/components/ui/CitySelect";
 import { ApiError, calculateShippingQuote, selectShippingQuote } from "@/lib/api/shipping";
 import type { RateQuoteItem, ShipmentType, ShippingQuoteResponse } from "@/types/quote";
@@ -32,9 +33,9 @@ const initialForm: FormState = {
   shipmentType: "parcel",
   weightKg: "",
   quantity: "1",
-  widthCm: "",
-  heightCm: "",
-  depthCm: "",
+  widthCm: "10",
+  heightCm: "10",
+  depthCm: "10",
 };
 
 function validateQuoteForm(form: FormState): string | null {
@@ -874,7 +875,7 @@ export default function HomePage() {
                 Сравниваем цены ведущих служб в реальном времени
               </p>
               <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", alignItems: "center" }}>
-                {["Azimuth", "Exline", "CSE"].map((label) => (
+                {["Azimuth Cargo", "Exline", "CSE"].map((label) => (
                   <div
                     key={label}
                     style={{
@@ -955,7 +956,7 @@ export default function HomePage() {
                     Не нашли ответ? Напишите нам.
                   </p>
                   <a
-                    href="mailto:support@novex.kz"
+                    href={`mailto:${CONTACTS.supportEmail}`}
                     style={{
                       display: "inline-block",
                       border: "1.5px solid #E5E7EB",

@@ -67,6 +67,7 @@ function Field({
   autoComplete,
   required,
   right,
+  inputMode,
 }: {
   label: string;
   type?: string;
@@ -76,6 +77,7 @@ function Field({
   autoComplete?: string;
   required?: boolean;
   right?: React.ReactNode;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
 }) {
   const [focused, setFocused] = useState(false);
   return (
@@ -100,6 +102,7 @@ function Field({
           placeholder={placeholder}
           autoComplete={autoComplete}
           required={required}
+          inputMode={inputMode}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           style={{
@@ -143,6 +146,7 @@ type FormState = {
   phone: string;
   customer_type: CustomerType;
   company_name: string;
+  tax_id: string;
 };
 
 const initial: FormState = {
@@ -152,6 +156,7 @@ const initial: FormState = {
   phone: "",
   customer_type: "individual",
   company_name: "",
+  tax_id: "",
 };
 
 /* ─── Page ───────────────────────────────────────────────────────────────── */
@@ -178,12 +183,23 @@ export default function RegisterPage() {
       phone: form.phone.trim() || null,
       customer_type: form.customer_type,
       company_name: isCompany ? form.company_name.trim() || null : null,
+      tax_id: form.tax_id.trim(),
     };
+  }
+
+  function validateTaxId(): string | null {
+    const cleaned = form.tax_id.trim();
+    if (!/^\d{12}$/.test(cleaned)) {
+      return `${isCompany ? "БИН" : "ИИН"} должен состоять ровно из 12 цифр.`;
+    }
+    return null;
   }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+    const taxErr = validateTaxId();
+    if (taxErr) { setError(taxErr); return; }
     setIsSubmitting(true);
     try {
       await registerUser(toPayload());
@@ -405,6 +421,16 @@ export default function RegisterPage() {
                 required={isCompany}
               />
             )}
+
+            {/* ИИН / БИН */}
+            <Field
+              label={isCompany ? "БИН" : "ИИН"}
+              value={form.tax_id}
+              onChange={(v) => set("tax_id", v.replace(/\D/g, "").slice(0, 12))}
+              placeholder="12 цифр"
+              required
+              inputMode="numeric"
+            />
 
             {error && (
               <div

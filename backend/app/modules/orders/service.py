@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from sqlalchemy.orm import Session
 
 from app.common.pagination import PageParams
-from app.core.exceptions import ForbiddenError, NotFoundError, ValidationError
+from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
 from app.modules.address_book.repository import AddressBookRepository
 from app.modules.orders.models import OrderDraft, ShipmentPackage, ShipmentParty
 from app.modules.orders.repository import OrdersRepository
@@ -29,6 +29,52 @@ logger = logging.getLogger(__name__)
 
 def _utcnow() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
+
+
+class _RecalcOverrides:
+    """Per-package override for the recalc path. All fields optional — a
+    missing field falls back to the quote_session value."""
+
+    __slots__ = ("weight_kg", "width_cm", "height_cm", "depth_cm", "quantity")
+
+    def __init__(
+        self,
+        weight_kg: float | None = None,
+        width_cm: float | None = None,
+        height_cm: float | None = None,
+        depth_cm: float | None = None,
+        quantity: int | None = None,
+    ) -> None:
+        self.weight_kg = weight_kg
+        self.width_cm = width_cm
+        self.height_cm = height_cm
+        self.depth_cm = depth_cm
+        self.quantity = quantity
+
+    @classmethod
+    def from_payload(cls, payload: CseRecalcRequest) -> "_RecalcOverrides":
+        return cls(
+            weight_kg=float(payload.weight_kg) if payload.weight_kg is not None else None,
+            width_cm=float(payload.width_cm) if payload.width_cm is not None else None,
+            height_cm=float(payload.height_cm) if payload.height_cm is not None else None,
+            depth_cm=float(payload.depth_cm) if payload.depth_cm is not None else None,
+            quantity=payload.quantity,
+        )
+
+    @classmethod
+    def from_order_draft(cls, order_draft: OrderDraft) -> "_RecalcOverrides":
+        """Read the currently persisted first package as an override so a
+        post-save recalc uses the same numbers that were just written."""
+        if not order_draft.packages:
+            return cls()
+        pkg = order_draft.packages[0]
+        return cls(
+            weight_kg=float(pkg.weight_kg) if pkg.weight_kg is not None else None,
+            width_cm=float(pkg.width_cm) if pkg.width_cm is not None else None,
+            height_cm=float(pkg.height_cm) if pkg.height_cm is not None else None,
+            depth_cm=float(pkg.depth_cm) if pkg.depth_cm is not None else None,
+            quantity=int(pkg.quantity) if pkg.quantity is not None else None,
+        )
 
 
 class OrdersService:
@@ -388,6 +434,212 @@ class OrdersService:
         db.commit()
         logger.info("Order draft deleted: draft_id=%s user_id=%s", draft_id, user_id)
 
+    def cancel_order(
+        self,
+        db: Session,
+        *,
+        user_id: int,
+        order_id: int,
+        reason: str,
+    ) -> OrderDraftResponse:
+        """Cancel a paid order at the customer's request.
+
+        Cancellable statuses:
+          paid, dispatch_queued, dispatch_failed, pending_manual,
+          pending_manual_dispatch, sent_to_carrier.
+
+        For sent_to_carrier we call the carrier API via carrier-gateway. If the
+        carrier refuses (already in transit / not supported) we surface 409 and
+        instruct the customer to contact support.
+        """
+        from sqlalchemy import select as _select
+
+        from app.common.status_machine import can_transition
+        from app.core.carrier_gateway_client import get_gateway_client
+        from app.modules.carriers.api_credentials import CarrierAPICredentialsRepository
+        from app.modules.dispatch.models import (
+            DispatchJob,
+            DispatchJobStatus,
+            OrderStatusHistory,
+        )
+        from app.modules.identity.models import Role, RoleCode, User
+        from app.modules.notifications.repository import NotificationsRepository
+        from app.modules.notifications.service import NotificationsService
+        from app.modules.payments.transaction_models import (
+            PaymentStatusHistory,
+            PaymentTransaction,
+            TxStatus,
+        )
+        from app.modules.tracking.models import TrackingEvent
+
+        _CANCELLABLE = {
+            "paid",
+            "dispatch_queued",
+            "dispatch_failed",
+            "pending_manual",
+            "pending_manual_dispatch",
+            "sent_to_carrier",
+        }
+
+        reason = (reason or "").strip()
+        if len(reason) < 3:
+            raise ValidationError("Причина отмены должна содержать минимум 3 символа")
+        if len(reason) > 500:
+            raise ValidationError("Причина отмены не должна превышать 500 символов")
+
+        order = self.repository.get_order_draft_by_id(db, order_id)
+        if order is None:
+            raise NotFoundError("Заказ не найден")
+        if order.user_id != user_id:
+            raise ForbiddenError("Заказ не принадлежит текущему пользователю")
+
+        if order.status not in _CANCELLABLE:
+            raise ValidationError(
+                f"Отмена невозможна для статуса «{order.status}». "
+                "Если посылка уже в пути, обратитесь в поддержку."
+            )
+        if not can_transition(order.status, "cancelled"):
+            raise ValidationError(
+                f"Переход из статуса «{order.status}» в «cancelled» не разрешён"
+            )
+
+        old_status = order.status
+
+        # 1) sent_to_carrier — need to cancel on the carrier's side first.
+        if old_status == "sent_to_carrier":
+            from app.modules.shipments.models import Shipment as _Shipment
+            shipment = db.scalar(
+                _select(_Shipment).where(_Shipment.order_draft_id == order.id)
+            )
+            invoice_id = None
+            if shipment:
+                invoice_id = (
+                    shipment.carrier_tracking_number or shipment.tracking_number
+                )
+            if not invoice_id:
+                raise ValidationError(
+                    "Не удалось определить номер накладной перевозчика. "
+                    "Обратитесь в поддержку."
+                )
+
+            creds = CarrierAPICredentialsRepository().get_by_carrier_code(
+                db, order.carrier_code_snapshot
+            )
+            if not creds or not creds.is_active:
+                raise ValidationError(
+                    "Отмена через API перевозчика недоступна. Обратитесь в поддержку."
+                )
+            api_creds = {
+                "api_url": creds.api_url,
+                "api_token": creds.api_token,
+                **(creds.extra_config or {}),
+            }
+            try:
+                ok = get_gateway_client().cancel_invoice(
+                    order.carrier_code_snapshot, invoice_id, api_creds
+                )
+            except Exception as exc:
+                logger.warning(
+                    "cancel_order: carrier API refused: order_id=%s carrier=%s error=%s",
+                    order.id, order.carrier_code_snapshot, exc,
+                )
+                raise ConflictError(
+                    "Перевозчик отклонил отмену. Возможно, заказ уже в пути. "
+                    "Обратитесь в поддержку."
+                ) from exc
+            if not ok:
+                raise ConflictError(
+                    "Перевозчик отклонил отмену. Обратитесь в поддержку."
+                )
+
+        # 2) Cancel queued dispatch job so the worker does not fire after cancel.
+        if old_status in ("dispatch_queued", "dispatch_failed", "pending_manual", "pending_manual_dispatch"):
+            active_jobs = db.scalars(
+                _select(DispatchJob).where(
+                    DispatchJob.order_id == order.id,
+                    DispatchJob.status.in_(
+                        [DispatchJobStatus.QUEUED, DispatchJobStatus.FAILED]
+                    ),
+                )
+            ).all()
+            for job in active_jobs:
+                job.status = DispatchJobStatus.CANCELLED
+
+        # 3) Flip the order to cancelled.
+        self.repository.update_order_draft_status(
+            db, order_draft=order, status="cancelled"
+        )
+        db.add(OrderStatusHistory(
+            order_id=order.id,
+            old_status=old_status,
+            new_status="cancelled",
+            changed_by_user_id=user_id,
+            source="customer_cancel",
+            comment=reason,
+        ))
+        db.add(TrackingEvent(
+            order_draft_id=order.id,
+            status="cancelled",
+            description=f"Заказ отменён клиентом: {reason}",
+        ))
+
+        # 4) Mark the paid payment(s) as refund_pending so admin can initiate refund.
+        paid_txs = db.scalars(
+            _select(PaymentTransaction).where(
+                PaymentTransaction.order_id == order.id,
+                PaymentTransaction.status == TxStatus.PAID,
+            )
+        ).all()
+        for tx in paid_txs:
+            db.add(PaymentStatusHistory(
+                payment_id=tx.id,
+                old_status=tx.status.value if hasattr(tx.status, "value") else str(tx.status),
+                new_status=TxStatus.REFUND_PENDING.value,
+                changed_by_user_id=user_id,
+                comment=f"Клиент отменил заказ: {reason}",
+            ))
+            tx.status = TxStatus.REFUND_PENDING
+
+        # 5) Notify admins so they can process the refund.
+        notif_repo = NotificationsRepository()
+        admins = db.scalars(
+            _select(User).join(User.role).where(
+                Role.code == RoleCode.ADMIN, User.is_active.is_(True)
+            )
+        ).all()
+        for admin in admins:
+            notif_repo.create(
+                db,
+                user_id=admin.id,
+                type="order_cancelled_by_customer",
+                title=f"Клиент отменил заказ #{order.id}",
+                body=(
+                    f"Причина: {reason}. "
+                    + (
+                        "Требуется оформить возврат средств."
+                        if paid_txs else "Возврат средств не требуется."
+                    )
+                ),
+            )
+
+        # 6) Confirm to the customer.
+        NotificationsService().notify_order_status(
+            db, user_id=order.user_id, order_id=order.id, status="cancelled"
+        )
+
+        db.commit()
+
+        refreshed = self.repository.get_order_draft_by_id(db, order_id)
+        if refreshed is None:
+            raise NotFoundError("Failed to reload order")
+
+        logger.info(
+            "Order cancelled by customer: order_id=%s user_id=%s from_status=%s "
+            "refund_pending=%d",
+            order.id, user_id, old_status, len(paid_txs),
+        )
+        return self._build_order_draft_response(refreshed)
+
     def update_shipment_details(
         self,
         db: Session,
@@ -460,6 +712,18 @@ class OrdersService:
         if payload.recipient.save_to_address_book:
             self._save_address_book(db, user_id=user_id, party=payload.recipient)
 
+        # Persist recalc: weight/dim edits in the shipment form must be
+        # reflected in price_snapshot before proceed_to_checkout.
+        db.flush()
+        db.refresh(order_draft)
+        self._persist_recalc(
+            db, order_draft,
+            delivery_type=payload.delivery_type,
+            insurance=payload.insurance,
+            declared_value=float(payload.packages[0].declared_value or 0)
+                if payload.packages else 0.0,
+        )
+
         self.repository.update_order_draft_status(
             db,
             order_draft=order_draft,
@@ -488,12 +752,11 @@ class OrdersService:
         draft_id: int,
         payload: CseRecalcRequest,
     ) -> CseRecalcResponse:
-        """Second Calc for a CSE draft including add-on services.
+        """Recalculate a draft's price for the current carrier/tariff.
 
-        Idempotent, no DB writes. Returns fully-loaded customer-facing price
-        for the currently selected urgency. On any resolution failure or if
-        the carrier is not CSE, echoes the draft's current price_snapshot so
-        the FE can call this endpoint unconditionally without branching.
+        CSE goes through the live Calc API (services + declared value).
+        Other carriers use the tariff engine with the supplied weight/dims.
+        Idempotent — no DB writes.
         """
         order_draft = self.repository.get_order_draft_by_id(db, draft_id)
         if order_draft is None:
@@ -501,13 +764,21 @@ class OrdersService:
         if order_draft.user_id != user_id:
             raise ForbiddenError("Order draft does not belong to the current user")
 
-        result = self._run_cse_recalc(
-            db,
-            order_draft,
-            delivery_type=payload.delivery_type,
-            insurance=payload.insurance,
-            declared_value=float(payload.declared_value or 0),
-        )
+        overrides = _RecalcOverrides.from_payload(payload)
+
+        carrier_code = (order_draft.carrier_code_snapshot or "").lower()
+        if carrier_code == "cse":
+            result = self._run_cse_recalc(
+                db,
+                order_draft,
+                delivery_type=payload.delivery_type,
+                insurance=payload.insurance,
+                declared_value=float(payload.declared_value or 0),
+                overrides=overrides,
+            )
+        else:
+            result = self._run_generic_recalc(db, order_draft, overrides=overrides)
+
         if result is None:
             return CseRecalcResponse(
                 price=order_draft.price_snapshot,
@@ -529,6 +800,7 @@ class OrdersService:
         delivery_type: str,
         insurance: bool,
         declared_value: float,
+        overrides: "_RecalcOverrides | None" = None,
     ):
         """Shared helper for the preview endpoint + the persist step at
         checkout. Returns (carrier_price, price_with_markup, currency) on
@@ -550,6 +822,7 @@ class OrdersService:
         quote_session = db.get(QuoteSession, order_draft.quote_session_id)
         if quote_session is None:
             return None
+        ov = overrides or _RecalcOverrides()
 
         try:
             from app.modules.carriers.api_credentials import CarrierAPICredentialsRepository
@@ -575,13 +848,15 @@ class OrdersService:
         if not from_guid or not to_guid:
             return None
 
-        weight_kg = float(quote_session.weight_kg) * int(quote_session.quantity or 1)
+        qty = int(ov.quantity if ov.quantity is not None else (quote_session.quantity or 1))
+        weight_one = float(ov.weight_kg if ov.weight_kg is not None else quote_session.weight_kg)
+        weight_kg = weight_one * qty
         vol = 0.0
-        w = float(quote_session.width_cm or 0)
-        h = float(quote_session.height_cm or 0)
-        d = float(quote_session.depth_cm or 0)
+        w = float(ov.width_cm if ov.width_cm is not None else (quote_session.width_cm or 0))
+        h = float(ov.height_cm if ov.height_cm is not None else (quote_session.height_cm or 0))
+        d = float(ov.depth_cm if ov.depth_cm is not None else (quote_session.depth_cm or 0))
         if w > 0 and h > 0 and d > 0:
-            vol = (w * h * d / 5000.0) * int(quote_session.quantity or 1)
+            vol = (w * h * d / 5000.0) * qty
 
         _DELIVERY_MAP = {
             "door_to_door":           "ДоставкаДоДверей",
@@ -625,6 +900,141 @@ class OrdersService:
         price = (carrier_price + markup).quantize(Decimal("0.01"))
         currency = str(tariff.get("currency") or order_draft.currency_snapshot)
         return carrier_price, price, currency
+
+    def _run_generic_recalc(
+        self,
+        db: Session,
+        order_draft: OrderDraft,
+        *,
+        overrides: _RecalcOverrides | None = None,
+    ):
+        """Recalculate for non-CSE carriers via the tariff engine.
+
+        Uses the carrier + tariff already selected on the draft (matches by
+        carrier_code_snapshot and tariff_name_snapshot). Returns
+        (carrier_price, price_with_markup, currency) or None on any failure.
+        """
+        from decimal import Decimal
+
+        from app.modules.carriers.tariff_engine import calculate_quotes
+        from app.modules.commissions.markup import build_markup_calculator
+
+        quote_session = db.get(QuoteSession, order_draft.quote_session_id)
+        if quote_session is None:
+            return None
+        ov = overrides or _RecalcOverrides()
+
+        weight_kg = float(ov.weight_kg if ov.weight_kg is not None else quote_session.weight_kg)
+        qty = int(ov.quantity if ov.quantity is not None else (quote_session.quantity or 1))
+        width_cm = float(ov.width_cm if ov.width_cm is not None else (quote_session.width_cm or 0))
+        height_cm = float(ov.height_cm if ov.height_cm is not None else (quote_session.height_cm or 0))
+        depth_cm = float(ov.depth_cm if ov.depth_cm is not None else (quote_session.depth_cm or 0))
+
+        if weight_kg <= 0:
+            return None
+
+        carrier_code = (order_draft.carrier_code_snapshot or "").lower()
+
+        # Exline is priced live via its Calc API when its rates are not
+        # mirrored in carrier_tariff_rates. Skipping the live call would
+        # return an empty Exline result set and leave the customer looking
+        # at a stale snapshot. For every other carrier the DB path (Azimuth
+        # zone table + carrier_tariff_rates) is authoritative — no network.
+        include_live = carrier_code == "exline"
+
+        try:
+            quotes = calculate_quotes(
+                from_city=order_draft.from_city_snapshot,
+                to_city=order_draft.to_city_snapshot,
+                weight_kg=weight_kg,
+                quantity=qty,
+                width_cm=width_cm,
+                height_cm=height_cm,
+                depth_cm=depth_cm,
+                db=db,
+                include_live=include_live,
+            )
+        except Exception as exc:
+            logger.warning(
+                "generic recalc: tariff_engine call failed (draft=%s carrier=%s): %s",
+                order_draft.id, carrier_code, exc,
+            )
+            return None
+
+        tariff_name = (order_draft.tariff_name_snapshot or "").strip().lower()
+        matched = None
+        for q in quotes:
+            if q.carrier_code.lower() != carrier_code:
+                continue
+            if q.tariff_name.strip().lower() == tariff_name:
+                matched = q
+                break
+        # Fallback: same carrier, any tariff — better than a stale price.
+        if matched is None:
+            for q in quotes:
+                if q.carrier_code.lower() == carrier_code:
+                    matched = q
+                    break
+        if matched is None:
+            return None
+
+        markup_calc = build_markup_calculator(db, [carrier_code])
+        carrier_price = Decimal(str(matched.price)).quantize(Decimal("0.01"))
+        markup = markup_calc.markup_for(carrier_code, carrier_price)
+        price = (carrier_price + markup).quantize(Decimal("0.01"))
+        currency = matched.currency or order_draft.currency_snapshot
+        return carrier_price, price, currency
+
+    def _persist_recalc(
+        self,
+        db: Session,
+        order_draft: OrderDraft,
+        *,
+        delivery_type: str,
+        insurance: bool,
+        declared_value: float,
+    ) -> None:
+        """Recalc for a persisted draft and write price_snapshot in place.
+
+        Called at the end of update_shipment_details so any weight/dim edit
+        the customer made reaches price_snapshot before checkout. Silent
+        no-op if the engine cannot produce a price (missing tariffs, network
+        failure, etc.) — the previous snapshot stays and the customer sees
+        the same total they saw before.
+        """
+        from decimal import Decimal
+
+        overrides = _RecalcOverrides.from_order_draft(order_draft)
+        carrier_code = (order_draft.carrier_code_snapshot or "").lower()
+
+        if carrier_code == "cse":
+            result = self._run_cse_recalc(
+                db, order_draft,
+                delivery_type=delivery_type,
+                insurance=insurance,
+                declared_value=declared_value,
+                overrides=overrides,
+            )
+        else:
+            result = self._run_generic_recalc(db, order_draft, overrides=overrides)
+
+        if result is None:
+            logger.info(
+                "persist recalc: no result — keeping snapshot (draft=%s carrier=%s)",
+                order_draft.id, carrier_code,
+            )
+            return
+
+        carrier_price, price, currency = result
+        old_price = order_draft.price_snapshot
+        order_draft.carrier_price_snapshot = Decimal(str(carrier_price))
+        order_draft.price_snapshot = Decimal(str(price))
+        order_draft.markup_amount_snapshot = (Decimal(str(price)) - Decimal(str(carrier_price))).quantize(Decimal("0.01"))
+        order_draft.currency_snapshot = currency
+        logger.info(
+            "persist recalc: draft=%s carrier=%s old=%s new=%s",
+            order_draft.id, carrier_code, old_price, price,
+        )
 
     def _ensure_prefill_package(
         self,
@@ -674,6 +1084,7 @@ class OrdersService:
             phone=party.phone,
             email=party.email,
             company_name=party.company_name,
+            tax_id=party.tax_id,
             country=party.country,
             city=party.city,
             address_line1=party.address_line1,
@@ -699,6 +1110,7 @@ class OrdersService:
             phone=payload.phone,
             email=payload.email,
             company_name=payload.company_name,
+            tax_id=payload.tax_id,
             country=payload.country,
             city=payload.city,
             address_line1=payload.address_line1,
@@ -760,6 +1172,7 @@ class OrdersService:
             phone=party.phone,
             email=party.email,
             company_name=party.company_name,
+            tax_id=party.tax_id,
             country=party.country,
             city=party.city,
             address_line1=party.address_line1,
