@@ -477,10 +477,13 @@ class PaymentService:
         tx = db.get(PaymentTransaction, payment_id)
         if not tx:
             raise ValueError("Платёж не найден")
-        if tx.status != TxStatus.PAID:
+        # REFUND_PENDING is set by customer-initiated cancellation (see
+        # OrdersService.cancel_order). Admin sees it as "ожидает возврата"
+        # and can finalize the refund from here.
+        if tx.status not in (TxStatus.PAID, TxStatus.REFUND_PENDING):
             raise ValueError(
-                f"Возврат возможен только для оплаченных заказов. "
-                f"Текущий статус: '{tx.status}'"
+                "Возврат возможен только для оплаченных заказов или заказов, "
+                f"ожидающих возврата. Текущий статус: '{tx.status}'"
             )
 
         # For Kaspi: log that operator must process refund manually via Kaspi Business portal

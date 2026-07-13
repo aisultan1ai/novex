@@ -138,6 +138,26 @@ def list_all_orders(
         shps = db.scalars(select(_Shipment).where(_Shipment.order_draft_id.in_(order_ids))).all()
         shipments_map = {s.order_draft_id: s for s in shps}
 
+    # Preload customer-cancel events + reasons for the visible page in one query
+    # so the list can show "отмена клиентом" flags without an N+1.
+    cancel_map: dict[int, dict] = {}
+    if order_ids:
+        cancel_rows = db.scalars(
+            select(OrderStatusHistory)
+            .where(
+                OrderStatusHistory.order_id.in_(order_ids),
+                OrderStatusHistory.new_status == "cancelled",
+            )
+            .order_by(OrderStatusHistory.created_at.desc())
+        ).all()
+        for row in cancel_rows:
+            if row.order_id not in cancel_map:
+                cancel_map[row.order_id] = {
+                    "reason": row.comment or "Причина не указана",
+                    "source": row.source,
+                    "cancelled_at": row.created_at.isoformat(),
+                }
+
     items = [
         {
             "id": o.id,
@@ -170,6 +190,7 @@ def list_all_orders(
             "tracking_number": shipments_map[o.id].tracking_number if o.id in shipments_map else None,
             "carrier_tracking_number": shipments_map[o.id].carrier_tracking_number if o.id in shipments_map else None,
             "carrier_barcode": shipments_map[o.id].carrier_barcode if o.id in shipments_map else None,
+            "cancellation": cancel_map.get(o.id),
         }
         for o in orders
     ]
@@ -199,6 +220,46 @@ def get_order(
     user = db.get(User, order.user_id)
     from app.modules.shipments.models import Shipment as _Shipment
     shipment = db.scalar(select(_Shipment).where(_Shipment.order_draft_id == order_id))
+
+    # Cancellation details — read the most recent cancel event from OrderStatusHistory.
+    # `source` distinguishes customer_cancel vs admin vs system_worker.
+    cancel_event = db.scalar(
+        select(OrderStatusHistory)
+        .where(
+            OrderStatusHistory.order_id == order_id,
+            OrderStatusHistory.new_status == "cancelled",
+        )
+        .order_by(OrderStatusHistory.created_at.desc())
+        .limit(1)
+    )
+    cancellation: dict | None = None
+    if cancel_event:
+        cancelled_by_user = (
+            db.get(User, cancel_event.changed_by_user_id)
+            if cancel_event.changed_by_user_id else None
+        )
+        cancellation = {
+            "reason": cancel_event.comment or "Причина не указана",
+            "cancelled_at": cancel_event.created_at.isoformat(),
+            "source": cancel_event.source,
+            "cancelled_by_email": cancelled_by_user.email if cancelled_by_user else None,
+            "cancelled_by_name": cancelled_by_user.full_name if cancelled_by_user else None,
+        }
+
+    # Refund status — take the latest PaymentTransaction. Customer cancel sets
+    # it to refund_pending; admin refund flips to refunded.
+    from app.modules.payments.transaction_models import PaymentTransaction
+    latest_tx = db.scalar(
+        select(PaymentTransaction)
+        .where(PaymentTransaction.order_id == order_id)
+        .order_by(PaymentTransaction.created_at.desc())
+        .limit(1)
+    )
+    refund_status: str | None = None
+    if latest_tx:
+        tx_status = latest_tx.status.value if hasattr(latest_tx.status, "value") else str(latest_tx.status)
+        if tx_status in ("refund_pending", "refunded"):
+            refund_status = tx_status
 
     return {
         "id": order.id,
@@ -247,6 +308,8 @@ def get_order(
             }
             for p in order.packages
         ],
+        "cancellation": cancellation,
+        "refund_status": refund_status,
     }
 
 

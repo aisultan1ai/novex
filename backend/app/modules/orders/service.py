@@ -600,34 +600,56 @@ class OrdersService:
             ))
             tx.status = TxStatus.REFUND_PENDING
 
-        # 5) Notify admins so they can process the refund.
-        notif_repo = NotificationsRepository()
-        admins = db.scalars(
-            _select(User).join(User.role).where(
+        # 5) Notify admins so they can process the refund. Batch INSERT — one
+        # query for the whole fan-out instead of N (one per admin).
+        from sqlalchemy import insert as _sa_insert
+        from app.modules.notifications.models import Notification as _Notification
+        admin_ids = db.scalars(
+            _select(User.id).join(User.role).where(
                 Role.code == RoleCode.ADMIN, User.is_active.is_(True)
             )
         ).all()
-        for admin in admins:
-            notif_repo.create(
-                db,
-                user_id=admin.id,
-                type="order_cancelled_by_customer",
-                title=f"Клиент отменил заказ #{order.id}",
-                body=(
-                    f"Причина: {reason}. "
-                    + (
-                        "Требуется оформить возврат средств."
-                        if paid_txs else "Возврат средств не требуется."
-                    )
-                ),
+        admin_notif_body = (
+            f"Причина: {reason}. "
+            + ("Требуется оформить возврат средств." if paid_txs
+               else "Возврат средств не требуется.")
+        )
+        if admin_ids:
+            db.execute(
+                _sa_insert(_Notification),
+                [
+                    {
+                        "user_id": aid,
+                        "type": "order_cancelled_by_customer",
+                        "title": f"Клиент отменил заказ #{order.id}",
+                        "body": admin_notif_body,
+                        "is_read": False,
+                    }
+                    for aid in admin_ids
+                ],
             )
 
-        # 6) Confirm to the customer.
-        NotificationsService().notify_order_status(
-            db, user_id=order.user_id, order_id=order.id, status="cancelled"
-        )
-
+        # 6) Commit the whole order-level change atomically. Do this BEFORE
+        # user-facing notifications so a failed commit does not leave the
+        # customer with an inbox notification about an order that was never
+        # actually cancelled.
         db.commit()
+
+        # 7) Notify the customer post-commit. NotificationsService opens its
+        # own repo write + email send; wrap in try/except so an email backend
+        # blip does not surface as a 500 to a user whose order is already
+        # cancelled successfully.
+        try:
+            NotificationsService().notify_order_status(
+                db, user_id=order.user_id, order_id=order.id, status="cancelled"
+            )
+            db.commit()
+        except Exception as exc:
+            logger.exception(
+                "cancel_order: post-commit notification failed for order=%s: %s",
+                order.id, exc,
+            )
+            db.rollback()
 
         refreshed = self.repository.get_order_draft_by_id(db, order_id)
         if refreshed is None:
@@ -635,8 +657,8 @@ class OrdersService:
 
         logger.info(
             "Order cancelled by customer: order_id=%s user_id=%s from_status=%s "
-            "refund_pending=%d",
-            order.id, user_id, old_status, len(paid_txs),
+            "refund_pending=%d admins_notified=%d",
+            order.id, user_id, old_status, len(paid_txs), len(admin_ids),
         )
         return self._build_order_draft_response(refreshed)
 

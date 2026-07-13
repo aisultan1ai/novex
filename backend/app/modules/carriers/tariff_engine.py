@@ -27,6 +27,11 @@ from typing import TYPE_CHECKING
 
 import httpx
 
+# Shared async client for live carrier quote calls (Exline, CSE). Bounds the
+# number of outbound sockets even under bursty quote traffic — without this,
+# every request spawned a fresh httpx.AsyncClient with no keepalive pool.
+_LIVE_HTTP_LIMITS = httpx.Limits(max_keepalive_connections=20, max_connections=40)
+
 from app.core.config import get_settings
 from app.modules.carriers.cse_geography import city_to_postcode_geo, get_city_guid
 from app.modules.carriers.zone_mapper import get_zone, is_known_city
@@ -727,7 +732,7 @@ async def _call_exline_calculator_async(
         "</calculator>"
     )
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(limits=_LIVE_HTTP_LIMITS) as client:
             resp = await client.post(
                 api_url,
                 content=xml.encode("utf-8"),
@@ -860,7 +865,7 @@ async def _call_cse_calc_async(
         login, password, from_geo, to_geo, kg, 1, cargo_type_guid, volume_weight,
     )
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(limits=_LIVE_HTTP_LIMITS) as client:
             resp = await client.post(
                 api_url,
                 content=build_envelope("Calc", inner),
@@ -935,7 +940,7 @@ async def _get_cse_card_availability_async(
 
     card_available = False
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(limits=_LIVE_HTTP_LIMITS) as client:
             resp = await client.post(
                 api_url,
                 content=build_envelope("GetReferenceData", inner),

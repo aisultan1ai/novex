@@ -23,6 +23,14 @@ export interface AdminUserDetail extends AdminUser {
   orders: AdminOrderRow[];
 }
 
+export interface AdminOrderCancellation {
+  reason: string;
+  source: string;              // "customer_cancel" | "admin" | "system_worker" | ...
+  cancelled_at: string;        // ISO
+  cancelled_by_email?: string | null;
+  cancelled_by_name?: string | null;
+}
+
 export interface AdminOrderRow {
   id: number;
   status: string;
@@ -42,6 +50,7 @@ export interface AdminOrderRow {
   tracking_number: string | null;
   carrier_tracking_number: string | null;
   carrier_barcode: string | null;
+  cancellation?: Omit<AdminOrderCancellation, "cancelled_by_email" | "cancelled_by_name"> | null;
 }
 
 export interface AdminOrderDetail extends AdminOrderRow {
@@ -51,6 +60,8 @@ export interface AdminOrderDetail extends AdminOrderRow {
   updated_at: string;
   parties: { role: string; full_name: string; phone: string; city: string; address_line1: string }[];
   packages: { quantity: number; weight_kg: number; description: string }[];
+  cancellation: AdminOrderCancellation | null;
+  refund_status: "refund_pending" | "refunded" | null;
 }
 
 export interface AdminCarrier {

@@ -922,10 +922,15 @@ class CSEAPIClient(CarrierAPIClient):
                 cargo_type_guid = ""
         urgency_guid = _esc(recipient.get("urgency_guid", ""))
         if not urgency_guid:
-            logger.warning(
-                "CSE SaveWaybillOffice: urgency_guid missing for order_id=%s — "
-                "CSE may reject the request. Ensure tariff engine passes urgency_guid.",
-                order_data.get("order_id"),
+            # Without urgency_guid CSE silently falls back to the account
+            # default tariff — the customer gets a different service level
+            # than the one they paid for. Fail loudly instead: dispatch will
+            # retry or land in dispatch_failed for admin to investigate.
+            raise RuntimeError(
+                f"CSE dispatch aborted: urgency_guid missing "
+                f"(order_id={order_data.get('order_id')}). "
+                "Tariff engine did not persist the CSE service GUID on the "
+                "selected rate_quote — cannot guarantee correct tariff."
             )
 
         login = _esc(self._login(creds))

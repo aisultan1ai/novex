@@ -254,8 +254,40 @@ function OrderDetailPanel({ orderId }: { orderId: number }) {
   const sender    = detail.parties.find((p) => p.role === "sender");
   const recipient = detail.parties.find((p) => p.role === "recipient");
 
+  const sourceLabel =
+    detail.cancellation?.source === "customer_cancel" ? "клиентом"
+    : detail.cancellation?.source === "admin" ? "администратором"
+    : "системой";
+
   return (
     <div style={dp.wrap}>
+      {/* ── Отмена (показываем сразу вверху, если есть) ─────────────── */}
+      {detail.cancellation && (
+        <div style={{ marginBottom: 16, padding: "14px 18px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 6 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#991B1B" }}>
+              Заказ отменён {sourceLabel}
+            </div>
+            <div style={{ fontSize: 12, color: "#7F1D1D" }}>
+              {new Date(detail.cancellation.cancelled_at).toLocaleString("ru-RU")}
+            </div>
+          </div>
+          <div style={{ fontSize: 13, color: "#7F1D1D", lineHeight: 1.5 }}>
+            <b>Причина:</b> {detail.cancellation.reason}
+          </div>
+          {detail.cancellation.cancelled_by_email && (
+            <div style={{ fontSize: 12, color: "#7F1D1D", marginTop: 4 }}>
+              Инициатор: {detail.cancellation.cancelled_by_name || detail.cancellation.cancelled_by_email}
+            </div>
+          )}
+          {detail.refund_status && (
+            <div style={{ marginTop: 10, padding: "6px 12px", background: detail.refund_status === "refunded" ? "#DCFCE7" : "#FEF3C7", borderRadius: 6, fontSize: 12, fontWeight: 600, color: detail.refund_status === "refunded" ? "#166534" : "#92400E", display: "inline-block" }}>
+              {detail.refund_status === "refunded" ? "✓ Возврат оформлен" : "⏳ Ожидает возврата средств"}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Метаданные ──────────────────────────────────────────────── */}
       <div style={dp.section}>
         <div style={dp.sectionTitle}>Информация о заказе</div>
@@ -546,7 +578,22 @@ export default function AdminOrdersPage() {
                     )}
                   </div>
 
-                  <StatusBadge status={order.status} />
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4 }}>
+                    <StatusBadge status={order.status} />
+                    {order.cancellation?.source === "customer_cancel" && (
+                      <span
+                        title={`Клиент отменил: ${order.cancellation.reason}`}
+                        style={{
+                          fontSize: 10, fontWeight: 700, letterSpacing: "0.03em",
+                          padding: "2px 8px", borderRadius: 999,
+                          background: "#FEE2E2", color: "#991B1B",
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        Клиент
+                      </span>
+                    )}
+                  </div>
 
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                     {hasPayment && (

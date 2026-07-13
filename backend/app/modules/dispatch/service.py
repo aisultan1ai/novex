@@ -548,7 +548,10 @@ def _save_waybill_document(
         except Exception:
             pass
     except Exception as exc:
-        logger.warning("Failed to save waybill PDF (non-fatal): %s", exc)
+        logger.exception(
+            "Failed to save waybill PDF (non-fatal) for order_id=%s waybill=%s: %s",
+            order.id, waybill_number, exc,
+        )
 
 
 def _build_dispatch_payload(order: OrderDraft) -> dict:
@@ -563,12 +566,14 @@ def _build_dispatch_payload(order: OrderDraft) -> dict:
             "phone": sender.phone if sender else "",
             "city": sender.city if sender else "",
             "address": sender.address_line1 if sender else "",
+            "tax_id": (sender.tax_id if sender else "") or "",
         },
         "recipient": {
             "full_name": recipient.full_name if recipient else "",
             "phone": recipient.phone if recipient else "",
             "city": recipient.city if recipient else "",
             "address": recipient.address_line1 if recipient else "",
+            "tax_id": (recipient.tax_id if recipient else "") or "",
         },
         "packages": [
             {
