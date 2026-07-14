@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.common.status_machine import can_transition
 from app.core.db import get_db
-from app.core.dependencies import get_current_user_id
+from app.core.dependencies import get_current_user_id, require_verified_email
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.limiter import limiter
 from app.core.storage import MAX_FILE_SIZE, get_storage
@@ -66,6 +66,7 @@ def initiate_bank_transfer(
     request: Request,
     draft_id: int,
     current_user_id: int = Depends(get_current_user_id),
+    _verified = Depends(require_verified_email),
     db: Session = Depends(get_db),
 ) -> InitiateBankTransferResponse:
     order = order_repo.get_order_draft_by_id(db, draft_id)
@@ -109,6 +110,7 @@ async def upload_payment_proof(
     comment: str | None = Form(default=None),
     file: UploadFile = File(...),
     current_user_id: int = Depends(get_current_user_id),
+    _verified = Depends(require_verified_email),
     db: Session = Depends(get_db),
 ) -> dict:
     order = order_repo.get_order_draft_by_id(db, draft_id)

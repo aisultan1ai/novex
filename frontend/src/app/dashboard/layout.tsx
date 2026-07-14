@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/providers/auth-provider";
 import { useIsMobile } from "@/hooks/use-is-mobile";
+import { ApiError, resendVerificationEmail } from "@/lib/api/auth";
 import { listNotifications } from "@/lib/api/notifications";
 
 function IconLogout() {
@@ -67,6 +68,76 @@ function BellButton({ unread, onClick }: { unread: number; onClick: () => void }
         </span>
       )}
     </button>
+  );
+}
+
+function VerifyEmailBanner({ email, isMobile }: { email: string; isMobile: boolean }) {
+  const [sending, setSending] = useState(false);
+  const [status, setStatus] = useState<"idle" | "sent" | "error">("idle");
+  const [message, setMessage] = useState<string>("");
+
+  async function handleResend() {
+    setSending(true);
+    setStatus("idle");
+    try {
+      await resendVerificationEmail();
+      setStatus("sent");
+      setMessage("Письмо отправлено — проверьте почту.");
+    } catch (err) {
+      setStatus("error");
+      setMessage(
+        err instanceof ApiError
+          ? err.detail
+          : "Не удалось отправить письмо. Попробуйте позже.",
+      );
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div
+      style={{
+        background: "#FEF3C7",
+        borderBottom: "1px solid #FCD34D",
+        padding: isMobile ? "12px 16px" : "12px 40px",
+        display: "flex",
+        alignItems: isMobile ? "flex-start" : "center",
+        flexDirection: isMobile ? "column" : "row",
+        gap: 10,
+        fontFamily: "Inter Variable, sans-serif",
+      }}
+    >
+      <div style={{ flex: 1, fontSize: 13, color: "#78350F", lineHeight: 1.5 }}>
+        <b>Подтвердите email.</b> Мы отправили ссылку на <b>{email}</b>. Перейдите по
+        ссылке, чтобы оформлять и оплачивать заказы.
+        {status !== "idle" && (
+          <span style={{ marginLeft: 6, color: status === "sent" ? "#166534" : "#B91C1C", fontWeight: 500 }}>
+            {message}
+          </span>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={handleResend}
+        disabled={sending}
+        style={{
+          padding: "8px 14px",
+          borderRadius: 8,
+          border: "1px solid #B45309",
+          background: sending ? "#FCD34D" : "#FFFFFF",
+          color: "#78350F",
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: sending ? "not-allowed" : "pointer",
+          fontFamily: "inherit",
+          whiteSpace: "nowrap",
+          flexShrink: 0,
+        }}
+      >
+        {sending ? "Отправляем…" : "Отправить снова"}
+      </button>
+    </div>
   );
 }
 
@@ -242,6 +313,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           );
         })}
       </nav>
+
+      {/* VERIFY EMAIL BANNER — visible only until the user confirms their email */}
+      {currentUser && currentUser.email_verified === false && (
+        <VerifyEmailBanner email={currentUser.email} isMobile={isMobile} />
+      )}
 
       {/* CONTENT */}
       <div

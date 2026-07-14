@@ -76,7 +76,7 @@ def _applicant_html(app: PartnerApplication) -> str:
         "<div style='font-family:Inter,Arial,sans-serif;color:#0f172a;line-height:1.55;'>"
         f"<p>Здравствуйте, {escape(app.contact_name)}!</p>"
         f"<p>Мы получили заявку от <b>{escape(app.company_name)}</b> "
-        "на партнёрство с Novex. Свяжемся с вами в течение 2 рабочих дней "
+        "на партнёрство с Novex. Наш менеджер свяжется с вами "
         "по указанным контактам.</p>"
         "<p>Если у вас появятся вопросы, можно ответить на это письмо.</p>"
         "<p style='margin-top:24px;color:#64748b;font-size:13px;'>Novex Logistics</p>"

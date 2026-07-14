@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from enum import Enum, StrEnum
 
-from sqlalchemy import Boolean, ForeignKey, String
+from datetime import datetime
+
+from sqlalchemy import Boolean, DateTime, ForeignKey, String
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -60,6 +62,12 @@ class User(Base, TimestampMixin):
     full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # NULL until the user clicks the verification link sent to their inbox.
+    # Grandfathered accounts (created before the feature shipped) are backfilled
+    # with NOW() in migration 036 so they don't lose access.
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Timestamp of the last verification email — used to rate-limit resend.
+    email_verify_sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     role_id: Mapped[int] = mapped_column(ForeignKey("roles.id"), nullable=False)
 

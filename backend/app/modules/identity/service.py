@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import secrets
+from datetime import datetime
 
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
@@ -46,13 +47,20 @@ class CreateCarrierAccountRequest(BaseModel):
 
 _RESET_TTL = 3600          # 1 час — forgot-password
 _SETUP_LINK_TTL = 172_800  # 48 часов — первичная активация аккаунта перевозчика
+_VERIFY_EMAIL_TTL = 86_400  # 24 часа — подтверждение email при регистрации
+_VERIFY_RESEND_COOLDOWN = 60  # секунд между повторными отправками письма
 
 
 class IdentityService:
     def __init__(self, repository: IdentityRepository | None = None) -> None:
         self.repository = repository or IdentityRepository()
 
-    def register_user(self, db: Session, payload: RegisterRequest) -> ProfileResponse:
+    def register_user(
+        self,
+        db: Session,
+        payload: RegisterRequest,
+        frontend_url: str | None = None,
+    ) -> ProfileResponse:
         logger.info("Registering user: email=%s", payload.email)
         existing_user = self.repository.get_user_by_email(db, payload.email)
         if existing_user is not None:
@@ -99,7 +107,96 @@ class IdentityService:
         logger.info(
             "User registered: user_id=%s email=%s", created_user.id, created_user.email
         )
+
+        # Send verification link. Non-fatal — a broken SMTP setup should not
+        # break registration itself. The user can request a resend later.
+        if frontend_url:
+            try:
+                self._send_verification_email(db, created_user, frontend_url)
+            except Exception:
+                logger.exception(
+                    "Verification email send failed (non-fatal): user_id=%s",
+                    created_user.id,
+                )
+
         return self._build_profile_response(created_user)
+
+    def _send_verification_email(self, db: Session, user: User, frontend_url: str) -> None:
+        """Generate a one-time token, store it in Redis, send the email, and
+        record the send timestamp for resend cooldown."""
+        token = secrets.token_urlsafe(32)
+        r = get_redis()
+        r.setex(f"verify_email:{token}", _VERIFY_EMAIL_TTL, str(user.id))
+
+        user.email_verify_sent_at = datetime.utcnow()
+        db.commit()
+
+        verify_link = f"{frontend_url.rstrip('/')}/verify-email?token={token}"
+        send_email(
+            to=user.email,
+            subject="Подтвердите email — Novex",
+            html=f"""
+            <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px">
+              <h2 style="color:#0f172a">Подтвердите email</h2>
+              <p style="color:#475569">
+                Здравствуйте! Вы зарегистрировались на Novex как <b>{user.email}</b>.<br>
+                Нажмите кнопку ниже, чтобы подтвердить адрес и оформлять заказы.
+              </p>
+              <a href="{verify_link}"
+                 style="display:inline-block;margin:24px 0;padding:12px 28px;background:#0f172a;color:#fff;
+                        border-radius:10px;text-decoration:none;font-weight:600">
+                Подтвердить аккаунт
+              </a>
+              <p style="color:#94a3b8;font-size:13px">
+                Ссылка действует 24 часа. Если вы не регистрировались на Novex — просто проигнорируйте это письмо.
+              </p>
+            </div>
+            """,
+        )
+        logger.info("Verification email sent: user_id=%s", user.id)
+
+    def verify_email(self, db: Session, token: str) -> None:
+        """Validate the token from the email link and mark the account
+        verified. Idempotent: verifying an already-verified account is a no-op."""
+        r = get_redis()
+        user_id_str = r.get(f"verify_email:{token}")
+        if not user_id_str:
+            raise UnauthorizedError("Ссылка недействительна или устарела")
+
+        user = self.repository.get_user_by_id(db, int(user_id_str))  # type: ignore[arg-type]
+        if not user:
+            raise NotFoundError("Пользователь не найден")
+
+        if user.email_verified_at is None:
+            user.email_verified_at = datetime.utcnow()
+            db.commit()
+            logger.info("Email verified: user_id=%s", user.id)
+
+        # Burn the token even if the account was already verified — prevents
+        # link reuse across sessions or shared browsers.
+        r.delete(f"verify_email:{token}")
+
+    def resend_verification_email(
+        self, db: Session, user_id: int, frontend_url: str
+    ) -> None:
+        """Re-issue a verification link. Rate-limited to _VERIFY_RESEND_COOLDOWN
+        seconds per user so a stuck client can't spam our SMTP."""
+        user = self.repository.get_user_by_id(db, user_id)
+        if not user:
+            raise NotFoundError("Пользователь не найден")
+        if user.email_verified_at is not None:
+            # Already verified — nothing to do, but don't error either.
+            return
+
+        if user.email_verify_sent_at is not None:
+            elapsed = (datetime.utcnow() - user.email_verify_sent_at).total_seconds()
+            if elapsed < _VERIFY_RESEND_COOLDOWN:
+                wait = int(_VERIFY_RESEND_COOLDOWN - elapsed)
+                raise ConflictError(
+                    f"Подождите {wait} сек. перед повторной отправкой письма."
+                )
+
+        self._send_verification_email(db, user, frontend_url)
 
     def authenticate_user(self, db: Session, payload: LoginRequest) -> TokenResponse:
         logger.info("Login attempt: email=%s", payload.email)
@@ -327,6 +424,7 @@ class IdentityService:
                 full_name=user.full_name,
                 phone=user.phone,
                 is_active=user.is_active,
+                email_verified=user.email_verified_at is not None,
                 role=role_code,
                 carrier_id=cp.carrier_id if cp else None,
             )
@@ -338,6 +436,7 @@ class IdentityService:
                 full_name=user.full_name,
                 phone=user.phone,
                 is_active=user.is_active,
+                email_verified=user.email_verified_at is not None,
                 role=role_code,
             )
 
@@ -351,6 +450,7 @@ class IdentityService:
             full_name=user.full_name,
             phone=user.phone,
             is_active=user.is_active,
+            email_verified=user.email_verified_at is not None,
             role=role_code,
             customer_type=profile.customer_type,
             company_name=profile.company_name,

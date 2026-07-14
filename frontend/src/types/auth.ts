@@ -24,6 +24,7 @@ export interface ProfileResponse {
   full_name: string | null;
   phone: string | null;
   is_active: boolean;
+  email_verified: boolean;
   role: RoleCode;
   customer_type: CustomerType | null;
   company_name: string | null;

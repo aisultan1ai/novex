@@ -84,10 +84,13 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
     smtp_from: str = ""
+    # Display name shown in the recipient's inbox next to the address.
+    # Cyrillic and other non-ASCII are OK — formataddr() encodes automatically.
+    smtp_from_name: str = "Novex"
     smtp_tls: bool = True
     # Partner-application inbox. Comma-separated list is accepted so ops can
     # route the alert to multiple mailboxes without touching code.
-    partners_email: str = "partners@novex.kz"
+    partners_email: str = "support@novex.kz"
 
     # Kaspi Pay (disabled until merchant onboarding is complete)
     kaspi_merchant_id: str = ""

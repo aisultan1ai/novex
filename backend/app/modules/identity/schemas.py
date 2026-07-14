@@ -136,6 +136,7 @@ class ProfileResponse(BaseModel):
     full_name: str | None
     phone: str | None
     is_active: bool
+    email_verified: bool = True
     role: RoleCode
     customer_type: CustomerType | None = None
     company_name: str | None = None
@@ -184,6 +185,10 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str = Field(min_length=8, max_length=128)
+
+
+class VerifyEmailRequest(BaseModel):
+    token: str = Field(min_length=1, max_length=128)
 
 
 class ChangePasswordRequest(BaseModel):

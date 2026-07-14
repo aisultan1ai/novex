@@ -24,6 +24,7 @@ from app.modules.identity.schemas import (
     RegisterRequest,
     ResetPasswordRequest,
     TokenResponse,
+    VerifyEmailRequest,
 )
 from app.modules.identity.service import IdentityService
 
@@ -82,7 +83,8 @@ def register_user(
     payload: RegisterRequest,
     db: Session = Depends(get_db),
 ) -> ProfileResponse:
-    return identity_service.register_user(db, payload)
+    settings = get_settings()
+    return identity_service.register_user(db, payload, frontend_url=settings.frontend_url)
 
 
 @router.post(
@@ -222,3 +224,36 @@ def reset_password(
 ) -> dict:
     identity_service.reset_password(db, payload)
     return {"detail": "Пароль успешно изменён"}
+
+
+@router.post(
+    "/verify-email",
+    status_code=200,
+    summary="Подтвердить email по токену из письма",
+)
+@limiter.limit("10/minute")
+def verify_email(
+    request: Request,
+    payload: VerifyEmailRequest,
+    db: Session = Depends(get_db),
+) -> dict:
+    identity_service.verify_email(db, payload.token)
+    return {"detail": "Email подтверждён"}
+
+
+@router.post(
+    "/resend-verification",
+    status_code=200,
+    summary="Отправить письмо подтверждения повторно",
+)
+@limiter.limit("5/minute")
+def resend_verification(
+    request: Request,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict:
+    settings = get_settings()
+    identity_service.resend_verification_email(
+        db, current_user_id, frontend_url=settings.frontend_url
+    )
+    return {"detail": "Письмо отправлено"}

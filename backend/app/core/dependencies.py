@@ -90,6 +90,29 @@ def get_current_user(
     return user
 
 
+def require_verified_email(current_user: User = Depends(get_current_user)) -> User:
+    """Guard for actions that require a confirmed email — placing orders,
+    paying, etc. Returns 403 with a machine-readable error code so the
+    frontend can render a "resend verification" prompt instead of a generic
+    forbidden banner."""
+    from app.modules.identity.models import RoleCode
+
+    # Non-customer roles are trusted (admins/operators/carriers manage their
+    # own auth flows and their emails are seeded / set up separately).
+    if current_user.role.code != RoleCode.CUSTOMER:
+        return current_user
+
+    if current_user.email_verified_at is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "email_not_verified",
+                "message": "Подтвердите email, чтобы продолжить.",
+            },
+        )
+    return current_user
+
+
 def require_admin(current_user: User = Depends(get_current_user)) -> User:
     from app.modules.identity.models import RoleCode
 

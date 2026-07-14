@@ -8,30 +8,81 @@ from app.modules.carriers.polling.base import CarrierPollingAdapter, TrackingEve
 
 logger = logging.getLogger(__name__)
 
-# Map CSE status names → internal Novex statuses
+# Map CSE status names → internal Novex statuses.
+#
+# `_map_status` picks the FIRST key whose substring appears in the CSE
+# status string. Order matters: put SPECIFIC phrases before shorter
+# generic ones. Example: "прибыл в пункт выдачи" must come before "прибыл",
+# otherwise the short key would match first and short-circuit to arrived
+# for every "прибыл*" event including transit hops.
 _STATUS_MAP: dict[str, str] = {
-    # Russian names from CSE system
-    "принят":               "sent_to_carrier",
-    "принято":              "sent_to_carrier",
-    "поступил":             "sent_to_carrier",
-    "забран":               "picked_up",
-    "забрано":              "picked_up",
-    "забор":                "picked_up",
-    "в пути":               "in_transit",
-    "в транзите":           "in_transit",
-    "транзит":              "in_transit",
-    "прибыл":               "in_transit",
-    "прибыло":              "in_transit",
-    "передан на доставку":  "in_transit",
-    "вручено":              "delivered",
-    "доставлено":           "delivered",
-    "получено":             "delivered",
-    "отказ":                "delivery_failed",
-    "неудачная попытка":    "delivery_failed",
-    "возврат":              "return_in_progress",
-    "возвращено":           "return_in_progress",
-    "отменено":             "cancelled",
-    "аннулировано":         "cancelled",
+    # ── Registered with carrier (paperwork done, not yet picked up) ────────
+    "оформлен":                     "sent_to_carrier",
+    "принят":                       "sent_to_carrier",
+    "принято":                      "sent_to_carrier",
+    "поступил":                     "sent_to_carrier",
+
+    # ── Courier picked it up at the sender ────────────────────────────────
+    "забран":                       "picked_up",
+    "забрано":                      "picked_up",
+    "забор":                        "picked_up",
+
+    # ── At destination pickup point, waiting for recipient (arrived) ──────
+    # Specific phrases go first so they win over the shorter "прибыл" below.
+    "прибыл в пункт выдачи":        "arrived",
+    "прибыл в пвз":                 "arrived",
+    "прибыл в город":               "arrived",
+    "прибыло в город":              "arrived",
+    "на складе назначения":         "arrived",
+    "в пункте выдачи":              "arrived",
+    "готов к выдаче":               "arrived",
+    "готов к получению":            "arrived",
+    "ожидает получения":            "arrived",
+    "ожидает получателя":           "arrived",
+
+    # ── Out for delivery (courier is on the way to the recipient) ─────────
+    "передан на доставку":          "out_for_delivery",
+    "передан курьеру для доставки": "out_for_delivery",
+    "выехал на доставку":           "out_for_delivery",
+    "выезд на доставку":            "out_for_delivery",
+    "курьер выехал":                "out_for_delivery",
+    "курьер в пути":                "out_for_delivery",
+
+    # ── In transit between warehouses ─────────────────────────────────────
+    "в пути":                       "in_transit",
+    "в транзите":                   "in_transit",
+    "транзит":                      "in_transit",
+    "отправлен":                    "in_transit",
+    "отгружен":                     "in_transit",
+
+    # Bare "прибыл" without context — treated as arrived (client-facing:
+    # more informative than a generic "in_transit"). Placed AFTER all
+    # specific "прибыл ..." keys so those win when applicable.
+    "прибыл":                       "arrived",
+    "прибыло":                      "arrived",
+
+    # ── Delivered ─────────────────────────────────────────────────────────
+    "вручено":                      "delivered",
+    "вручен":                       "delivered",
+    "доставлено":                   "delivered",
+    "доставлен":                    "delivered",
+    "получено":                     "delivered",
+    "выдано":                       "delivered",
+
+    # ── Delivery attempt failed ──────────────────────────────────────────
+    "отказ":                        "delivery_failed",
+    "неудачная попытка":            "delivery_failed",
+    "не доставлен":                 "delivery_failed",
+
+    # ── Return ────────────────────────────────────────────────────────────
+    "возврат":                      "return_in_progress",
+    "возвращено":                   "return_in_progress",
+    "возвращается":                 "return_in_progress",
+
+    # ── Cancelled ─────────────────────────────────────────────────────────
+    "отменено":                     "cancelled",
+    "отменен":                      "cancelled",
+    "аннулировано":                 "cancelled",
 }
 
 
@@ -40,6 +91,9 @@ def _map_status(carrier_status: str) -> str:
     for key, mapped in _STATUS_MAP.items():
         if key in normalized:
             return mapped
+    # Unknown status — log so we can extend _STATUS_MAP when new phrasings
+    # appear in prod. Fallback keeps the order visible in the tracking UI.
+    logger.warning("CSEPollingAdapter: unmapped carrier status %r → in_transit (fallback)", carrier_status)
     return "in_transit"
 
 

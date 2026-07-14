@@ -168,6 +168,7 @@ export default function RegisterPage() {
   const [showPwd, setShowPwd] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [verifyModalEmail, setVerifyModalEmail] = useState<string | null>(null);
 
   const isCompany = useMemo(() => form.customer_type === "company", [form.customer_type]);
 
@@ -202,7 +203,14 @@ export default function RegisterPage() {
     if (taxErr) { setError(taxErr); return; }
     setIsSubmitting(true);
     try {
-      await registerUser(toPayload());
+      const created = await registerUser(toPayload());
+      // Show a "check your inbox" modal before sending the user to /login.
+      // Existing accounts (backfilled email_verified=true in migration 036)
+      // don't get the modal — but freshly created ones always do.
+      if (!created.email_verified) {
+        setVerifyModalEmail(created.email);
+        return;
+      }
       router.push("/login?registered=1");
     } catch (err) {
       setError(
@@ -497,6 +505,52 @@ export default function RegisterPage() {
           </Link>
         </p>
       </div>
+
+      {verifyModalEmail && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 20, zIndex: 100,
+          }}
+        >
+          <div
+            style={{
+              background: "#ffffff", borderRadius: 18, maxWidth: 440, width: "100%",
+              padding: isMobile ? "28px 22px" : "32px 30px",
+              boxShadow: "0 24px 64px rgba(15,23,42,0.28)",
+              textAlign: "center",
+            }}
+          >
+            <div style={{ fontSize: 44, marginBottom: 12 }}>📩</div>
+            <h2 style={{ font: "700 20px/1.3 Inter Variable, sans-serif", color: "#111827", margin: "0 0 10px" }}>
+              Аккаунт создан
+            </h2>
+            <p style={{ font: "400 14px/1.6 Inter Variable, sans-serif", color: "#4B5563", margin: "0 0 8px" }}>
+              Мы отправили письмо на <b style={{ color: "#111827" }}>{verifyModalEmail}</b>.
+            </p>
+            <p style={{ font: "400 14px/1.6 Inter Variable, sans-serif", color: "#4B5563", margin: "0 0 24px" }}>
+              Перейдите по ссылке в письме, чтобы подтвердить аккаунт. Проверьте папку «Спам», если письмо не пришло — ссылка живёт 24 часа.
+            </p>
+            <button
+              type="button"
+              onClick={() => { setVerifyModalEmail(null); router.push("/login?registered=1"); }}
+              style={{
+                width: "100%", height: 46, borderRadius: 10, border: "none",
+                background: "#2563EB", color: "#ffffff",
+                font: "600 15px/1 Inter Variable, sans-serif",
+                cursor: "pointer", fontFamily: "inherit", transition: "background 0.15s",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "#1D4ED8"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "#2563EB"; }}
+            >
+              Понятно
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

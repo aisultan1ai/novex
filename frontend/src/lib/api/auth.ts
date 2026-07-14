@@ -67,3 +67,14 @@ export async function changePassword(payload: {
     body: JSON.stringify(payload),
   });
 }
+
+export async function verifyEmail(token: string): Promise<void> {
+  await apiRequest("/auth/verify-email", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
+}
+
+export async function resendVerificationEmail(): Promise<void> {
+  await apiRequest("/auth/resend-verification", { method: "POST" });
+}
