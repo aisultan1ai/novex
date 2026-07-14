@@ -728,6 +728,10 @@ function ShipmentPageInner() {
   const [senderPvzList, setSenderPvzList] = useState<CsePvzItem[]>([]);
   const [recipientPvzList, setRecipientPvzList] = useState<CsePvzItem[]>([]);
   const [pvzLoading, setPvzLoading] = useState<{ sender: boolean; recipient: boolean }>({ sender: false, recipient: false });
+  // "checked" = we've actually queried CSE for this city and know the result.
+  // Distinguishes "не проверяли" from "проверили и пусто" — the latter must
+  // disable warehouse delivery options; the former must not.
+  const [pvzChecked, setPvzChecked] = useState<{ sender: boolean; recipient: boolean }>({ sender: false, recipient: false });
 
   // Live recalc: whenever the customer toggles insurance / delivery_type /
   // declared_value, ask the backend for the fully-loaded final price so the
@@ -738,6 +742,26 @@ function ShipmentPageInner() {
   const isCse = (draft?.carrier_code_snapshot ?? "").toLowerCase() === "cse";
   const senderLegWh = form.delivery_type === "warehouse_to_door" || form.delivery_type === "warehouse_to_warehouse";
   const recipientLegWh = form.delivery_type === "door_to_warehouse" || form.delivery_type === "warehouse_to_warehouse";
+  // City the PVZ check should use — prefer what user typed in the form once
+  // they've reached step 1/2, else fall back to the route city captured when
+  // the tariff was picked (draft.*_city_snapshot). This lets us pre-check on
+  // step 0 (Данные отправления) before the party forms are filled.
+  const senderCheckCity = (form.sender.city.trim() || draft?.from_city_snapshot || "").trim();
+  const recipientCheckCity = (form.recipient.city.trim() || draft?.to_city_snapshot || "").trim();
+  const senderCityHasPvz = pvzChecked.sender && senderPvzList.length > 0;
+  const recipientCityHasPvz = pvzChecked.recipient && recipientPvzList.length > 0;
+  const senderCityNoPvz = pvzChecked.sender && senderPvzList.length === 0;
+  const recipientCityNoPvz = pvzChecked.recipient && recipientPvzList.length === 0;
+
+  function isDeliveryOptionAvailable(opt: DeliveryType): boolean {
+    if (!isCse) return true;
+    switch (opt) {
+      case "door_to_door":           return true;
+      case "warehouse_to_door":      return !senderCityNoPvz;
+      case "door_to_warehouse":      return !recipientCityNoPvz;
+      case "warehouse_to_warehouse": return !senderCityNoPvz && !recipientCityNoPvz;
+    }
+  }
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -750,32 +774,54 @@ function ShipmentPageInner() {
     setForm((prev) => ({ ...prev, sender: mergeSenderWithCurrentUser(prev.sender, currentUser) }));
   }, [currentUser]);
 
-  // Fetch sender-side PVZ list when it's needed and the city is known.
+  // Fetch PVZ lists proactively for CSE regardless of the currently-selected
+  // delivery_type — we need to know availability up-front on step 0 so that
+  // warehouse-based delivery options can be disabled when the destination
+  // (or origin) city has no CSE pickup points.
   useEffect(() => {
-    if (!isCse || !senderLegWh) { setSenderPvzList([]); return; }
-    const city = form.sender.city.trim();
-    if (!city) { setSenderPvzList([]); return; }
+    if (!isCse || !senderCheckCity) {
+      setSenderPvzList([]); setPvzChecked((p) => ({ ...p, sender: false }));
+      return;
+    }
     const ac = new AbortController();
     setPvzLoading((p) => ({ ...p, sender: true }));
-    fetchCsePvzByCity(city, ac.signal)
-      .then((list) => setSenderPvzList(list))
-      .catch(() => { /* network error → keep list empty; UI will show hint */ })
+    fetchCsePvzByCity(senderCheckCity, ac.signal)
+      .then((list) => { setSenderPvzList(list); setPvzChecked((p) => ({ ...p, sender: true })); })
+      .catch(() => { /* network error → leave checked=false so we don't disable options wrongly */ })
       .finally(() => setPvzLoading((p) => ({ ...p, sender: false })));
     return () => ac.abort();
-  }, [isCse, senderLegWh, form.sender.city]);
+  }, [isCse, senderCheckCity]);
 
   useEffect(() => {
-    if (!isCse || !recipientLegWh) { setRecipientPvzList([]); return; }
-    const city = form.recipient.city.trim();
-    if (!city) { setRecipientPvzList([]); return; }
+    if (!isCse || !recipientCheckCity) {
+      setRecipientPvzList([]); setPvzChecked((p) => ({ ...p, recipient: false }));
+      return;
+    }
     const ac = new AbortController();
     setPvzLoading((p) => ({ ...p, recipient: true }));
-    fetchCsePvzByCity(city, ac.signal)
-      .then((list) => setRecipientPvzList(list))
-      .catch(() => { /* keep empty */ })
+    fetchCsePvzByCity(recipientCheckCity, ac.signal)
+      .then((list) => { setRecipientPvzList(list); setPvzChecked((p) => ({ ...p, recipient: true })); })
+      .catch(() => { /* keep checked=false */ })
       .finally(() => setPvzLoading((p) => ({ ...p, recipient: false })));
     return () => ac.abort();
-  }, [isCse, recipientLegWh, form.recipient.city]);
+  }, [isCse, recipientCheckCity]);
+
+  // Auto-downgrade to door_to_door if the city check just revealed the
+  // currently-selected option is impossible (e.g. user picked warehouse_to_*
+  // before we knew the city has no CSE PVZ). Keeps the form in a valid state
+  // without a jarring error banner.
+  useEffect(() => {
+    if (!isCse) return;
+    if (!isDeliveryOptionAvailable(form.delivery_type)) {
+      updateForm((prev) => ({
+        ...prev,
+        delivery_type: "door_to_door",
+        sender_pvz_guid: "",
+        recipient_pvz_guid: "",
+      }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCse, senderCityNoPvz, recipientCityNoPvz]);
 
   // Clear stale PVZ selections when the user switches delivery type away from
   // a leg that needed a PVZ. Prevents sending an unrelated GUID to backend.
@@ -1136,22 +1182,42 @@ function ShipmentPageInner() {
                   {isCse && (
                     <SectionCard title="Тип доставки">
                       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                        {DELIVERY_TYPE_OPTIONS.map((opt) => (
-                          <label key={opt.value} style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
-                            <input
-                              type="radio"
-                              name="delivery_type"
-                              value={opt.value}
-                              checked={form.delivery_type === opt.value}
-                              onChange={() => updateForm((prev) => ({ ...prev, delivery_type: opt.value }))}
-                              style={{ marginTop: 3, width: 16, height: 16, cursor: "pointer", accentColor: "#2563EB" }}
-                            />
-                            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                              <span style={{ font: "500 14px/1.3 Inter Variable, sans-serif", color: "#111827" }}>{opt.label}</span>
-                              <span style={{ font: "400 12px/1.4 Inter Variable, sans-serif", color: "#6B7280" }}>{opt.hint}</span>
-                            </div>
-                          </label>
-                        ))}
+                        {DELIVERY_TYPE_OPTIONS.map((opt) => {
+                          const available = isDeliveryOptionAvailable(opt.value);
+                          const needsSenderPvz = opt.value === "warehouse_to_door" || opt.value === "warehouse_to_warehouse";
+                          const needsRecipientPvz = opt.value === "door_to_warehouse" || opt.value === "warehouse_to_warehouse";
+                          const noSender = needsSenderPvz && senderCityNoPvz;
+                          const noRecipient = needsRecipientPvz && recipientCityNoPvz;
+                          const disabledReason = !available
+                            ? `Недоступно: в городе ${noSender && noRecipient ? `${senderCheckCity} и ${recipientCheckCity}` : noSender ? senderCheckCity : recipientCheckCity} у CSE нет ПВЗ.`
+                            : "";
+                          return (
+                            <label
+                              key={opt.value}
+                              style={{
+                                display: "flex", alignItems: "flex-start", gap: 10,
+                                cursor: available ? "pointer" : "not-allowed",
+                                opacity: available ? 1 : 0.45,
+                              }}
+                            >
+                              <input
+                                type="radio"
+                                name="delivery_type"
+                                value={opt.value}
+                                checked={form.delivery_type === opt.value}
+                                disabled={!available}
+                                onChange={() => available && updateForm((prev) => ({ ...prev, delivery_type: opt.value }))}
+                                style={{ marginTop: 3, width: 16, height: 16, cursor: available ? "pointer" : "not-allowed", accentColor: "#2563EB" }}
+                              />
+                              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                                <span style={{ font: "500 14px/1.3 Inter Variable, sans-serif", color: "#111827" }}>{opt.label}</span>
+                                <span style={{ font: "400 12px/1.4 Inter Variable, sans-serif", color: "#6B7280" }}>
+                                  {available ? opt.hint : disabledReason}
+                                </span>
+                              </div>
+                            </label>
+                          );
+                        })}
                         {(senderLegWh || recipientLegWh) && (
                           <div style={{ marginTop: 4, padding: 10, background: "#F3F4F6", borderRadius: 8, font: "400 12px/1.4 Inter Variable, sans-serif", color: "#6B7280" }}>
                             ПВЗ выбирается на следующих шагах, после заполнения города{senderLegWh && recipientLegWh ? " отправителя и получателя" : senderLegWh ? " отправителя" : " получателя"}.
@@ -1202,7 +1268,7 @@ function ShipmentPageInner() {
                     onChange={(key, val) => updatePartyField("sender", key, val)}
                     onToggleSave={(val) => toggleSaveAddress("sender", val)}
                   />
-                  {isCse && senderLegWh && (
+                  {isCse && senderLegWh && senderCityHasPvz && (
                     <PvzPickerSection
                       title="ПВЗ отправителя (CSE)"
                       city={form.sender.city}
@@ -1224,7 +1290,7 @@ function ShipmentPageInner() {
                     onChange={(key, val) => updatePartyField("recipient", key, val)}
                     onToggleSave={(val) => toggleSaveAddress("recipient", val)}
                   />
-                  {isCse && recipientLegWh && (
+                  {isCse && recipientLegWh && recipientCityHasPvz && (
                     <PvzPickerSection
                       title="ПВЗ получателя (CSE)"
                       city={form.recipient.city}

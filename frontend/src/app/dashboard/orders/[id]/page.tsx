@@ -14,7 +14,6 @@ import {
   downloadOrderLabel,
   getOrderDraft,
 } from "@/lib/api/orders";
-import { retryOrderDispatch } from "@/lib/api/admin";
 import type { OrderDraftResponse } from "@/types/order";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -113,8 +112,7 @@ function IconArrowLeft() {
 const card = { background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, padding: "20px 24px" };
 
 export default function OrderDetailPage() {
-  const { isAuthenticated, isLoading: authLoading, currentUser } = useAuth();
-  const isAdmin = currentUser?.role === "admin" || currentUser?.role === "operator";
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const isMobile = useIsMobile();
   const router = useRouter();
   const params = useParams();
@@ -124,7 +122,6 @@ export default function OrderDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [isRetryingDispatch, setIsRetryingDispatch] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -211,20 +208,6 @@ export default function OrderDetailPage() {
     }
   }
 
-  async function handleRetryDispatch() {
-    if (!confirm("Повторно отправить заказ перевозчику по API? Будет создана накладная у Azimuth и получен трекинг-номер.")) return;
-    setIsRetryingDispatch(true);
-    setError(null);
-    try {
-      await retryOrderDispatch(draftId);
-      alert("Заказ отправлен на dispatch. Обновите страницу через 10 секунд.");
-    } catch (err) {
-      setError(err instanceof ApiError ? err.detail : "Не удалось отправить заказ.");
-    } finally {
-      setIsRetryingDispatch(false);
-    }
-  }
-
   if (authLoading || (!isAuthenticated && !authLoading)) return null;
 
   return (
@@ -294,16 +277,6 @@ export default function OrderDetailPage() {
                   style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", color: "#111827", fontSize: 14, fontWeight: 600, cursor: isDownloading ? "not-allowed" : "pointer", opacity: isDownloading ? 0.6 : 1, fontFamily: "inherit" }}
                 >
                   {isDownloading ? "Скачиваем…" : "Скачать накладную"}
-                </button>
-              )}
-              {isAdmin && !order.tracking_number && (
-                <button
-                  onClick={() => void handleRetryDispatch()}
-                  disabled={isRetryingDispatch}
-                  title="Отправить заказ перевозчику по API (создаст накладную и трекинг)"
-                  style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid #d97706", background: "#fff", color: "#d97706", fontSize: 14, fontWeight: 600, cursor: isRetryingDispatch ? "not-allowed" : "pointer", opacity: isRetryingDispatch ? 0.6 : 1, fontFamily: "inherit" }}
-                >
-                  {isRetryingDispatch ? "Отправляем…" : "Отправить в Azimuth"}
                 </button>
               )}
               {order.status === "draft" && !pendingDelete && (
