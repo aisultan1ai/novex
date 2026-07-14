@@ -369,7 +369,15 @@ class CSEAPIClient(CarrierAPIClient):
             headers={"Content-Type": "text/xml; charset=utf-8"},
             timeout=timeout,
         )
-        resp.raise_for_status()
+        if resp.status_code >= 400:
+            body_snippet = (resp.text or "")[:2000]
+            logger.error(
+                "CSE %s HTTP %s at %s; body: %s",
+                method, resp.status_code, self._url(creds), body_snippet,
+            )
+            raise RuntimeError(
+                f"CSE {method} HTTP {resp.status_code}: {body_snippet}"
+            )
         return extract_return(resp.text, method)
 
     # ── auth prefix used in most method bodies ───────────────────────────────
@@ -700,21 +708,17 @@ class CSEAPIClient(CarrierAPIClient):
 
     # ── GetFormsForDocuments ──────────────────────────────────────────────────
 
-    def get_print_form(self, waybill_number: str, creds: dict) -> bytes:
-        """Download PDF print form of an Order. Returns raw PDF bytes.
+    _DEFAULT_PRINT_FORM_NAME = "Универсальная печатная форма документа ЗАКАЗ"
 
-        Per CSE Web API docs (GetFormsForDocuments, pages 189–195):
-          - <m:parameters> children are <m:List> (Key/Value/ValueType), NOT
-            <m:Properties>. Using Properties here silently returns no BData.
-          - DocumentType is "order" (the object SaveWaybillOffice produced) or
-            "waybill" (an internal delivery leg). For customer print forms we
-            want the Order document.
-        """
-        # <Name> pins the specific print form. Without it CSE returns whichever
-        # form is set as default in the account settings — could change any day
-        # to a "Марка ГМХ" (parcel label) or a variant. "Универсальная печатная
-        # форма документа ЗАКАЗ" is the canonical customer-facing order print.
-        inner = (
+    def _build_print_form_inner(
+        self, waybill_number: str, creds: dict, *, form_name: str | None
+    ) -> str:
+        name_xml = (
+            f"<m:List><m:Key>Name</m:Key><m:Value>{_esc(form_name)}</m:Value>"
+            "<m:ValueType>string</m:ValueType></m:List>"
+            if form_name else ""
+        )
+        return (
             self._auth(creds)
             + "<m:documents>"
             + "<m:Key>Documents</m:Key>"
@@ -724,11 +728,13 @@ class CSEAPIClient(CarrierAPIClient):
             + "<m:Key>Parameters</m:Key>"
             + "<m:List><m:Key>DocumentType</m:Key><m:Value>order</m:Value><m:ValueType>string</m:ValueType></m:List>"
             + "<m:List><m:Key>Type</m:Key><m:Value>print</m:Value><m:ValueType>string</m:ValueType></m:List>"
-            + "<m:List><m:Key>Name</m:Key><m:Value>Универсальная печатная форма документа ЗАКАЗ</m:Value><m:ValueType>string</m:ValueType></m:List>"
+            + name_xml
             + "<m:List><m:Key>Format</m:Key><m:Value>pdf</m:Value><m:ValueType>string</m:ValueType></m:List>"
             + "</m:parameters>"
         )
-        ret = self._post("GetFormsForDocuments", inner, creds, timeout=_TIMEOUT)
+
+    @staticmethod
+    def _extract_bdata(ret: ET.Element) -> bytes | None:
         for item in list_items(ret):
             bdata = fields_of(item).get("BData", "") or find_text(item, "BData")
             if bdata:
@@ -736,7 +742,122 @@ class CSEAPIClient(CarrierAPIClient):
         bdata = find_text(ret, "BData")
         if bdata:
             return base64.b64decode(bdata)
-        raise RuntimeError(f"CSE: no PDF data returned for waybill {waybill_number}")
+        return None
+
+    @staticmethod
+    def _extract_cse_error(ret: ET.Element) -> tuple[str, str] | None:
+        """Parse CSE error envelope from GetFormsForDocuments response.
+
+        Per CSE Web API docs (page 12): errors come back as a <Properties> node
+        with Key=Error, Value=true, and a nested <List> with Key=Description
+        containing the ErrorCodes GUID or literal error text.
+        Returns (description, info) or None if no error is present.
+        """
+        for props in ret.iter(f"{_NM}Properties"):
+            key_el = props.find(f"{_NM}Key")
+            val_el = props.find(f"{_NM}Value")
+            if key_el is None or val_el is None:
+                continue
+            if (key_el.text or "").strip() != "Error":
+                continue
+            if (val_el.text or "").strip().lower() not in ("true", "1"):
+                continue
+            description = ""
+            info = ""
+            for sub in props.findall(f"{_NM}List"):
+                sub_key = (sub.findtext(f"{_NM}Key") or "").strip()
+                sub_val = (sub.findtext(f"{_NM}Value") or "").strip()
+                if sub_key == "Description":
+                    description = sub_val
+                elif sub_key == "Info":
+                    info = sub_val
+            return description, info
+        return None
+
+    def _call_print_form(
+        self, waybill_number: str, creds: dict, *, form_name: str | None
+    ) -> tuple[bytes | None, str | None, str | None, str]:
+        """Single GetFormsForDocuments call. Returns (pdf, err_code, err_info, raw_xml)."""
+        inner = self._build_print_form_inner(waybill_number, creds, form_name=form_name)
+        resp = httpx.post(
+            self._url(creds),
+            content=build_envelope("GetFormsForDocuments", inner),
+            headers={"Content-Type": "text/xml; charset=utf-8"},
+            timeout=_TIMEOUT,
+        )
+        if resp.status_code >= 400:
+            body_snippet = (resp.text or "")[:2000]
+            logger.error(
+                "CSE GetFormsForDocuments HTTP %s waybill=%s body=%s",
+                resp.status_code, waybill_number, body_snippet,
+            )
+            raise RuntimeError(
+                f"CSE GetFormsForDocuments HTTP {resp.status_code}: {body_snippet}"
+            )
+        ret = extract_return(resp.text, "GetFormsForDocuments")
+        pdf = self._extract_bdata(ret)
+        if pdf is not None:
+            return pdf, None, None, resp.text
+        err = self._extract_cse_error(ret)
+        if err is not None:
+            return None, err[0] or "unknown", err[1], resp.text
+        return None, None, None, resp.text
+
+    def get_print_form(self, waybill_number: str, creds: dict) -> bytes:
+        """Download PDF print form of an Order. Returns raw PDF bytes.
+
+        Per CSE Web API docs (GetFormsForDocuments, pages 189–195):
+          - <m:parameters> children are <m:List> (Key/Value/ValueType), NOT
+            <m:Properties>. Using Properties here silently returns no BData.
+          - DocumentType is "order" (the object SaveWaybillOffice produced) or
+            "waybill" (an internal delivery leg). For customer print forms we
+            want the Order document.
+          - Error envelope (page 12): Properties[Error=true] with nested
+            List[Description=<ErrorCodes GUID or text>].
+
+        Strategy: try with a specific print-form Name (canonical customer form).
+        If CSE responds with an Error (typical case: form not attached to the
+        account, common in test env), retry once without Name so CSE serves
+        the account's default form.
+        """
+        pdf, err_code, err_info, raw = self._call_print_form(
+            waybill_number, creds, form_name=self._DEFAULT_PRINT_FORM_NAME
+        )
+        if pdf is not None:
+            return pdf
+
+        if err_code is not None:
+            logger.warning(
+                "CSE GetFormsForDocuments returned Error for waybill=%s name=%r: code=%s info=%r; retrying without Name",
+                waybill_number, self._DEFAULT_PRINT_FORM_NAME, err_code, err_info,
+            )
+            pdf2, err_code2, err_info2, raw2 = self._call_print_form(
+                waybill_number, creds, form_name=None
+            )
+            if pdf2 is not None:
+                return pdf2
+            snippet = (raw2 or raw)[:3000]
+            reason = (
+                f"code={err_code2 or err_code}"
+                + (f" info={err_info2 or err_info!r}" if (err_info2 or err_info) else "")
+            )
+            logger.error(
+                "CSE GetFormsForDocuments fallback also failed for waybill=%s (%s); response: %s",
+                waybill_number, reason, snippet,
+            )
+            raise RuntimeError(
+                f"CSE print form error for waybill {waybill_number}: {reason}"
+            )
+
+        # No BData and no parseable Error — CSE returned an empty envelope.
+        response_snippet = (raw or "")[:3000]
+        logger.warning(
+            "CSE GetFormsForDocuments returned no BData for waybill=%s; full response: %s",
+            waybill_number, response_snippet,
+        )
+        raise RuntimeError(
+            f"CSE: no PDF data returned for waybill {waybill_number}; response: {response_snippet}"
+        )
 
     # ── Tracking ──────────────────────────────────────────────────────────────
 
@@ -1117,6 +1238,8 @@ class CSEAPIClient(CarrierAPIClient):
             f"</m:Cargo>"
             + recipient_pvz_xml +
             f"</m:Recipient>"
+            + reply_email_xml +
+            reply_sms_xml +
             f"<m:Sender>"
             f"<m:Client>{_esc(s_client)}</m:Client>"
             + sender_official_xml +
@@ -1129,8 +1252,6 @@ class CSEAPIClient(CarrierAPIClient):
             + _party_extras_xml(sender) +
             sender_pvz_xml +
             f"</m:Sender>"
-            + reply_email_xml +
-            reply_sms_xml +
             f"<m:TakeDate>{_esc(take_date)}</m:TakeDate>"
             f"<m:TypeOfCargo>{_esc(cargo_type_guid)}</m:TypeOfCargo>"
             f"<m:TypeOfPayer>0</m:TypeOfPayer>"
@@ -1147,7 +1268,15 @@ class CSEAPIClient(CarrierAPIClient):
             headers={"Content-Type": "text/xml; charset=utf-8"},
             timeout=_TIMEOUT,
         )
-        resp_xml.raise_for_status()
+        if resp_xml.status_code >= 400:
+            body_snippet = (resp_xml.text or "")[:2000]
+            logger.error(
+                "CSE SaveWaybillOffice HTTP %s at %s; request_inner_snippet=%s; response_body=%s",
+                resp_xml.status_code, self._url(creds), inner[:1500], body_snippet,
+            )
+            raise RuntimeError(
+                f"CSE SaveWaybillOffice HTTP {resp_xml.status_code}: {body_snippet}"
+            )
 
         # Response: <m:return><m:Items><m:Value>waybill_number</m:Value><m:Error>false</m:Error>...
         try:
