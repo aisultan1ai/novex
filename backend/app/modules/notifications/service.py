@@ -16,7 +16,7 @@ _STATUS_TITLES: dict[str, str] = {
     "paid": "Оплата подтверждена",
     "awaiting_payment": "Ожидание оплаты",
     "payment_under_review": "Чек на проверке",
-    "payment_rejected": "Чек отклонён — требуется повторная оплата",
+    "payment_rejected": "Чек отклонён - требуется повторная оплата",
     "ready_for_checkout": "Готов к оформлению",
     "sent_to_carrier": "Передан перевозчику",
     "picked_up": "Забран перевозчиком",

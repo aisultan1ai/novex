@@ -206,7 +206,7 @@ export default function RegisterPage() {
       const created = await registerUser(toPayload());
       // Show a "check your inbox" modal before sending the user to /login.
       // Existing accounts (backfilled email_verified=true in migration 036)
-      // don't get the modal — but freshly created ones always do.
+      // don't get the modal - but freshly created ones always do.
       if (!created.email_verified) {
         setVerifyModalEmail(created.email);
         return;
@@ -532,7 +532,7 @@ export default function RegisterPage() {
               Мы отправили письмо на <b style={{ color: "#111827" }}>{verifyModalEmail}</b>.
             </p>
             <p style={{ font: "400 14px/1.6 Inter Variable, sans-serif", color: "#4B5563", margin: "0 0 24px" }}>
-              Перейдите по ссылке в письме, чтобы подтвердить аккаунт. Проверьте папку «Спам», если письмо не пришло — ссылка живёт 24 часа.
+              Перейдите по ссылке в письме, чтобы подтвердить аккаунт. Проверьте папку «Спам», если письмо не пришло - ссылка живёт 24 часа.
             </p>
             <button
               type="button"

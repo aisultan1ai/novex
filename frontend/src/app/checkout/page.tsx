@@ -334,7 +334,7 @@ function CheckoutPageInner() {
           </p>
         </div>
 
-        {/* Stepper — step 4 (Оплата) active, 1–3 completed */}
+        {/* Stepper - step 4 (Оплата) active, 1-3 completed */}
         <Stepper current={3} />
 
         {isLoading ? (
@@ -367,10 +367,10 @@ function CheckoutPageInner() {
                     {draft.from_city_snapshot} → {draft.to_city_snapshot}
                   </div>
                   <div style={{ font: "400 13px/1.6 Inter Variable, sans-serif", color: "#6B7280" }}>
-                    {draft.shipment_type_snapshot} · {draft.eta_days_min_snapshot}–{draft.eta_days_max_snapshot} дн.
+                    {draft.shipment_type_snapshot} · {draft.eta_days_min_snapshot}-{draft.eta_days_max_snapshot} дн.
                   </div>
                   <div style={{ font: "400 13px/1 Inter Variable, sans-serif", color: "#6B7280", marginTop: 4 }}>
-                    {draft.carrier_name_snapshot} — {draft.tariff_name_snapshot}
+                    {draft.carrier_name_snapshot} - {draft.tariff_name_snapshot}
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
@@ -513,13 +513,13 @@ function CheckoutPageInner() {
                   <li>Переведите точную сумму по реквизитам выше.</li>
                   <li>В назначении платежа укажите номер заказа.</li>
                   <li>Сохраните скриншот или PDF-квитанцию из банка.</li>
-                  <li>Загрузите файл ниже — оператор проверит оплату.</li>
+                  <li>Загрузите файл ниже - оператор проверит оплату.</li>
                 </ol>
                 <p style={{ font: "400 12px/1 Inter Variable, sans-serif", color: "#9CA3AF", marginBottom: 16 }}>
                   Принимаются: JPEG, PNG, PDF. Максимальный размер: 5 МБ.
                 </p>
                 <form onSubmit={(e) => void handleUpload(e)} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {/* Hidden native input — controlled via the styled label below. */}
+                  {/* Hidden native input - controlled via the styled label below. */}
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -625,7 +625,7 @@ function CheckoutPageInner() {
                     onMouseEnter={(e) => { if (!uploading && selectedFile) e.currentTarget.style.background = "#1D4ED8"; }}
                     onMouseLeave={(e) => { if (!uploading && selectedFile) e.currentTarget.style.background = "#2563EB"; }}
                   >
-                    {uploading ? "Загрузка..." : "Я оплатил — загрузить чек"}
+                    {uploading ? "Загрузка..." : "Я оплатил - загрузить чек"}
                   </button>
                 </form>
               </div>

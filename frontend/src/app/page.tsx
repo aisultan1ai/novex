@@ -51,7 +51,7 @@ function validateQuoteForm(form: FormState): string | null {
   if (qty > 999) return "Количество не может превышать 999.";
 
   if (form.shipmentType !== "document") {
-    // Dimensions are required for parcels — used for volumetric weight (Azimuth
+    // Dimensions are required for parcels - used for volumetric weight (Azimuth
     // tariff table) and mandatory in CSE SaveWaybillOffice (Length/Width/Height).
     // Making them required here avoids a surprise validation error at the order
     // step where they are always required.
@@ -306,7 +306,7 @@ export default function HomePage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    // Intracity delivery is supported (zone 0 in tariff_engine) — do not block
+    // Intracity delivery is supported (zone 0 in tariff_engine) - do not block
     // same-city quotes here.
     const numericError = validateQuoteForm(form);
     if (numericError) { setError(numericError); return; }
@@ -575,7 +575,7 @@ export default function HomePage() {
             </form>
           </div>
 
-          {/* Social proof — always visible */}
+          {/* Social proof - always visible */}
           <div
             style={{
               display: "flex",
@@ -594,7 +594,7 @@ export default function HomePage() {
             <span><b style={{ color: "#10B981" }}>5.0 ★</b> средний рейтинг</span>
           </div>
 
-          {/* Mini how-it-works — shown only before results */}
+          {/* Mini how-it-works - shown only before results */}
         </section>
 
         {/* ── RESULTS (inline, appears below form) ──────────────────────── */}
@@ -757,7 +757,7 @@ export default function HomePage() {
                             flexWrap: "wrap",
                           }}
                         >
-                          <span>Срок: {rate.eta_days_min}–{rate.eta_days_max} дн.</span>
+                          <span>Срок: {rate.eta_days_min}-{rate.eta_days_max} дн.</span>
                           <span>Сбор: по будням</span>
                         </div>
                       </div>
@@ -1110,7 +1110,7 @@ export default function HomePage() {
 
             <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
               <DetailRow label="Тариф" value={selectedRate.tariff_name} />
-              <DetailRow label="Срок доставки" value={`${selectedRate.eta_days_min}–${selectedRate.eta_days_max} рабочих дней`} />
+              <DetailRow label="Срок доставки" value={`${selectedRate.eta_days_min}-${selectedRate.eta_days_max} рабочих дней`} />
               <DetailRow label="Ограничения" value="Макс. 30 кг · 150×150×150 см" muted />
               <DetailRow label="Страховка" value="Нет" />
             </div>

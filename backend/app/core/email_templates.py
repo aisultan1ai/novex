@@ -24,7 +24,7 @@ _BADGE_GRAY = "display:inline-block;padding:4px 12px;background:#f1f5f9;color:#4
 
 
 def _wrap(body_inner: str) -> str:
-    return f'<div style="{_BASE_STYLE}">{body_inner}<p style="{_FOOTER_STYLE}">Novex — агрегатор курьерских услуг. Если у вас есть вопросы, ответьте на это письмо.</p></div>'
+    return f'<div style="{_BASE_STYLE}">{body_inner}<p style="{_FOOTER_STYLE}">Novex - агрегатор курьерских услуг. Если у вас есть вопросы, ответьте на это письмо.</p></div>'
 
 
 def _order_link(order_id: int) -> str:
@@ -44,7 +44,7 @@ def _greeting(user_name: str | None) -> str:
 # ── templates ──────────────────────────────────────────────────────────────
 
 def _tpl_payment_under_review(order_id: int, user_name: str | None) -> tuple[str, str]:
-    subject = f"Чек получен — Заказ #{order_id} на проверке"
+    subject = f"Чек получен - Заказ #{order_id} на проверке"
     html = _wrap(f"""
       <h2 style="{_HEADER_STYLE}">{_greeting(user_name)}</h2>
       <span style="{_BADGE_BLUE}">Чек на проверке</span>
@@ -58,13 +58,13 @@ def _tpl_payment_under_review(order_id: int, user_name: str | None) -> tuple[str
 
 
 def _tpl_paid(order_id: int, user_name: str | None) -> tuple[str, str]:
-    subject = f"Оплата подтверждена — Заказ #{order_id}"
+    subject = f"Оплата подтверждена - Заказ #{order_id}"
     html = _wrap(f"""
       <h2 style="{_HEADER_STYLE}">{_greeting(user_name)}</h2>
       <span style="{_BADGE_GREEN}">Оплата подтверждена</span>
       <p style="{_BODY_STYLE}">
         Оплата по заказу <b>#{order_id}</b> успешно подтверждена.<br>
-        Мы передаём ваш заказ в службу доставки — вы получите уведомление, как только он будет забран.
+        Мы передаём ваш заказ в службу доставки - вы получите уведомление, как только он будет забран.
       </p>
       {_cta(order_id, 'Отследить заказ')}
     """)
@@ -72,7 +72,7 @@ def _tpl_paid(order_id: int, user_name: str | None) -> tuple[str, str]:
 
 
 def _tpl_payment_rejected(order_id: int, user_name: str | None, reject_reason: str | None) -> tuple[str, str]:
-    subject = f"Чек отклонён — Заказ #{order_id}"
+    subject = f"Чек отклонён - Заказ #{order_id}"
     reason_block = (
         f'<p style="background:#fff1f2;border-left:3px solid #f43f5e;padding:12px 16px;border-radius:0 8px 8px 0;color:#9f1239;font-size:14px;margin-bottom:20px;"><b>Причина:</b> {reject_reason}</p>'
         if reject_reason else ""
@@ -93,7 +93,7 @@ def _tpl_payment_rejected(order_id: int, user_name: str | None, reject_reason: s
 
 
 def _tpl_dispatched(order_id: int, user_name: str | None) -> tuple[str, str]:
-    subject = f"Заказ передан перевозчику — #{order_id}"
+    subject = f"Заказ передан перевозчику - #{order_id}"
     html = _wrap(f"""
       <h2 style="{_HEADER_STYLE}">{_greeting(user_name)}</h2>
       <span style="{_BADGE_BLUE}">Передан перевозчику</span>
@@ -106,7 +106,7 @@ def _tpl_dispatched(order_id: int, user_name: str | None) -> tuple[str, str]:
 
 
 def _tpl_in_transit(order_id: int, user_name: str | None) -> tuple[str, str]:
-    subject = f"Заказ в пути — #{order_id}"
+    subject = f"Заказ в пути - #{order_id}"
     html = _wrap(f"""
       <h2 style="{_HEADER_STYLE}">{_greeting(user_name)}</h2>
       <span style="{_BADGE_BLUE}">В пути</span>
@@ -119,7 +119,7 @@ def _tpl_in_transit(order_id: int, user_name: str | None) -> tuple[str, str]:
 
 
 def _tpl_arrived(order_id: int, user_name: str | None) -> tuple[str, str]:
-    subject = f"Заказ прибыл в пункт выдачи — #{order_id}"
+    subject = f"Заказ прибыл в пункт выдачи - #{order_id}"
     html = _wrap(f"""
       <h2 style="{_HEADER_STYLE}">{_greeting(user_name)}</h2>
       <span style="{_BADGE_GREEN}">Прибыл в пункт выдачи</span>
@@ -132,7 +132,7 @@ def _tpl_arrived(order_id: int, user_name: str | None) -> tuple[str, str]:
 
 
 def _tpl_delivered(order_id: int, user_name: str | None) -> tuple[str, str]:
-    subject = f"Заказ доставлен — #{order_id}"
+    subject = f"Заказ доставлен - #{order_id}"
     html = _wrap(f"""
       <h2 style="{_HEADER_STYLE}">{_greeting(user_name)}</h2>
       <span style="{_BADGE_GREEN}">Доставлен</span>
@@ -145,13 +145,13 @@ def _tpl_delivered(order_id: int, user_name: str | None) -> tuple[str, str]:
 
 
 def _tpl_cancelled(order_id: int, user_name: str | None) -> tuple[str, str]:
-    subject = f"Заказ отменён — #{order_id}"
+    subject = f"Заказ отменён - #{order_id}"
     html = _wrap(f"""
       <h2 style="{_HEADER_STYLE}">{_greeting(user_name)}</h2>
       <span style="{_BADGE_GRAY}">Отменён</span>
       <p style="{_BODY_STYLE}">
         Заказ <b>#{order_id}</b> был отменён.<br>
-        Если у вас есть вопросы — ответьте на это письмо, мы поможем.
+        Если у вас есть вопросы - ответьте на это письмо, мы поможем.
       </p>
       {_cta(order_id, 'Создать новый заказ')}
     """)
@@ -159,7 +159,7 @@ def _tpl_cancelled(order_id: int, user_name: str | None) -> tuple[str, str]:
 
 
 def _tpl_returned(order_id: int, user_name: str | None) -> tuple[str, str]:
-    subject = f"Возврат оформлен — #{order_id}"
+    subject = f"Возврат оформлен - #{order_id}"
     html = _wrap(f"""
       <h2 style="{_HEADER_STYLE}">{_greeting(user_name)}</h2>
       <span style="{_BADGE_GRAY}">Возврат оформлен</span>

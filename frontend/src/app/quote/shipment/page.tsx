@@ -83,7 +83,7 @@ function mapPartyFormToPayload(party: PartyFormState): ShipmentPartyInput {
   };
 }
 
-// Standard envelope dimensions used when shipment_type is "document" — carriers
+// Standard envelope dimensions used when shipment_type is "document" - carriers
 // still require positive dimensions on their APIs even for docs.
 const DOCUMENT_ENVELOPE_CM = { width: 32, height: 22, depth: 1 };
 
@@ -322,7 +322,7 @@ function PvzPickerSection({
     cursor: "pointer",
   };
   const hint = !city.trim()
-    ? "Введите город выше — тогда покажем список ПВЗ."
+    ? "Введите город выше - тогда покажем список ПВЗ."
     : loading
     ? "Загружаем список ПВЗ…"
     : list.length === 0
@@ -337,7 +337,7 @@ function PvzPickerSection({
           disabled={loading || list.length === 0}
           style={selectStyle}
         >
-          <option value="">— Выберите ПВЗ —</option>
+          <option value="">- Выберите ПВЗ -</option>
           {list.map((p) => (
             <option key={p.guid} value={p.guid}>
               {p.address}{p.schedule ? `  •  ${p.schedule}` : ""}
@@ -435,7 +435,7 @@ function TariffSummary({
             color: "#2563EB",
             marginBottom: isMobile ? 0 : 12,
           }}>
-            {draft.eta_days_min_snapshot}–{draft.eta_days_max_snapshot} дн.
+            {draft.eta_days_min_snapshot}-{draft.eta_days_max_snapshot} дн.
           </div>
         </div>
         <button
@@ -729,7 +729,7 @@ function ShipmentPageInner() {
   const [recipientPvzList, setRecipientPvzList] = useState<CsePvzItem[]>([]);
   const [pvzLoading, setPvzLoading] = useState<{ sender: boolean; recipient: boolean }>({ sender: false, recipient: false });
   // "checked" = we've actually queried CSE for this city and know the result.
-  // Distinguishes "не проверяли" from "проверили и пусто" — the latter must
+  // Distinguishes "не проверяли" from "проверили и пусто" - the latter must
   // disable warehouse delivery options; the former must not.
   const [pvzChecked, setPvzChecked] = useState<{ sender: boolean; recipient: boolean }>({ sender: false, recipient: false });
 
@@ -742,7 +742,7 @@ function ShipmentPageInner() {
   const isCse = (draft?.carrier_code_snapshot ?? "").toLowerCase() === "cse";
   const senderLegWh = form.delivery_type === "warehouse_to_door" || form.delivery_type === "warehouse_to_warehouse";
   const recipientLegWh = form.delivery_type === "door_to_warehouse" || form.delivery_type === "warehouse_to_warehouse";
-  // City the PVZ check should use — prefer what user typed in the form once
+  // City the PVZ check should use - prefer what user typed in the form once
   // they've reached step 1/2, else fall back to the route city captured when
   // the tariff was picked (draft.*_city_snapshot). This lets us pre-check on
   // step 0 (Данные отправления) before the party forms are filled.
@@ -775,7 +775,7 @@ function ShipmentPageInner() {
   }, [currentUser]);
 
   // Fetch PVZ lists proactively for CSE regardless of the currently-selected
-  // delivery_type — we need to know availability up-front on step 0 so that
+  // delivery_type - we need to know availability up-front on step 0 so that
   // warehouse-based delivery options can be disabled when the destination
   // (or origin) city has no CSE pickup points.
   useEffect(() => {
@@ -857,7 +857,7 @@ function ShipmentPageInner() {
     const heightOverride = Number.isFinite(h) && h > 0 ? h : null;
     const depthOverride = Number.isFinite(d) && d > 0 ? d : null;
 
-    // If neither dims/weight nor CSE add-ons are set, don't override —
+    // If neither dims/weight nor CSE add-ons are set, don't override -
     // the TariffSummary will show the original price_snapshot.
     const hasDimOverride =
       weightOverride !== null || widthOverride !== null ||
@@ -882,7 +882,7 @@ function ShipmentPageInner() {
           if (r.recalculated) setLivePrice({ price: Number(r.price), currency: r.currency });
           else setLivePrice(null);
         })
-        .catch(() => { /* silent — TariffSummary falls back to draft.price_snapshot */ })
+        .catch(() => { /* silent - TariffSummary falls back to draft.price_snapshot */ })
         .finally(() => setIsRecalculating(false));
     }, 500);
 

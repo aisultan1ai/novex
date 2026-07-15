@@ -457,7 +457,7 @@ export default function OrderDetailPage() {
             </h2>
             {order.status !== "sent_to_carrier" && (
               <p style={{ margin: "0 0 16px", fontSize: 13, color: "#64748b", lineHeight: 1.5 }}>
-                Заказ будет отменён. Возврат средств оформит администратор — обычно 3–5 рабочих дней.
+                Заказ будет отменён. Возврат средств оформит администратор - обычно 3-5 рабочих дней.
               </p>
             )}
 

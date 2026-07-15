@@ -246,7 +246,7 @@ function MyOrdersPageInner() {
               </div>
 
               <div style={{ fontSize: 12, color: "#64748b" }}>
-                {order.carrier_name_snapshot} · {order.tariff_name_snapshot} · {order.eta_days_min_snapshot}–{order.eta_days_max_snapshot} дн.
+                {order.carrier_name_snapshot} · {order.tariff_name_snapshot} · {order.eta_days_min_snapshot}-{order.eta_days_max_snapshot} дн.
               </div>
             </div>
           ))}

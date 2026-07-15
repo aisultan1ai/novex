@@ -82,7 +82,7 @@ function VerifyEmailBanner({ email, isMobile }: { email: string; isMobile: boole
     try {
       await resendVerificationEmail();
       setStatus("sent");
-      setMessage("Письмо отправлено — проверьте почту.");
+      setMessage("Письмо отправлено - проверьте почту.");
     } catch (err) {
       setStatus("error");
       setMessage(
@@ -260,7 +260,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      {/* NAV TABS — горизонтальный скролл на мобилке */}
+      {/* NAV TABS - горизонтальный скролл на мобилке */}
       <nav
         style={{
           background: "#ffffff",
@@ -314,7 +314,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         })}
       </nav>
 
-      {/* VERIFY EMAIL BANNER — visible only until the user confirms their email */}
+      {/* VERIFY EMAIL BANNER - visible only until the user confirms their email */}
       {currentUser && currentUser.email_verified === false && (
         <VerifyEmailBanner email={currentUser.email} isMobile={isMobile} />
       )}

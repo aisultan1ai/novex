@@ -38,7 +38,7 @@ function extractErrorDetail(data: unknown, status: number): string {
           if (typeof item !== "object" || item === null) return null;
           const msg = (item as { msg?: unknown }).msg;
           if (typeof msg !== "string") return null;
-          // Pydantic prefixes user errors with "Value error, " — strip it
+          // Pydantic prefixes user errors with "Value error, " - strip it
           return msg.replace(/^Value error,\s*/, "");
         })
         .filter((m): m is string => !!m);

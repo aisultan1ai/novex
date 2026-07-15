@@ -52,7 +52,7 @@ export default function Footer() {
             marginBottom: isMobile ? 36 : 48,
           }}
         >
-          {/* Brand — spans both columns on mobile */}
+          {/* Brand - spans both columns on mobile */}
           <div style={isMobile ? { gridColumn: "1 / -1" } : {}}>
             <Link
               href="/"

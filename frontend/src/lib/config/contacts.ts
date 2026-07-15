@@ -1,6 +1,6 @@
 // Публичные контакты, отображаемые в шапке/футере/лендингах.
 // Значения берутся из NEXT_PUBLIC_* переменных окружения (файл .env), с
-// разумными дефолтами для локальной разработки. Дефолты — только заглушки;
+// разумными дефолтами для локальной разработки. Дефолты - только заглушки;
 // на проде все три переменных должны быть переопределены в .env.
 //
 // Как поменять в проде:
@@ -10,7 +10,7 @@
 //     NEXT_PUBLIC_PARTNERS_EMAIL=partners@company.kz
 //     NEXT_PUBLIC_OFFICE_ADDRESS=Алматы, Казахстан
 //
-// NEXT_PUBLIC_ префикс обязателен — без него Next.js не подставит значение
+// NEXT_PUBLIC_ префикс обязателен - без него Next.js не подставит значение
 // в клиентский бандл. После правки .env нужен ребилд фронта.
 
 export const CONTACTS = {
@@ -20,7 +20,7 @@ export const CONTACTS = {
   officeAddress: process.env.NEXT_PUBLIC_OFFICE_ADDRESS || "Алматы, Казахстан",
 } as const;
 
-// Телефон для href="tel:" — убираем всё кроме цифр и ведущего +.
+// Телефон для href="tel:" - убираем всё кроме цифр и ведущего +.
 export function phoneHref(phone: string): string {
   const cleaned = phone.replace(/[^\d+]/g, "");
   return `tel:${cleaned}`;

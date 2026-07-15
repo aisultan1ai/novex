@@ -167,7 +167,7 @@ export default function CarrierOrderDetailPage() {
         </div>
       )}
 
-      {/* Carrier IDs — orderno / barcode returned by carrier API */}
+      {/* Carrier IDs - orderno / barcode returned by carrier API */}
       {(order.carrier_tracking_number || order.carrier_barcode) && (
         <div style={styles.card}>
           <div style={styles.cardTitle}>Идентификаторы</div>

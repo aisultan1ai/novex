@@ -16,11 +16,11 @@ def send_email(*, to: str, subject: str, html: str) -> None:
 
     if not settings.smtp_host or not settings.smtp_user:
         logger.warning(
-            "SMTP не настроен — письмо не отправлено. To: %s | Subject: %s", to, subject
+            "SMTP не настроен - письмо не отправлено. To: %s | Subject: %s", to, subject
         )
         return
 
-    # Envelope-from stays a bare address — most SMTP servers reject a MAIL FROM
+    # Envelope-from stays a bare address - most SMTP servers reject a MAIL FROM
     # command that carries a display name. The header From: gets the pretty
     # "Name <addr>" via formataddr, which handles RFC 2047 encoding for
     # non-ASCII display names (Cyrillic works out of the box).

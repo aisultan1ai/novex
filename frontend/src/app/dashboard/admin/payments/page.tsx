@@ -352,7 +352,7 @@ export default function AdminPaymentsPage() {
                 </td>
                 <td style={styles.td}>
                   <div style={{ display: "flex", gap: 6, flexDirection: "column" }}>
-                    {/* View proof button — always visible */}
+                    {/* View proof button - always visible */}
                     <button
                       onClick={() => setProofPaymentId(p.id)}
                       style={styles.btnProof}

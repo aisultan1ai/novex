@@ -295,7 +295,7 @@ function OrderDetailPanel({ orderId }: { orderId: number }) {
           <dp.Field label="Тип отправления"  value={SHIPMENT_TYPE_LABELS[detail.shipment_type] ?? detail.shipment_type} />
           <dp.Field label="Перевозчик"        value={detail.carrier_name} />
           <dp.Field label="Тариф"             value={detail.tariff_name} />
-          <dp.Field label="Срок доставки"     value={`${detail.eta_days_min}–${detail.eta_days_max} раб. дней`} />
+          <dp.Field label="Срок доставки"     value={`${detail.eta_days_min}-${detail.eta_days_max} раб. дней`} />
           <dp.Field label="Создан"            value={new Date(detail.created_at).toLocaleString("ru-RU")} />
           <dp.Field label="Обновлён"          value={new Date(detail.updated_at).toLocaleString("ru-RU")} />
         </div>

@@ -382,7 +382,7 @@ function QuoteResultsPageInner() {
                         flexWrap: "wrap",
                         paddingLeft: isMobile ? 50 : 60,
                       }}>
-                        <span>Срок: {rate.eta_days_min}–{rate.eta_days_max} дн.</span>
+                        <span>Срок: {rate.eta_days_min}-{rate.eta_days_max} дн.</span>
                         {/эконом|econom/i.test(rate.tariff_name) && (
                           <span style={{ color: "#F59E0B" }}>мин. 10 кг</span>
                         )}

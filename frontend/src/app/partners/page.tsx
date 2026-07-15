@@ -171,7 +171,7 @@ export default function PartnersPage() {
               Оставить заявку
             </h2>
             <p style={{ font: "400 15px/1.55 Inter Variable, sans-serif", color: "#6B7280", margin: "0 0 28px", textAlign: "center" }}>
-              Оставьте заявку — наш менеджер свяжется с вами.
+              Оставьте заявку - наш менеджер свяжется с вами.
             </p>
 
             {submitted ? (

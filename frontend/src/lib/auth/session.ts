@@ -46,7 +46,7 @@ export function getStoredCurrentUser(): ProfileResponse | null {
       full_name: stored.full_name ?? null,
       phone: null,
       is_active: true,
-      // Assume verified when hydrating from localStorage — the freshest value
+      // Assume verified when hydrating from localStorage - the freshest value
       // comes from /auth/profile on next mount and will overwrite this.
       email_verified: true,
       role: stored.role as ProfileResponse["role"],

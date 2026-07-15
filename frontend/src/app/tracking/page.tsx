@@ -264,7 +264,7 @@ function TrackingResults({
               <div style={{ font: "600 16px/1 Inter Variable, sans-serif", color: "#111827" }}>
                 {data.eta_days_min === data.eta_days_max
                   ? `${data.eta_days_min} дн.`
-                  : `${data.eta_days_min}–${data.eta_days_max} дн.`}
+                  : `${data.eta_days_min}-${data.eta_days_max} дн.`}
               </div>
             </div>
           </div>

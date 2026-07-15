@@ -17,12 +17,12 @@ const CARRIER_DEFAULTS: Record<string, { api_url: string; extra_config: Record<s
   azimuth: {
     api_url: "https://api.azimuthcargo.kz",
     extra_config: { payment_type: 2, payer: 1, payer_tin: "" },
-    hint: "payment_type (1=Наличные, 2=Безнал, 3=Электронный), payer (1=Отправитель, 2=Получатель, 3=Третье лицо), payer_tin — ИИН/БИН плательщика, ровно 12 цифр (обязательно). service_type определяется автоматически из тарифа выбранного клиентом.",
+    hint: "payment_type (1=Наличные, 2=Безнал, 3=Электронный), payer (1=Отправитель, 2=Получатель, 3=Третье лицо), payer_tin - ИИН/БИН плательщика, ровно 12 цифр (обязательно). service_type определяется автоматически из тарифа выбранного клиентом.",
   },
   exline: {
     api_url: "https://home.courierexe.ru/api/",
     extra_config: { extra: "", login: "", password: "" },
-    hint: "extra — идентификатор компании в MeaSoft, login — логин, password — пароль",
+    hint: "extra - идентификатор компании в MeaSoft, login - логин, password - пароль",
     no_token: true,
   },
   cse: {
@@ -134,7 +134,7 @@ export default function CarrierAPIPage() {
       const saved = await upsertCarrierAPICredentials(carrier.code, {
         carrier_code: carrier.code,
         api_url: form.api_url.trim(),
-        api_token: form.api_token.trim(),  // "" is valid — backend re-encrypts with current key
+        api_token: form.api_token.trim(),  // "" is valid - backend re-encrypts with current key
         is_active: form.is_active,
         extra_config: extra,
       });
