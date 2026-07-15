@@ -224,19 +224,50 @@ class ExlineAPIClient(CarrierAPIClient):
 
         body = resp.text.strip()
 
-        # Случай 2: XML-ответ с ошибкой
-        if body.startswith("<") and ("error" in body.lower()):
+        # Случай 2: XML-ответ. По документации Exline waybill возвращает
+        #   <waybill><file name="...">BASE64_PDF</file></waybill>
+        # В XML также может быть атрибут error != "0".
+        if body.startswith("<"):
             try:
                 root = ET.fromstring(body)
+            except ET.ParseError:
+                root = None
+            if root is not None:
                 err = root.attrib.get("error", "0")
                 if err and err != "0":
-                    msg = root.attrib.get("errormsg", root.attrib.get("errormsgru", "unknown"))
+                    msg = (
+                        root.attrib.get("errormsgru")
+                        or root.attrib.get("errormsg", "unknown")
+                    )
                     raise RuntimeError(f"Exline waybill API error {err}: {msg}")
-            except ET.ParseError:
-                pass
+                # Реальный API возвращает <waybill><content>BASE64</content></waybill>.
+                # Вики упоминает <file> — на всякий случай поддерживаем оба.
+                # NB: Element.__bool__ ложен у элемента без детей, поэтому
+                # используем явный is-not-None каскад вместо `a or b`.
+                file_node = root.find(".//content")
+                if file_node is None:
+                    file_node = root.find(".//file")
+                if file_node is not None and file_node.text:
+                    raw_b64 = "".join(file_node.text.split())
+                    try:
+                        decoded = base64.b64decode(raw_b64, validate=True)
+                    except Exception as exc:
+                        raise RuntimeError(
+                            f"Exline waybill: не удалось декодировать base64 в <file> "
+                            f"для invoice_id={invoice_id}: {exc}"
+                        ) from exc
+                    if decoded[:4] != b"%PDF":
+                        raise RuntimeError(
+                            f"Exline waybill: декодированный <file> не PDF "
+                            f"для invoice_id={invoice_id} (первые байты: {decoded[:8]!r})"
+                        )
+                    logger.info(
+                        "Exline waybill: PDF извлечён из <file>, invoice_id=%s size=%d",
+                        invoice_id, len(decoded),
+                    )
+                    return decoded
 
-        # Случай 3: API вернул PDF как base64-строку (тело — raw base64, content-type text/*)
-        # Exline может вернуть base64 без оборачивания в XML/HTML
+        # Случай 3: API вернул PDF как "голую" base64-строку (без XML-обёртки).
         raw_b64 = body.replace("\n", "").replace("\r", "").replace(" ", "")
         try:
             decoded = base64.b64decode(raw_b64, validate=True)
