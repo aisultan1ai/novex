@@ -273,17 +273,28 @@ class ExlineAPIClient(CarrierAPIClient):
         xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <cancelorder>
   {self._auth_tag(creds)}
-  <orderno>{_esc(invoice_id)}</orderno>
+  <order orderno="{_esc(invoice_id)}" />
 </cancelorder>"""
         try:
             root = self._post_xml(xml, self._api_url(creds))
-            success = root.attrib.get("error", "1") == "0"
-            if not success:
+            order_node = root.find("order")
+            if order_node is None:
                 logger.warning(
-                    "Exline cancel_invoice failed: %s",
-                    root.attrib.get("errormsg", ""),
+                    "Exline cancel_invoice: no <order> in response for orderno=%s: %s",
+                    invoice_id, ET.tostring(root, encoding="unicode"),
                 )
-            return success
+                return False
+            err = order_node.attrib.get("error", "1")
+            if err != "0":
+                logger.warning(
+                    "Exline cancel_invoice failed: orderno=%s error=%s msg=%s",
+                    invoice_id,
+                    err,
+                    order_node.attrib.get("errormsgru")
+                    or order_node.attrib.get("errormsg", ""),
+                )
+                return False
+            return True
         except Exception as exc:
             logger.warning("Exline cancel_invoice exception: %s", exc)
             return False

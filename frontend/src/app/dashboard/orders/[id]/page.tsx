@@ -455,11 +455,11 @@ export default function OrderDetailPage() {
             <h2 style={{ margin: "0 0 8px", fontSize: 20, fontWeight: 800, color: "#111827" }}>
               Отменить заказ #{order.draft_id}?
             </h2>
-            <p style={{ margin: "0 0 16px", fontSize: 13, color: "#64748b", lineHeight: 1.5 }}>
-              {order.status === "sent_to_carrier"
-                ? "Мы попробуем отменить заказ у перевозчика. Если он уже в пути — отмена не сработает."
-                : "Заказ будет отменён. Возврат средств оформит администратор — обычно 3–5 рабочих дней."}
-            </p>
+            {order.status !== "sent_to_carrier" && (
+              <p style={{ margin: "0 0 16px", fontSize: 13, color: "#64748b", lineHeight: 1.5 }}>
+                Заказ будет отменён. Возврат средств оформит администратор — обычно 3–5 рабочих дней.
+              </p>
+            )}
 
             <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6 }}>
               Причина отмены <span style={{ color: "#ef4444" }}>*</span>
@@ -468,7 +468,6 @@ export default function OrderDetailPage() {
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
               rows={4}
-              placeholder="Например: передумал отправлять, ошибся в адресе, изменились планы…"
               maxLength={500}
               disabled={isCancelling}
               style={{ width: "100%", padding: "10px 12px", border: "1px solid #e5e7eb", borderRadius: 10, fontSize: 14, fontFamily: "inherit", outline: "none", resize: "vertical", boxSizing: "border-box", color: "#111827", background: "#fff" }}

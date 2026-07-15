@@ -203,7 +203,6 @@ export default function PartnersPage() {
                   <div style={{ display: "grid", gap: 8 }}>
                     {[
                       { key: "api", label: "Готовы к автоматической интеграции" },
-                      { key: "manual", label: "Принимаем заказы вручную через кабинет" },
                       { key: "unsure", label: "Нужна консультация" },
                     ].map((opt) => (
                       <label key={opt.key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", border: form.integration_type === opt.key ? "1px solid #2563EB" : "1px solid #E5E7EB", borderRadius: 10, background: form.integration_type === opt.key ? "#EFF6FF" : "#FFFFFF", cursor: submitting ? "not-allowed" : "pointer", transition: "all 0.15s" }}>
