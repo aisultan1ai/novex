@@ -74,6 +74,15 @@ export interface UpdateShipmentDetailsRequest {
   delivery_type?: DeliveryType;
   sender_pvz_guid?: string | null;
   recipient_pvz_guid?: string | null;
+  // Optional courier pickup — consumed by the Azimuth /order-courier flow
+  // in the dispatch worker. When pickup_requested is true the backend
+  // requires pickup_date + pickup_time_slot. contact_person / phone default
+  // to the sender on the server side when left blank.
+  pickup_requested?: boolean;
+  pickup_date?: string | null;      // YYYY-MM-DD
+  pickup_time_slot?: string | null; // e.g. "14:00-18:00"
+  pickup_contact_person?: string | null;
+  pickup_contact_phone?: string | null;
 }
 
 export type ShipmentPartyResponse = {
@@ -131,6 +140,16 @@ export type OrderDraftResponse = {
   delivery_type: DeliveryType;
   sender_pvz_guid: string | null;
   recipient_pvz_guid: string | null;
+
+  pickup_requested?: boolean;
+  pickup_date?: string | null;
+  pickup_time_slot?: string | null;
+  pickup_contact_person?: string | null;
+  pickup_contact_phone?: string | null;
+  // Set by the backend once /order-courier succeeded (or once, if it fails,
+  // pickup_error carries the last error message for admin retry).
+  pickup_scheduled?: boolean;
+  pickup_error?: string | null;
 
   sender: ShipmentPartyResponse | null;
   recipient: ShipmentPartyResponse | null;

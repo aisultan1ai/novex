@@ -213,6 +213,22 @@ class DispatchWorker:
                 comment=f"Dispatched via job {job.id}",
             )
 
+            # ── Azimuth /order-courier (optional second step) ──────────────
+            # After create_invoice succeeds, if the customer asked us to
+            # schedule a courier pickup, fire the separate order-courier
+            # request. This is INDEPENDENT of the main dispatch: a pickup
+            # failure does NOT roll back the invoice — Azimuth has no undo
+            # for a created waybill, and retrying dispatch as a whole would
+            # spawn a second waybill. Instead we record pickup_error so an
+            # admin can trigger a pickup-only retry via a dedicated endpoint.
+            if (
+                order.carrier_code_snapshot
+                and order.carrier_code_snapshot.lower() == "azimuth"
+                and order.pickup_requested
+                and not order.pickup_scheduled_azimuth_id
+            ):
+                self._schedule_azimuth_pickup(db, order)
+
             job.status = DispatchJobStatus.COMPLETED
             job.completed_at = _utcnow()
             logger.info("dispatch_worker: job %s completed, order %s sent_to_carrier", job.id, order.id)
@@ -312,6 +328,140 @@ class DispatchWorker:
             shipment = _shipments_repo.get_by_order_id(db, order.id)
             return shipment.carrier_tracking_number if shipment else None
         return None
+
+    def _schedule_azimuth_pickup(self, db: Session, order: OrderDraft) -> None:
+        """Fire Azimuth's /order-courier for an already-dispatched order.
+
+        Idempotent: refuses to re-schedule when pickup_scheduled_azimuth_id
+        is set (Azimuth has no dedup on their side, so we hold the lock).
+        A failure here does not raise — it records the error on the order
+        for an admin retry.
+        """
+        from app.modules.carriers.api_clients.azimuth import AzimuthAPIClient
+        from app.modules.carriers.azimuth_regions import AzimuthRegionsRepository
+
+        creds_row = CarrierAPICredentialsRepository().get_by_carrier_code(db, "azimuth")
+        if not creds_row or not creds_row.is_active:
+            order.pickup_error = "Нет активных Azimuth-креденшелсов"
+            return
+        creds = {
+            "api_url": creds_row.api_url,
+            "api_token": creds_row.api_token,
+            **(creds_row.extra_config or {}),
+        }
+
+        sender = next((p for p in order.parties if p.role == "sender"), None)
+        recipient = next((p for p in order.parties if p.role == "recipient"), None)
+        if not sender:
+            order.pickup_error = "Нет данных отправителя для вызова курьера"
+            return
+
+        # Resolve the exact `region` string Azimuth expects — the docs example
+        # is "title, path" (e.g. "Алматы, Казахстан, город Алматы"). We store
+        # {title, path} from /regions and glue them here.
+        regions_repo = AzimuthRegionsRepository()
+        sender_reg = regions_repo.find(db, sender.city, direction="origin")
+        # Payer defaults to sender (typical case: same person pays). Fall back
+        # to origin-side lookup for the payer's city too so the field is not
+        # silently empty.
+        payer_source = sender  # simple default; extend when payer_* fields exist
+        payer_reg = regions_repo.find(db, payer_source.city, direction="origin")
+
+        def _region_str(row, fallback_city: str) -> str:
+            if row is None:
+                return fallback_city
+            return f"{row.title}, {row.path}" if row.path else row.title
+
+        # Map our tariff → Azimuth service_type (same mapping as create_invoice).
+        tariff_lower = (order.tariff_name_snapshot or "").lower()
+        shipment_lower = (order.shipment_type_snapshot or "").lower()
+        service_type: int | None = None
+        if "экспресс-пакет" in tariff_lower or "express-package" in tariff_lower:
+            service_type = 3
+        elif "экспресс" in tariff_lower or "express" in tariff_lower:
+            service_type = 2
+        elif "стандарт" in tariff_lower or "standard" in tariff_lower:
+            service_type = 1
+        elif "эконом" in tariff_lower or "economy" in tariff_lower:
+            service_type = 1
+        elif shipment_lower == "document":
+            service_type = 3
+        service_type = service_type or int(creds.get("service_type", 2))
+
+        total_qty = sum(int(p.quantity) for p in order.packages) or 1
+
+        pickup_time = (order.pickup_time_slot or "").strip()
+        pickup_date = order.pickup_date.isoformat() if order.pickup_date else ""
+
+        payload = {
+            "sender_name": sender.full_name,
+            "sender_tin": sender.tax_id or "",
+            "sender_region": _region_str(sender_reg, sender.city),
+            "sender_address": sender.address_line1,
+            "sender_phone": sender.phone,
+            "payer_name": payer_source.full_name,
+            "payer_tin": payer_source.tax_id or "",
+            "payer_region": _region_str(payer_reg, payer_source.city),
+            "payer_address": payer_source.address_line1,
+            "payer_phone": payer_source.phone,
+            "service_type": service_type,
+            "payer_type": int(creds.get("payer", 1)),
+            "quantity": total_qty,
+            "pickup_date": pickup_date,
+            "pickup_time": pickup_time,
+            "contact_person": order.pickup_contact_person or sender.full_name,
+            "contact_person_phone": order.pickup_contact_phone or sender.phone,
+            "payment": int(creds.get("payment_type", 2)),
+            "notes": (recipient.comment if recipient else None) or "",
+        }
+
+        t0 = time.time()
+        try:
+            resp = AzimuthAPIClient().schedule_pickup(payload, creds)
+        except Exception as exc:
+            order.pickup_error = str(exc)[:1000]
+            _integration_log.create(
+                db, carrier_code="azimuth", direction="outbound",
+                event_type="order_courier", order_id=order.id,
+                payload=json.dumps(mask_pii(payload), ensure_ascii=False),
+                duration_ms=int((time.time() - t0) * 1000),
+                status="error", error_message=str(exc),
+            )
+            logger.warning(
+                "Azimuth pickup failed for order=%s (invoice OK, admin can retry pickup): %s",
+                order.id, exc,
+            )
+            return
+
+        # Success — store an idempotency lock so a re-run of the dispatch job
+        # cannot schedule a second pickup. Azimuth does not return their own
+        # id in the docs, so we use a synthesised marker (timestamp) when the
+        # body has no obvious id field.
+        azimuth_id = ""
+        if isinstance(resp, dict):
+            inner = resp.get("data") if isinstance(resp.get("data"), dict) else resp
+            azimuth_id = str(
+                inner.get("id")
+                or inner.get("courier_order_id")
+                or inner.get("uuid")
+                or ""
+            )
+        if not azimuth_id:
+            azimuth_id = f"pickup-{order.id}-{int(t0)}"
+        order.pickup_scheduled_azimuth_id = azimuth_id
+        order.pickup_error = None
+        _integration_log.create(
+            db, carrier_code="azimuth", direction="outbound",
+            event_type="order_courier", order_id=order.id,
+            payload=json.dumps(mask_pii(payload), ensure_ascii=False),
+            response=json.dumps(resp, ensure_ascii=False)[:2000],
+            duration_ms=int((time.time() - t0) * 1000),
+            status="success",
+        )
+        logger.info(
+            "Azimuth pickup scheduled for order=%s azimuth_id=%s date=%s time=%s",
+            order.id, azimuth_id, pickup_date, pickup_time,
+        )
 
     def _dispatch_to_carrier(self, db: Session, order: OrderDraft) -> _DispatchOutcome:
         carrier_code = order.carrier_code_snapshot
@@ -585,7 +735,11 @@ def _build_dispatch_payload(order: OrderDraft) -> dict:
             }
             for p in order.packages
         ],
-        "declared_value": float(order.price_snapshot or 0) if order.insurance else 0,
+        # Declared value = sum of package.declared_value only. Never fall back
+        # to price_snapshot (that's shipping cost, not goods value — carriers
+        # reject or mis-tariff insurance if we mix them). Mirrors the rule in
+        # _build_api_order_data.
+        "declared_value": sum(float(p.declared_value or 0) for p in order.packages),
         "currency": order.currency_snapshot,
         "additional_services": {
             "call_before_delivery": order.call_before_delivery,

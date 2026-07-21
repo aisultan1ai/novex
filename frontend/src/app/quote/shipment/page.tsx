@@ -46,7 +46,22 @@ type ShipmentFormState = {
   delivery_type: DeliveryType;
   sender_pvz_guid: string;
   recipient_pvz_guid: string;
+  // Azimuth-only: optional pickup request. When pickup_requested=true, the
+  // backend fires /order-courier immediately after admin approves payment.
+  // Ignored for CSE / Exline drafts.
+  pickup_requested: boolean;
+  pickup_date: string;       // YYYY-MM-DD
+  pickup_time_slot: string;  // one of PICKUP_TIME_SLOTS
 };
+
+// Slots we let the customer choose from. These map 1:1 to Azimuth's expected
+// pickup_time string (they accept a free-form label up to 50 chars). Kept in
+// UI-only so we can localise / A-B without touching the backend.
+const PICKUP_TIME_SLOTS: readonly string[] = [
+  "09:00-13:00",
+  "13:00-18:00",
+  "18:00-21:00",
+];
 
 const DELIVERY_TYPE_OPTIONS: { value: DeliveryType; label: string; hint: string }[] = [
   { value: "door_to_door",           label: "Курьер до двери",              hint: "Курьер заберёт у отправителя и привезёт получателю" },
@@ -104,13 +119,22 @@ function mapPackageFormToPayload(
   };
 }
 
-function buildShipmentPayload(form: ShipmentFormState, isDocument: boolean): UpdateShipmentDetailsRequest {
+function buildShipmentPayload(
+  form: ShipmentFormState,
+  isDocument: boolean,
+  isAzimuth: boolean,
+): UpdateShipmentDetailsRequest {
   const parsedDeclared = form.insurance ? Number(form.declared_value) : NaN;
   const declaredValue = Number.isFinite(parsedDeclared) && parsedDeclared > 0
     ? parsedDeclared
     : null;
   const senderWh = form.delivery_type === "warehouse_to_door" || form.delivery_type === "warehouse_to_warehouse";
   const recipientWh = form.delivery_type === "door_to_warehouse" || form.delivery_type === "warehouse_to_warehouse";
+  // Pickup fields are only meaningful for Azimuth. Silently drop them for
+  // other carriers so a customer who ticked "вызвать курьера" and then
+  // switched tariff does not send stale data to /order-courier for a
+  // non-Azimuth order.
+  const pickup = isAzimuth && form.pickup_requested;
   return {
     sender: mapPartyFormToPayload(form.sender),
     recipient: mapPartyFormToPayload(form.recipient),
@@ -121,6 +145,11 @@ function buildShipmentPayload(form: ShipmentFormState, isDocument: boolean): Upd
     delivery_type: form.delivery_type,
     sender_pvz_guid: senderWh ? (form.sender_pvz_guid || null) : null,
     recipient_pvz_guid: recipientWh ? (form.recipient_pvz_guid || null) : null,
+    pickup_requested: pickup,
+    pickup_date: pickup ? (form.pickup_date || null) : null,
+    pickup_time_slot: pickup ? (form.pickup_time_slot || null) : null,
+    // Contact person / phone default to the sender on the server side when
+    // omitted, so we do not need to duplicate them from the form here.
   };
 }
 
@@ -155,6 +184,9 @@ function mapDraftToForm(draft: OrderDraftResponse, user: ProfileResponse | null)
     delivery_type: draft.delivery_type ?? "door_to_door",
     sender_pvz_guid: draft.sender_pvz_guid ?? "",
     recipient_pvz_guid: draft.recipient_pvz_guid ?? "",
+    pickup_requested: draft.pickup_requested ?? false,
+    pickup_date: draft.pickup_date ?? "",
+    pickup_time_slot: draft.pickup_time_slot ?? "",
   };
 }
 
@@ -702,6 +734,9 @@ function ShipmentPageInner() {
         delivery_type: parsed.delivery_type ?? "door_to_door",
         sender_pvz_guid: parsed.sender_pvz_guid ?? "",
         recipient_pvz_guid: parsed.recipient_pvz_guid ?? "",
+        pickup_requested: parsed.pickup_requested ?? false,
+        pickup_date: parsed.pickup_date ?? "",
+        pickup_time_slot: parsed.pickup_time_slot ?? "",
       };
     } catch { return null; }
   }
@@ -715,7 +750,13 @@ function ShipmentPageInner() {
   }
 
   const [form, setForm] = useState<ShipmentFormState>(
-    () => loadSavedForm() ?? { sender: emptyParty(), recipient: emptyParty(), packageItem: emptyPackage(), call_before_delivery: false, insurance: false, fragile: false, declared_value: "", delivery_type: "door_to_door", sender_pvz_guid: "", recipient_pvz_guid: "" },
+    () => loadSavedForm() ?? {
+      sender: emptyParty(), recipient: emptyParty(), packageItem: emptyPackage(),
+      call_before_delivery: false, insurance: false, fragile: false,
+      declared_value: "",
+      delivery_type: "door_to_door", sender_pvz_guid: "", recipient_pvz_guid: "",
+      pickup_requested: false, pickup_date: "", pickup_time_slot: "",
+    },
   );
 
   const [draft, setDraft] = useState<OrderDraftResponse | null>(null);
@@ -740,6 +781,7 @@ function ShipmentPageInner() {
   const [isRecalculating, setIsRecalculating] = useState(false);
 
   const isCse = (draft?.carrier_code_snapshot ?? "").toLowerCase() === "cse";
+  const isAzimuth = (draft?.carrier_code_snapshot ?? "").toLowerCase() === "azimuth";
   const senderLegWh = form.delivery_type === "warehouse_to_door" || form.delivery_type === "warehouse_to_warehouse";
   const recipientLegWh = form.delivery_type === "door_to_warehouse" || form.delivery_type === "warehouse_to_warehouse";
   // City the PVZ check should use - prefer what user typed in the form once
@@ -990,6 +1032,20 @@ function ShipmentPageInner() {
           return "Укажите объявленную ценность для страхования.";
         }
       }
+      // Azimuth-only: validate pickup fields when the customer opted in.
+      // For other carriers pickup_* are dropped in buildShipmentPayload so
+      // there is nothing to validate.
+      if (isAzimuth && form.pickup_requested) {
+        if (!form.pickup_date) return "Укажите дату забора груза курьером.";
+        // Sanity: pickup date must be today or later.
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const picked = new Date(form.pickup_date);
+        if (isNaN(picked.getTime()) || picked < today) {
+          return "Дата забора не может быть в прошлом.";
+        }
+        if (!form.pickup_time_slot) return "Выберите интервал времени для забора.";
+      }
     }
     if (step === 1) {
       const s = form.sender;
@@ -1041,7 +1097,7 @@ function ShipmentPageInner() {
     setIsSubmitting(true);
     try {
       const isDocument = (draft.shipment_type_snapshot ?? "").toLowerCase() === "document";
-      await updateOrderDraftShipment(draft.draft_id, buildShipmentPayload(form, isDocument));
+      await updateOrderDraftShipment(draft.draft_id, buildShipmentPayload(form, isDocument, isAzimuth));
       clearSavedForm();
       router.push(`/checkout?draftId=${draft.draft_id}`);
     } catch (err) {
@@ -1256,6 +1312,120 @@ function ShipmentPageInner() {
                       )}
                     </div>
                   </SectionCard>
+
+                  {/* ── Azimuth pickup opt-in ─────────────────────────── */}
+                  {/* Ships to backend as pickup_requested + pickup_date +
+                      pickup_time_slot. After payment is approved by admin,
+                      the dispatch worker calls Azimuth /order-courier. For
+                      any other carrier this section is hidden and the
+                      payload silently drops these fields. */}
+                  {isAzimuth && (
+                    <SectionCard title="Вызов курьера Azimuth">
+                      <label style={{
+                        display: "flex", alignItems: "center", gap: 10, cursor: "pointer",
+                        font: "500 14px/1 Inter Variable, sans-serif", color: "#374151",
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={form.pickup_requested}
+                          onChange={(e) => updateForm((prev) => ({
+                            ...prev,
+                            pickup_requested: e.target.checked,
+                            // Wipe stale values when the customer toggles off
+                            // so we do not carry orphan data into checkout.
+                            pickup_date: e.target.checked ? prev.pickup_date : "",
+                            pickup_time_slot: e.target.checked ? prev.pickup_time_slot : "",
+                          }))}
+                          style={{ width: 16, height: 16, cursor: "pointer", accentColor: "#2563EB" }}
+                        />
+                        Вызвать курьера Azimuth для забора груза
+                      </label>
+                      <div style={{
+                        marginTop: 8,
+                        font: "400 12px/1.4 Inter Variable, sans-serif",
+                        color: "#6B7280",
+                      }}>
+                        Курьер приедет по адресу отправителя после подтверждения оплаты.
+                        Если не выбирать — груз нужно сдать в отделение Azimuth самостоятельно.
+                      </div>
+
+                      {form.pickup_requested && (
+                        <div style={{
+                          marginTop: 14,
+                          paddingTop: 14,
+                          borderTop: "1px dashed #E5E7EB",
+                          display: "grid",
+                          gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))",
+                          gap: 14,
+                        }}>
+                          <div>
+                            <label style={{
+                              display: "block",
+                              font: "600 13px/1 Inter Variable, sans-serif",
+                              color: "#374151",
+                              marginBottom: 6,
+                            }}>
+                              Дата забора <span style={{ color: "#EF4444", marginLeft: 2 }}>*</span>
+                            </label>
+                            <input
+                              type="date"
+                              value={form.pickup_date}
+                              min={new Date().toISOString().slice(0, 10)}
+                              onChange={(e) => updateForm((prev) => ({
+                                ...prev, pickup_date: e.target.value,
+                              }))}
+                              style={{
+                                width: "100%",
+                                padding: "11px 14px",
+                                borderRadius: 10,
+                                border: "1.5px solid #E5E7EB",
+                                font: "400 14px/1 Inter Variable, sans-serif",
+                                color: "#111827",
+                                background: "#fff",
+                                outline: "none",
+                                boxSizing: "border-box",
+                                fontFamily: "inherit",
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{
+                              display: "block",
+                              font: "600 13px/1 Inter Variable, sans-serif",
+                              color: "#374151",
+                              marginBottom: 6,
+                            }}>
+                              Интервал времени <span style={{ color: "#EF4444", marginLeft: 2 }}>*</span>
+                            </label>
+                            <select
+                              value={form.pickup_time_slot}
+                              onChange={(e) => updateForm((prev) => ({
+                                ...prev, pickup_time_slot: e.target.value,
+                              }))}
+                              style={{
+                                width: "100%",
+                                padding: "11px 14px",
+                                borderRadius: 10,
+                                border: "1.5px solid #E5E7EB",
+                                font: "400 14px/1 Inter Variable, sans-serif",
+                                color: "#111827",
+                                background: "#fff",
+                                outline: "none",
+                                boxSizing: "border-box",
+                                fontFamily: "inherit",
+                                cursor: "pointer",
+                              }}
+                            >
+                              <option value="">— Выберите интервал —</option>
+                              {PICKUP_TIME_SLOTS.map((slot) => (
+                                <option key={slot} value={slot}>{slot}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      )}
+                    </SectionCard>
+                  )}
                 </>
               )}
 

@@ -123,15 +123,19 @@ class IdentityService:
 
     def _send_verification_email(self, db: Session, user: User, frontend_url: str) -> None:
         """Generate a one-time token, store it in Redis, send the email, and
-        record the send timestamp for resend cooldown."""
+        (only on success) record the send timestamp for resend cooldown.
+
+        The timestamp is set AFTER `send_email` returns so that an SMTP outage
+        does not lock the user out of a legitimate resend attempt.
+        """
+        import html as _html
+
         token = secrets.token_urlsafe(32)
         r = get_redis()
         r.setex(f"verify_email:{token}", _VERIFY_EMAIL_TTL, str(user.id))
 
-        user.email_verify_sent_at = datetime.utcnow()
-        db.commit()
-
         verify_link = f"{frontend_url.rstrip('/')}/verify-email?token={token}"
+        safe_email = _html.escape(user.email)
         send_email(
             to=user.email,
             subject="Подтвердите email — Novex",
@@ -139,7 +143,7 @@ class IdentityService:
             <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px">
               <h2 style="color:#0f172a">Подтвердите email</h2>
               <p style="color:#475569">
-                Здравствуйте! Вы зарегистрировались на Novex как <b>{user.email}</b>.<br>
+                Здравствуйте! Вы зарегистрировались на Novex как <b>{safe_email}</b>.<br>
                 Нажмите кнопку ниже, чтобы подтвердить адрес и оформлять заказы.
               </p>
               <a href="{verify_link}"
@@ -153,6 +157,10 @@ class IdentityService:
             </div>
             """,
         )
+        # Send succeeded — record the timestamp so the cooldown starts counting
+        # only when a real email actually left our SMTP.
+        user.email_verify_sent_at = datetime.utcnow()
+        db.commit()
         logger.info("Verification email sent: user_id=%s", user.id)
 
     def verify_email(self, db: Session, token: str) -> None:
@@ -280,18 +288,21 @@ class IdentityService:
             # не раскрываем существование аккаунта
             return
 
+        import html as _html
+
         token = secrets.token_urlsafe(32)
         r = get_redis()
         r.setex(f"reset:{token}", _RESET_TTL, str(user.id))
 
         reset_link = f"{frontend_url}/reset-password?token={token}"
+        safe_email = _html.escape(user.email)
         send_email(
             to=user.email,
             subject="Сброс пароля — Novex",
             html=f"""
             <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px">
               <h2 style="color:#0f172a">Сброс пароля</h2>
-              <p style="color:#475569">Вы запросили сброс пароля для аккаунта <b>{user.email}</b>.</p>
+              <p style="color:#475569">Вы запросили сброс пароля для аккаунта <b>{safe_email}</b>.</p>
               <a href="{reset_link}"
                  style="display:inline-block;margin:24px 0;padding:12px 28px;background:#0f172a;color:#fff;
                         border-radius:10px;text-decoration:none;font-weight:600">
@@ -379,10 +390,14 @@ class IdentityService:
 
         # Generate a one-time setup link so the carrier sets their own password.
         # Reuses the existing reset-password flow (same Redis key prefix, same endpoint).
+        import html as _html
+
         setup_token = secrets.token_urlsafe(32)
         get_redis().setex(f"reset:{setup_token}", _SETUP_LINK_TTL, str(user.id))
         setup_link = f"{frontend_url}/reset-password?token={setup_token}"
 
+        safe_email = _html.escape(payload.email)
+        safe_carrier = _html.escape(carrier_name)
         send_email(
             to=payload.email,
             subject=f"Добро пожаловать в Novex — активируйте аккаунт {carrier_name}",
@@ -390,7 +405,7 @@ class IdentityService:
             <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px">
               <h2 style="color:#0f172a">Ваш аккаунт перевозчика создан</h2>
               <p style="color:#475569">
-                Платформа Novex открыла для вас доступ как перевозчику <b>{carrier_name}</b>.
+                Платформа Novex открыла для вас доступ как перевозчику <b>{safe_carrier}</b>.
               </p>
               <p style="color:#475569">Нажмите кнопку ниже чтобы установить пароль и начать работу:</p>
               <a href="{setup_link}"
@@ -399,7 +414,7 @@ class IdentityService:
                 Установить пароль
               </a>
               <p style="color:#475569;font-size:14px">
-                Email для входа: <b>{payload.email}</b>
+                Email для входа: <b>{safe_email}</b>
               </p>
               <p style="color:#94a3b8;font-size:13px">
                 Ссылка активна 48 часов. Если она истекла — воспользуйтесь восстановлением пароля на странице входа.

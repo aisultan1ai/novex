@@ -43,6 +43,7 @@ from workers.jobs import (
     refresh_quote_cache,
     retry_failed_callbacks,
     send_email_notifications,
+    sync_azimuth_regions,
     sync_tracking,
 )
 from workers.scheduler import WorkerScheduler
@@ -104,6 +105,9 @@ def run() -> None:
     scheduler.register(cleanup_expired_files.run, 3600)
     scheduler.register(retry_failed_callbacks.run, 300)
     scheduler.register(refresh_quote_cache.run, 1800)
+    # Azimuth /regions catalogue refresh — weekly is enough for a national
+    # courier's region list (rarely changes). Job is idempotent + Redis-locked.
+    scheduler.register(sync_azimuth_regions.run, 7 * 24 * 3600)
     # sync_tracking also has a dedicated tracking-poller container in prod. Running
     # it here as well is safe: sync_tracking.run() acquires a Redis lock so only
     # one instance polls a given tick. In dev (no tracking-poller container) this

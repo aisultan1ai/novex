@@ -401,6 +401,55 @@ def retry_dispatch(
     return {"ok": True, "tracking_number": tracking_number}
 
 
+@router.post("/{draft_id}/retry-pickup")
+def retry_azimuth_pickup(
+    draft_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin_or_operator),
+) -> dict:
+    """Retry ONLY the Azimuth /order-courier step for an order.
+
+    Used when create_invoice succeeded but schedule_pickup failed — retrying
+    the whole dispatch would create a duplicate waybill, so we expose a
+    scoped retry that only touches the pickup call. Idempotent: refuses if
+    pickup_scheduled_azimuth_id is already set.
+    """
+    order = db.get(OrderDraft, draft_id)
+    if not order:
+        raise HTTPException(404, "Заказ не найден")
+    if (order.carrier_code_snapshot or "").lower() != "azimuth":
+        raise HTTPException(400, "Retry pickup доступен только для Azimuth-заказов")
+    if not order.pickup_requested:
+        raise HTTPException(400, "Клиент не запрашивал вызов курьера для этого заказа")
+    if order.pickup_scheduled_azimuth_id:
+        raise HTTPException(
+            409,
+            "Курьер уже вызван по этому заказу (idempotency lock — "
+            "pickup_scheduled_azimuth_id уже установлен).",
+        )
+
+    _dispatch_svc._schedule_azimuth_pickup(db, order)
+    db.commit()
+
+    _audit_svc.log(
+        db,
+        actor=admin,
+        action="order.retry_pickup",
+        resource_type="order",
+        resource_id=order.id,
+        new_value={
+            "pickup_scheduled": bool(order.pickup_scheduled_azimuth_id),
+            "pickup_error": order.pickup_error,
+        },
+    )
+    db.commit()
+    return {
+        "ok": bool(order.pickup_scheduled_azimuth_id),
+        "pickup_scheduled_azimuth_id": order.pickup_scheduled_azimuth_id,
+        "pickup_error": order.pickup_error,
+    }
+
+
 @router.post("/{order_id}/refresh-waybill")
 def refresh_waybill(
     order_id: int,

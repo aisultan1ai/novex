@@ -729,6 +729,19 @@ class OrdersService:
         order_draft.sender_pvz_guid = payload.sender_pvz_guid
         order_draft.recipient_pvz_guid = payload.recipient_pvz_guid
 
+        # Courier pickup opt-in. The schema validator already normalised the
+        # dependent fields (wipes them when requested=False, backfills
+        # contact_person/phone from sender when blank).
+        order_draft.pickup_requested = payload.pickup_requested
+        order_draft.pickup_date = payload.pickup_date
+        order_draft.pickup_time_slot = payload.pickup_time_slot
+        order_draft.pickup_contact_person = payload.pickup_contact_person
+        order_draft.pickup_contact_phone = payload.pickup_contact_phone
+        # Editing shipment details clears any previous pickup error so a
+        # retried dispatch can succeed. Do NOT wipe pickup_scheduled_azimuth_id —
+        # that stays as the idempotency lock for orders already handed off.
+        order_draft.pickup_error = None
+
         if payload.sender.save_to_address_book:
             self._save_address_book(db, user_id=user_id, party=payload.sender)
         if payload.recipient.save_to_address_book:
@@ -736,14 +749,20 @@ class OrdersService:
 
         # Persist recalc: weight/dim edits in the shipment form must be
         # reflected in price_snapshot before proceed_to_checkout.
+        # Use SUM of declared values across all packages so this matches
+        # proceed_to_checkout's `declared_total` calculation — otherwise a
+        # multi-package order would get two different prices at the two
+        # gates.
         db.flush()
         db.refresh(order_draft)
+        declared_total = sum(
+            float(pkg.declared_value or 0) for pkg in payload.packages
+        )
         self._persist_recalc(
             db, order_draft,
             delivery_type=payload.delivery_type,
             insurance=payload.insurance,
-            declared_value=float(payload.packages[0].declared_value or 0)
-                if payload.packages else 0.0,
+            declared_value=declared_total,
         )
 
         self.repository.update_order_draft_status(
@@ -1171,6 +1190,13 @@ class OrdersService:
             delivery_type=order_draft.delivery_type,  # type: ignore[arg-type]
             sender_pvz_guid=order_draft.sender_pvz_guid,
             recipient_pvz_guid=order_draft.recipient_pvz_guid,
+            pickup_requested=order_draft.pickup_requested,
+            pickup_date=order_draft.pickup_date,
+            pickup_time_slot=order_draft.pickup_time_slot,
+            pickup_contact_person=order_draft.pickup_contact_person,
+            pickup_contact_phone=order_draft.pickup_contact_phone,
+            pickup_scheduled=order_draft.pickup_scheduled_azimuth_id is not None,
+            pickup_error=order_draft.pickup_error,
             created_at=order_draft.created_at,
             sender=self._map_party(sender) if sender else None,
             recipient=self._map_party(recipient) if recipient else None,

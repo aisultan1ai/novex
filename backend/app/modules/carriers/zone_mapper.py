@@ -1,11 +1,20 @@
 ﻿"""
-zone_mapper.py — определение зоны доставки Azimuth по городам.
+zone_mapper.py — Azimuth-only zone lookup (FALLBACK path).
 
-Зоны согласно тарифным документам Azimuth 2026:
+The authoritative source for Azimuth city/zone data is the `azimuth_regions`
+table populated from Azimuth's own /api/integration/regions endpoint (see
+azimuth_regions.py and scripts/sync_azimuth_regions.py). This module is only
+consulted when the DB has no row for a given city yet — e.g. before the first
+sync runs, or when a user types a city variant we do not yet have an alias for.
+
+CSE and Exline do NOT use this — CSE has its own Geography GUID cache in
+cse_geography.py, and Exline's Calc API returns its own zone number.
+
+Zones according to the Azimuth 2026 tariff sheet:
   Зона 0 — внутригородская доставка (отправка и получение в одном городе)
   Зона 1 — пересылка между областными центрами РК
-  Зона 2 — из областных центров в районные центры РК (Аксай, Экибастуз, Рудный и др.)
-  Зона 3 — удалённые населённые пункты от районных центров РК
+  Зона 2 — из областных центров в районные центры РК
+  Зона 3 — удалённые населённые пункты
 """
 
 from __future__ import annotations

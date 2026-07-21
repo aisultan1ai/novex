@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import html as _html
+
 from app.core.config import get_settings
 
 _BASE_STYLE = """
@@ -37,7 +39,9 @@ def _cta(order_id: int, label: str) -> str:
 
 
 def _greeting(user_name: str | None) -> str:
-    name = user_name or "Клиент"
+    # Escape the user-supplied name — full_name comes from the customer profile
+    # and can contain HTML control characters that would otherwise inject markup.
+    name = _html.escape(user_name) if user_name else "Клиент"
     return f"Здравствуйте, {name}!"
 
 
@@ -73,8 +77,10 @@ def _tpl_paid(order_id: int, user_name: str | None) -> tuple[str, str]:
 
 def _tpl_payment_rejected(order_id: int, user_name: str | None, reject_reason: str | None) -> tuple[str, str]:
     subject = f"Чек отклонён - Заказ #{order_id}"
+    # reject_reason is typed by admin — always escape before splicing into HTML.
+    safe_reason = _html.escape(reject_reason) if reject_reason else ""
     reason_block = (
-        f'<p style="background:#fff1f2;border-left:3px solid #f43f5e;padding:12px 16px;border-radius:0 8px 8px 0;color:#9f1239;font-size:14px;margin-bottom:20px;"><b>Причина:</b> {reject_reason}</p>'
+        f'<p style="background:#fff1f2;border-left:3px solid #f43f5e;padding:12px 16px;border-radius:0 8px 8px 0;color:#9f1239;font-size:14px;margin-bottom:20px;"><b>Причина:</b> {safe_reason}</p>'
         if reject_reason else ""
     )
     html = _wrap(f"""

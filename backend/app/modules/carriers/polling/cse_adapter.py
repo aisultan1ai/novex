@@ -86,15 +86,27 @@ _STATUS_MAP: dict[str, str] = {
 }
 
 
+_UNKNOWN_STATUS = "carrier_unknown"
+
+
 def _map_status(carrier_status: str) -> str:
     normalized = carrier_status.strip().lower()
     for key, mapped in _STATUS_MAP.items():
         if key in normalized:
             return mapped
     # Unknown status — log so we can extend _STATUS_MAP when new phrasings
-    # appear in prod. Fallback keeps the order visible in the tracking UI.
-    logger.warning("CSEPollingAdapter: unmapped carrier status %r → in_transit (fallback)", carrier_status)
-    return "in_transit"
+    # appear in prod. Return `carrier_unknown` (not present in the internal
+    # state machine) so that `can_transition(order.status, "carrier_unknown")`
+    # in the polling scheduler always returns False and the order status stays
+    # untouched. The raw carrier_status is still persisted on TrackingEvent so
+    # the customer sees the timeline entry — we just refuse to lie about the
+    # internal status. Previously this fell back to "in_transit", which could
+    # silently move e.g. `picked_up → in_transit` for a "проблема" event.
+    logger.warning(
+        "CSEPollingAdapter: unmapped carrier status %r → keeping order status unchanged",
+        carrier_status,
+    )
+    return _UNKNOWN_STATUS
 
 
 def _parse_datetime(value: str) -> datetime:

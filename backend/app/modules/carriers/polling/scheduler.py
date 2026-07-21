@@ -18,7 +18,7 @@ from app.core.carrier_gateway_client import (
     get_gateway_client,
 )
 from app.core.config import get_settings
-from app.modules.carriers.api_credentials import CarrierAPICredentialsRepository
+from app.modules.carriers.creds_cache import get_creds as _get_creds
 from app.modules.carriers.integration_log import IntegrationLogRepository
 from app.modules.dispatch.models import OrderStatusHistory
 from app.modules.notifications.service import NotificationsService
@@ -30,44 +30,12 @@ logger = logging.getLogger(__name__)
 
 _tracking_repo = TrackingRepository()
 _notifications_svc = NotificationsService()
-_creds_repo = CarrierAPICredentialsRepository()
 _integration_log = IntegrationLogRepository()
 
 _ACTIVE_STATUSES = {
     "sent_to_carrier", "dispatched", "picked_up", "in_transit",
     "out_for_delivery", "customs_hold", "delivery_failed",
 }
-
-_CREDS_CACHE_PREFIX = "carrier_creds:"
-
-
-def _get_creds(db: Session, carrier_code: str) -> dict:
-    """Return carrier creds from Redis cache or DB."""
-    settings = get_settings()
-    cache_key = f"{_CREDS_CACHE_PREFIX}{carrier_code}"
-
-    try:
-        from app.core.redis import get_redis
-        cached = get_redis().get(cache_key)
-        if cached:
-            return json.loads(cached)  # type: ignore[arg-type]
-    except Exception as exc:
-        logger.debug("Creds cache read failed for %s: %s", carrier_code, exc)
-
-    db_creds = _creds_repo.get_by_carrier_code(db, carrier_code)
-    creds = (
-        {"api_url": db_creds.api_url, **(db_creds.extra_config or {})}
-        if db_creds and db_creds.is_active
-        else {}
-    )
-
-    try:
-        from app.core.redis import get_redis
-        get_redis().setex(cache_key, settings.polling_creds_ttl_seconds, json.dumps(creds))
-    except Exception as exc:
-        logger.debug("Creds cache write failed for %s: %s", carrier_code, exc)
-
-    return creds
 
 
 @dataclass

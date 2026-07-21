@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
+    Date,
     ForeignKey,
     Integer,
     Numeric,
@@ -60,6 +62,22 @@ class OrderDraft(Base, TimestampMixin):
     )
     sender_pvz_guid: Mapped[str | None] = mapped_column(String(50), nullable=True)
     recipient_pvz_guid: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    # Courier-pickup request (currently only Azimuth /order-courier consumes
+    # these; ignored for CSE/Exline). Filled from the shipment form when the
+    # customer opts into "вызвать курьера".
+    pickup_requested: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    pickup_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # Time slot label as the carrier expects it (e.g. "14:00-18:00"). Free
+    # string so we can pass through whatever slot the carrier accepts.
+    pickup_time_slot: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    pickup_contact_person: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    pickup_contact_phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # Set after a successful schedule_pickup call — presence of this value
+    # blocks re-scheduling for the same order (Azimuth has no dedup key of
+    # their own, so we enforce idempotency on our side).
+    pickup_scheduled_azimuth_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    pickup_error: Mapped[str | None] = mapped_column(String, nullable=True)
 
     carrier_code_snapshot: Mapped[str] = mapped_column(String(50), nullable=False)
     carrier_name_snapshot: Mapped[str] = mapped_column(String(100), nullable=False)

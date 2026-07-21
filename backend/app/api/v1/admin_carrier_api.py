@@ -15,6 +15,7 @@ from app.modules.carriers.api_credentials import (
     CarrierAPICredentialsResponse,
     CarrierAPICredentialsUpdate,
 )
+from app.modules.carriers.creds_cache import invalidate_creds
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin/carrier-api", tags=["admin:carrier-api"])
@@ -59,6 +60,10 @@ def upsert_credentials(
     creds = _repo.upsert(db, payload)
     db.commit()
     db.refresh(creds)
+    # Drop the shared Redis cache so live-quote calls, polling and dispatch
+    # all pick up the new values on their next request instead of waiting
+    # out the TTL (default 5 minutes).
+    invalidate_creds(carrier_code)
     logger.info("API credentials upserted: carrier_code=%s", carrier_code)
     return CarrierAPICredentialsResponse.from_orm_masked(creds)
 
@@ -76,6 +81,7 @@ def update_credentials(
         raise HTTPException(404, str(exc)) from exc
     db.commit()
     db.refresh(creds)
+    invalidate_creds(carrier_code)
     return CarrierAPICredentialsResponse.from_orm_masked(creds)
 
 
@@ -87,7 +93,47 @@ def delete_credentials(
 ) -> None:
     _repo.delete(db, carrier_code)
     db.commit()
+    invalidate_creds(carrier_code)
     logger.info("API credentials deleted: carrier_code=%s", carrier_code)
+
+
+@router.get("/azimuth/regions")
+def probe_azimuth_regions(
+    type: str,
+    title: str,
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+) -> dict:
+    """Read-only probe of Azimuth's /regions endpoint.
+
+    Returns the raw JSON body as Azimuth sent it — used to inspect the actual
+    response shape before we design a local schema for storing Azimuth city
+    mappings. Safe: GET only, no side effects on Azimuth side.
+
+    Usage from admin UI or curl:
+        GET /api/v1/admin/carrier-api/azimuth/regions?type=origin&title=Алматы
+    """
+    from app.modules.carriers.api_clients.azimuth import AzimuthAPIClient
+
+    if type not in ("origin", "destination"):
+        raise HTTPException(422, "type must be 'origin' or 'destination'")
+    if not title or not title.strip():
+        raise HTTPException(422, "title is required")
+
+    creds_obj = _repo.get_by_carrier_code(db, "azimuth")
+    if not creds_obj or not creds_obj.is_active:
+        raise HTTPException(404, "No active Azimuth API credentials configured")
+    creds = {
+        "api_url": creds_obj.api_url,
+        "api_token": creds_obj.api_token,
+        **(creds_obj.extra_config or {}),
+    }
+    try:
+        raw = AzimuthAPIClient().search_regions(type, title, creds)
+    except Exception as exc:
+        logger.warning("Azimuth regions probe failed: %s", exc)
+        raise HTTPException(502, f"Azimuth /regions call failed: {exc}") from exc
+    return {"type": type, "title": title, "azimuth_raw_response": raw}
 
 
 @router.post("/{carrier_code}/test")

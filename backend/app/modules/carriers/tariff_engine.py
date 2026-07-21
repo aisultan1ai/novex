@@ -215,6 +215,78 @@ class QuoteResult:
     available_services: list[dict] = field(default_factory=list)
 
 
+def _resolve_azimuth_route(
+    db: Session | None,
+    from_city: str,
+    to_city: str,
+) -> tuple[bool, int]:
+    """Decide whether to offer Azimuth for a route + which zone applies.
+
+    Source of truth: the `azimuth_regions` table (synced from Azimuth's own
+    /regions API). Azimuth is offered only when it services BOTH origin and
+    destination. Zone = max of both endpoints' zone_number (the more expensive
+    side wins, which matches the tariff sheet).
+
+    Fallback when the DB has no row for a city (never synced or user typed a
+    variant we do not have an alias for): use the hardcoded zone_mapper set.
+    Better a slightly wrong price than "no Azimuth option at all".
+    """
+    fallback_zone = get_zone(from_city, to_city)
+    if db is None:
+        applicable = is_known_city(from_city) and is_known_city(to_city)
+        return applicable, fallback_zone
+
+    from app.modules.carriers.azimuth_regions import AzimuthRegionsRepository
+    repo = AzimuthRegionsRepository()
+    from_row = repo.find(db, from_city, direction="origin")
+    to_row = repo.find(db, to_city, direction="destination")
+
+    if from_row is not None and to_row is not None:
+        return True, max(from_row.zone_number, to_row.zone_number)
+
+    # Partial hit: one side missing from cache. Fall back to hardcoded
+    # heuristic — do not silently drop Azimuth from the quote just because
+    # our sync has not caught up. Lazy learning via resolve_city() upstream
+    # will fill the gap on the next call.
+    applicable = is_known_city(from_city) and is_known_city(to_city)
+    return applicable, fallback_zone
+
+
+async def _resolve_azimuth_route_async(
+    db: AsyncSession,
+    from_city: str,
+    to_city: str,
+) -> tuple[bool, int]:
+    """Async twin of _resolve_azimuth_route — used from the /shipping/quote path."""
+    fallback_zone = get_zone(from_city, to_city)
+
+    from sqlalchemy import select as _select
+    from app.modules.carriers.azimuth_regions import AzimuthRegion, normalize_title
+
+    async def _lookup(city: str, direction_col) -> "AzimuthRegion | None":
+        norm = normalize_title(city)
+        if not norm:
+            return None
+        stmt = (
+            _select(AzimuthRegion)
+            .where(AzimuthRegion.title_normalized == norm)
+            .where(direction_col.is_(True))
+            .order_by(AzimuthRegion.zone_number.asc())
+            .limit(1)
+        )
+        result = await db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    from_row = await _lookup(from_city, AzimuthRegion.is_origin)
+    to_row = await _lookup(to_city, AzimuthRegion.is_destination)
+
+    if from_row is not None and to_row is not None:
+        return True, max(from_row.zone_number, to_row.zone_number)
+
+    applicable = is_known_city(from_city) and is_known_city(to_city)
+    return applicable, fallback_zone
+
+
 def calculate_quotes(
     from_city: str,
     to_city: str,
@@ -236,18 +308,16 @@ def calculate_quotes(
     include_live=False — пропустить вызов Exline API (используется когда вызывающий
     код хочет освободить DB-соединение перед внешним HTTP-запросом).
     """
-    fallback_zone = get_zone(from_city, to_city)
     kg = chargeable_weight(weight_kg, quantity, width_cm, height_cm, depth_cm)
 
     results: list[QuoteResult] = []
 
-    # Azimuth рассчитывает только для городов из своего справочника.
-    # Для неизвестных городов пропускаем — иначе вернётся некорректная Zone 3 цена.
-    azimuth_applicable = is_known_city(from_city) and is_known_city(to_city)
+    # Applicability + zone come from azimuth_regions when we have DB access.
+    azimuth_applicable, azimuth_zone = _resolve_azimuth_route(db, from_city, to_city)
 
     if azimuth_applicable:
         if db is not None:
-            db_results = _calculate_from_db(db, from_city, to_city, fallback_zone, kg)
+            db_results = _calculate_from_db(db, from_city, to_city, azimuth_zone, kg)
             if db_results:
                 logger.debug(
                     "tariff_engine: DB rates used (%d quotes, kg=%.2f)",
@@ -259,14 +329,14 @@ def calculate_quotes(
                 logger.debug(
                     "tariff_engine: DB has no rates, falling back to hardcoded Azimuth table"
                 )
-                results = _calculate_hardcoded(fallback_zone, kg)
+                results = _calculate_hardcoded(azimuth_zone, kg)
         else:
-            results = _calculate_hardcoded(fallback_zone, kg)
+            results = _calculate_hardcoded(azimuth_zone, kg)
 
     if include_live:
         # Добавляем live-котировки Exline только если DB не вернула Exline-ставки
         if not any(r.carrier_code == "exline" for r in results):
-            results.extend(_calculate_exline_live(from_city, to_city, kg))
+            results.extend(_calculate_exline_live(from_city, to_city, kg, db=db))
         results.sort(key=lambda r: (r.price, r.eta_days_min))
 
     return results
@@ -280,10 +350,11 @@ def fetch_exline_quotes(
     width_cm: float,
     height_cm: float,
     depth_cm: float,
+    db: Session | None = None,
 ) -> list[QuoteResult]:
     """Только внешний вызов Exline — без DB. Вызывать после закрытия DB-соединения."""
     kg = chargeable_weight(weight_kg, quantity, width_cm, height_cm, depth_cm)
-    return _calculate_exline_live(from_city, to_city, kg)
+    return _calculate_exline_live(from_city, to_city, kg, db=db)
 
 
 async def calculate_quotes_async(
@@ -298,29 +369,33 @@ async def calculate_quotes_async(
     shipment_type: str = "parcel",
 ) -> list[QuoteResult]:
     """Async version для /api/shipping/quote — DB и Exline HTTP не держат соединение одновременно."""
-    fallback_zone = get_zone(from_city, to_city)
     if shipment_type == "document":
         kg = round_up_to_half(weight_kg * quantity)
     else:
         kg = chargeable_weight(weight_kg, quantity, width_cm, height_cm, depth_cm)
 
-    db_results = await _calculate_from_db_async(db, from_city, to_city, fallback_zone, kg)
-    azimuth_applicable = is_known_city(from_city) and is_known_city(to_city)
+    # Azimuth applicability + zone from azimuth_regions (live source of truth).
+    azimuth_applicable, azimuth_zone = await _resolve_azimuth_route_async(db, from_city, to_city)
+
+    db_results = await _calculate_from_db_async(db, from_city, to_city, azimuth_zone, kg)
     if db_results:
         results: list[QuoteResult] = db_results
     elif azimuth_applicable:
-        results = _calculate_hardcoded(fallback_zone, kg)
+        results = _calculate_hardcoded(azimuth_zone, kg)
     else:
         results = []
 
-    # Run Exline and CSE live calls concurrently
+    # Run Exline and CSE live calls concurrently. Pass db so the shared creds
+    # cache can resolve DB values that admins edit in the UI — env vars are
+    # only a fallback for dev/local installs.
     live_tasks = []
     if not any(r.carrier_code == "exline" for r in results):
-        live_tasks.append(_calculate_exline_live_async(from_city, to_city, kg))
+        live_tasks.append(_calculate_exline_live_async(from_city, to_city, kg, db=db))
     if not any(r.carrier_code == "cse" for r in results):
         live_tasks.append(_calculate_cse_live_async(
             from_city, to_city, kg, shipment_type,
             width_cm=width_cm, height_cm=height_cm, depth_cm=depth_cm, quantity=quantity,
+            db=db,
         ))
 
     if live_tasks:
@@ -678,15 +753,38 @@ def _call_exline_calculator(
     )
 
 
+def _resolve_exline_creds(db: Session | None) -> tuple[str, str, str, str]:
+    """DB creds first (via shared cache), env-var fallback second.
+
+    Returns (extra, login, password, api_url). Empty extra/login signals
+    "no creds available" and callers should return an empty quote list.
+    """
+    db_creds: dict = {}
+    if db is not None:
+        try:
+            from app.modules.carriers.creds_cache import get_creds
+            db_creds = get_creds(db, "exline")
+        except Exception as exc:
+            logger.debug("Exline: DB creds unavailable, falling back to env: %s", exc)
+
+    extra = str(db_creds.get("extra") or os.getenv("EXLINE_EXTRA") or "")
+    login = str(db_creds.get("login") or os.getenv("EXLINE_LOGIN") or "")
+    password = str(db_creds.get("password") or os.getenv("EXLINE_PASSWORD") or "")
+    api_url = str(
+        db_creds.get("api_url")
+        or os.getenv("EXLINE_API_URL")
+        or "https://home.courierexe.ru/api/"
+    ).rstrip("/") + "/"
+    return extra, login, password, api_url
+
+
 def _calculate_exline_live(
     from_city: str,
     to_city: str,
     kg: float,
+    db: Session | None = None,
 ) -> list[QuoteResult]:
-    extra = os.getenv("EXLINE_EXTRA", "")
-    login = os.getenv("EXLINE_LOGIN", "")
-    password = os.getenv("EXLINE_PASSWORD", "")
-    api_url = os.getenv("EXLINE_API_URL", "https://home.courierexe.ru/api/").rstrip("/") + "/"
+    extra, login, password, api_url = _resolve_exline_creds(db)
 
     if not extra or not login:
         return []
@@ -797,15 +895,35 @@ async def _call_exline_calculator_async(
     )
 
 
+async def _resolve_exline_creds_async(
+    db: AsyncSession | None,
+) -> tuple[str, str, str, str]:
+    db_creds: dict = {}
+    if db is not None:
+        try:
+            from app.modules.carriers.creds_cache import get_creds_async
+            db_creds = await get_creds_async(db, "exline")
+        except Exception as exc:
+            logger.debug("Exline async: DB creds unavailable, falling back to env: %s", exc)
+
+    extra = str(db_creds.get("extra") or os.getenv("EXLINE_EXTRA") or "")
+    login = str(db_creds.get("login") or os.getenv("EXLINE_LOGIN") or "")
+    password = str(db_creds.get("password") or os.getenv("EXLINE_PASSWORD") or "")
+    api_url = str(
+        db_creds.get("api_url")
+        or os.getenv("EXLINE_API_URL")
+        or "https://home.courierexe.ru/api/"
+    ).rstrip("/") + "/"
+    return extra, login, password, api_url
+
+
 async def _calculate_exline_live_async(
     from_city: str,
     to_city: str,
     kg: float,
+    db: AsyncSession | None = None,
 ) -> list[QuoteResult]:
-    extra = os.getenv("EXLINE_EXTRA", "")
-    login = os.getenv("EXLINE_LOGIN", "")
-    password = os.getenv("EXLINE_PASSWORD", "")
-    api_url = os.getenv("EXLINE_API_URL", "https://home.courierexe.ru/api/").rstrip("/") + "/"
+    extra, login, password, api_url = await _resolve_exline_creds_async(db)
 
     if not extra or not login:
         return []
@@ -980,11 +1098,22 @@ async def _calculate_cse_live_async(
     height_cm: float = 0.0,
     depth_cm: float = 0.0,
     quantity: int = 1,
+    db: AsyncSession | None = None,
 ) -> list[QuoteResult]:
+    # DB creds first (via shared cache), settings/env fallback second so that
+    # admin edits in the UI take effect for live quotes with no restart.
+    db_creds: dict = {}
+    if db is not None:
+        try:
+            from app.modules.carriers.creds_cache import get_creds_async
+            db_creds = await get_creds_async(db, "cse")
+        except Exception as exc:
+            logger.debug("CSE async: DB creds unavailable, falling back to settings: %s", exc)
+
     _s = get_settings()
-    login = _s.cse_login
-    password = _s.cse_password
-    api_url = _s.cse_api_url
+    login = str(db_creds.get("login") or _s.cse_login or "")
+    password = str(db_creds.get("password") or _s.cse_password or "")
+    api_url = str(db_creds.get("api_url") or _s.cse_api_url or "")
 
     if not login:
         return []

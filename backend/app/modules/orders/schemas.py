@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
@@ -149,6 +149,37 @@ class UpdateShipmentDetailsRequest(BaseModel):
     sender_pvz_guid: str | None = Field(default=None, max_length=50)
     recipient_pvz_guid: str | None = Field(default=None, max_length=50)
 
+    # Courier-pickup request (Azimuth /order-courier). Optional — customer
+    # opts in on the shipment form. `pickup_requested=True` requires the
+    # date + slot + contact person to be provided (see _validate_pickup).
+    pickup_requested: bool = False
+    pickup_date: date | None = None
+    pickup_time_slot: str | None = Field(default=None, max_length=50)
+    pickup_contact_person: str | None = Field(default=None, max_length=255)
+    pickup_contact_phone: str | None = Field(default=None, max_length=50)
+
+    @model_validator(mode="after")
+    def _validate_pickup(self) -> "UpdateShipmentDetailsRequest":
+        if not self.pickup_requested:
+            # Wipe stale pickup fields when the flag is off so a toggle-off
+            # never leaves orphan values in the DB.
+            self.pickup_date = None
+            self.pickup_time_slot = None
+            self.pickup_contact_person = None
+            self.pickup_contact_phone = None
+            return self
+        if not self.pickup_date:
+            raise ValueError("pickup_date обязателен при вызове курьера")
+        if not self.pickup_time_slot:
+            raise ValueError("pickup_time_slot обязателен при вызове курьера")
+        # Contact defaults to the sender if the customer left it blank —
+        # they are the person the courier will actually meet.
+        if not self.pickup_contact_person:
+            self.pickup_contact_person = self.sender.full_name
+        if not self.pickup_contact_phone:
+            self.pickup_contact_phone = self.sender.phone
+        return self
+
     @model_validator(mode="after")
     def _validate_pvz_for_delivery_type(self) -> "UpdateShipmentDetailsRequest":
         sender_leg_wh = self.delivery_type in (
@@ -235,6 +266,17 @@ class OrderDraftResponse(BaseModel):
     delivery_type: DeliveryType = "door_to_door"
     sender_pvz_guid: str | None = None
     recipient_pvz_guid: str | None = None
+
+    pickup_requested: bool = False
+    pickup_date: date | None = None
+    pickup_time_slot: str | None = None
+    pickup_contact_person: str | None = None
+    pickup_contact_phone: str | None = None
+    # Set to True by dispatch worker once schedule_pickup succeeded once —
+    # the front-end uses this to render "курьер вызван" instead of the
+    # generic pickup section.
+    pickup_scheduled: bool = False
+    pickup_error: str | None = None
 
     sender: ShipmentPartyResponse | None = None
     recipient: ShipmentPartyResponse | None = None

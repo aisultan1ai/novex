@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.common.pagination import PageParams
 from app.core.db import get_db
-from app.core.dependencies import get_current_user_id
+from app.core.dependencies import get_current_user_id, require_verified_email
 from app.core.limiter import limiter
 from app.modules.orders.schemas import (
     CreateDraftFromQuoteRequest,
@@ -84,6 +84,7 @@ def get_order_draft(
 def proceed_to_checkout(
     draft_id: int,
     current_user_id: int = Depends(get_current_user_id),
+    _verified = Depends(require_verified_email),
     db: Session = Depends(get_db),
 ) -> OrderDraftResponse:
     return orders_service.proceed_to_checkout(
