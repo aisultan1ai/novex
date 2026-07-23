@@ -25,7 +25,7 @@ class Shipment(Base):
     # to query carrier status. For Exline this is the client-side orderno
     # (NOVEX-000042); for CSE the SaveWaybillOffice order number.
     carrier_tracking_number: Mapped[str | None] = mapped_column(
-        String(100), nullable=True
+        String(100), nullable=True, index=True
     )
     # Physical barcode / awb printed on the package. Distinct from
     # carrier_tracking_number for carriers that separate internal orderno from

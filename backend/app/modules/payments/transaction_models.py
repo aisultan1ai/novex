@@ -7,6 +7,7 @@ from enum import StrEnum
 from sqlalchemy import (
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
@@ -63,6 +64,12 @@ class ProviderWebhookStatus(StrEnum):
 
 class PaymentTransaction(Base):
     __tablename__ = "payment_transactions"
+    __table_args__ = (
+        # Composite for "active transactions of this order" queries — order_id
+        # and status each have their own btree already, but the combined
+        # lookup is common enough to warrant a dedicated index.
+        Index("ix_payment_transactions_order_id_status", "order_id", "status"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     order_id: Mapped[int] = mapped_column(

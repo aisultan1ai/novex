@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   listAdminOrders,
@@ -421,6 +421,175 @@ const ps: Record<string, React.CSSProperties> = {
 
 const PAYMENT_STATUSES = new Set(["payment_under_review", "payment_rejected", "awaiting_payment", "paid"]);
 
+// ── Row component (memoised) ────────────────────────────────────────────────
+// Extracted so a click on one row's panel-toggle only re-renders that row.
+// Previously every state change (editing/payment/detail toggled on any row)
+// re-rendered all N rows because the whole list was inlined in the parent.
+//
+// Edit-related props are passed as `undefined` when the row is not being
+// edited so React.memo's shallow compare treats them as stable across
+// typing/selection on the currently-edited row.
+type OrderRowProps = {
+  order: AdminOrderRow;
+  isLast: boolean;
+  isEditing: boolean;
+  isPaymentOpen: boolean;
+  isDetailOpen: boolean;
+  hasPayment: boolean;
+  editStatus?: string;
+  saving?: boolean;
+  onOpenPayment: (id: number) => void;
+  onOpenDetail: (id: number) => void;
+  onStartEdit: (id: number, currentStatus: string) => void;
+  onCancelEdit: () => void;
+  onChangeEditStatus?: (status: string) => void;
+  onSaveStatus?: (id: number) => void;
+  onPaymentAction: () => void;
+};
+
+const OrderRow = memo(function OrderRow({
+  order,
+  isLast,
+  isEditing,
+  isPaymentOpen,
+  isDetailOpen,
+  hasPayment,
+  editStatus,
+  saving,
+  onOpenPayment,
+  onOpenDetail,
+  onStartEdit,
+  onCancelEdit,
+  onChangeEditStatus,
+  onSaveStatus,
+  onPaymentAction,
+}: OrderRowProps) {
+  return (
+    <div>
+      <div
+        style={{ display: "grid", gridTemplateColumns: "70px 160px 1fr 150px 110px 150px 160px", gap: 12, padding: "14px 20px", borderBottom: isLast && !isEditing && !isPaymentOpen && !isDetailOpen ? "none" : "1px solid #f1f5f9", alignItems: "center", fontSize: 14 }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = "#f8fafc"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = ""; }}
+      >
+        <span style={{ fontFamily: "monospace", fontSize: 13, color: "#475569", fontWeight: 600 }}>#{order.id}</span>
+
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {order.user_name || order.user_email || "-"}
+          </div>
+          <div style={{ fontSize: 11, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {order.user_email}
+          </div>
+        </div>
+
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{order.from_city} → {order.to_city}</div>
+          <div style={{ fontSize: 11, color: "#94a3b8" }}>{new Date(order.created_at).toLocaleDateString("ru-RU")}</div>
+          {order.tracking_number && (
+            <div style={{ fontSize: 11, color: "#1d4ed8", fontFamily: "monospace", marginTop: 2 }}>{order.tracking_number}</div>
+          )}
+          {order.carrier_barcode && order.carrier_barcode !== order.carrier_tracking_number && (
+            <div style={{ fontSize: 11, color: "#94a3b8", fontFamily: "monospace" }} title="Штрих-код перевозчика">ШК: {order.carrier_barcode}</div>
+          )}
+        </div>
+
+        <div style={{ fontSize: 13, color: "#475569" }}>{order.carrier_name}</div>
+
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }} title="Оплатил клиент">{formatPrice(order.price, order.currency)}</div>
+          {order.markup_amount > 0 && (
+            <div style={{ fontSize: 11, color: "#94a3b8" }} title={`Перевозчику ${formatPrice(order.carrier_price, order.currency)} · Наценка ${formatPrice(order.markup_amount, order.currency)}`}>
+              {formatPrice(order.carrier_price, order.currency)} + {formatPrice(order.markup_amount, order.currency)}
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4 }}>
+          <StatusBadge status={order.status} />
+          {order.cancellation?.source === "customer_cancel" && (
+            <span
+              title={`Клиент отменил: ${order.cancellation.reason}`}
+              style={{
+                fontSize: 10, fontWeight: 700, letterSpacing: "0.03em",
+                padding: "2px 8px", borderRadius: 999,
+                background: "#FEE2E2", color: "#991B1B",
+                textTransform: "uppercase",
+              }}
+            >
+              Клиент
+            </span>
+          )}
+        </div>
+
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {hasPayment && (
+            <button
+              onClick={() => onOpenPayment(order.id)}
+              style={{
+                padding: "6px 10px", borderRadius: 8, border: "none", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+                background: isPaymentOpen ? "#1d4ed8" : "#dbeafe",
+                color: isPaymentOpen ? "#ffffff" : "#1e40af",
+              }}
+            >
+              {isPaymentOpen ? "Скрыть" : "💳 Чек"}
+            </button>
+          )}
+          <button
+            onClick={() => onOpenDetail(order.id)}
+            style={{
+              padding: "6px 10px", borderRadius: 8, border: "none", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+              background: isDetailOpen ? "#0f172a" : "#f1f5f9",
+              color: isDetailOpen ? "#ffffff" : "#0f172a",
+            }}
+          >
+            {isDetailOpen ? "Скрыть" : "Детали"}
+          </button>
+          <button
+            onClick={() => onStartEdit(order.id, order.status)}
+            style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#ffffff", color: "#0f172a", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+          >
+            Статус
+          </button>
+        </div>
+      </div>
+
+      {isPaymentOpen && (
+        <PaymentPanel orderId={order.id} onAction={onPaymentAction} />
+      )}
+
+      {isDetailOpen && <OrderDetailPanel orderId={order.id} />}
+
+      {isEditing && (
+        <div style={{ padding: "12px 20px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 13, color: "#64748b", fontWeight: 500 }}>Новый статус:</span>
+          <select
+            value={editStatus ?? order.status}
+            onChange={(e) => onChangeEditStatus?.(e.target.value)}
+            style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 13, fontFamily: "inherit", background: "#ffffff", color: "#0f172a" }}
+          >
+            {ALL_STATUSES.map((s) => (
+              <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+            ))}
+          </select>
+          <button
+            onClick={() => onSaveStatus?.(order.id)}
+            disabled={saving}
+            style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#0f172a", color: "#ffffff", fontSize: 13, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1, fontFamily: "inherit" }}
+          >
+            {saving ? "Сохраняем..." : "Сохранить"}
+          </button>
+          <button
+            onClick={onCancelEdit}
+            style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#ffffff", color: "#64748b", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
+          >
+            Отмена
+          </button>
+        </div>
+      )}
+    </div>
+  );
+});
+
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<AdminOrderRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -455,7 +624,23 @@ export default function AdminOrdersPage() {
 
   useEffect(() => { void load(); }, [load]);
 
-  async function saveStatus(orderId: number) {
+  // Stable callbacks for row-level actions so React.memo on OrderRow can
+  // skip re-render of untouched rows. All setters returned by useState are
+  // already stable; the wrappers below only depend on `load` / `editStatus`
+  // where needed.
+  const togglePayment = useCallback((id: number) => {
+    setPaymentOpenId((cur) => (cur === id ? null : id));
+  }, []);
+  const toggleDetail = useCallback((id: number) => {
+    setDetailOpenId((cur) => (cur === id ? null : id));
+  }, []);
+  const startEdit = useCallback((id: number, currentStatus: string) => {
+    setEditingId((cur) => (cur === id ? null : id));
+    setEditStatus(currentStatus);
+  }, []);
+  const cancelEdit = useCallback(() => setEditingId(null), []);
+  const changeEditStatus = useCallback((s: string) => setEditStatus(s), []);
+  const saveStatus = useCallback(async (orderId: number) => {
     setSaving(true);
     try {
       await updateOrderStatus(orderId, editStatus);
@@ -466,9 +651,13 @@ export default function AdminOrdersPage() {
     } finally {
       setSaving(false);
     }
-  }
+  }, [editStatus, load]);
+  const paymentAction = useCallback(() => {
+    void load();
+    setPaymentOpenId(null);
+  }, [load]);
 
-  const totalPages = Math.ceil(total / SIZE);
+  const totalPages = useMemo(() => Math.ceil(total / SIZE), [total]);
 
   return (
     <>
@@ -533,140 +722,25 @@ export default function AdminOrdersPage() {
         ) : (
           orders.map((order, idx) => {
             const isEditing = editingId === order.id;
-            const isPaymentOpen = paymentOpenId === order.id;
-            const isDetailOpen = detailOpenId === order.id;
-            const hasPayment = PAYMENT_STATUSES.has(order.status);
-            const isLast = idx === orders.length - 1;
-
             return (
-              <div key={order.id}>
-                <div
-                  style={{ display: "grid", gridTemplateColumns: "70px 160px 1fr 150px 110px 150px 160px", gap: 12, padding: "14px 20px", borderBottom: isLast && !isEditing && !isPaymentOpen && !isDetailOpen ? "none" : "1px solid #f1f5f9", alignItems: "center", fontSize: 14 }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = "#f8fafc"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = ""; }}
-                >
-                  <span style={{ fontFamily: "monospace", fontSize: 13, color: "#475569", fontWeight: 600 }}>#{order.id}</span>
-
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {order.user_name || order.user_email || "-"}
-                    </div>
-                    <div style={{ fontSize: 11, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {order.user_email}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{order.from_city} → {order.to_city}</div>
-                    <div style={{ fontSize: 11, color: "#94a3b8" }}>{new Date(order.created_at).toLocaleDateString("ru-RU")}</div>
-                    {order.tracking_number && (
-                      <div style={{ fontSize: 11, color: "#1d4ed8", fontFamily: "monospace", marginTop: 2 }}>{order.tracking_number}</div>
-                    )}
-                    {order.carrier_barcode && order.carrier_barcode !== order.carrier_tracking_number && (
-                      <div style={{ fontSize: 11, color: "#94a3b8", fontFamily: "monospace" }} title="Штрих-код перевозчика">ШК: {order.carrier_barcode}</div>
-                    )}
-                  </div>
-
-                  <div style={{ fontSize: 13, color: "#475569" }}>{order.carrier_name}</div>
-
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }} title="Оплатил клиент">{formatPrice(order.price, order.currency)}</div>
-                    {order.markup_amount > 0 && (
-                      <div style={{ fontSize: 11, color: "#94a3b8" }} title={`Перевозчику ${formatPrice(order.carrier_price, order.currency)} · Наценка ${formatPrice(order.markup_amount, order.currency)}`}>
-                        {formatPrice(order.carrier_price, order.currency)} + {formatPrice(order.markup_amount, order.currency)}
-                      </div>
-                    )}
-                  </div>
-
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4 }}>
-                    <StatusBadge status={order.status} />
-                    {order.cancellation?.source === "customer_cancel" && (
-                      <span
-                        title={`Клиент отменил: ${order.cancellation.reason}`}
-                        style={{
-                          fontSize: 10, fontWeight: 700, letterSpacing: "0.03em",
-                          padding: "2px 8px", borderRadius: 999,
-                          background: "#FEE2E2", color: "#991B1B",
-                          textTransform: "uppercase",
-                        }}
-                      >
-                        Клиент
-                      </span>
-                    )}
-                  </div>
-
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    {hasPayment && (
-                      <button
-                        onClick={() => setPaymentOpenId(isPaymentOpen ? null : order.id)}
-                        style={{
-                          padding: "6px 10px", borderRadius: 8, border: "none", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
-                          background: isPaymentOpen ? "#1d4ed8" : "#dbeafe",
-                          color: isPaymentOpen ? "#ffffff" : "#1e40af",
-                        }}
-                      >
-                        {isPaymentOpen ? "Скрыть" : "💳 Чек"}
-                      </button>
-                    )}
-                    <button
-                      onClick={() => setDetailOpenId(isDetailOpen ? null : order.id)}
-                      style={{
-                        padding: "6px 10px", borderRadius: 8, border: "none", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
-                        background: isDetailOpen ? "#0f172a" : "#f1f5f9",
-                        color: isDetailOpen ? "#ffffff" : "#0f172a",
-                      }}
-                    >
-                      {isDetailOpen ? "Скрыть" : "Детали"}
-                    </button>
-                    <button
-                      onClick={() => { setEditingId(isEditing ? null : order.id); setEditStatus(order.status); }}
-                      style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#ffffff", color: "#0f172a", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
-                    >
-                      Статус
-                    </button>
-                  </div>
-                </div>
-
-                {/* Payment panel */}
-                {isPaymentOpen && (
-                  <PaymentPanel
-                    orderId={order.id}
-                    onAction={() => { void load(); setPaymentOpenId(null); }}
-                  />
-                )}
-
-                {/* Detail panel */}
-                {isDetailOpen && <OrderDetailPanel orderId={order.id} />}
-
-                {/* Status edit panel */}
-                {isEditing && (
-                  <div style={{ padding: "12px 20px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 13, color: "#64748b", fontWeight: 500 }}>Новый статус:</span>
-                    <select
-                      value={editStatus}
-                      onChange={(e) => setEditStatus(e.target.value)}
-                      style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 13, fontFamily: "inherit", background: "#ffffff", color: "#0f172a" }}
-                    >
-                      {ALL_STATUSES.map((s) => (
-                        <option key={s} value={s}>{STATUS_LABELS[s]}</option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={() => void saveStatus(order.id)}
-                      disabled={saving}
-                      style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#0f172a", color: "#ffffff", fontSize: 13, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1, fontFamily: "inherit" }}
-                    >
-                      {saving ? "Сохраняем..." : "Сохранить"}
-                    </button>
-                    <button
-                      onClick={() => setEditingId(null)}
-                      style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#ffffff", color: "#64748b", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
-                    >
-                      Отмена
-                    </button>
-                  </div>
-                )}
-              </div>
+              <OrderRow
+                key={order.id}
+                order={order}
+                isLast={idx === orders.length - 1}
+                isEditing={isEditing}
+                isPaymentOpen={paymentOpenId === order.id}
+                isDetailOpen={detailOpenId === order.id}
+                hasPayment={PAYMENT_STATUSES.has(order.status)}
+                editStatus={isEditing ? editStatus : undefined}
+                saving={isEditing ? saving : undefined}
+                onOpenPayment={togglePayment}
+                onOpenDetail={toggleDetail}
+                onStartEdit={startEdit}
+                onCancelEdit={cancelEdit}
+                onChangeEditStatus={isEditing ? changeEditStatus : undefined}
+                onSaveStatus={isEditing ? saveStatus : undefined}
+                onPaymentAction={paymentAction}
+              />
             );
           })
         )}

@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import logging
 import secrets
-from datetime import datetime
-
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 
+from app.common.time_utils import utcnow
 from app.core.email import send_email
 from app.core.exceptions import ConflictError, NotFoundError, UnauthorizedError
 from app.core.redis import get_redis
@@ -159,7 +158,7 @@ class IdentityService:
         )
         # Send succeeded — record the timestamp so the cooldown starts counting
         # only when a real email actually left our SMTP.
-        user.email_verify_sent_at = datetime.utcnow()
+        user.email_verify_sent_at = utcnow()
         db.commit()
         logger.info("Verification email sent: user_id=%s", user.id)
 
@@ -176,7 +175,7 @@ class IdentityService:
             raise NotFoundError("Пользователь не найден")
 
         if user.email_verified_at is None:
-            user.email_verified_at = datetime.utcnow()
+            user.email_verified_at = utcnow()
             db.commit()
             logger.info("Email verified: user_id=%s", user.id)
 
@@ -197,7 +196,7 @@ class IdentityService:
             return
 
         if user.email_verify_sent_at is not None:
-            elapsed = (datetime.utcnow() - user.email_verify_sent_at).total_seconds()
+            elapsed = (utcnow() - user.email_verify_sent_at).total_seconds()
             if elapsed < _VERIFY_RESEND_COOLDOWN:
                 wait = int(_VERIFY_RESEND_COOLDOWN - elapsed)
                 raise ConflictError(

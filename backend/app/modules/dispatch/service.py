@@ -7,7 +7,7 @@ import logging
 import time
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 
 import httpx
 from sqlalchemy import select
@@ -15,6 +15,7 @@ from sqlalchemy import update as sa_update
 from sqlalchemy.orm import Session
 
 from app.common.status_machine import InvalidTransitionError, transition_order
+from app.common.time_utils import utcnow as _utcnow
 from app.core.carrier_gateway_client import get_gateway_client
 from app.modules.carriers.api_credentials import CarrierAPICredentialsRepository
 from app.modules.carriers.integration_log import IntegrationLogRepository
@@ -30,10 +31,6 @@ from app.modules.shipments.repository import ShipmentsRepository
 from app.modules.shipments.service import ShipmentsService
 
 logger = logging.getLogger(__name__)
-
-
-def _utcnow() -> datetime:
-    return datetime.now(UTC).replace(tzinfo=None)
 
 _webhook_repo = CarrierWebhookRepository()
 _shipments_svc = ShipmentsService()
@@ -233,6 +230,7 @@ class DispatchWorker:
             job.completed_at = _utcnow()
             logger.info("dispatch_worker: job %s completed, order %s sent_to_carrier", job.id, order.id)
 
+            job_id = job.id
         except Exception as exc:
             exc_msg = str(exc) or repr(exc) or f"{type(exc).__name__}: (no message)"
             logger.warning(
@@ -243,6 +241,19 @@ class DispatchWorker:
                 type(exc).__name__,
                 exc_msg,
             )
+            # Discard any partial writes from _dispatch_to_carrier /
+            # create_for_order / record_order_status before we mark FAILED.
+            # Without this, `db.commit()` at the bottom would flush the
+            # half-baked shipment/history rows together with our error
+            # bookkeeping. Rollback expires all attached objects, so re-load
+            # job and order below.
+            db.rollback()
+
+            job = db.get(DispatchJob, job_id)
+            if job is None:
+                logger.error("dispatch_worker: job %s vanished after rollback", job_id)
+                return
+            order = db.get(OrderDraft, job.order_id)
             job.last_error = exc_msg
 
             if _is_permanent_error(exc):
@@ -257,14 +268,15 @@ class DispatchWorker:
                 job.status = DispatchJobStatus.QUEUED
             else:
                 job.status = DispatchJobStatus.FAILED
-                order.dispatch_error = str(exc)
-                record_order_status(
-                    db,
-                    order=order,
-                    new_status="dispatch_failed",
-                    source="system_worker",
-                    comment=f"Max attempts reached: {exc}",
-                )
+                if order is not None:
+                    order.dispatch_error = str(exc)
+                    record_order_status(
+                        db,
+                        order=order,
+                        new_status="dispatch_failed",
+                        source="system_worker",
+                        comment=f"Max attempts reached: {exc}",
+                    )
 
         db.commit()
 
@@ -447,7 +459,11 @@ class DispatchWorker:
                 or ""
             )
         if not azimuth_id:
-            azimuth_id = f"pickup-{order.id}-{int(t0)}"
+            # Azimuth did not return an id — synthesise a globally unique
+            # marker so a double-click retry within the same second cannot
+            # produce a colliding lock (prev impl used int(t0) which was 1-s
+            # granular).
+            azimuth_id = f"pickup-{order.id}-{uuid.uuid4().hex}"
         order.pickup_scheduled_azimuth_id = azimuth_id
         order.pickup_error = None
         _integration_log.create(

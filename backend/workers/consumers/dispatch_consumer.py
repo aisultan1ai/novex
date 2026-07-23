@@ -5,7 +5,8 @@ import socket
 from threading import Event
 
 from app.core.redis import get_redis
-from app.core.streams import GROUP_DISPATCH, STREAM_DISPATCH
+from app.core.request_context import bind_request_id
+from app.core.streams import GROUP_DISPATCH, REQUEST_ID_FIELD, STREAM_DISPATCH
 
 logger = logging.getLogger(__name__)
 
@@ -36,11 +37,12 @@ def run(stop_event: Event) -> None:
 
         for _, messages in entries:  # type: ignore[union-attr]
             for msg_id, data in messages:
-                try:
-                    _process(data)
-                    r.xack(STREAM_DISPATCH, GROUP_DISPATCH, msg_id)
-                except Exception:
-                    logger.exception("Dispatch consumer: msg %s failed, left in PEL for recovery", msg_id)
+                with bind_request_id(data.get(REQUEST_ID_FIELD)):
+                    try:
+                        _process(data)
+                        r.xack(STREAM_DISPATCH, GROUP_DISPATCH, msg_id)
+                    except Exception:
+                        logger.exception("Dispatch consumer: msg %s failed, left in PEL for recovery", msg_id)
 
 
 def _recover_pending(r) -> None:
@@ -49,11 +51,12 @@ def _recover_pending(r) -> None:
         return
     for _, messages in entries:
         for msg_id, data in messages:
-            try:
-                _process(data)
-                r.xack(STREAM_DISPATCH, GROUP_DISPATCH, msg_id)
-            except Exception:
-                logger.exception("Dispatch consumer: pending msg %s failed, left in PEL for recovery", msg_id)
+            with bind_request_id(data.get(REQUEST_ID_FIELD)):
+                try:
+                    _process(data)
+                    r.xack(STREAM_DISPATCH, GROUP_DISPATCH, msg_id)
+                except Exception:
+                    logger.exception("Dispatch consumer: pending msg %s failed, left in PEL for recovery", msg_id)
 
 
 def _process(data: dict) -> None:

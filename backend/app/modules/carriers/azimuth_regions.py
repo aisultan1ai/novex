@@ -32,6 +32,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
+from app.common.time_utils import utcnow
 from app.core.db import Base
 
 logger = logging.getLogger(__name__)
@@ -49,7 +50,7 @@ class AzimuthRegion(Base):
     is_origin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_destination: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     title_normalized: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-    synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, default=datetime.utcnow)
+    synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False, default=utcnow)
 
 
 # ── Normalisation ─────────────────────────────────────────────────────────────
@@ -165,7 +166,7 @@ class AzimuthRegionsRepository:
                 "is_origin": bool(it.get("origin", False)),
                 "is_destination": bool(it.get("destination", False)),
                 "title_normalized": normalize_title(title),
-                "synced_at": datetime.utcnow(),
+                "synced_at": utcnow(),
             })
 
         if not rows:

@@ -42,6 +42,16 @@ class TrackingWebhookEvent(Base):
 
 class TrackingEvent(Base):
     __tablename__ = "tracking_events"
+    __table_args__ = (
+        # Backs the bulk `INSERT ... ON CONFLICT DO NOTHING` in the polling
+        # scheduler. NULL carrier_status stays "not equal" per SQL semantics —
+        # that matches the pre-existing per-event dedup check, so no behaviour
+        # change for webhook-driven events that omit carrier_status.
+        UniqueConstraint(
+            "order_draft_id", "carrier_status", "occurred_at",
+            name="uq_tracking_events_order_carrier_status_occurred_at",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     order_draft_id: Mapped[int] = mapped_column(

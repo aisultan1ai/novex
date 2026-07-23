@@ -23,6 +23,7 @@ from datetime import UTC, datetime
 
 import httpx
 
+from app.common.log_ratelimit import log_once_per
 from app.modules.carriers.polling.base import CarrierPollingAdapter, TrackingEventData
 
 logger = logging.getLogger(__name__)
@@ -111,7 +112,12 @@ def _map_track(code: str, description: str) -> str:
             if phrase in normalized:
                 return mapped
 
-    logger.warning(
+    # Rate-limited: mass polling would otherwise log this for every unknown
+    # event on every tick. Key on (code, description) so a genuinely new code
+    # still surfaces once per TTL window.
+    log_once_per(
+        logger,
+        f"azimuth-unmapped:{code!r}:{(description or '').strip().lower()!r}",
         "AzimuthAdapter: unmapped tracking event code=%r description=%r "
         "→ keeping order status unchanged",
         code, description,
@@ -125,9 +131,15 @@ def _parse_datetime(value: str) -> datetime:
     Fallback to now() only if the input is unparseable — event dedup uses
     occurred_at as part of the key, so an unparseable date collapses multiple
     events into the same "now" bucket. Log so we can tighten the parser.
+
+    Truncated to whole seconds: dedup in the polling scheduler compares
+    occurred_at equality across all adapters, and CSE / Exline emit
+    second-precision timestamps. Keeping microseconds here would cause the
+    same Azimuth event to look "new" whenever the fallback branch fired,
+    since two `now()` calls a millisecond apart would not collide.
     """
     if not value:
-        return datetime.now(UTC).replace(tzinfo=None)
+        return datetime.now(UTC).replace(tzinfo=None, microsecond=0)
     raw = value.strip()
     # Handle "2021-01-05T09:42:38.278000Z" and variants.
     if raw.endswith("Z"):
@@ -136,12 +148,12 @@ def _parse_datetime(value: str) -> datetime:
         dt = datetime.fromisoformat(raw)
     except ValueError:
         logger.debug("AzimuthAdapter: unparseable date %r, falling back to now()", value)
-        return datetime.now(UTC).replace(tzinfo=None)
+        return datetime.now(UTC).replace(tzinfo=None, microsecond=0)
     # Store naive UTC to match every other adapter — TrackingEvent.occurred_at
     # is a TIMESTAMP WITHOUT TIME ZONE column.
     if dt.tzinfo is not None:
         dt = dt.astimezone(UTC).replace(tzinfo=None)
-    return dt
+    return dt.replace(microsecond=0)
 
 
 class AzimuthAdapter(CarrierPollingAdapter):

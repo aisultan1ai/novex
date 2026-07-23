@@ -95,6 +95,11 @@ class ExlineAdapter(CarrierPollingAdapter):
                     occurred_at = datetime.fromisoformat(event_time_str)
                 except (ValueError, TypeError):
                     occurred_at = datetime.now(UTC).replace(tzinfo=None)
+                # Whole-second truncation so scheduler dedup key aligns with
+                # the other adapters (Azimuth µs vs CSE s vs Exline mix).
+                occurred_at = occurred_at.replace(microsecond=0)
+                if occurred_at.tzinfo is not None:
+                    occurred_at = occurred_at.astimezone(UTC).replace(tzinfo=None)
 
                 mapped = _STATUS_MAP.get(carrier_status, "in_transit")
                 events.append(TrackingEventData(

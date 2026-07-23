@@ -13,6 +13,44 @@ export class ApiError extends Error {
   }
 }
 
+// Endpoints where a 401 is a normal outcome (bad credentials, already logged
+// out) — do NOT trigger the global session-expired flow. Match by URL suffix
+// against the request path (already stripped of API_BASE_URL).
+const AUTH_ENDPOINTS_NO_REDIRECT = [
+  "/auth/login",
+  "/auth/logout",
+  "/auth/register",
+  "/auth/forgot-password",
+  "/auth/reset-password",
+];
+
+let sessionExpiredHandled = false;
+
+async function handleSessionExpired(): Promise<void> {
+  if (typeof window === "undefined") return;
+  if (sessionExpiredHandled) return;
+  sessionExpiredHandled = true;
+
+  // Best-effort: ask the server to clear the httpOnly cookie. Ignore failures
+  // — we redirect regardless so the user is never stuck on a stale page.
+  try {
+    await fetch(`${API_BASE_URL}/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+    });
+  } catch {
+    /* noop */
+  }
+
+  const { pathname, search } = window.location;
+  // Avoid redirect loops if we're already on a public/auth page.
+  if (pathname.startsWith("/login")) return;
+
+  const next = encodeURIComponent(`${pathname}${search}`);
+  window.location.href = `/login?next=${next}`;
+}
+
 async function parseJsonSafely(response: Response): Promise<unknown> {
   const ct = response.headers.get("content-type") ?? "";
   if (!ct.includes("application/json")) return null;
@@ -65,6 +103,14 @@ export async function apiRequest<T>(
   const data = await parseJsonSafely(response);
 
   if (!response.ok) {
+    if (
+      response.status === 401 &&
+      !AUTH_ENDPOINTS_NO_REDIRECT.some((p) => path.startsWith(p))
+    ) {
+      // Fire the session-expired flow but still throw so callers can bail
+      // out of their current work — the browser will navigate away shortly.
+      void handleSessionExpired();
+    }
     throw new ApiError(response.status, extractErrorDetail(data, response.status));
   }
 
@@ -85,6 +131,14 @@ export async function apiFormDataRequest<T>(
   const data = await parseJsonSafely(response);
 
   if (!response.ok) {
+    if (
+      response.status === 401 &&
+      !AUTH_ENDPOINTS_NO_REDIRECT.some((p) => path.startsWith(p))
+    ) {
+      // Fire the session-expired flow but still throw so callers can bail
+      // out of their current work — the browser will navigate away shortly.
+      void handleSessionExpired();
+    }
     throw new ApiError(response.status, extractErrorDetail(data, response.status));
   }
 

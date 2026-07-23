@@ -5,6 +5,8 @@ import uuid
 from starlette.datastructures import Headers, MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from app.core.request_context import reset_request_id, set_request_id
+
 
 class RequestIdMiddleware:
     """Pure ASGI middleware — no response buffering."""
@@ -19,13 +21,19 @@ class RequestIdMiddleware:
 
         request_id = Headers(scope=scope).get("X-Request-Id") or str(uuid.uuid4())
         scope.setdefault("state", {})["request_id"] = request_id
+        # Bind into contextvar so every log record + downstream call
+        # (carrier-gateway, stream publish) inherits the same trace id.
+        token = set_request_id(request_id)
 
         async def _send(message: Message) -> None:
             if message["type"] == "http.response.start":
                 MutableHeaders(scope=message).append("X-Request-Id", request_id)
             await send(message)
 
-        await self.app(scope, receive, _send)
+        try:
+            await self.app(scope, receive, _send)
+        finally:
+            reset_request_id(token)
 
 
 class SecurityHeadersMiddleware:

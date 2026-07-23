@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, memo, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -116,6 +116,88 @@ const cardStyle: CSSProperties = {
   overflow: "hidden",
 };
 
+// Row components extracted + memoised so toggling top-level state (filter,
+// auth, etc.) does not re-render every row when the underlying order object
+// has not changed.
+type OrderRowProps = { order: OrderDraftResponse; isLast: boolean; onOpen: (id: number) => void };
+
+const MobileOrderCard = memo(function MobileOrderCard({ order, onOpen }: OrderRowProps) {
+  return (
+    <div
+      onClick={() => onOpen(order.draft_id)}
+      style={{ ...cardStyle, padding: "16px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 10 }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#111827", marginBottom: 2 }}>
+            {order.from_city_snapshot} → {order.to_city_snapshot}
+          </div>
+          <div style={{ fontSize: 12, color: "#94a3b8" }}>
+            #{order.draft_id} · {formatDate(order.created_at)}
+          </div>
+        </div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 2 }}>
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+        <StatusBadge status={order.status} />
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>
+          {formatPrice(order.price_snapshot, order.currency_snapshot)}
+        </div>
+      </div>
+
+      <div style={{ fontSize: 12, color: "#64748b" }}>
+        {order.carrier_name_snapshot} · {order.tariff_name_snapshot} · {order.eta_days_min_snapshot}-{order.eta_days_max_snapshot} дн.
+      </div>
+    </div>
+  );
+});
+
+const DesktopOrderRow = memo(function DesktopOrderRow({ order, isLast, onOpen }: OrderRowProps) {
+  return (
+    <div
+      onClick={() => onOpen(order.draft_id)}
+      style={{ display: "grid", gridTemplateColumns: "120px 1fr 180px 140px 140px 32px", gap: 12, padding: "16px 24px", borderBottom: isLast ? "none" : "1px solid #f1f5f9", alignItems: "center", cursor: "pointer", transition: "background 0.1s" }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = "#f8fafc"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = ""; }}
+    >
+      <span style={{ fontFamily: "monospace", fontSize: 13, color: "#475569", fontWeight: 600 }}>
+        #{order.draft_id}
+      </span>
+
+      <div>
+        <div style={{ fontSize: 14, fontWeight: 600, color: "#111827", marginBottom: 3 }}>
+          {order.to_city_snapshot || "-"}
+        </div>
+        <div style={{ fontSize: 12, color: "#94a3b8" }}>
+          {order.from_city_snapshot} → {order.to_city_snapshot} · {formatDate(order.created_at)}
+        </div>
+      </div>
+
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 500, color: "#111827", marginBottom: 3 }}>
+          {order.carrier_name_snapshot}
+        </div>
+        <div style={{ fontSize: 12, color: "#94a3b8" }}>
+          {order.tariff_name_snapshot} · {order.eta_days_min_snapshot}-{order.eta_days_max_snapshot} дн.
+        </div>
+      </div>
+
+      <StatusBadge status={order.status} />
+
+      <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>
+        {formatPrice(order.price_snapshot, order.currency_snapshot)}
+      </div>
+
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="9 18 15 12 9 6" />
+      </svg>
+    </div>
+  );
+});
+
 function MyOrdersPageInner() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
@@ -148,11 +230,22 @@ function MyOrdersPageInner() {
     void fetchOrders();
   }, [isAuthenticated]);
 
-  if (authLoading || (!isAuthenticated && !authLoading)) return null;
+  // Stable identity so React.memo'd row components can skip re-render when
+  // the filter or auth state changes without affecting a given order.
+  const openOrder = useCallback(
+    (draftId: number) => router.push(`/dashboard/orders/${draftId}`),
+    [router],
+  );
 
-  const filteredOrders = activeFilter === "all"
-    ? orders
-    : orders.filter((o) => FILTER_GROUPS[activeFilter]?.includes(o.status));
+  // Recompute only when the source array or the active filter actually
+  // change — previously this was O(N) on every render.
+  const filteredOrders = useMemo(() => (
+    activeFilter === "all"
+      ? orders
+      : orders.filter((o) => FILTER_GROUPS[activeFilter]?.includes(o.status))
+  ), [orders, activeFilter]);
+
+  if (authLoading || (!isAuthenticated && !authLoading)) return null;
 
   return (
     <>
@@ -218,37 +311,13 @@ function MyOrdersPageInner() {
       ) : isMobile ? (
         /* ── Mobile: card list ── */
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {filteredOrders.map((order) => (
-            <div
+          {filteredOrders.map((order, idx) => (
+            <MobileOrderCard
               key={order.draft_id}
-              onClick={() => router.push(`/dashboard/orders/${order.draft_id}`)}
-              style={{ ...cardStyle, padding: "16px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 10 }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "#111827", marginBottom: 2 }}>
-                    {order.from_city_snapshot} → {order.to_city_snapshot}
-                  </div>
-                  <div style={{ fontSize: 12, color: "#94a3b8" }}>
-                    #{order.draft_id} · {formatDate(order.created_at)}
-                  </div>
-                </div>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 2 }}>
-                  <polyline points="9 18 15 12 9 6" />
-                </svg>
-              </div>
-
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-                <StatusBadge status={order.status} />
-                <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>
-                  {formatPrice(order.price_snapshot, order.currency_snapshot)}
-                </div>
-              </div>
-
-              <div style={{ fontSize: 12, color: "#64748b" }}>
-                {order.carrier_name_snapshot} · {order.tariff_name_snapshot} · {order.eta_days_min_snapshot}-{order.eta_days_max_snapshot} дн.
-              </div>
-            </div>
+              order={order}
+              isLast={idx === filteredOrders.length - 1}
+              onOpen={openOrder}
+            />
           ))}
         </div>
       ) : (
@@ -263,50 +332,14 @@ function MyOrdersPageInner() {
             <span />
           </div>
 
-          {filteredOrders.map((order, idx) => {
-            const isLast = idx === filteredOrders.length - 1;
-            return (
-              <div
-                key={order.draft_id}
-                onClick={() => router.push(`/dashboard/orders/${order.draft_id}`)}
-                style={{ display: "grid", gridTemplateColumns: "120px 1fr 180px 140px 140px 32px", gap: 12, padding: "16px 24px", borderBottom: isLast ? "none" : "1px solid #f1f5f9", alignItems: "center", cursor: "pointer", transition: "background 0.1s" }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = "#f8fafc"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = ""; }}
-              >
-                <span style={{ fontFamily: "monospace", fontSize: 13, color: "#475569", fontWeight: 600 }}>
-                  #{order.draft_id}
-                </span>
-
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#111827", marginBottom: 3 }}>
-                    {order.to_city_snapshot || "-"}
-                  </div>
-                  <div style={{ fontSize: 12, color: "#94a3b8" }}>
-                    {order.from_city_snapshot} → {order.to_city_snapshot} · {formatDate(order.created_at)}
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: "#111827", marginBottom: 3 }}>
-                    {order.carrier_name_snapshot}
-                  </div>
-                  <div style={{ fontSize: 12, color: "#94a3b8" }}>
-                    {order.tariff_name_snapshot} · {order.eta_days_min_snapshot}-{order.eta_days_max_snapshot} дн.
-                  </div>
-                </div>
-
-                <StatusBadge status={order.status} />
-
-                <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>
-                  {formatPrice(order.price_snapshot, order.currency_snapshot)}
-                </div>
-
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="9 18 15 12 9 6" />
-                </svg>
-              </div>
-            );
-          })}
+          {filteredOrders.map((order, idx) => (
+            <DesktopOrderRow
+              key={order.draft_id}
+              order={order}
+              isLast={idx === filteredOrders.length - 1}
+              onOpen={openOrder}
+            />
+          ))}
         </div>
       )}
     </>

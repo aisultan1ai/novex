@@ -4,6 +4,7 @@ import logging
 import os
 from datetime import UTC, datetime
 
+from app.common.log_ratelimit import log_once_per
 from app.modules.carriers.polling.base import CarrierPollingAdapter, TrackingEventData
 
 logger = logging.getLogger(__name__)
@@ -102,7 +103,11 @@ def _map_status(carrier_status: str) -> str:
     # the customer sees the timeline entry — we just refuse to lie about the
     # internal status. Previously this fell back to "in_transit", which could
     # silently move e.g. `picked_up → in_transit` for a "проблема" event.
-    logger.warning(
+    # Rate-limited: high-volume polling would otherwise flood logs with the
+    # same unknown status for every event on every tick.
+    log_once_per(
+        logger,
+        f"cse-unmapped:{normalized!r}",
         "CSEPollingAdapter: unmapped carrier status %r → keeping order status unchanged",
         carrier_status,
     )
@@ -110,12 +115,15 @@ def _map_status(carrier_status: str) -> str:
 
 
 def _parse_datetime(value: str) -> datetime:
+    # Truncated to whole seconds so the polling-scheduler dedup key
+    # (carrier_status, occurred_at) is comparable across adapters — Azimuth
+    # emits microseconds, CSE only seconds.
     for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
         try:
-            return datetime.strptime(value, fmt)
+            return datetime.strptime(value, fmt).replace(microsecond=0)
         except ValueError:
             continue
-    return datetime.now(UTC).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None, microsecond=0)
 
 
 class CSEPollingAdapter(CarrierPollingAdapter):

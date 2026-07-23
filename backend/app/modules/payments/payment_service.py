@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
 from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.common.status_machine import can_transition, transition_order
+from app.common.time_utils import utcnow as _utcnow
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.streams import STREAM_DISPATCH
 from app.core.streams import publish as stream_publish
@@ -34,11 +34,6 @@ from app.modules.shipments.service import ShipmentsService
 logger = logging.getLogger(__name__)
 _notifications_svc = NotificationsService()
 _shipments_svc = ShipmentsService()
-
-
-def _utcnow() -> datetime:
-    return datetime.now(UTC).replace(tzinfo=None)
-
 
 _settings_repo = PlatformSettingsRepository()
 _commissions_svc = CommissionsService()
@@ -452,10 +447,23 @@ class PaymentService:
                 carrier_code=order.carrier_code_snapshot,
             )
             dispatch_job = create_dispatch_job(db, order=order)
-            _notifications_svc.notify_order_status(
-                db, user_id=order.user_id, order_id=order.id, status="paid"
-            )
             db.commit()
+
+            # Post-commit side effects. Notifications and stream publish MUST
+            # NOT roll back the money-confirmation transaction — an SMTP hiccup
+            # or Redis blip is not a reason to un-pay a customer's order.
+            try:
+                _notifications_svc.notify_order_status(
+                    db, user_id=order.user_id, order_id=order.id, status="paid"
+                )
+                db.commit()
+            except Exception:
+                # Best-effort — swallow so the outer flow returns success. Do
+                # NOT db.rollback(): the payment/dispatch commit above is
+                # durable and rollback here would only expire in-memory state.
+                logger.exception(
+                    "confirm_paid: post-commit notification failed for order=%s", order.id
+                )
             try:
                 stream_publish(STREAM_DISPATCH, {
                     "dispatch_job_id": str(dispatch_job.id),
@@ -510,17 +518,21 @@ class PaymentService:
 
         order = db.get(OrderDraft, tx.order_id)
         if order:
-            _commissions_svc.void_for_order(db, order.id)
-
             old_order_status = order.status
+            # Do not silently override the state machine — a refund on a
+            # terminal order (delivered/returned/cancelled) means the ops flow
+            # is wrong. Force the caller to move the order through the proper
+            # transitions (e.g. return_requested → return_in_progress → returned)
+            # before issuing the money-back leg.
             if not can_transition(old_order_status, "cancelled"):
-                logger.warning(
-                    "admin_refund: forcing order %s to cancelled from '%s' (state machine override)",
-                    order.id,
-                    old_order_status,
+                raise ValidationError(
+                    f"Нельзя отменить возвратом заказ в статусе '{old_order_status}'. "
+                    "Проведите заказ через соответствующие переходы состояния "
+                    "(например, return_requested → return_in_progress → returned) "
+                    "перед оформлением возврата средств."
                 )
-            else:
-                transition_order(old_order_status, "cancelled")
+            transition_order(old_order_status, "cancelled")
+            _commissions_svc.void_for_order(db, order.id)
             order.status = "cancelled"
             db.add(
                 OrderStatusHistory(
@@ -532,15 +544,26 @@ class PaymentService:
                     comment=f"Заказ отменён в связи с возвратом средств. Причина: {reason}",
                 )
             )
-            _notifications_svc.notify_order_status(
-                db,
-                user_id=order.user_id,
-                order_id=order.id,
-                status="refunded",
-            )
 
         db.commit()
         db.refresh(tx)
+
+        # Notify post-commit — an email/notification failure must not roll back
+        # the refund that just landed.
+        if order:
+            try:
+                _notifications_svc.notify_order_status(
+                    db,
+                    user_id=order.user_id,
+                    order_id=order.id,
+                    status="refunded",
+                )
+                db.commit()
+            except Exception:
+                logger.exception(
+                    "admin_refund: post-commit notification failed for order=%s", order.id
+                )
+
         return tx
 
     def list_for_admin(

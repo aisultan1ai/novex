@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
 from app.common.pagination import PageParams
+from app.common.time_utils import utcnow as _utcnow
 from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
 from app.modules.address_book.repository import AddressBookRepository
 from app.modules.orders.models import OrderDraft, ShipmentPackage, ShipmentParty
@@ -25,10 +25,6 @@ from app.modules.quotes.models import QuoteSession
 from app.modules.shipments.models import Shipment
 
 logger = logging.getLogger(__name__)
-
-
-def _utcnow() -> datetime:
-    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class _RecalcOverrides:

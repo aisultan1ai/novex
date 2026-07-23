@@ -6,7 +6,8 @@ import socket
 from threading import Event
 
 from app.core.redis import get_redis
-from app.core.streams import GROUP_EMAILS, STREAM_EMAILS
+from app.core.request_context import bind_request_id
+from app.core.streams import GROUP_EMAILS, REQUEST_ID_FIELD, STREAM_EMAILS
 
 logger = logging.getLogger(__name__)
 
@@ -37,11 +38,12 @@ def run(stop_event: Event) -> None:
 
         for _, messages in entries:  # type: ignore[union-attr]
             for msg_id, data in messages:
-                try:
-                    _process(data)
-                    r.xack(STREAM_EMAILS, GROUP_EMAILS, msg_id)
-                except Exception:
-                    logger.exception("Email consumer: msg %s failed, left in PEL for recovery", msg_id)
+                with bind_request_id(data.get(REQUEST_ID_FIELD)):
+                    try:
+                        _process(data)
+                        r.xack(STREAM_EMAILS, GROUP_EMAILS, msg_id)
+                    except Exception:
+                        logger.exception("Email consumer: msg %s failed, left in PEL for recovery", msg_id)
 
 
 def _recover_pending(r) -> None:
@@ -51,12 +53,13 @@ def _recover_pending(r) -> None:
         return
     for _, messages in entries:
         for msg_id, data in messages:
-            try:
-                _process(data)
-            except Exception:
-                logger.exception("Email consumer: pending msg %s failed, skipping", msg_id)
-            finally:
-                r.xack(STREAM_EMAILS, GROUP_EMAILS, msg_id)
+            with bind_request_id(data.get(REQUEST_ID_FIELD)):
+                try:
+                    _process(data)
+                except Exception:
+                    logger.exception("Email consumer: pending msg %s failed, skipping", msg_id)
+                finally:
+                    r.xack(STREAM_EMAILS, GROUP_EMAILS, msg_id)
 
 
 def _process(data: dict) -> None:

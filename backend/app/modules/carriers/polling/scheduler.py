@@ -5,13 +5,17 @@ import logging
 import time
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any
 
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+import uuid
+
 from app.common.status_machine import can_transition
+from app.common.time_utils import utcnow
+from app.core.request_context import bind_request_id
 from app.core.carrier_gateway_client import (
     CarrierGatewayClient,
     GatewayTrackingEvent,
@@ -23,7 +27,6 @@ from app.modules.carriers.integration_log import IntegrationLogRepository
 from app.modules.dispatch.models import OrderStatusHistory
 from app.modules.notifications.service import NotificationsService
 from app.modules.shipments.models import Shipment
-from app.modules.tracking.models import TrackingEvent
 from app.modules.tracking.repository import TrackingRepository
 
 logger = logging.getLogger(__name__)
@@ -43,6 +46,10 @@ class _PollWork:
     shipment: Any
     order: Any
     creds: dict
+    # Per-shipment trace id — shared between the gateway call in the worker
+    # thread and the subsequent DB write in the main thread so operators can
+    # follow one shipment's poll end-to-end with a single grep.
+    request_id: str
 
 
 @dataclass
@@ -52,38 +59,44 @@ class _PollResult:
     events: list[GatewayTrackingEvent]
     error: Exception | None
     duration_ms: int
+    request_id: str
 
 
 def _fetch(work: _PollWork, gateway: CarrierGatewayClient) -> _PollResult:
-    t0 = time.monotonic()
-    try:
-        events = gateway.fetch_tracking(
-            work.order.carrier_code_snapshot,
-            work.shipment.carrier_tracking_number,
-            work.creds,
-        )
-        return _PollResult(
-            shipment=work.shipment,
-            order=work.order,
-            events=events,
-            error=None,
-            duration_ms=int((time.monotonic() - t0) * 1000),
-        )
-    except Exception as exc:
-        return _PollResult(
-            shipment=work.shipment,
-            order=work.order,
-            events=[],
-            error=exc,
-            duration_ms=int((time.monotonic() - t0) * 1000),
-        )
+    # Contextvars do not auto-propagate into ThreadPoolExecutor workers, so
+    # rebind here from the id we stamped on the work item.
+    with bind_request_id(work.request_id):
+        t0 = time.monotonic()
+        try:
+            events = gateway.fetch_tracking(
+                work.order.carrier_code_snapshot,
+                work.shipment.carrier_tracking_number,
+                work.creds,
+            )
+            return _PollResult(
+                shipment=work.shipment,
+                order=work.order,
+                events=events,
+                error=None,
+                duration_ms=int((time.monotonic() - t0) * 1000),
+                request_id=work.request_id,
+            )
+        except Exception as exc:
+            return _PollResult(
+                shipment=work.shipment,
+                order=work.order,
+                events=[],
+                error=exc,
+                duration_ms=int((time.monotonic() - t0) * 1000),
+                request_id=work.request_id,
+            )
 
 
 def poll_all_active_shipments(db: Session) -> None:
     from app.modules.orders.models import OrderDraft
 
     settings = get_settings()
-    cooldown_threshold = datetime.utcnow() - timedelta(seconds=settings.polling_cooldown_seconds)
+    cooldown_threshold = utcnow() - timedelta(seconds=settings.polling_cooldown_seconds)
 
     rows = db.execute(
         select(Shipment, OrderDraft)
@@ -108,6 +121,7 @@ def poll_all_active_shipments(db: Session) -> None:
             shipment=shipment,
             order=order,
             creds=_get_creds(db, order.carrier_code_snapshot),
+            request_id=f"poll-{uuid.uuid4().hex[:12]}",
         ))
 
     if not work_items:
@@ -125,35 +139,21 @@ def poll_all_active_shipments(db: Session) -> None:
             results.append(fut.result())
 
     for result in results:
-        shipment = result.shipment
-        order = result.order
+        # Same trace id we used for the gateway call — every log line and
+        # DB write below carries it so operators can grep one shipment poll
+        # end-to-end.
+        with bind_request_id(result.request_id):
+            _process_result(db, result)
 
-        # Mark as polled regardless of outcome — prevents retry storms on broken carriers.
-        shipment.last_polled_at = datetime.utcnow()
 
-        if result.error is not None:
-            _integration_log.create(
-                db,
-                carrier_code=order.carrier_code_snapshot,
-                direction="outbound",
-                event_type="polling",
-                order_id=order.id,
-                payload=json.dumps({"tracking_number": shipment.carrier_tracking_number}),
-                duration_ms=result.duration_ms,
-                status="error",
-                error_message=str(result.error),
-            )
-            logger.warning(
-                "polling failed for shipment %s (%s): %s",
-                shipment.id, shipment.carrier_tracking_number, result.error,
-            )
-            try:
-                db.commit()
-            except Exception as exc:
-                logger.error("commit failed (error branch) shipment %s: %s", shipment.id, exc)
-                db.rollback()
-            continue
+def _process_result(db: Session, result: _PollResult) -> None:
+    shipment = result.shipment
+    order = result.order
 
+    # Mark as polled regardless of outcome — prevents retry storms on broken carriers.
+    shipment.last_polled_at = utcnow()
+
+    if result.error is not None:
         _integration_log.create(
             db,
             carrier_code=order.carrier_code_snapshot,
@@ -161,56 +161,88 @@ def poll_all_active_shipments(db: Session) -> None:
             event_type="polling",
             order_id=order.id,
             payload=json.dumps({"tracking_number": shipment.carrier_tracking_number}),
-            response=json.dumps({"events_count": len(result.events)}),
             duration_ms=result.duration_ms,
-            status="success",
+            status="error",
+            error_message=str(result.error),
         )
-
-        for ev in result.events:
-            duplicate = db.scalar(
-                select(TrackingEvent).where(
-                    TrackingEvent.order_draft_id == order.id,
-                    TrackingEvent.carrier_status == ev.carrier_status,
-                    TrackingEvent.occurred_at == ev.occurred_at,
-                )
-            )
-            if duplicate:
-                continue
-
-            _tracking_repo.add_event(
-                db,
-                order_draft_id=order.id,
-                status=ev.status,
-                carrier_status=ev.carrier_status,
-                location=ev.location,
-                description=ev.description,
-                occurred_at=ev.occurred_at,
-            )
-
-            if can_transition(order.status, ev.status):
-                old_status = order.status
-                order.status = ev.status
-                db.add(OrderStatusHistory(
-                    order_id=order.id,
-                    old_status=old_status,
-                    new_status=ev.status,
-                    source="polling",
-                    comment=f"Carrier status: {ev.carrier_status}",
-                ))
-                _notifications_svc.notify_order_status(
-                    db,
-                    user_id=order.user_id,
-                    order_id=order.id,
-                    status=ev.status,
-                )
-            elif ev.status != order.status:
-                logger.warning(
-                    "polling: invalid transition order_id=%s %s -> %s (carrier=%s)",
-                    order.id, order.status, ev.status, ev.carrier_status,
-                )
-
+        logger.warning(
+            "polling failed for shipment %s (%s): %s",
+            shipment.id, shipment.carrier_tracking_number, result.error,
+        )
         try:
             db.commit()
         except Exception as exc:
-            logger.error("commit failed after polling shipment %s: %s", shipment.id, exc)
+            logger.error("commit failed (error branch) shipment %s: %s", shipment.id, exc)
             db.rollback()
+        return
+
+    _integration_log.create(
+        db,
+        carrier_code=order.carrier_code_snapshot,
+        direction="outbound",
+        event_type="polling",
+        order_id=order.id,
+        payload=json.dumps({"tracking_number": shipment.carrier_tracking_number}),
+        response=json.dumps({"events_count": len(result.events)}),
+        duration_ms=result.duration_ms,
+        status="success",
+    )
+
+    # Bulk dedup: one SELECT for all incoming keys instead of N per-event
+    # queries. `existing_keys` returns the set already in the DB; the rest
+    # are candidates for insertion. ON CONFLICT DO NOTHING under the unique
+    # constraint also protects against concurrent pollers writing the same
+    # event between our SELECT and INSERT.
+    keys = [(ev.carrier_status, ev.occurred_at) for ev in result.events]
+    existing = _tracking_repo.existing_keys(db, order_draft_id=order.id, keys=keys)
+    new_events = [
+        ev for ev in result.events
+        if (ev.carrier_status, ev.occurred_at) not in existing
+    ]
+
+    if new_events:
+        _tracking_repo.bulk_insert_events(
+            db,
+            rows=[
+                {
+                    "order_draft_id": order.id,
+                    "status": ev.status,
+                    "carrier_status": ev.carrier_status,
+                    "location": ev.location,
+                    "description": ev.description,
+                    "occurred_at": ev.occurred_at,
+                }
+                for ev in new_events
+            ],
+        )
+
+    # Apply status transitions in chronological order so we don't skip
+    # intermediate states when a carrier returns the full history at once.
+    for ev in sorted(new_events, key=lambda e: e.occurred_at):
+        if can_transition(order.status, ev.status):
+            old_status = order.status
+            order.status = ev.status
+            db.add(OrderStatusHistory(
+                order_id=order.id,
+                old_status=old_status,
+                new_status=ev.status,
+                source="polling",
+                comment=f"Carrier status: {ev.carrier_status}",
+            ))
+            _notifications_svc.notify_order_status(
+                db,
+                user_id=order.user_id,
+                order_id=order.id,
+                status=ev.status,
+            )
+        elif ev.status != order.status:
+            logger.warning(
+                "polling: invalid transition order_id=%s %s -> %s (carrier=%s)",
+                order.id, order.status, ev.status, ev.carrier_status,
+            )
+
+    try:
+        db.commit()
+    except Exception as exc:
+        logger.error("commit failed after polling shipment %s: %s", shipment.id, exc)
+        db.rollback()

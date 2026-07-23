@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import logging
 import secrets
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from decimal import Decimal
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session, selectinload
 
+from app.common.time_utils import utcnow as _utcnow
 from app.core.exceptions import NotFoundError
 from app.modules.carriers.tariff_engine import (
     calculate_quotes_async as _engine_quotes_async,
@@ -23,9 +24,6 @@ from app.modules.quotes.schemas import (
     ShippingQuoteResponse,
 )
 
-
-def _utcnow() -> datetime:
-    return datetime.now(UTC).replace(tzinfo=None)
 
 _TOKEN_TTL_HOURS = 24
 

@@ -17,6 +17,7 @@ from functools import lru_cache
 import httpx
 
 from app.core.config import get_settings
+from app.core.request_context import get_request_id
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,13 @@ class CarrierGatewayClient:
         self._client = httpx.Client(limits=_HTTP_LIMITS)
 
     def _headers(self) -> dict[str, str]:
-        return {"X-Gateway-Secret": self._secret}
+        headers = {"X-Gateway-Secret": self._secret}
+        # Forward the caller's trace id so gateway logs correlate with API +
+        # worker logs. Missing id (bootstrap / test) simply omits the header.
+        rid = get_request_id()
+        if rid:
+            headers["X-Request-Id"] = rid
+        return headers
 
     def _post_with_retry(self, url: str, *, json: dict, timeout: int) -> httpx.Response:
         """POST with one automatic retry on stale-connection errors.
