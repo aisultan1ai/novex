@@ -33,35 +33,35 @@ def upgrade() -> None:
     # already installed it.
     op.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
 
-    # Plain btree on the equality-lookup column.
-    op.create_index(
-        "ix_shipments_carrier_tracking_number",
-        "shipments",
-        ["carrier_tracking_number"],
+    # All CREATE INDEX statements below use IF NOT EXISTS so this migration
+    # is idempotent against hand-created indexes (occasionally an operator
+    # creates a suggested index in prod before the migration lands, then the
+    # migration crashes on rollout). Postgres treats index creation as
+    # transactional, so a mid-migration failure otherwise rolls back the
+    # entire step — meaning a single manual index turns into "run every
+    # `CREATE INDEX` manually or you're stuck".
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS ix_shipments_carrier_tracking_number "
+        "ON shipments (carrier_tracking_number)"
     )
-
-    # Composite for "active tx per order" queries. order_id first because
-    # the leading column has the higher selectivity in practice — a single
-    # order has few payment_transactions rows.
-    op.create_index(
-        "ix_payment_transactions_order_id_status",
-        "payment_transactions",
-        ["order_id", "status"],
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS ix_payment_transactions_order_id_status "
+        "ON payment_transactions (order_id, status)"
     )
 
     # GIN trigram indexes for infix LIKE on admin barcode search. Using raw
     # SQL because Alembic's create_index does not expose gin_trgm_ops nicely
     # across SQLAlchemy versions.
     op.execute(
-        "CREATE INDEX ix_shipments_tracking_number_trgm "
+        "CREATE INDEX IF NOT EXISTS ix_shipments_tracking_number_trgm "
         "ON shipments USING gin (tracking_number gin_trgm_ops)"
     )
     op.execute(
-        "CREATE INDEX ix_shipments_carrier_tracking_number_trgm "
+        "CREATE INDEX IF NOT EXISTS ix_shipments_carrier_tracking_number_trgm "
         "ON shipments USING gin (carrier_tracking_number gin_trgm_ops)"
     )
     op.execute(
-        "CREATE INDEX ix_shipments_carrier_barcode_trgm "
+        "CREATE INDEX IF NOT EXISTS ix_shipments_carrier_barcode_trgm "
         "ON shipments USING gin (carrier_barcode gin_trgm_ops)"
     )
 
