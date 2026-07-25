@@ -43,6 +43,10 @@ COPY backend/app/modules/__init__.py ./app/modules/__init__.py
 COPY backend/app/__init__.py       ./app/__init__.py
 COPY backend/app/core/config.py    ./app/core/config.py
 COPY backend/app/core/__init__.py  ./app/core/__init__.py
+# app/common — required by polling adapters (log_ratelimit) and shared
+# time / status helpers. Cheap to include (~4 files, no DB deps) and
+# safer than hand-picking modules as new imports get added.
+COPY backend/app/common            ./app/common
 COPY backend/carrier_gateway       ./carrier_gateway
 COPY backend/pyproject.toml        .
 
