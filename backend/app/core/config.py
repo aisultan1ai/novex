@@ -120,6 +120,27 @@ class Settings(BaseSettings):
     polling_cooldown_seconds: int = 100
     polling_batch_size: int = 200
     polling_creds_ttl_seconds: int = 300
+    # Redis-lock TTL for the sync_tracking cron. Must comfortably exceed the
+    # longest expected polling run so a second replica cannot start on top of
+    # a still-running poll. Rule of thumb:
+    #   TTL >= ceil(polling_batch_size / polling_max_workers) * per_carrier_timeout + safety
+    # Default 300s covers a 200-item batch × 15s HTTP timeout ÷ 10 workers (≈300s).
+    polling_lock_ttl_seconds: int = 300
+    # How often the tracking-poller container wakes up between ticks. Kept
+    # short so SIGTERM shutdown is snappy (K8s terminationGracePeriodSeconds
+    # is typically 30s). Previously this was hard-coded at 30s.
+    tracking_poller_tick_interval_seconds: int = 5
+
+    # Dispatch retry backoff (seconds between attempts). Comma-separated in
+    # the env, e.g. DISPATCH_RETRY_DELAYS_SECONDS="60,300,900". Length also
+    # determines the cap for max_attempts — a 4-attempt job with 3 delays
+    # uses the last delay for attempt #3 and beyond.
+    dispatch_retry_delays_seconds: list[int] = Field(default_factory=lambda: [60, 300, 900])
+
+    # CSE reference-data cache TTL (TypesOfCargo, Geography GUIDs). Kept as
+    # a setting so ops can shorten it if CSE ever refuses to serve a request
+    # against a stale GUID after they rename or add a type.
+    cse_reference_cache_ttl_seconds: int = 3600
 
     backend_cors_origins: list[str] = Field(
         default_factory=lambda: [
@@ -128,6 +149,23 @@ class Settings(BaseSettings):
             "http://localhost:3000",
         ]
     )
+
+    @field_validator("dispatch_retry_delays_seconds", mode="before")
+    @classmethod
+    def parse_retry_delays(cls, value: Any) -> list[int]:
+        # Accept both a native list (test / programmatic override) and the
+        # env-provided comma-separated string form.
+        if isinstance(value, list):
+            return [int(v) for v in value]
+        if isinstance(value, str):
+            cleaned = value.strip()
+            if not cleaned:
+                return [60, 300, 900]
+            if cleaned.startswith("[") and cleaned.endswith("]"):
+                import json
+                return [int(v) for v in json.loads(cleaned)]
+            return [int(x.strip()) for x in cleaned.split(",") if x.strip()]
+        raise ValueError("Invalid DISPATCH_RETRY_DELAYS_SECONDS value")
 
     @field_validator("backend_cors_origins", mode="before")
     @classmethod

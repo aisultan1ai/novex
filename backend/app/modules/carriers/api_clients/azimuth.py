@@ -5,6 +5,7 @@ import logging
 import httpx
 
 from app.modules.carriers.api_clients.base import CarrierAPIClient, CarrierServiceOption, InvoiceResult
+from app.modules.carriers.pii_mask import mask_pii_text
 
 logger = logging.getLogger(__name__)
 
@@ -15,8 +16,6 @@ class AzimuthAPIClient(CarrierAPIClient):
     carrier_code = "azimuth"
 
     def create_invoice(self, order_data: dict, creds: dict) -> InvoiceResult:
-        import secrets
-
         api_url = creds["api_url"].rstrip("/")
         token = creds["api_token"]
 
@@ -43,8 +42,20 @@ class AzimuthAPIClient(CarrierAPIClient):
 
         # Azimuth waybill_number regex: ^\d*RS\d*$ + size:12
         # Must contain exactly one "RS", rest digits, total 12 chars.
-        # Format: 10 random digits + "RS" at the end (any position works).
-        digits = f"{secrets.randbelow(10**10):010d}"
+        # Derived from our own order.id so it is deterministic + globally
+        # unique (order.id is autoincrement, we hold the row). Previously we
+        # used secrets.randbelow(10**10), which had a small but non-zero
+        # birthday-collision probability; on collision Azimuth returned 500
+        # and dispatch retried, potentially producing a second waybill (they
+        # have no cancel). Format: 10 digits derived from order.id (zero-
+        # padded, wrapped modulo 10**10 for safety with very large ids) + "RS".
+        order_id = int(order_data.get("order_id") or 0)
+        if order_id <= 0:
+            raise RuntimeError(
+                "Azimuth create_invoice: order_data['order_id'] is required "
+                "to derive a collision-safe waybill_number."
+            )
+        digits = f"{order_id % 10**10:010d}"
         waybill_number = f"{digits}RS"
 
         # Azimuth caps quantity at 4 per invoice. Silently clamping would
@@ -136,7 +147,7 @@ class AzimuthAPIClient(CarrierAPIClient):
         # Azimuth uses HTTP 500 for validation errors — surface all field errors
         # instead of a generic 500. Try to parse `errors` map if Laravel returned it.
         if resp.status_code >= 400:
-            body_preview = resp.text[:800] if resp.text else "<empty>"
+            body_preview = mask_pii_text(resp.text)[:800] if resp.text else "<empty>"
             errors_summary: str
             try:
                 jbody = resp.json()
@@ -151,12 +162,14 @@ class AzimuthAPIClient(CarrierAPIClient):
                     errors_summary = body_preview
             except Exception:
                 errors_summary = body_preview
+            # Response body echoes our sender/receiver JSON. Scrub before log
+            # so PII does not leak to Sentry.
             logger.warning(
-                "Azimuth create_invoice failed: status=%s FULL_BODY=%s SENT_WAYBILL=%s",
-                resp.status_code, resp.text, waybill_number,
+                "Azimuth create_invoice failed: status=%s BODY=%s SENT_WAYBILL=%s",
+                resp.status_code, mask_pii_text(resp.text), waybill_number,
             )
             raise RuntimeError(
-                f"Azimuth API вернул {resp.status_code}: {errors_summary}"
+                f"Azimuth API вернул {resp.status_code}: {mask_pii_text(errors_summary)}"
             )
         data = resp.json()
 
@@ -428,7 +441,7 @@ class AzimuthAPIClient(CarrierAPIClient):
         )
         if resp.status_code >= 400:
             # Reuse the same Laravel-error parsing shape as create_invoice.
-            body_preview = (resp.text or "")[:800]
+            body_preview = mask_pii_text(resp.text or "")[:800]
             errors_summary: str
             try:
                 jbody = resp.json()
@@ -445,10 +458,10 @@ class AzimuthAPIClient(CarrierAPIClient):
                 errors_summary = body_preview
             logger.warning(
                 "Azimuth order-courier failed: status=%s body=%s",
-                resp.status_code, resp.text,
+                resp.status_code, mask_pii_text(resp.text or ""),
             )
             raise RuntimeError(
-                f"Azimuth order-courier вернул {resp.status_code}: {errors_summary}"
+                f"Azimuth order-courier вернул {resp.status_code}: {mask_pii_text(errors_summary)}"
             )
 
         try:

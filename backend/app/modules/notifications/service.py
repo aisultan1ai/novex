@@ -32,8 +32,10 @@ _STATUS_TITLES: dict[str, str] = {
     "dispatched": "Заказ передан перевозчику",
     "dispatch_queued": "Заказ поставлен в очередь на отправку",
     "dispatch_failed": "Заказ оформлен, уточняем детали доставки",
+    # Оба pending_manual* для клиента звучат одинаково — внутренняя разница
+    # (нет API у перевозчика vs требуется ручной push) видна только админам.
     "pending_manual": "Заказ оформлен, передаётся перевозчику",
-    "pending_manual_dispatch": "Ожидает ручной отправки",
+    "pending_manual_dispatch": "Заказ оформлен, передаётся перевозчику",
 }
 
 
@@ -52,8 +54,22 @@ class NotificationsService:
     ) -> None:
         title = _STATUS_TITLES.get(status, f"Статус обновлён: {status}")
         body = f"Заказ #{order_id}: {title.lower()}"
+        # Payment-adjacent statuses take the user to /checkout so they land on
+        # the pay/upload-proof screen instead of the read-only order card.
+        # Everything else routes to the order detail page.
+        _PAYMENT_STATUSES = {"awaiting_payment", "payment_rejected", "ready_for_checkout"}
+        link_url = (
+            f"/checkout?draftId={order_id}"
+            if status in _PAYMENT_STATUSES
+            else f"/dashboard/orders/{order_id}"
+        )
         self.repo.create(
-            db, user_id=user_id, type="order_status", title=title, body=body
+            db,
+            user_id=user_id,
+            type="order_status",
+            title=title,
+            body=body,
+            link_url=link_url,
         )
         logger.info(
             "Notification sent: user_id=%s order_id=%s status=%s",

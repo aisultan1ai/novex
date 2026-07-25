@@ -19,8 +19,15 @@ class NotificationsRepository:
         type: str,
         title: str,
         body: str | None = None,
+        link_url: str | None = None,
     ) -> Notification:
-        n = Notification(user_id=user_id, type=type, title=title, body=body)
+        n = Notification(
+            user_id=user_id,
+            type=type,
+            title=title,
+            body=body,
+            link_url=link_url,
+        )
         db.add(n)
         db.flush()
         return n

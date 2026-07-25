@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 
 import httpx
 
+from app.core.config import get_settings
 from app.modules.carriers.polling.base import CarrierPollingAdapter, TrackingEventData
 
 
@@ -16,7 +17,9 @@ def _esc(s: str) -> str:
 logger = logging.getLogger(__name__)
 
 _DEFAULT_API_URL = "https://home.courierexe.ru/api/"
-_TIMEOUT = 15
+# Same shape as the main client — splitting connect/read so a slow response
+# on one shipment cannot block the entire polling tick.
+_TIMEOUT = httpx.Timeout(connect=5.0, read=15.0, write=10.0, pool=5.0)
 
 # Маппинг статусов Exline → внутренние статусы Novex
 _STATUS_MAP: dict[str, str] = {
@@ -43,14 +46,27 @@ class ExlineAdapter(CarrierPollingAdapter):
     carrier_code = "exline"
 
     def fetch_status(self, tracking_number: str, creds: dict) -> list[TrackingEventData]:
-        extra = str(creds.get("extra") or os.getenv("EXLINE_EXTRA") or "")
-        login = str(creds.get("login") or os.getenv("EXLINE_LOGIN") or "")
-        password = str(creds.get("password") or os.getenv("EXLINE_PASSWORD") or "")
-        api_url = str(creds.get("api_url") or os.getenv("EXLINE_API_URL") or _DEFAULT_API_URL).rstrip("/") + "/"
+        # Env-var fallback is a dev-only convenience. In production every
+        # carrier MUST have its credentials in CarrierAPICredentials so we
+        # never accidentally poll live carriers with stale env values (which
+        # would also be shared across every carrier — a footgun waiting to
+        # happen). Fail fast in prod if creds are missing.
+        allow_env_fallback = get_settings().environment != "production"
+        extra = str(creds.get("extra") or "").strip()
+        login = str(creds.get("login") or "").strip()
+        password = str(creds.get("password") or "")
+        api_url_raw = str(creds.get("api_url") or "").strip()
+        if allow_env_fallback:
+            extra = extra or (os.getenv("EXLINE_EXTRA") or "")
+            login = login or (os.getenv("EXLINE_LOGIN") or "")
+            password = password or (os.getenv("EXLINE_PASSWORD") or "")
+            api_url_raw = api_url_raw or (os.getenv("EXLINE_API_URL") or _DEFAULT_API_URL)
+        api_url = (api_url_raw or _DEFAULT_API_URL).rstrip("/") + "/"
 
         if not extra or not login:
             logger.warning(
-                "ExlineAdapter: no credentials available for tracking (orderno=%s)",
+                "ExlineAdapter: no credentials available for tracking (orderno=%s) "
+                "— configure CarrierAPICredentials for 'exline' via admin.",
                 tracking_number,
             )
             return []

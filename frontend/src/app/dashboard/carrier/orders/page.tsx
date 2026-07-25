@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { listCarrierOrders, type CarrierOrderItem } from "@/lib/api/carrier";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 
 const STATUS_LABELS: Record<string, string> = {
   sent_to_carrier: "Передан перевозчику",
@@ -34,7 +35,58 @@ const badge: React.CSSProperties = {
   display: "inline-block",
 };
 
+const PAGE_SIZE = 20;
+
+function StatusBadge({ status }: { status: string }) {
+  return (
+    <span style={{ ...badge, ...(STATUS_STYLE[status] ?? { background: "#f1f5f9" }) }}>
+      {STATUS_LABELS[status] ?? status}
+    </span>
+  );
+}
+
+function OrderMobileCard({ order }: { order: CarrierOrderItem }) {
+  const pkg = order.packages[0];
+  const sender = order.parties.find((p) => p.role === "sender");
+  const recipient = order.parties.find((p) => p.role === "recipient");
+  return (
+    <Link
+      href={`/dashboard/carrier/orders/${order.id}`}
+      style={{
+        display: "block",
+        background: "#ffffff",
+        border: "1px solid #e5e7eb",
+        borderRadius: 12,
+        padding: "14px 16px",
+        textDecoration: "none",
+        color: "inherit",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 6 }}>
+        <span style={{ fontWeight: 700, color: "#111827" }}>#{order.id}</span>
+        <StatusBadge status={order.status} />
+      </div>
+      <div style={{ fontSize: 14, fontWeight: 600, color: "#111827", marginBottom: 4 }}>
+        {order.from_city} → {order.to_city}
+      </div>
+      <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 8 }}>
+        {order.tariff_name}
+        {pkg ? ` · ${pkg.weight_kg} кг` : ""}
+      </div>
+      {sender && <div style={{ fontSize: 12, color: "#6b7280" }}>От: {sender.full_name}</div>}
+      {recipient && <div style={{ fontSize: 12, color: "#6b7280" }}>Кому: {recipient.full_name}</div>}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10, paddingTop: 10, borderTop: "1px solid #f1f5f9" }}>
+        <span style={{ fontSize: 11, color: "#94a3b8" }}>{new Date(order.created_at).toLocaleDateString("ru-KZ")}</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>
+          {order.price.toLocaleString()} {order.currency}
+        </span>
+      </div>
+    </Link>
+  );
+}
+
 export default function CarrierOrdersPage() {
+  const isMobile = useIsMobile();
   const [orders, setOrders] = useState<CarrierOrderItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -46,7 +98,7 @@ export default function CarrierOrdersPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await listCarrierOrders({ status: statusFilter || undefined, page, size: 20 });
+      const res = await listCarrierOrders({ status: statusFilter || undefined, page, size: PAGE_SIZE });
       setOrders(res.items);
       setTotal(res.total);
     } catch (e) {
@@ -57,6 +109,13 @@ export default function CarrierOrdersPage() {
   }, [statusFilter, page]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Correct "next" gate: derived from `total`, not from the local page size.
+  // Previously we blocked next when `orders.length < 20` — which mis-fired on
+  // exactly-20-item last pages and left users clicking through to an empty page.
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const hasPrev = page > 1;
+  const hasNext = page < totalPages;
 
   return (
     <div style={{ padding: "0 0 24px" }}>
@@ -79,68 +138,72 @@ export default function CarrierOrdersPage() {
 
       {loading ? (
         <p style={{ color: "#6b7280" }}>Загрузка...</p>
+      ) : orders.length === 0 ? (
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "48px 24px", textAlign: "center", color: "#94a3b8", fontSize: 14 }}>
+          Заказы не найдены
+        </div>
+      ) : isMobile ? (
+        /* Mobile: card list — the desktop table would horizontally overflow */
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {orders.map((o) => <OrderMobileCard key={o.id} order={o} />)}
+        </div>
       ) : (
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              {["ID", "Маршрут", "Вес/Тариф", "Сумма", "Статус", "Дата", ""].map((h) => (
-                <th key={h} style={styles.th}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {orders.map((o) => {
-              const pkg = o.packages[0];
-              const sender = o.parties.find((p) => p.role === "sender");
-              const recipient = o.parties.find((p) => p.role === "recipient");
-              return (
-                <tr key={o.id} style={styles.tr}>
-                  <td style={styles.td}>
-                    <span style={{ fontWeight: 600 }}>#{o.id}</span>
-                  </td>
-                  <td style={styles.td}>
-                    <div style={{ fontWeight: 600 }}>{o.from_city} → {o.to_city}</div>
-                    {sender && <div style={{ fontSize: 11, color: "#6b7280" }}>От: {sender.full_name}</div>}
-                    {recipient && <div style={{ fontSize: 11, color: "#6b7280" }}>Кому: {recipient.full_name}</div>}
-                  </td>
-                  <td style={styles.td}>
-                    <div>{pkg ? `${pkg.weight_kg} кг` : "-"}</div>
-                    <div style={{ fontSize: 11, color: "#6b7280" }}>{o.tariff_name}</div>
-                  </td>
-                  <td style={styles.td}>
-                    <span style={{ fontWeight: 700 }}>{o.price.toLocaleString()} {o.currency}</span>
-                  </td>
-                  <td style={styles.td}>
-                    <span style={{ ...badge, ...(STATUS_STYLE[o.status] ?? { background: "#f1f5f9" }) }}>
-                      {STATUS_LABELS[o.status] ?? o.status}
-                    </span>
-                  </td>
-                  <td style={styles.td}>
-                    {new Date(o.created_at).toLocaleDateString("ru-KZ")}
-                  </td>
-                  <td style={styles.td}>
-                    <Link href={`/dashboard/carrier/orders/${o.id}`} style={styles.btn}>
-                      Открыть
-                    </Link>
-                  </td>
-                </tr>
-              );
-            })}
-            {orders.length === 0 && (
+        /* Desktop: same table as before, wrapped in an overflow container so
+           narrow viewports scroll horizontally instead of clipping. */
+        <div style={{ overflowX: "auto" }}>
+          <table style={styles.table}>
+            <thead>
               <tr>
-                <td colSpan={7} style={{ ...styles.td, textAlign: "center", color: "#9ca3af" }}>
-                  Заказы не найдены
-                </td>
+                {["ID", "Маршрут", "Вес/Тариф", "Сумма", "Статус", "Дата", ""].map((h) => (
+                  <th key={h} style={styles.th}>{h}</th>
+                ))}
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {orders.map((o) => {
+                const pkg = o.packages[0];
+                const sender = o.parties.find((p) => p.role === "sender");
+                const recipient = o.parties.find((p) => p.role === "recipient");
+                return (
+                  <tr key={o.id} style={styles.tr}>
+                    <td style={styles.td}>
+                      <span style={{ fontWeight: 600 }}>#{o.id}</span>
+                    </td>
+                    <td style={styles.td}>
+                      <div style={{ fontWeight: 600 }}>{o.from_city} → {o.to_city}</div>
+                      {sender && <div style={{ fontSize: 11, color: "#6b7280" }}>От: {sender.full_name}</div>}
+                      {recipient && <div style={{ fontSize: 11, color: "#6b7280" }}>Кому: {recipient.full_name}</div>}
+                    </td>
+                    <td style={styles.td}>
+                      <div>{pkg ? `${pkg.weight_kg} кг` : "-"}</div>
+                      <div style={{ fontSize: 11, color: "#6b7280" }}>{o.tariff_name}</div>
+                    </td>
+                    <td style={styles.td}>
+                      <span style={{ fontWeight: 700 }}>{o.price.toLocaleString()} {o.currency}</span>
+                    </td>
+                    <td style={styles.td}>
+                      <StatusBadge status={o.status} />
+                    </td>
+                    <td style={styles.td}>
+                      {new Date(o.created_at).toLocaleDateString("ru-KZ")}
+                    </td>
+                    <td style={styles.td}>
+                      <Link href={`/dashboard/carrier/orders/${o.id}`} style={styles.btn}>
+                        Открыть
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
 
-      <div style={{ display: "flex", gap: 8, marginTop: 16, alignItems: "center" }}>
-        <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} style={styles.pageBtn}>← Назад</button>
-        <span style={{ fontSize: 13 }}>Стр. {page} · Всего {total}</span>
-        <button onClick={() => setPage((p) => p + 1)} disabled={orders.length < 20} style={styles.pageBtn}>Вперёд →</button>
+      <div style={{ display: "flex", gap: 8, marginTop: 16, alignItems: "center", flexWrap: "wrap" }}>
+        <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={!hasPrev} style={styles.pageBtn}>← Назад</button>
+        <span style={{ fontSize: 13 }}>Стр. {page} из {totalPages} · всего {total}</span>
+        <button onClick={() => setPage((p) => p + 1)} disabled={!hasNext} style={styles.pageBtn}>Вперёд →</button>
       </div>
     </div>
   );
@@ -148,7 +211,7 @@ export default function CarrierOrdersPage() {
 
 const styles: Record<string, React.CSSProperties> = {
   select: { border: "1px solid #e5e7eb", borderRadius: 6, padding: "6px 12px", fontSize: 13, outline: "none" },
-  table: { width: "100%", borderCollapse: "collapse", fontSize: 13 },
+  table: { width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 720 },
   th: { textAlign: "left", padding: "8px 12px", borderBottom: "2px solid #e5e7eb", fontWeight: 600, color: "#374151", whiteSpace: "nowrap" },
   tr: { borderBottom: "1px solid #f3f4f6" },
   td: { padding: "10px 12px", verticalAlign: "top" },

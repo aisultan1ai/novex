@@ -82,6 +82,10 @@ class OrderDraft(Base, TimestampMixin):
     carrier_code_snapshot: Mapped[str] = mapped_column(String(50), nullable=False)
     carrier_name_snapshot: Mapped[str] = mapped_column(String(100), nullable=False)
     tariff_name_snapshot: Mapped[str] = mapped_column(String(100), nullable=False)
+    # CSE-only: frozen at quote-select time so dispatch works even if the
+    # RateQuote row was housekept between order creation and dispatch.
+    # Nullable because non-CSE carriers do not populate it.
+    urgency_guid_snapshot: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     # price_snapshot = customer-facing total = what the customer is charged.
     price_snapshot: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)

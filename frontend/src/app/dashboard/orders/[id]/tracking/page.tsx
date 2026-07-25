@@ -21,7 +21,7 @@ const STATUS_LABELS: Record<string, string> = {
   dispatch_queued:            "Ожидает отправки",
   dispatch_failed:            "Уточняем детали",
   pending_manual:             "Передаётся перевозчику",
-  pending_manual_dispatch:    "Ожидает ручной отправки",
+  pending_manual_dispatch:    "Передаётся перевозчику",
   sent_to_carrier:            "Передан перевозчику",
   picked_up:                  "Забран перевозчиком",
   in_transit:                 "В пути",

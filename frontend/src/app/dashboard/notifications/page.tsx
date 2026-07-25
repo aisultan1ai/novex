@@ -66,6 +66,14 @@ export default function NotificationsPage() {
     }
   }
 
+  // Row click: navigate to the linked entity (if any) AND fire the read
+  // toggle. We optimistically mark-read first so navigation is not delayed by
+  // the PATCH round-trip.
+  function handleRowClick(n: Notification) {
+    if (!n.is_read) void handleMarkRead(n.id);
+    if (n.link_url) router.push(n.link_url);
+  }
+
   async function handleMarkAll() {
     setMarkingAll(true);
     try {
@@ -141,6 +149,10 @@ export default function NotificationsPage() {
           {items.map((n, idx) => {
             const isLast = idx === items.length - 1;
             const icon = TYPE_ICONS[n.type] ?? "🔔";
+            // Row is clickable when it has a target OR is still unread —
+            // either action counts as user intent. Fully read + no link is
+            // rendered as static text.
+            const clickable = Boolean(n.link_url) || !n.is_read;
             return (
               <div
                 key={n.id}
@@ -151,10 +163,10 @@ export default function NotificationsPage() {
                   padding: isMobile ? "14px 16px" : "18px 24px",
                   borderBottom: isLast ? "none" : "1px solid #f1f5f9",
                   background: n.is_read ? "#ffffff" : "#f8faff",
-                  cursor: n.is_read ? "default" : "pointer",
+                  cursor: clickable ? "pointer" : "default",
                   transition: "background 0.1s",
                 }}
-                onClick={() => { if (!n.is_read) void handleMarkRead(n.id); }}
+                onClick={() => { if (clickable) handleRowClick(n); }}
               >
                 <div style={{ fontSize: 22, flexShrink: 0, marginTop: 1 }}>{icon}</div>
 

@@ -96,6 +96,7 @@ class OrdersRepository:
         status: str = "draft",
         carrier_price_snapshot: Decimal | None = None,
         markup_amount_snapshot: Decimal | None = None,
+        urgency_guid_snapshot: str | None = None,
     ) -> OrderDraft:
         order_draft = OrderDraft(
             user_id=user_id,
@@ -105,6 +106,7 @@ class OrdersRepository:
             carrier_code_snapshot=carrier_code_snapshot,
             carrier_name_snapshot=carrier_name_snapshot,
             tariff_name_snapshot=tariff_name_snapshot,
+            urgency_guid_snapshot=urgency_guid_snapshot,
             price_snapshot=price_snapshot,
             carrier_price_snapshot=carrier_price_snapshot,
             markup_amount_snapshot=markup_amount_snapshot,
@@ -141,11 +143,13 @@ class OrdersRepository:
         shipment_type_snapshot: str,
         carrier_price_snapshot: Decimal | None = None,
         markup_amount_snapshot: Decimal | None = None,
+        urgency_guid_snapshot: str | None = None,
     ) -> OrderDraft:
         order_draft.selected_rate_quote_id = selected_rate_quote_id
         order_draft.carrier_code_snapshot = carrier_code_snapshot
         order_draft.carrier_name_snapshot = carrier_name_snapshot
         order_draft.tariff_name_snapshot = tariff_name_snapshot
+        order_draft.urgency_guid_snapshot = urgency_guid_snapshot
         order_draft.price_snapshot = price_snapshot
         order_draft.carrier_price_snapshot = carrier_price_snapshot
         order_draft.markup_amount_snapshot = markup_amount_snapshot

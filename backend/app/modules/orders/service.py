@@ -153,6 +153,8 @@ class OrdersService:
                 carrier_code_snapshot=selected_rate_quote.carrier_code,
                 carrier_name_snapshot=selected_rate_quote.carrier_name,
                 tariff_name_snapshot=selected_rate_quote.tariff_name,
+                # Freeze urgency_guid so dispatch survives RateQuote cleanup.
+                urgency_guid_snapshot=selected_rate_quote.urgency_guid,
                 price_snapshot=selected_rate_quote.price,
                 carrier_price_snapshot=selected_rate_quote.carrier_price,
                 markup_amount_snapshot=selected_rate_quote.markup_amount,
@@ -190,6 +192,7 @@ class OrdersService:
             carrier_code_snapshot=selected_rate_quote.carrier_code,
             carrier_name_snapshot=selected_rate_quote.carrier_name,
             tariff_name_snapshot=selected_rate_quote.tariff_name,
+            urgency_guid_snapshot=selected_rate_quote.urgency_guid,
             price_snapshot=selected_rate_quote.price,
             carrier_price_snapshot=selected_rate_quote.carrier_price,
             markup_amount_snapshot=selected_rate_quote.markup_amount,

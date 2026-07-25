@@ -26,8 +26,11 @@ const STATUS_LABELS: Record<string, string> = {
   paid:                       "Оплачен",
   dispatch_queued:            "Ожидает отправки",
   dispatch_failed:            "Уточняем детали",
+  // Оба «pending_manual*» для клиента означают одно и то же: заказ у нас,
+  // ждём подтверждения от перевозчика. Внутренняя разница (auto-dispatch vs
+  // manual push) видна только админам и перевозчику в их порталах.
   pending_manual:             "Передаётся перевозчику",
-  pending_manual_dispatch:    "Ожидает ручной отправки",
+  pending_manual_dispatch:    "Передаётся перевозчику",
   sent_to_carrier:            "Передан курьеру",
   picked_up:                  "Забран",
   out_for_delivery:           "Выезд на доставку",

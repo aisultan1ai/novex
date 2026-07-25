@@ -20,6 +20,10 @@ class Notification(Base):
     type: Mapped[str] = mapped_column(String(50), nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     body: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Relative URL the client navigates to when the user clicks the row (e.g.
+    # /dashboard/orders/1042). Nullable for system messages that have no
+    # canonical target.
+    link_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=False),

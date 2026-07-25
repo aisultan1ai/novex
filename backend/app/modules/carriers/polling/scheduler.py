@@ -218,6 +218,14 @@ def _process_result(db: Session, result: _PollResult) -> None:
 
     # Apply status transitions in chronological order so we don't skip
     # intermediate states when a carrier returns the full history at once.
+    #
+    # Notifications: we no longer fire one per event. When a carrier ships us
+    # 5 back-dated events in a single tick, the customer used to see 5 push /
+    # email notifications spelling out an already-completed sequence. Instead
+    # we collect only the FINAL applied status and notify once per shipment
+    # after the DB commit — the intermediate history rows still exist for the
+    # timeline UI.
+    final_new_status: str | None = None
     for ev in sorted(new_events, key=lambda e: e.occurred_at):
         if can_transition(order.status, ev.status):
             old_status = order.status
@@ -229,12 +237,7 @@ def _process_result(db: Session, result: _PollResult) -> None:
                 source="polling",
                 comment=f"Carrier status: {ev.carrier_status}",
             ))
-            _notifications_svc.notify_order_status(
-                db,
-                user_id=order.user_id,
-                order_id=order.id,
-                status=ev.status,
-            )
+            final_new_status = ev.status
         elif ev.status != order.status:
             logger.warning(
                 "polling: invalid transition order_id=%s %s -> %s (carrier=%s)",
@@ -246,3 +249,25 @@ def _process_result(db: Session, result: _PollResult) -> None:
     except Exception as exc:
         logger.error("commit failed after polling shipment %s: %s", shipment.id, exc)
         db.rollback()
+        return
+
+    # Notify AFTER commit so a downstream email-stream publish cannot roll
+    # back the tracking events, and we only tell the customer about a status
+    # that is actually persisted. `notify_order_status` opens its own writes
+    # (Notification row + Redis Stream), so failing here does not corrupt
+    # the tracking data.
+    if final_new_status is not None:
+        try:
+            _notifications_svc.notify_order_status(
+                db,
+                user_id=order.user_id,
+                order_id=order.id,
+                status=final_new_status,
+            )
+            db.commit()
+        except Exception as exc:
+            logger.warning(
+                "notify failed for order %s after polling (tracking already committed): %s",
+                order.id, exc,
+            )
+            db.rollback()

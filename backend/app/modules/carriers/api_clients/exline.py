@@ -1,17 +1,28 @@
 from __future__ import annotations
 
 import logging
+import time
 import xml.etree.ElementTree as ET
 from datetime import date
 
 import httpx
 
 from app.modules.carriers.api_clients.base import CarrierAPIClient, CarrierServiceOption, InvoiceResult
+from app.modules.carriers.pii_mask import mask_pii_text
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_API_URL = "https://home.courierexe.ru/api/"
-_TIMEOUT = 30
+# Split connect vs read: connect must be fast (fail-fast on DNS / TCP), read
+# can be generous (Exline's XML PDF export can be slow). Previously the client
+# used a single 30s timeout and the polling adapter a different 15s — both
+# now derive from the same base value.
+_TIMEOUT = httpx.Timeout(connect=5.0, read=25.0, write=10.0, pool=5.0)
+# Retry policy for transient network errors (connect refused, timeout, 5xx).
+# Applied by _post_xml — SaveWaybillOffice / statusreq become resilient to a
+# 5-second Exline blip without escalating to DispatchWorker retry.
+_MAX_RETRIES = 2
+_RETRY_BACKOFF_SECONDS = (0.5, 1.5)
 
 # Маппинг внутреннего tariff_code → код услуги Exline (<service> в API)
 _TARIFF_TO_SERVICE: dict[str, str] = {
@@ -49,25 +60,68 @@ class ExlineAPIClient(CarrierAPIClient):
 
     carrier_code = "exline"
 
+    @staticmethod
+    def _post_with_retry(
+        api_url: str,
+        xml_body: str,
+    ) -> httpx.Response:
+        """POST with a small retry budget for transient failures.
+
+        Retries on:
+          * network errors (`httpx.TransportError` — connect refused, DNS,
+            timeout, TLS handshake failures)
+          * HTTP 5xx from Exline (their backend occasionally throws 502/504
+            during deploys)
+
+        4xx responses are NOT retried — those are permanent (bad credentials,
+        malformed XML, etc.) and would just waste time.
+        """
+        last_exc: Exception | None = None
+        for attempt in range(_MAX_RETRIES + 1):
+            try:
+                resp = httpx.post(
+                    api_url,
+                    content=xml_body.encode("utf-8"),
+                    headers={"Content-Type": "text/xml; charset=utf-8"},
+                    timeout=_TIMEOUT,
+                )
+            except httpx.TransportError as exc:
+                last_exc = exc
+                if attempt >= _MAX_RETRIES:
+                    logger.warning(
+                        "Exline: transport error after %d retries: %s",
+                        attempt, exc,
+                    )
+                    raise
+                delay = _RETRY_BACKOFF_SECONDS[min(attempt, len(_RETRY_BACKOFF_SECONDS) - 1)]
+                logger.info(
+                    "Exline: transport error (%s), retrying in %.1fs (attempt %d/%d)",
+                    exc, delay, attempt + 1, _MAX_RETRIES,
+                )
+                time.sleep(delay)
+                continue
+
+            if resp.status_code >= 500 and attempt < _MAX_RETRIES:
+                delay = _RETRY_BACKOFF_SECONDS[min(attempt, len(_RETRY_BACKOFF_SECONDS) - 1)]
+                logger.info(
+                    "Exline: HTTP %s, retrying in %.1fs (attempt %d/%d)",
+                    resp.status_code, delay, attempt + 1, _MAX_RETRIES,
+                )
+                time.sleep(delay)
+                continue
+
+            resp.raise_for_status()
+            return resp
+
+        # Unreachable — the loop either returns or raises.
+        raise RuntimeError(f"Exline: exhausted retries: {last_exc}")
+
     def _post_xml(self, xml_body: str, api_url: str) -> ET.Element:
-        resp = httpx.post(
-            api_url,
-            content=xml_body.encode("utf-8"),
-            headers={"Content-Type": "text/xml; charset=utf-8"},
-            timeout=_TIMEOUT,
-        )
-        resp.raise_for_status()
+        resp = self._post_with_retry(api_url, xml_body)
         return ET.fromstring(resp.text)
 
     def _post_xml_raw(self, xml_body: str, api_url: str) -> httpx.Response:
-        resp = httpx.post(
-            api_url,
-            content=xml_body.encode("utf-8"),
-            headers={"Content-Type": "text/xml; charset=utf-8"},
-            timeout=_TIMEOUT,
-        )
-        resp.raise_for_status()
-        return resp
+        return self._post_with_retry(api_url, xml_body)
 
     def _auth_tag(self, creds: dict) -> str:
         extra = creds.get("extra", "")
@@ -165,9 +219,13 @@ class ExlineAPIClient(CarrierAPIClient):
         barcode = node.attrib.get("barcode", orderno)
 
         if not orderno:
+            # Response echoes our order XML back — sender ФИО/телефон/адрес
+            # would leak to Sentry if logged raw. mask_pii_text redacts
+            # <person>, <phone>, <address>, phone numbers and emails.
+            raw_response = ET.tostring(root, encoding="unicode")
             raise RuntimeError(
                 f"Exline error {error}: {errormsg or 'no orderno returned'}. "
-                f"Response: {ET.tostring(root, encoding='unicode')}"
+                f"Response: {mask_pii_text(raw_response)}"
             )
 
         if error != "0":
@@ -312,7 +370,8 @@ class ExlineAPIClient(CarrierAPIClient):
             if order_node is None:
                 logger.warning(
                     "Exline cancel_invoice: no <order> in response for orderno=%s: %s",
-                    invoice_id, ET.tostring(root, encoding="unicode"),
+                    invoice_id,
+                    mask_pii_text(ET.tostring(root, encoding="unicode")),
                 )
                 return False
             err = order_node.attrib.get("error", "1")

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import base64
 import logging
+import time
 import xml.etree.ElementTree as ET
 from datetime import date
 from typing import Any
@@ -22,6 +23,7 @@ from typing import Any
 import httpx
 
 from app.modules.carriers.api_clients.base import CarrierAPIClient, CarrierServiceOption, InvoiceResult
+from app.modules.carriers.pii_mask import mask_pii_text
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +37,21 @@ _NM = f"{{{_NS_M}}}"
 _TIMEOUT = 30
 _CALC_TIMEOUT = 10
 
-# In-process cache for TypesOfCargo GUID keyed by login (stable reference data)
-_cargo_type_guid_cache: dict[str, str] = {}
+# In-process TTL cache for TypesOfCargo GUID. Keyed by (login, api_url) so
+# switching envs (prod ↔ test) does not cross-contaminate. Entries expire
+# after settings.cse_reference_cache_ttl_seconds; previously the plain dict
+# never invalidated and a CSE-side rename required a pod restart.
+_cargo_type_guid_cache: dict[tuple[str, str], tuple[str, float]] = {}
+
+
+def _cargo_cache_ttl() -> int:
+    from app.core.config import get_settings
+    return int(get_settings().cse_reference_cache_ttl_seconds)
+
+
+def _clear_cargo_type_cache() -> None:
+    """Test / admin hook: wipe the in-process TTL cache."""
+    _cargo_type_guid_cache.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -370,7 +385,9 @@ class CSEAPIClient(CarrierAPIClient):
             timeout=timeout,
         )
         if resp.status_code >= 400:
-            body_snippet = (resp.text or "")[:2000]
+            # SOAP body echoes our request (with sender ФИО/телефон/адрес).
+            # Redact common PII shapes before writing to logs / raising.
+            body_snippet = mask_pii_text(resp.text or "")[:2000]
             logger.error(
                 "CSE %s HTTP %s at %s; body: %s",
                 method, resp.status_code, self._url(creds), body_snippet,
@@ -403,9 +420,16 @@ class CSEAPIClient(CarrierAPIClient):
         ]
 
     def _cargo_type_guid(self, creds: dict) -> str:
-        cache_key = creds.get("login", "")
-        if cache_key in _cargo_type_guid_cache:
-            return _cargo_type_guid_cache[cache_key]
+        # Include api_url in the cache key so prod ↔ test envs (which live on
+        # different endpoints) never share cached GUIDs.
+        cache_key = (creds.get("login", ""), self._url(creds))
+        now = time.monotonic()
+        hit = _cargo_type_guid_cache.get(cache_key)
+        if hit is not None:
+            guid, expires_at = hit
+            if now < expires_at:
+                return guid
+            # Fall through — expired entry, refresh below.
         types = self._types_of_cargo(creds)
         guid: str | None = None
         # Prefer "Груз" (freight/parcel) over "Документы" (documents is Default=true
@@ -426,7 +450,7 @@ class CSEAPIClient(CarrierAPIClient):
             guid = types[0]["guid"]
         if guid is None:
             raise RuntimeError("CSE: cannot resolve TypeOfCargo GUID")
-        _cargo_type_guid_cache[cache_key] = guid
+        _cargo_type_guid_cache[cache_key] = (guid, now + _cargo_cache_ttl())
         return guid
 
     # ── Geography ────────────────────────────────────────────────────────────
@@ -786,7 +810,7 @@ class CSEAPIClient(CarrierAPIClient):
             timeout=_TIMEOUT,
         )
         if resp.status_code >= 400:
-            body_snippet = (resp.text or "")[:2000]
+            body_snippet = mask_pii_text(resp.text or "")[:2000]
             logger.error(
                 "CSE GetFormsForDocuments HTTP %s waybill=%s body=%s",
                 resp.status_code, waybill_number, body_snippet,
@@ -836,7 +860,7 @@ class CSEAPIClient(CarrierAPIClient):
             )
             if pdf2 is not None:
                 return pdf2
-            snippet = (raw2 or raw)[:3000]
+            snippet = mask_pii_text(raw2 or raw)[:3000]
             reason = (
                 f"code={err_code2 or err_code}"
                 + (f" info={err_info2 or err_info!r}" if (err_info2 or err_info) else "")
@@ -850,7 +874,7 @@ class CSEAPIClient(CarrierAPIClient):
             )
 
         # No BData and no parseable Error — CSE returned an empty envelope.
-        response_snippet = (raw or "")[:3000]
+        response_snippet = mask_pii_text(raw or "")[:3000]
         logger.warning(
             "CSE GetFormsForDocuments returned no BData for waybill=%s; full response: %s",
             waybill_number, response_snippet,
@@ -1269,10 +1293,14 @@ class CSEAPIClient(CarrierAPIClient):
             timeout=_TIMEOUT,
         )
         if resp_xml.status_code >= 400:
-            body_snippet = (resp_xml.text or "")[:2000]
+            # Both request echo (our SOAP body with sender info) and CSE
+            # response echo carry PII — run both through the scrubber before
+            # they hit stderr / Sentry.
+            body_snippet = mask_pii_text(resp_xml.text or "")[:2000]
+            request_snippet = mask_pii_text(inner)[:1500]
             logger.error(
                 "CSE SaveWaybillOffice HTTP %s at %s; request_inner_snippet=%s; response_body=%s",
-                resp_xml.status_code, self._url(creds), inner[:1500], body_snippet,
+                resp_xml.status_code, self._url(creds), request_snippet, body_snippet,
             )
             raise RuntimeError(
                 f"CSE SaveWaybillOffice HTTP {resp_xml.status_code}: {body_snippet}"
