@@ -20,17 +20,17 @@ const ENDPOINTS: Endpoint[] = [
     method: "POST",
     path: "/api/v1/carriers/{carrier_code}/tracking-webhook",
     title: "Отправить трекинг-событие",
-    auth: "HMAC-SHA256 подпись в заголовке X-Carrier-Signature",
-    description: "Вызывайте этот endpoint каждый раз, когда статус отправления меняется. Novex обновит статус заказа и отправит push-уведомление клиенту.",
+    auth: "HMAC-SHA256 подпись в X-Carrier-Signature + текущий unix-time в X-Novex-Timestamp",
+    description: "Вызывайте этот endpoint каждый раз, когда статус отправления меняется. Novex обновит статус заказа и отправит уведомление клиенту.",
     requestBody: JSON.stringify({
       novex_order_id: 1042,
-      status: "in_transit",
+      status: "IN_TRANSIT",
       location: "Алматы, сортировочный центр",
       description: "Посылка передана в транзит",
-      occurred_at: "2026-05-13T10:30:00Z",
+      event_id: "opt-uuid-for-dedup",
     }, null, 2),
     responseBody: JSON.stringify({ ok: true }, null, 2),
-    notes: "Если novex_order_id не найден - возвращаем 200 OK без ошибки (идемпотентно).",
+    notes: "status регистронезависимо. event_id опционален (нужен для идемпотентности при ретраях). Если novex_order_id не найден — возвращаем 200 OK без ошибки. Заголовок X-Novex-Timestamp обязателен когда настроен webhook_secret — окно ±5 минут.",
   },
   {
     method: "POST",
@@ -40,26 +40,55 @@ const ENDPOINTS: Endpoint[] = [
     description: "Novex вызовет ваш API автоматически после оплаты заказа клиентом. Вам нужно обработать заказ и вернуть трекинг-номер.",
     requestBody: JSON.stringify({
       novex_order_id: 1042,
+      order_reference: "NOVEX-001042",
       tariff_code: "STANDARD",
-      sender: { city: "Алматы", address: "ул. Абая, 1", full_name: "Магазин", phone: "+77001112233" },
-      recipient: { city: "Астана", address: "пр. Мангилик Ел, 55", full_name: "Иван Иванов", phone: "+77009998877" },
-      packages: [{ weight_kg: 2.5, length_cm: 30, width_cm: 20, height_cm: 15 }],
+      sender: {
+        full_name: "Магазин",
+        phone: "+77001112233",
+        city: "Алматы",
+        address: "ул. Абая, 1",
+        tax_id: "123456789012",
+      },
+      recipient: {
+        full_name: "Иван Иванов",
+        phone: "+77009998877",
+        city: "Астана",
+        address: "пр. Мангилик Ел, 55",
+        tax_id: "210987654321",
+      },
+      packages: [{
+        weight_kg: 2.5,
+        width_cm: 20,
+        height_cm: 15,
+        depth_cm: 30,
+        quantity: 1,
+      }],
       declared_value: 15000,
       currency: "KZT",
+      additional_services: {
+        call_before_delivery: false,
+        insurance: false,
+        fragile: false,
+      },
     }, null, 2),
-    responseBody: JSON.stringify({ tracking_number: "AZM-20260513-1042" }, null, 2),
-    notes: "Ответ должен прийти в течение timeout_seconds (по умолчанию 10 с). При ошибке Novex повторит запрос retry_count раз.",
+    responseBody: JSON.stringify({
+      tracking_number: "AZM-20260513-1042",
+      barcode: "AZM-BC-20260513-1042",
+    }, null, 2),
+    notes: "Обязательно только tracking_number, поле barcode (или carrier_invoice_id) — опционально: отдельный физический баркод, который печатается на этикетке. Ответ должен прийти в течение timeout_seconds. При ошибке Novex повторит запрос retry_count раз с backoff.",
   },
 ];
 
 const STATUSES = [
-  { code: "picked_up",          desc: "Курьер забрал посылку у отправителя" },
-  { code: "in_transit",         desc: "Посылка в пути / на сортировке" },
-  { code: "out_for_delivery",   desc: "Курьер выехал к получателю" },
-  { code: "delivered",          desc: "Доставлено - заказ закрыт" },
-  { code: "failed_attempt",     desc: "Попытка доставки не удалась" },
-  { code: "returned",           desc: "Возврат отправителю" },
-  { code: "cancelled",          desc: "Отправление отменено" },
+  { code: "PICKED_UP",         desc: "Курьер забрал посылку у отправителя" },
+  { code: "IN_TRANSIT",        desc: "Посылка в пути / на сортировке" },
+  { code: "OUT_FOR_DELIVERY",  desc: "Курьер выехал к получателю" },
+  { code: "ARRIVED",           desc: "Прибыл в пункт выдачи получателя" },
+  { code: "DELIVERED",         desc: "Доставлено - заказ закрыт" },
+  { code: "FAILED_ATTEMPT",    desc: "Попытка доставки не удалась" },
+  { code: "CUSTOMS_HOLD",      desc: "Задержан на таможне" },
+  { code: "RETURNED",          desc: "Возврат отправителю" },
+  { code: "CANCELLED",         desc: "Отправление отменено" },
 ];
 
 const CODE_EXAMPLES = {
@@ -74,18 +103,22 @@ def sign(body: bytes, secret: str) -> str:
 
 payload = {
     "novex_order_id": 1042,
-    "status": "delivered",
+    "status": "DELIVERED",
     "location": "Астана, пр. Мангилик Ел",
     "description": "Посылка вручена получателю",
-    "occurred_at": "2026-05-13T15:00:00Z",
 }
 body = json.dumps(payload, ensure_ascii=False).encode()
 sig  = sign(body, SECRET)
+ts   = str(int(time.time()))
 
 resp = requests.post(
     NOVEX_WEBHOOK,
     data=body,
-    headers={"Content-Type": "application/json", "X-Carrier-Signature": sig},
+    headers={
+        "Content-Type": "application/json",
+        "X-Carrier-Signature": sig,
+        "X-Novex-Timestamp": ts,  # обязательный для anti-replay (окно ±5 мин)
+    },
 )
 print(resp.status_code, resp.json())`,
 
@@ -96,18 +129,22 @@ const NOVEX_WEBHOOK = 'https://api.novex.kz/api/v1/carriers/YOUR_CODE/tracking-w
 
 const payload = {
   novex_order_id: 1042,
-  status: 'delivered',
+  status: 'DELIVERED',
   location: 'Астана, пр. Мангилик Ел',
   description: 'Посылка вручена получателю',
-  occurred_at: new Date().toISOString(),
 };
 
 const body = JSON.stringify(payload);
 const sig  = crypto.createHmac('sha256', SECRET).update(body).digest('hex');
+const ts   = String(Math.floor(Date.now() / 1000));
 
 fetch(NOVEX_WEBHOOK, {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json', 'X-Carrier-Signature': sig },
+  headers: {
+    'Content-Type': 'application/json',
+    'X-Carrier-Signature': sig,
+    'X-Novex-Timestamp': ts,  // обязательный для anti-replay (окно ±5 мин)
+  },
   body,
 }).then(r => r.json()).then(console.log);`,
 
