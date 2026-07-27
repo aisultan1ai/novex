@@ -43,6 +43,10 @@ COPY backend/app/modules/__init__.py ./app/modules/__init__.py
 COPY backend/app/__init__.py       ./app/__init__.py
 COPY backend/app/core/config.py    ./app/core/config.py
 COPY backend/app/core/__init__.py  ./app/core/__init__.py
+# app.common — log_ratelimit / time_utils / status_machine used by the
+# polling adapters copied above. Without this the container crashes on
+# `from app.common.log_ratelimit import log_once_per`.
+COPY backend/app/common            ./app/common
 COPY backend/carrier_gateway       ./carrier_gateway
 COPY backend/pyproject.toml        .
 
