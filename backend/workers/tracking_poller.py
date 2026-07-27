@@ -76,7 +76,10 @@ def run() -> None:
 
     scheduler = WorkerScheduler()
     scheduler.register(sync_tracking.run, interval_secs=120)
-    logger.info("Tracking poller ready. Poll interval=120s.")
+    tick_interval = int(settings.tracking_poller_tick_interval_seconds)
+    logger.info(
+        "Tracking poller ready. Poll interval=120s, wake-up tick=%ds.", tick_interval,
+    )
 
     while not stop_event.is_set():
         scheduler.tick()
@@ -84,7 +87,10 @@ def run() -> None:
             get_redis().setex(_ALIVE_KEY, _ALIVE_TTL, "1")
         except Exception:
             logger.warning("Tracking poller heartbeat write failed")
-        stop_event.wait(timeout=30)
+        # Short wake-ups so SIGTERM interrupts the loop within `tick_interval`
+        # seconds instead of the previous 30s. This keeps the shutdown well
+        # inside K8s terminationGracePeriodSeconds (usually 30s).
+        stop_event.wait(timeout=tick_interval)
 
     logger.info("Tracking poller stopped cleanly.")
 

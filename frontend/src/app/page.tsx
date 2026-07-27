@@ -10,6 +10,7 @@ import { useIsMobile } from "@/hooks/use-is-mobile";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import { CONTACTS } from "@/lib/config/contacts";
+import { LANDING_STATS, SUPPORTED_CARRIERS } from "@/lib/config/landing";
 import CitySelect from "@/components/ui/CitySelect";
 import { ApiError, calculateShippingQuote, selectShippingQuote } from "@/lib/api/shipping";
 import type { RateQuoteItem, ShipmentType, ShippingQuoteResponse } from "@/types/quote";
@@ -179,17 +180,18 @@ function InputField({
 
 /* ─── Carrier logos ──────────────────────────────────────────────────────── */
 
-const CARRIER_LOGOS: Record<string, string> = {
-  azimuth: "/carriers/azimuth.png",
-  az:      "/carriers/azimuth.png",
-  exline:  "/carriers/exline.svg",
-  ex:      "/carriers/exline.svg",
-  cse:     "/carriers/cse.png",
-  kse:     "/carriers/cse.png",
+// Two-letter aliases still map to full carrier codes; keep in sync with the
+// canonical list in @/lib/config/landing.ts (SUPPORTED_CARRIERS).
+const _CARRIER_LOGO_ALIASES: Record<string, string> = {
+  az:  "azimuth",
+  ex:  "exline",
+  kse: "cse",
 };
 
 function getCarrierLogo(carrierCode: string): string | null {
-  return CARRIER_LOGOS[carrierCode.toLowerCase()] ?? null;
+  const code = carrierCode.toLowerCase();
+  const canonical = _CARRIER_LOGO_ALIASES[code] ?? code;
+  return SUPPORTED_CARRIERS.find((c) => c.code === canonical)?.logo ?? null;
 }
 
 /* ─── Static sections ────────────────────────────────────────────────────── */
@@ -205,7 +207,7 @@ const WHY_NOVEX = [
   {
     icon: <Star size={24} color="#2563EB" />,
     title: "Выгодные цены",
-    desc: "Сравниваем тарифы 10+ курьерских служб и показываем лучшие предложения",
+    desc: "Сравниваем тарифы ведущих курьерских служб и показываем лучшие предложения",
   },
   {
     icon: <Clock size={24} color="#2563EB" />,
@@ -575,24 +577,42 @@ export default function HomePage() {
             </form>
           </div>
 
-          {/* Social proof - always visible */}
-          <div
-            style={{
-              display: "flex",
-              gap: 32,
-              justifyContent: "center",
-              flexWrap: "wrap",
-              marginTop: 24,
-              font: "500 13px/1 Inter Variable, sans-serif",
-              color: "#6B7280",
-            }}
-          >
-            <span><b style={{ color: "#111827" }}>10+</b> служб доставки</span>
-            <span style={{ color: "#D1D5DB" }}>|</span>
-            <span><b style={{ color: "#111827" }}>50 000+</b> отправлений</span>
-            <span style={{ color: "#D1D5DB" }}>|</span>
-            <span><b style={{ color: "#10B981" }}>5.0 ★</b> средний рейтинг</span>
-          </div>
+          {/* Social proof. Numbers come from NEXT_PUBLIC_STAT_* env vars so ops
+              can bump them without a code push. Carrier count falls back to the
+              length of SUPPORTED_CARRIERS so it can never claim more services
+              than we actually show in the partners strip below. Optional stats
+              (shipments/rating) render only when their env var is set — hides
+              placeholders in fresh envs. */}
+          {(() => {
+            const carriersLabel = LANDING_STATS.carriersLabel || `${SUPPORTED_CARRIERS.length}+`;
+            return (
+              <div
+                style={{
+                  display: "flex",
+                  gap: 32,
+                  justifyContent: "center",
+                  flexWrap: "wrap",
+                  marginTop: 24,
+                  font: "500 13px/1 Inter Variable, sans-serif",
+                  color: "#6B7280",
+                }}
+              >
+                <span><b style={{ color: "#111827" }}>{carriersLabel}</b> служб доставки</span>
+                {LANDING_STATS.shipmentsLabel && (
+                  <>
+                    <span style={{ color: "#D1D5DB" }}>|</span>
+                    <span><b style={{ color: "#111827" }}>{LANDING_STATS.shipmentsLabel}</b> отправлений</span>
+                  </>
+                )}
+                {LANDING_STATS.ratingLabel && (
+                  <>
+                    <span style={{ color: "#D1D5DB" }}>|</span>
+                    <span><b style={{ color: "#10B981" }}>{LANDING_STATS.ratingLabel}</b> средний рейтинг</span>
+                  </>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Mini how-it-works - shown only before results */}
         </section>
@@ -869,15 +889,17 @@ export default function HomePage() {
               </div>
             </section>
 
-            {/* Partners / carriers */}
+            {/* Partners / carriers. Rendered from SUPPORTED_CARRIERS so the strip
+                always matches the "N+ служб доставки" claim in the hero — one
+                source of truth. */}
             <section style={{ background: "#FAFAFA", borderTop: "1px solid #E5E7EB", padding: isMobile ? "48px 20px" : "56px 48px", textAlign: "center" }}>
               <p style={{ font: "400 15px/1 Inter Variable, sans-serif", color: "#6B7280", margin: "0 0 28px" }}>
                 Сравниваем цены ведущих служб в реальном времени
               </p>
               <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", alignItems: "center" }}>
-                {["Azimuth Cargo", "Exline", "CSE"].map((label) => (
+                {SUPPORTED_CARRIERS.map((c) => (
                   <div
-                    key={label}
+                    key={c.code}
                     style={{
                       background: "#ffffff",
                       border: "1px solid #E5E7EB",
@@ -888,7 +910,7 @@ export default function HomePage() {
                       letterSpacing: "0.01em",
                     }}
                   >
-                    {label}
+                    {c.name}
                   </div>
                 ))}
               </div>
@@ -1111,8 +1133,12 @@ export default function HomePage() {
             <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
               <DetailRow label="Тариф" value={selectedRate.tariff_name} />
               <DetailRow label="Срок доставки" value={`${selectedRate.eta_days_min}-${selectedRate.eta_days_max} рабочих дней`} />
-              <DetailRow label="Ограничения" value="Макс. 30 кг · 150×150×150 см" muted />
-              <DetailRow label="Страховка" value="Нет" />
+              {/* Доп. услуги (страхование, хрупкий груз, звонок перед доставкой) — все
+                  три интегрированных перевозчика их поддерживают, конкретный набор и
+                  цена уточняются на шаге оформления. Раньше здесь был хардкод
+                  "Страховка: Нет" и "Ограничения: 30 кг · 150×150×150 см", что не
+                  соответствовало реальности ни одного из перевозчиков. */}
+              <DetailRow label="Доп. услуги" value="Страхование, хрупкий груз — на след. шаге" muted />
             </div>
 
             <hr style={{ border: "none", borderTop: "1px solid #E5E7EB", margin: "0 0 20px" }} />

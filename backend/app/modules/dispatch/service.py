@@ -39,7 +39,16 @@ _shipments_repo = ShipmentsRepository()
 _integration_log = IntegrationLogRepository()
 _notifications_svc = NotificationsService()
 
-RETRY_DELAYS_SECONDS = [60, 300, 900]
+def _retry_delays_seconds() -> list[int]:
+    """Get retry backoff schedule. Overridable via DISPATCH_RETRY_DELAYS_SECONDS.
+
+    Called at retry time (not module import) so tests / hot-config reloads
+    pick up new values without a process restart. Guarantees a non-empty
+    list so the min() below never gets `-1` indexing on an empty list.
+    """
+    from app.core.config import get_settings
+    delays = get_settings().dispatch_retry_delays_seconds
+    return delays if delays else [60, 300, 900]
 
 @dataclass
 class _DispatchOutcome:
@@ -187,7 +196,26 @@ class DispatchWorker:
             return
 
         try:
-            outcome = self._dispatch_to_carrier(db, order)
+            # ── Idempotency guard ─────────────────────────────────────────
+            # If a previous attempt already created a Shipment WITH a carrier
+            # tracking number, the invoice exists on the carrier's side. Do
+            # not call create_invoice again — a second call would produce a
+            # duplicate waybill (Azimuth has no cancel, Exline / CSE would
+            # bill twice). Instead, fast-forward to the "sent_to_carrier"
+            # transition using the tracking we already stored.
+            existing_shipment = _shipments_repo.get_by_order_id(db, order.id)
+            if existing_shipment and existing_shipment.carrier_tracking_number:
+                logger.info(
+                    "dispatch_worker: order %s already dispatched (carrier_tracking=%s), "
+                    "skipping carrier call and completing job",
+                    order.id, existing_shipment.carrier_tracking_number,
+                )
+                outcome = _DispatchOutcome(
+                    tracking_number=existing_shipment.carrier_tracking_number,
+                    barcode=existing_shipment.carrier_barcode,
+                )
+            else:
+                outcome = self._dispatch_to_carrier(db, order)
 
             _shipments_svc.create_for_order(
                 db,
@@ -203,6 +231,11 @@ class DispatchWorker:
                 # number so admin search still resolves.
                 shipment.carrier_barcode = outcome.barcode or outcome.tracking_number
                 shipment.status = "dispatched"
+                # Persist the tracking number as soon as we know it so a
+                # subsequent crash between here and the outer db.commit()
+                # does not leave the invoice orphaned. The idempotency guard
+                # above depends on this row being visible on retry.
+                db.flush()
 
             record_order_status(
                 db,
@@ -287,7 +320,8 @@ class DispatchWorker:
                 )
                 job.status = DispatchJobStatus.FAILED
             elif job.attempts < job.max_attempts:
-                delay = RETRY_DELAYS_SECONDS[min(job.attempts - 1, len(RETRY_DELAYS_SECONDS) - 1)]
+                delays = _retry_delays_seconds()
+                delay = delays[min(job.attempts - 1, len(delays) - 1)]
                 job.next_retry_at = _utcnow() + timedelta(seconds=delay)
                 job.status = DispatchJobStatus.QUEUED
             else:
@@ -516,8 +550,13 @@ class DispatchWorker:
                 "api_token": creds.api_token,
                 **(creds.extra_config or {}),
             }
-            urgency_guid: str | None = None
-            if order.selected_rate_quote_id:
+            # Authoritative source is the snapshot on the order itself
+            # (populated at quote-select time in migration 042); fall back to
+            # the linked RateQuote for orders created before the snapshot was
+            # introduced. Reading the snapshot first also lets dispatch run
+            # after the RateQuote row has been housekept.
+            urgency_guid: str | None = order.urgency_guid_snapshot
+            if not urgency_guid and order.selected_rate_quote_id:
                 from app.modules.quotes.models import RateQuote as _RateQuote
                 rq = db.get(_RateQuote, order.selected_rate_quote_id)
                 if rq:

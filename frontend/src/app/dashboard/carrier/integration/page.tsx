@@ -99,19 +99,48 @@ export default function IntegrationPage() {
             <summary style={{ fontSize: 13, fontWeight: 600, color: "#4338ca", userSelect: "none" }}>Пример тела запроса от Novex</summary>
             <pre style={{ margin: "12px 0 0", padding: "16px", background: "#0f172a", borderRadius: 10, color: "#e2e8f0", fontSize: 12, overflow: "auto", lineHeight: 1.6 }}>{JSON.stringify({
               novex_order_id: 1042,
+              order_reference: "NOVEX-001042",
               tariff_code: "STANDARD",
-              sender: { city: "Алматы", address: "ул. Абая, 1", full_name: "Магазин Novex", phone: "+77001112233" },
-              recipient: { city: "Астана", address: "пр. Мангилик Ел, 55", full_name: "Иван Иванов", phone: "+77009998877" },
-              packages: [{ weight_kg: 2.5, length_cm: 30, width_cm: 20, height_cm: 15 }],
+              sender: {
+                full_name: "Магазин Novex",
+                phone: "+77001112233",
+                city: "Алматы",
+                address: "ул. Абая, 1",
+                tax_id: "123456789012",
+              },
+              recipient: {
+                full_name: "Иван Иванов",
+                phone: "+77009998877",
+                city: "Астана",
+                address: "пр. Мангилик Ел, 55",
+                tax_id: "210987654321",
+              },
+              packages: [{
+                weight_kg: 2.5,
+                width_cm: 20,
+                height_cm: 15,
+                depth_cm: 30,
+                quantity: 1,
+              }],
               declared_value: 15000,
               currency: "KZT",
-              notes: null,
+              additional_services: {
+                call_before_delivery: false,
+                insurance: false,
+                fragile: false,
+              },
             }, null, 2)}</pre>
           </details>
 
           <details style={{ cursor: "pointer" }}>
             <summary style={{ fontSize: 13, fontWeight: 600, color: "#4338ca", userSelect: "none" }}>Ожидаемый ответ от вашего API</summary>
-            <pre style={{ margin: "12px 0 0", padding: "16px", background: "#0f172a", borderRadius: 10, color: "#e2e8f0", fontSize: 12, overflow: "auto" }}>{JSON.stringify({ tracking_number: "AZM-20260513-1042" }, null, 2)}</pre>
+            <pre style={{ margin: "12px 0 0", padding: "16px", background: "#0f172a", borderRadius: 10, color: "#e2e8f0", fontSize: 12, overflow: "auto" }}>{JSON.stringify({
+              tracking_number: "AZM-20260513-1042",
+              barcode: "AZM-BC-20260513-1042",
+            }, null, 2)}</pre>
+            <p style={{ margin: "8px 0 0", font: "400 12px/1.5 Inter Variable, sans-serif", color: "#64748b" }}>
+              tracking_number обязателен. barcode (или carrier_invoice_id) — опциональное физическое штрих-код на этикетке.
+            </p>
           </details>
         </div>
       </div>
@@ -152,20 +181,26 @@ export default function IntegrationPage() {
             <summary style={{ fontSize: 13, fontWeight: 600, color: "#4338ca", userSelect: "none" }}>Пример тела запроса (ваш запрос к нам)</summary>
             <pre style={{ margin: "12px 0 0", padding: "16px", background: "#0f172a", borderRadius: 10, color: "#e2e8f0", fontSize: 12, overflow: "auto", lineHeight: 1.6 }}>{JSON.stringify({
               novex_order_id: 1042,
-              status: "in_transit",
+              status: "IN_TRANSIT",
               location: "Алматы сортировочный центр",
               description: "Посылка принята и передана в транзит",
-              occurred_at: "2026-05-13T10:30:00Z",
+              event_id: "opt-uuid-for-dedup",
             }, null, 2)}</pre>
+            <p style={{ margin: "8px 0 0", font: "400 12px/1.5 Inter Variable, sans-serif", color: "#64748b" }}>
+              event_id опционален — используется для идемпотентности (если ретраите, ставьте один и тот же). Обязательные заголовки: <code>X-Novex-Timestamp</code> (unix-time, окно ±5 мин) и <code>X-Carrier-Signature</code> (HMAC-SHA256 от body).
+            </p>
           </details>
 
           <details style={{ cursor: "pointer" }}>
             <summary style={{ fontSize: 13, fontWeight: 600, color: "#4338ca", userSelect: "none" }}>Допустимые значения статуса</summary>
             <div style={{ margin: "12px 0 0", display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {["picked_up", "in_transit", "out_for_delivery", "delivered", "failed_attempt", "returned", "cancelled"].map((s) => (
+              {["PICKED_UP", "IN_TRANSIT", "OUT_FOR_DELIVERY", "ARRIVED", "DELIVERED", "FAILED_ATTEMPT", "CUSTOMS_HOLD", "RETURNED", "CANCELLED"].map((s) => (
                 <span key={s} style={{ fontFamily: "monospace", fontSize: 12, padding: "3px 10px", borderRadius: 6, background: "#f1f5f9", color: "#0f172a" }}>{s}</span>
               ))}
             </div>
+            <p style={{ margin: "8px 0 0", font: "400 12px/1.5 Inter Variable, sans-serif", color: "#64748b" }}>
+              Регистронезависимо. Неизвестный статус трактуется как <code>IN_TRANSIT</code> и логируется, чтобы мы добавили маппинг.
+            </p>
           </details>
         </div>
       </div>

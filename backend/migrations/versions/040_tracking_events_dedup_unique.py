@@ -40,10 +40,23 @@ def upgrade() -> None:
         """
     )
 
-    op.create_unique_constraint(
-        "uq_tracking_events_order_carrier_status_occurred_at",
-        "tracking_events",
-        ["order_draft_id", "carrier_status", "occurred_at"],
+    # ADD CONSTRAINT has no IF NOT EXISTS in Postgres before 15; use a
+    # DO-block so this migration is idempotent against a hand-added
+    # constraint (same reasoning as migration 039's IF NOT EXISTS guards).
+    op.execute(
+        """
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = 'uq_tracking_events_order_carrier_status_occurred_at'
+            ) THEN
+                ALTER TABLE tracking_events
+                ADD CONSTRAINT uq_tracking_events_order_carrier_status_occurred_at
+                UNIQUE (order_draft_id, carrier_status, occurred_at);
+            END IF;
+        END$$;
+        """
     )
 
 
