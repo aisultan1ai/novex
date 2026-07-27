@@ -90,6 +90,7 @@ def _deliver(db: Session, job: NotificationJob, payload: dict) -> None:
         job.order_id,
         user_name=user.full_name,
         reject_reason=payload.get("reject_reason"),
+        tracking_number=payload.get("tracking_number"),
     )
     if result is None:
         return

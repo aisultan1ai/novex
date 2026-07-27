@@ -84,6 +84,7 @@ def _process(data: dict) -> None:
             order_id,
             user_name=user.full_name,
             reject_reason=payload.get("reject_reason"),
+            tracking_number=payload.get("tracking_number"),
         )
         if rendered is None:
             return

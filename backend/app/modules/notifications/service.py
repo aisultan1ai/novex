@@ -49,9 +49,19 @@ class NotificationsService:
         order_id: int,
         status: str,
         reject_reason: str | None = None,
+        tracking_number: str | None = None,
     ) -> None:
         title = _STATUS_TITLES.get(status, f"Статус обновлён: {status}")
-        body = f"Заказ #{order_id}: {title.lower()}"
+        # sent_to_carrier — момент когда у нас впервые есть трек-номер:
+        # клиенту важно увидеть его в push/центре уведомлений вместе с
+        # инструкцией «ждите звонка курьера», без перехода на страницу заказа.
+        if status == "sent_to_carrier" and tracking_number:
+            body = (
+                f"Заказ #{order_id} передан перевозчику. "
+                f"Ожидайте звонка курьера. Трек-номер: {tracking_number}"
+            )
+        else:
+            body = f"Заказ #{order_id}: {title.lower()}"
         self.repo.create(
             db, user_id=user_id, type="order_status", title=title, body=body
         )
@@ -68,6 +78,7 @@ class NotificationsService:
             order_id=order_id,
             status=status,
             reject_reason=reject_reason,
+            tracking_number=tracking_number,
         )
 
     def _send_order_email(
@@ -78,6 +89,7 @@ class NotificationsService:
         order_id: int,
         status: str,
         reject_reason: str | None = None,
+        tracking_number: str | None = None,
     ) -> None:
         import json
 
@@ -86,6 +98,8 @@ class NotificationsService:
         payload: dict[str, str] = {}
         if reject_reason:
             payload["reject_reason"] = reject_reason
+        if tracking_number:
+            payload["tracking_number"] = tracking_number
 
         try:
             publish(STREAM_EMAILS, {

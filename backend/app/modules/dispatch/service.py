@@ -26,6 +26,7 @@ from app.modules.dispatch.models import (
     DispatchJobStatus,
     OrderStatusHistory,
 )
+from app.modules.notifications.service import NotificationsService
 from app.modules.orders.models import OrderDraft
 from app.modules.shipments.repository import ShipmentsRepository
 from app.modules.shipments.service import ShipmentsService
@@ -36,6 +37,7 @@ _webhook_repo = CarrierWebhookRepository()
 _shipments_svc = ShipmentsService()
 _shipments_repo = ShipmentsRepository()
 _integration_log = IntegrationLogRepository()
+_notifications_svc = NotificationsService()
 
 RETRY_DELAYS_SECONDS = [60, 300, 900]
 
@@ -209,6 +211,28 @@ class DispatchWorker:
                 source="system_worker",
                 comment=f"Dispatched via job {job.id}",
             )
+
+            # Customer notification: this is the first moment we have a real
+            # carrier tracking number, so we include it in the push/email
+            # instead of relying on the customer to reopen the order.
+            # `outcome.tracking_number` may be None for carriers that don't
+            # return one (rare) — the notification still fires with a generic
+            # body via the fallback branch in NotificationsService.
+            try:
+                _notifications_svc.notify_order_status(
+                    db,
+                    user_id=order.user_id,
+                    order_id=order.id,
+                    status="sent_to_carrier",
+                    tracking_number=outcome.tracking_number,
+                )
+            except Exception:
+                # Notification failures must not roll back the dispatch —
+                # the carrier already has the waybill.
+                logger.exception(
+                    "dispatch_worker: notify_order_status failed for order %s (non-fatal)",
+                    order.id,
+                )
 
             # ── Azimuth /order-courier (optional second step) ──────────────
             # After create_invoice succeeds, if the customer asked us to

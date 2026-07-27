@@ -98,14 +98,30 @@ def _tpl_payment_rejected(order_id: int, user_name: str | None, reject_reason: s
     return subject, html
 
 
-def _tpl_dispatched(order_id: int, user_name: str | None) -> tuple[str, str]:
+def _tpl_dispatched(
+    order_id: int,
+    user_name: str | None,
+    tracking_number: str | None = None,
+) -> tuple[str, str]:
     subject = f"Заказ передан перевозчику - #{order_id}"
+    # tracking_number приходит из dispatch-воркера сразу после успешного
+    # create_invoice у перевозчика — на этом же шаге его показывает и
+    # пользовательский UI, поэтому в письме имеет смысл продублировать.
+    safe_tn = _html.escape(tracking_number) if tracking_number else ""
+    tracking_block = (
+        f'<p style="background:#eff6ff;border-left:3px solid #2563eb;padding:12px 16px;'
+        f'border-radius:0 8px 8px 0;color:#1e3a8a;font-size:14px;margin-bottom:20px;">'
+        f'<b>Ваш трек-номер:</b> <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">{safe_tn}</span></p>'
+        if tracking_number else ""
+    )
     html = _wrap(f"""
       <h2 style="{_HEADER_STYLE}">{_greeting(user_name)}</h2>
       <span style="{_BADGE_BLUE}">Передан перевозчику</span>
       <p style="{_BODY_STYLE}">
-        Ваш заказ <b>#{order_id}</b> успешно передан перевозчику и начал своё путешествие к получателю.
+        Ваш заказ <b>#{order_id}</b> успешно передан перевозчику.<br>
+        Ожидайте звонка курьера — он свяжется с отправителем для согласования времени забора.
       </p>
+      {tracking_block}
       {_cta(order_id, 'Отследить заказ')}
     """)
     return subject, html
@@ -184,6 +200,7 @@ def order_status_email(
     order_id: int,
     user_name: str | None = None,
     reject_reason: str | None = None,
+    tracking_number: str | None = None,
 ) -> tuple[str, str] | None:
     """Return (subject, html) for statuses that warrant an email, else None."""
     match status:
@@ -194,7 +211,7 @@ def order_status_email(
         case "payment_rejected":
             return _tpl_payment_rejected(order_id, user_name, reject_reason)
         case "dispatched" | "sent_to_carrier":
-            return _tpl_dispatched(order_id, user_name)
+            return _tpl_dispatched(order_id, user_name, tracking_number)
         case "in_transit":
             return _tpl_in_transit(order_id, user_name)
         case "arrived":
