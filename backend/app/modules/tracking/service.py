@@ -53,6 +53,7 @@ class TrackingService:
         events = self.tracking_repo.list_events(db, order_draft_id=order_draft_id)
         return TrackingHistoryResponse(
             order_draft_id=order_draft_id,
+            carrier_code=order.carrier_code_snapshot,
             events=[TrackingEventResponse.model_validate(e) for e in events],
         )
 

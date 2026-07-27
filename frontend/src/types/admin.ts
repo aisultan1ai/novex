@@ -111,6 +111,7 @@ export interface AdminCommission {
   order_draft_id: number;
   carrier_code: string;
   gross_amount: number;
+  carrier_payout: number | null;
   commission_rate: number;
   commission_amount: number;
   currency: string;

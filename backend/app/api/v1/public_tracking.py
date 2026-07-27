@@ -10,6 +10,7 @@ from app.modules.orders.models import OrderDraft
 from app.modules.shipments.models import Shipment
 from app.modules.tracking.repository import TrackingRepository
 from app.modules.tracking.schemas import (
+    DeliveryInfo,
     PublicTrackingEventResponse,
     PublicTrackingResponse,
 )
@@ -43,8 +44,29 @@ def get_public_tracking(
 
     events = _tracking_repo.list_events(db, order_draft_id=order.id)
 
+    delivery: DeliveryInfo | None = None
+    delivered_event = next(
+        (e for e in reversed(events) if e.status == "delivered"), None
+    )
+    if delivered_event is not None:
+        recipient = next(
+            (p for p in order.parties if p.role == "recipient"), None
+        )
+        if recipient is not None:
+            address_parts = [
+                recipient.city,
+                recipient.address_line1,
+                recipient.address_line2,
+            ]
+            delivery = DeliveryInfo(
+                recipient_name=recipient.full_name,
+                recipient_address=", ".join(p for p in address_parts if p),
+                delivered_at=delivered_event.occurred_at,
+            )
+
     return PublicTrackingResponse(
         tracking_number=tracking_number,
+        carrier_code=order.carrier_code_snapshot,
         carrier_name=order.carrier_name_snapshot,
         from_city=order.from_city_snapshot,
         to_city=order.to_city_snapshot,
@@ -61,4 +83,5 @@ def get_public_tracking(
             )
             for e in events
         ],
+        delivery=delivery,
     )

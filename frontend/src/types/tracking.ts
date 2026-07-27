@@ -11,6 +11,7 @@ export interface TrackingEvent {
 
 export interface TrackingHistoryResponse {
   order_draft_id: number;
+  carrier_code: string;
   events: TrackingEvent[];
 }
 
@@ -21,8 +22,15 @@ export interface PublicTrackingEvent {
   occurred_at: string;
 }
 
+export interface DeliveryInfo {
+  recipient_name: string;
+  recipient_address: string;
+  delivered_at: string;
+}
+
 export interface PublicTrackingResponse {
   tracking_number: string;
+  carrier_code: string;
   carrier_name: string;
   from_city: string;
   to_city: string;
@@ -31,4 +39,5 @@ export interface PublicTrackingResponse {
   eta_days_max: number;
   created_at: string;
   events: PublicTrackingEvent[];
+  delivery: DeliveryInfo | null;
 }

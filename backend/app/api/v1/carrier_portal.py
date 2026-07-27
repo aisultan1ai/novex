@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import secrets
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy import func, select
@@ -10,11 +11,18 @@ from sqlalchemy.orm import Session, selectinload
 from app.core.db import get_db
 from app.core.dependencies import get_current_carrier_id, require_carrier
 from app.core.storage import MAX_FILE_SIZE, get_storage
-from app.modules.carriers.models import Carrier, CarrierService, CarrierTariffRate
+from app.modules.carriers.models import (
+    Carrier,
+    CarrierCommissionConfig,
+    CarrierService,
+    CarrierTariffRate,
+)
 from app.modules.carriers.webhook_config import (
     CarrierWebhookConfig,
     CarrierWebhookRepository,
 )
+from app.modules.commissions.schemas import CommissionSummary
+from app.modules.commissions.service import CommissionsService
 from app.modules.dispatch.models import OrderStatusHistory
 from app.modules.documents.models import Document, DocumentType
 from app.modules.identity.models import User
@@ -36,6 +44,8 @@ _POD_ALLOWED_STATUSES = {"in_transit", "arrived", "picked_up", "delivered"}
 _notif_repo = NotificationsRepository()
 
 _webhook_repo = CarrierWebhookRepository()
+
+_commissions_service = CommissionsService()
 
 
 def _mask_secret(secret: str | None) -> str | None:
@@ -590,4 +600,87 @@ async def upload_pod(
         "file_name": doc.file_name,
         "order_status": order.status,
         "message": "Подтверждение доставки загружено",
+    }
+
+
+# ─── Финансы / комиссии перевозчика (read-only) ─────────────────────────────
+#
+# Reuses CommissionsService (same code that powers /admin/commissions) and
+# just forces carrier_code = current carrier's code — perevozchik cannot spy
+# on other carriers' financials. Config endpoint returns the rate admin has
+# set for them; no PATCH/PUT here on purpose (только чтение).
+
+
+@router.get("/commissions", summary="Список комиссий по своим заказам")
+def list_own_commissions(
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=50, ge=1, le=200),
+    date_from: datetime | None = Query(default=None),
+    date_to: datetime | None = Query(default=None),
+    db: Session = Depends(get_db),
+    carrier_id: int = Depends(get_current_carrier_id),
+) -> dict:
+    carrier = _get_carrier_or_404(db, carrier_id)
+    return _commissions_service.list_commissions(
+        db,
+        page=page,
+        size=size,
+        date_from=date_from,
+        date_to=date_to,
+        carrier_code=carrier.code,
+    )
+
+
+@router.get(
+    "/commissions/summary",
+    response_model=CommissionSummary,
+    summary="Итоги по комиссиям",
+)
+def own_commissions_summary(
+    date_from: datetime | None = Query(default=None),
+    date_to: datetime | None = Query(default=None),
+    db: Session = Depends(get_db),
+    carrier_id: int = Depends(get_current_carrier_id),
+) -> CommissionSummary:
+    carrier = _get_carrier_or_404(db, carrier_id)
+    return _commissions_service.get_summary(
+        db,
+        date_from=date_from,
+        date_to=date_to,
+        carrier_code=carrier.code,
+    )
+
+
+@router.get(
+    "/commissions/config",
+    summary="Текущая ставка комиссии (установлена админом, read-only)",
+)
+def own_commission_config(
+    db: Session = Depends(get_db),
+    carrier_id: int = Depends(get_current_carrier_id),
+) -> dict:
+    carrier = _get_carrier_or_404(db, carrier_id)
+    config = db.scalar(
+        select(CarrierCommissionConfig).where(
+            CarrierCommissionConfig.carrier_code == carrier.code
+        )
+    )
+    if config is None:
+        # No per-carrier config → admin uses the global rate. Frontend renders
+        # "не установлена / по умолчанию платформы" в таком случае.
+        return {
+            "carrier_code": carrier.code,
+            "commission_type": None,
+            "commission_rate": None,
+            "fixed_amount": None,
+            "currency": "KZT",
+            "is_set": False,
+        }
+    return {
+        "carrier_code": config.carrier_code,
+        "commission_type": config.commission_type,
+        "commission_rate": str(config.commission_rate) if config.commission_rate is not None else None,
+        "fixed_amount": str(config.fixed_amount) if config.fixed_amount is not None else None,
+        "currency": config.currency,
+        "is_set": True,
     }

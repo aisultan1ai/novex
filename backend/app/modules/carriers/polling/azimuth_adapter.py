@@ -229,6 +229,7 @@ class AzimuthAdapter(CarrierPollingAdapter):
             return []
 
         events: list[TrackingEventData] = []
+        seen_statuses: set[str] = set()
 
         # 1) Per-parcel tracks — the granular event stream.
         for parcel in data.get("parcels") or []:
@@ -236,23 +237,28 @@ class AzimuthAdapter(CarrierPollingAdapter):
                 code = str(track.get("code") or "")
                 description = str(track.get("description") or "").strip()
                 carrier_status = description or code or "unknown"
+                mapped = _map_track(code, description)
                 events.append(TrackingEventData(
-                    status=_map_track(code, description),
+                    status=mapped,
                     carrier_status=carrier_status,
                     location=(track.get("location_full") or track.get("location") or None),
                     occurred_at=_parse_datetime(str(track.get("created_at") or "")),
                     description=description or None,
                 ))
+                seen_statuses.add(mapped)
 
         # 2) Top-level deliveries[] — terminal leg (success / failed / refused).
-        # We still emit them as TrackingEventData rows so the scheduler's
-        # dedup + transition logic handles them the same as intermediate
-        # events; usually they duplicate an "Успешная доставка" track but
-        # sometimes carry a reason (`notes`, `receiver_position`) that the
-        # `tracks[]` stream omits.
+        # Azimuth almost always duplicates the "Успешная доставка" track here
+        # with a *different* timestamp (admin close-out vs courier scan), which
+        # slips past the (carrier_status, occurred_at) dedup and shows the
+        # customer two "Доставлен" cards. Skip if we already have that mapped
+        # status from tracks[]; keep the entry only when it introduces a new
+        # terminal signal (e.g. `refused` when tracks[] has no such event).
         for delivery in data.get("deliveries") or []:
             status_str = str(delivery.get("status") or "").lower().strip()
             mapped = _DELIVERY_STATUS_MAP.get(status_str, _UNKNOWN_STATUS)
+            if mapped in seen_statuses:
+                continue
             description = str(delivery.get("description") or "").strip()
             carrier_status = description or f"delivery:{status_str}" or "delivery"
             events.append(TrackingEventData(
@@ -267,6 +273,7 @@ class AzimuthAdapter(CarrierPollingAdapter):
                     or None
                 ),
             ))
+            seen_statuses.add(mapped)
 
         logger.debug(
             "AzimuthAdapter: %d events for waybill=%s", len(events), tracking_number

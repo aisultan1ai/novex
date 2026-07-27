@@ -252,9 +252,23 @@ class IdentityService:
         if user is None:
             raise NotFoundError("User not found")
 
+        # Admins / operators / carriers historically had no CustomerProfile row —
+        # only customers got one on register. But тут же в /profile форме им нужно
+        # сохранять company_name и ИИН/БИН для использования как отправителя
+        # при тестовых/сервисных заказах, поэтому создаём профиль лениво с
+        # безопасными дефолтами (INDIVIDUAL / PREPAID). billing_mode остаётся
+        # PREPAID до тех пор, пока клиентский код где-либо не заведёт для этих
+        # ролей платёжную логику — сейчас он ими не читается.
         profile = user.customer_profile
         if profile is None:
-            raise NotFoundError("Customer profile not found")
+            profile = self.repository.create_customer_profile(
+                db,
+                user_id=user.id,
+                customer_type=CustomerType.INDIVIDUAL,
+                company_name=payload.company_name,
+                billing_mode=payload.billing_mode or BillingMode.PREPAID,
+                tax_id=payload.tax_id,
+            )
 
         self.repository.update_user(
             db,
@@ -444,6 +458,11 @@ class IdentityService:
             )
 
         if role_code in (RoleCode.ADMIN, RoleCode.OPERATOR):
+            # Admin/operator may (optionally) fill company_name / tax_id via
+            # /profile — needed when they place orders as senders themselves.
+            # Profile row is created lazily on first save, so it can still be
+            # None for freshly created staff accounts.
+            profile = user.customer_profile
             return ProfileResponse(
                 user_id=user.id,
                 email=user.email,
@@ -452,6 +471,8 @@ class IdentityService:
                 is_active=user.is_active,
                 email_verified=user.email_verified_at is not None,
                 role=role_code,
+                company_name=profile.company_name if profile else None,
+                tax_id=profile.tax_id if profile else None,
             )
 
         profile = user.customer_profile

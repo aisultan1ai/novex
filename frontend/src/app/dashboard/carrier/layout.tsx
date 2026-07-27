@@ -10,6 +10,7 @@ import { useAuth } from "@/components/providers/auth-provider";
 const TABS = [
   { label: "Обзор",      href: "/dashboard/carrier" },
   { label: "Заказы",     href: "/dashboard/carrier/orders" },
+  { label: "Финансы",    href: "/dashboard/carrier/commissions" },
   { label: "Тарифы",     href: "/dashboard/carrier/tariffs" },
   { label: "Интеграция", href: "/dashboard/carrier/integration" },
   { label: "API Docs",   href: "/dashboard/carrier/docs" },

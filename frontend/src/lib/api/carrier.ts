@@ -5,6 +5,11 @@ import type {
   CarrierServiceItem,
   IntegrationConfig,
 } from "@/types/carrier";
+import type {
+  AdminCommission,
+  CommissionSummary,
+  PaginatedResponse,
+} from "@/types/admin";
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") ?? "/api/v1";
 
@@ -125,3 +130,22 @@ export const uploadCarrierPod = async (orderId: number, file: File): Promise<{ d
   if (!res.ok) throw new Error(data.detail ?? `HTTP ${res.status}`);
   return data;
 };
+
+// ── Commissions (read-only for carrier) ────────────────────────────────────
+export interface CarrierCommissionConfig {
+  carrier_code: string;
+  commission_type: "percentage" | "fixed" | "combined" | null;
+  commission_rate: string | null;
+  fixed_amount: string | null;
+  currency: string;
+  is_set: boolean;
+}
+
+export const listCarrierCommissions = (page = 1, size = 50): Promise<PaginatedResponse<AdminCommission>> =>
+  apiRequest(`/carrier/commissions?page=${page}&size=${size}`);
+
+export const getCarrierCommissionsSummary = (): Promise<CommissionSummary> =>
+  apiRequest("/carrier/commissions/summary");
+
+export const getCarrierCommissionConfig = (): Promise<CarrierCommissionConfig> =>
+  apiRequest("/carrier/commissions/config");

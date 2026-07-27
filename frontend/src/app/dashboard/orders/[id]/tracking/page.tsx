@@ -55,6 +55,21 @@ const STATUS_COLORS: Record<string, { dot: string; line: string }> = {
 
 const REVIEWABLE_STATUSES = new Set(["delivered", "return", "returned"]);
 
+// See public tracking page — carriers whose native description is more
+// informative than our normalized STATUS_LABELS.
+const RAW_DESCRIPTION_CARRIERS = new Set(["azimuth"]);
+
+function eventLabel(
+  event: { status: string; description: string | null },
+  carrierCode: string | null,
+): string {
+  const raw = event.description?.trim();
+  if (carrierCode && RAW_DESCRIPTION_CARRIERS.has(carrierCode) && raw) return raw;
+  const normalized = STATUS_LABELS[event.status];
+  if (normalized) return normalized;
+  return raw || "Обновление статуса";
+}
+
 function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString("ru-RU", {
     day: "2-digit", month: "short", year: "numeric",
@@ -193,6 +208,7 @@ export default function OrderTrackingPage() {
   const draftId = Number(params.id);
 
   const [events, setEvents] = useState<TrackingEvent[]>([]);
+  const [carrierCode, setCarrierCode] = useState<string | null>(null);
   const [orderStatus, setOrderStatus] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -211,6 +227,7 @@ export default function OrderTrackingPage() {
     ])
       .then(([trackingRes, draftRes, existingReview]) => {
         setEvents(trackingRes.events);
+        setCarrierCode(trackingRes.carrier_code);
         setOrderStatus(draftRes.status);
         if (existingReview) setReview(existingReview);
       })
@@ -267,6 +284,10 @@ export default function OrderTrackingPage() {
           {events.map((event, idx) => {
             const colors = STATUS_COLORS[event.status] ?? { dot: "#94a3b8", line: "#e5e7eb" };
             const isLast = idx === events.length - 1;
+            const label = eventLabel(event, carrierCode);
+            const subtitle = event.description && event.description.trim() !== label
+              ? event.description
+              : null;
             return (
               <div key={event.id} style={{ display: "flex", gap: 16, paddingBottom: isLast ? 0 : 20 }}>
                 {/* dot + line */}
@@ -279,10 +300,10 @@ export default function OrderTrackingPage() {
                 {/* content */}
                 <div style={{ flex: 1, paddingBottom: isLast ? 0 : 4 }}>
                   <div style={{ font: "600 14px/1.3 Inter Variable, sans-serif", color: "#111827", marginBottom: 2 }}>
-                    {STATUS_LABELS[event.status] ?? event.status}
+                    {label}
                   </div>
-                  {event.description && (
-                    <div style={{ font: "400 13px/1.4 Inter Variable, sans-serif", color: "#6B7280", marginBottom: 2 }}>{event.description}</div>
+                  {subtitle && (
+                    <div style={{ font: "400 13px/1.4 Inter Variable, sans-serif", color: "#6B7280", marginBottom: 2 }}>{subtitle}</div>
                   )}
                   {event.location && (
                     <div style={{ font: "400 12px/1 Inter Variable, sans-serif", color: "#9CA3AF", marginBottom: 2 }}>{event.location}</div>

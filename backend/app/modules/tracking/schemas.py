@@ -27,6 +27,9 @@ class TrackingEventResponse(BaseModel):
 
 class TrackingHistoryResponse(BaseModel):
     order_draft_id: int
+    # Frontend needs this to decide whether to prefer raw carrier description
+    # over the normalized internal status label (per-carrier UX).
+    carrier_code: str
     events: list[TrackingEventResponse]
 
 
@@ -39,8 +42,18 @@ class PublicTrackingEventResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class DeliveryInfo(BaseModel):
+    # Populated only after the shipment reaches a terminal delivered state.
+    # FIO/address come from order_draft.parties (role=recipient); delivered_at
+    # is the occurred_at of the last event mapped to `delivered`.
+    recipient_name: str
+    recipient_address: str
+    delivered_at: datetime
+
+
 class PublicTrackingResponse(BaseModel):
     tracking_number: str
+    carrier_code: str
     carrier_name: str
     from_city: str
     to_city: str
@@ -49,3 +62,4 @@ class PublicTrackingResponse(BaseModel):
     eta_days_max: int
     created_at: datetime
     events: list[PublicTrackingEventResponse]
+    delivery: DeliveryInfo | None = None

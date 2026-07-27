@@ -10,6 +10,8 @@ import { useAuth } from "@/components/providers/auth-provider";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { ApiError, createDraftFromQuote, cseRecalcDraft, updateOrderDraftShipment } from "@/lib/api/orders";
 import { fetchCsePvzByCity, type CsePvzItem } from "@/lib/api/cse";
+import { listAddresses } from "@/lib/api/address_book";
+import type { AddressEntry } from "@/types/address_book";
 import type { ProfileResponse } from "@/types/auth";
 import type {
   DeliveryType,
@@ -164,6 +166,25 @@ function mergeSenderWithCurrentUser(sender: PartyFormState, user: ProfileRespons
   };
 }
 
+// Overwrites party fields with values from a saved address book entry. Keeps
+// `comment` and `save_to_address_book` — those are per-order flags the user
+// wouldn't want reset by picking a saved contact.
+function applyAddressEntry(party: PartyFormState, entry: AddressEntry): PartyFormState {
+  return {
+    ...party,
+    full_name: entry.full_name,
+    phone: entry.phone,
+    email: entry.email ?? "",
+    company_name: entry.company_name ?? "",
+    tax_id: entry.tax_id ?? "",
+    country: entry.country,
+    city: entry.city,
+    address_line1: entry.address_line1,
+    address_line2: entry.address_line2 ?? "",
+    postal_code: entry.postal_code ?? "",
+  };
+}
+
 function mapDraftToForm(draft: OrderDraftResponse, user: ProfileResponse | null): ShipmentFormState {
   const baseSender = draft.sender
     ? { full_name: draft.sender.full_name, phone: draft.sender.phone, email: draft.sender.email || "", company_name: draft.sender.company_name || "", tax_id: draft.sender.tax_id || "", country: draft.sender.country, city: draft.sender.city, address_line1: draft.sender.address_line1, address_line2: draft.sender.address_line2 || "", postal_code: draft.sender.postal_code || "", comment: draft.sender.comment || "", save_to_address_book: false }
@@ -307,7 +328,7 @@ function FormField({
 
 /* ─── Section card ───────────────────────────────────────────────────────── */
 
-function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+function SectionCard({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
   const isMobile = useIsMobile();
   return (
     <div
@@ -319,13 +340,23 @@ function SectionCard({ title, children }: { title: string; children: React.React
         boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
       }}
     >
-      <h2 style={{
-        font: `600 ${isMobile ? 16 : 18}px/1.2 Inter Variable, sans-serif`,
-        color: "#111827",
+      <div style={{
+        display: "flex",
+        alignItems: isMobile ? "flex-start" : "center",
+        justifyContent: "space-between",
+        gap: 12,
+        flexDirection: isMobile ? "column" : "row",
         margin: `0 0 ${isMobile ? 16 : 20}px`,
       }}>
-        {title}
-      </h2>
+        <h2 style={{
+          font: `600 ${isMobile ? 16 : 18}px/1.2 Inter Variable, sans-serif`,
+          color: "#111827",
+          margin: 0,
+        }}>
+          {title}
+        </h2>
+        {action}
+      </div>
       {children}
     </div>
   );
@@ -497,11 +528,112 @@ function TariffSummary({
 
 /* ─── Party section ──────────────────────────────────────────────────────── */
 
-function PartySection({ title, values, onChange, onToggleSave }: {
+function AddressBookPicker({ entries, onPick }: {
+  entries: AddressEntry[];
+  onPick: (entry: AddressEntry) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDocClick(e: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [open]);
+
+  if (entries.length === 0) return null;
+
+  return (
+    <div ref={rootRef} style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "8px 14px",
+          background: "#F3F4F6",
+          border: "1px solid #E5E7EB",
+          borderRadius: 8,
+          font: "500 13px/1 Inter Variable, sans-serif",
+          color: "#374151",
+          cursor: "pointer",
+          fontFamily: "inherit",
+        }}
+      >
+        Выбрать из адресной книги
+      </button>
+      {open && (
+        <div style={{
+          position: "absolute",
+          top: "calc(100% + 6px)",
+          right: 0,
+          zIndex: 20,
+          minWidth: 300,
+          maxWidth: 380,
+          maxHeight: 320,
+          overflowY: "auto",
+          background: "#ffffff",
+          border: "1px solid #E5E7EB",
+          borderRadius: 12,
+          boxShadow: "0 10px 30px rgba(0,0,0,0.10)",
+          padding: 6,
+        }}>
+          {entries.map((entry) => {
+            const line1 = entry.label || entry.full_name;
+            const line2 = [entry.city, entry.address_line1].filter(Boolean).join(", ");
+            return (
+              <button
+                type="button"
+                key={entry.id}
+                onClick={() => { onPick(entry); setOpen(false); }}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "10px 12px",
+                  background: "transparent",
+                  border: "none",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "#F9FAFB"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+              >
+                <div style={{ font: "600 14px/1.3 Inter Variable, sans-serif", color: "#111827", display: "flex", alignItems: "center", gap: 6 }}>
+                  {line1}
+                  {entry.is_default && (
+                    <span style={{ font: "600 10px/1 Inter Variable, sans-serif", color: "#065F46", background: "#D1FAE5", padding: "2px 6px", borderRadius: 999 }}>
+                      по умолчанию
+                    </span>
+                  )}
+                </div>
+                {line2 && (
+                  <div style={{ font: "400 12px/1.4 Inter Variable, sans-serif", color: "#6B7280", marginTop: 2 }}>
+                    {line2}
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PartySection({ title, values, onChange, onToggleSave, addressBook, onApplyAddress }: {
   title: string;
   values: PartyFormState;
   onChange: (key: keyof PartyFormState, value: string) => void;
   onToggleSave: (val: boolean) => void;
+  addressBook: AddressEntry[];
+  onApplyAddress: (entry: AddressEntry) => void;
 }) {
   const isMobile = useIsMobile();
   const fields: { key: keyof PartyFormState; label: string; required?: boolean; inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"]; digitsOnly?: boolean; maxLength?: number }[] = [
@@ -519,7 +651,7 @@ function PartySection({ title, values, onChange, onToggleSave }: {
   ];
 
   return (
-    <SectionCard title={title}>
+    <SectionCard title={title} action={<AddressBookPicker entries={addressBook} onPick={onApplyAddress} />}>
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))", gap: 14 }}>
         {fields.map(({ key, label, required, inputMode, digitsOnly, maxLength }) => (
           <FormField
@@ -774,6 +906,10 @@ function ShipmentPageInner() {
   // disable warehouse delivery options; the former must not.
   const [pvzChecked, setPvzChecked] = useState<{ sender: boolean; recipient: boolean }>({ sender: false, recipient: false });
 
+  // Saved address book entries — loaded once for both sender & recipient pickers.
+  // On failure we silently keep an empty list; the picker button just hides itself.
+  const [addressBook, setAddressBook] = useState<AddressEntry[]>([]);
+
   // Live recalc: whenever the customer toggles insurance / delivery_type /
   // declared_value, ask the backend for the fully-loaded final price so the
   // number shown next to "Продолжить к оплате" matches CSE billing.
@@ -815,6 +951,15 @@ function ShipmentPageInner() {
     if (!currentUser) return;
     setForm((prev) => ({ ...prev, sender: mergeSenderWithCurrentUser(prev.sender, currentUser) }));
   }, [currentUser]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    listAddresses()
+      .then((list) => { if (!cancelled) setAddressBook(list); })
+      .catch(() => { /* silent — picker just won't appear */ });
+    return () => { cancelled = true; };
+  }, [isAuthenticated]);
 
   // Fetch PVZ lists proactively for CSE regardless of the currently-selected
   // delivery_type - we need to know availability up-front on step 0 so that
@@ -979,6 +1124,9 @@ function ShipmentPageInner() {
   }
   function toggleSaveAddress(role: "sender" | "recipient", val: boolean) {
     updateForm((prev) => ({ ...prev, [role]: { ...prev[role], save_to_address_book: val } }));
+  }
+  function applyAddressBook(role: "sender" | "recipient", entry: AddressEntry) {
+    updateForm((prev) => ({ ...prev, [role]: applyAddressEntry(prev[role], entry) }));
   }
   function toggleService(key: "call_before_delivery" | "insurance" | "fragile", val: boolean) {
     updateForm((prev) => {
@@ -1436,6 +1584,8 @@ function ShipmentPageInner() {
                     values={form.sender}
                     onChange={(key, val) => updatePartyField("sender", key, val)}
                     onToggleSave={(val) => toggleSaveAddress("sender", val)}
+                    addressBook={addressBook}
+                    onApplyAddress={(entry) => applyAddressBook("sender", entry)}
                   />
                   {isCse && senderLegWh && senderCityHasPvz && (
                     <PvzPickerSection
@@ -1458,6 +1608,8 @@ function ShipmentPageInner() {
                     values={form.recipient}
                     onChange={(key, val) => updatePartyField("recipient", key, val)}
                     onToggleSave={(val) => toggleSaveAddress("recipient", val)}
+                    addressBook={addressBook}
+                    onApplyAddress={(entry) => applyAddressBook("recipient", entry)}
                   />
                   {isCse && recipientLegWh && recipientCityHasPvz && (
                     <PvzPickerSection
