@@ -44,10 +44,12 @@ class PublicTrackingEventResponse(BaseModel):
 
 class DeliveryInfo(BaseModel):
     # Populated only after the shipment reaches a terminal delivered state.
-    # FIO/address come from order_draft.parties (role=recipient); delivered_at
-    # is the occurred_at of the last event mapped to `delivered`.
-    recipient_name: str
-    recipient_address: str
+    # `delivered_at` is the occurred_at of the last event mapped to `delivered`.
+    #
+    # ВАЖНО: этот блок отдаётся из ПУБЛИЧНОГО эндпоинта отслеживания (кто угодно,
+    # имеющий трек-номер). Персональные данные получателя (ФИО, адрес) сюда НЕ
+    # включаются, чтобы не превращать трекинг в утечку PII. Если понадобится
+    # показать эти поля владельцу заказа, нужна отдельная авторизованная схема.
     delivered_at: datetime
 
 

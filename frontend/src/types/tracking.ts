@@ -23,8 +23,8 @@ export interface PublicTrackingEvent {
 }
 
 export interface DeliveryInfo {
-  recipient_name: string;
-  recipient_address: string;
+  // Public tracking: only the delivery timestamp is exposed. Recipient PII
+  // (FIO, address) is intentionally omitted to prevent leaks via tracking number.
   delivered_at: string;
 }
 

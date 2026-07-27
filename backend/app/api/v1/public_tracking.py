@@ -44,25 +44,15 @@ def get_public_tracking(
 
     events = _tracking_repo.list_events(db, order_draft_id=order.id)
 
+    # Public endpoint — только время доставки. ФИО/адрес получателя намеренно
+    # не отдаются, чтобы трек-номер не превращался в утечку PII (кто угодно,
+    # знающий номер, иначе бы видел получателя и его адрес).
     delivery: DeliveryInfo | None = None
     delivered_event = next(
         (e for e in reversed(events) if e.status == "delivered"), None
     )
     if delivered_event is not None:
-        recipient = next(
-            (p for p in order.parties if p.role == "recipient"), None
-        )
-        if recipient is not None:
-            address_parts = [
-                recipient.city,
-                recipient.address_line1,
-                recipient.address_line2,
-            ]
-            delivery = DeliveryInfo(
-                recipient_name=recipient.full_name,
-                recipient_address=", ".join(p for p in address_parts if p),
-                delivered_at=delivered_event.occurred_at,
-            )
+        delivery = DeliveryInfo(delivered_at=delivered_event.occurred_at)
 
     return PublicTrackingResponse(
         tracking_number=tracking_number,

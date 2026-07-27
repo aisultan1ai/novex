@@ -533,24 +533,72 @@ function AddressBookPicker({ entries, onPick }: {
   onPick: (entry: AddressEntry) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const isMobile = useIsMobile();
   const rootRef = useRef<HTMLDivElement>(null);
+  const menuId = "address-book-picker-menu";
 
+  // Клик вне попапа + ESC закрывают его. Раздельные листенеры чтобы
+  // не гоняли mousedown при закрытом состоянии.
   useEffect(() => {
     if (!open) return;
     function onDocClick(e: MouseEvent) {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
     }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
     document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onKeyDown);
+    };
   }, [open]);
 
   if (entries.length === 0) return null;
+
+  // На мобилке рендерим попап во всю ширину карточки — при hard-coded
+  // right:0 / minWidth:300 узкие экраны (~340px) обрезали дропдаун за
+  // левый край окна.
+  const popoverStyle: React.CSSProperties = isMobile
+    ? {
+        position: "absolute",
+        top: "calc(100% + 6px)",
+        left: 0,
+        right: 0,
+        zIndex: 20,
+        maxHeight: 320,
+        overflowY: "auto",
+        background: "#ffffff",
+        border: "1px solid #E5E7EB",
+        borderRadius: 12,
+        boxShadow: "0 10px 30px rgba(0,0,0,0.10)",
+        padding: 6,
+      }
+    : {
+        position: "absolute",
+        top: "calc(100% + 6px)",
+        right: 0,
+        zIndex: 20,
+        minWidth: 300,
+        maxWidth: 380,
+        maxHeight: 320,
+        overflowY: "auto",
+        background: "#ffffff",
+        border: "1px solid #E5E7EB",
+        borderRadius: 12,
+        boxShadow: "0 10px 30px rgba(0,0,0,0.10)",
+        padding: 6,
+      };
 
   return (
     <div ref={rootRef} style={{ position: "relative" }}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={menuId}
         style={{
           display: "inline-flex",
           alignItems: "center",
@@ -568,27 +616,14 @@ function AddressBookPicker({ entries, onPick }: {
         Выбрать из адресной книги
       </button>
       {open && (
-        <div style={{
-          position: "absolute",
-          top: "calc(100% + 6px)",
-          right: 0,
-          zIndex: 20,
-          minWidth: 300,
-          maxWidth: 380,
-          maxHeight: 320,
-          overflowY: "auto",
-          background: "#ffffff",
-          border: "1px solid #E5E7EB",
-          borderRadius: 12,
-          boxShadow: "0 10px 30px rgba(0,0,0,0.10)",
-          padding: 6,
-        }}>
+        <div id={menuId} role="menu" style={popoverStyle}>
           {entries.map((entry) => {
             const line1 = entry.label || entry.full_name;
             const line2 = [entry.city, entry.address_line1].filter(Boolean).join(", ");
             return (
               <button
                 type="button"
+                role="menuitem"
                 key={entry.id}
                 onClick={() => { onPick(entry); setOpen(false); }}
                 style={{
@@ -947,8 +982,15 @@ function ShipmentPageInner() {
     }
   }, [fullNextUrl, isAuthenticated, isLoading, router]);
 
+  // Merge должен отработать ОДИН раз на конкретного пользователя. Без ref-guard
+  // любой ре-эмит currentUser из auth-provider (refresh токена, revalidate)
+  // повторно вливал бы данные профиля в sender и мог бы затирать выбор из
+  // адресной книги, если контактное поле по какой-то причине оказалось пустым.
+  const senderMergedForUserRef = useRef<number | null>(null);
   useEffect(() => {
     if (!currentUser) return;
+    if (senderMergedForUserRef.current === currentUser.user_id) return;
+    senderMergedForUserRef.current = currentUser.user_id;
     setForm((prev) => ({ ...prev, sender: mergeSenderWithCurrentUser(prev.sender, currentUser) }));
   }, [currentUser]);
 

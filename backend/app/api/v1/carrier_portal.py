@@ -260,6 +260,12 @@ def _get_carrier_or_404(db: Session, carrier_id: int) -> Carrier:
     carrier = db.get(Carrier, carrier_id)
     if not carrier:
         raise HTTPException(404, "Перевозчик не найден")
+    # Sanity: bad seed / broken migration с пустым code полностью ломает
+    # scoping в /carrier/commissions и /carrier/orders — фильтры на пустую
+    # строку в repo превращаются в "без фильтра" и утекают чужие данные.
+    # Fail closed вместо тихого расширения scope.
+    if not (carrier.code or "").strip():
+        raise HTTPException(500, "Некорректная конфигурация перевозчика (пустой code)")
     return carrier
 
 

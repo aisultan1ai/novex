@@ -114,6 +114,15 @@ function Timeline({ data }: { data: PublicTrackingResponse }) {
   const events = data.events;
   const carrierCode = data.carrier_code;
   const delivery = data.delivery;
+  // Индекс ПОСЛЕДНЕГО delivered-события: под ним рисуем зелёный блок с
+  // временем доставки. Без этого блок дублировался бы под каждым событием
+  // со статусом "delivered" (например если в timeline два маркера).
+  const lastDeliveredIdx = (() => {
+    for (let i = events.length - 1; i >= 0; i--) {
+      if (events[i].status === "delivered") return i;
+    }
+    return -1;
+  })();
   if (events.length === 0) {
     return (
       <div style={{ background: "#fff", border: "1px solid #E5E7EB", borderRadius: 16, padding: "28px 30px", boxShadow: "0 1px 3px rgba(0,0,0,.08)" }}>
@@ -189,7 +198,7 @@ function Timeline({ data }: { data: PublicTrackingResponse }) {
                 <div style={{ font: "400 13px/1 Inter Variable, sans-serif", color: "#9CA3AF", marginTop: 2 }}>
                   {formatDate(event.occurred_at)}
                 </div>
-                {event.status === "delivered" && delivery && (
+                {idx === lastDeliveredIdx && delivery && (
                   <div style={{
                     marginTop: 12,
                     padding: "12px 14px",
@@ -197,17 +206,11 @@ function Timeline({ data }: { data: PublicTrackingResponse }) {
                     border: "1px solid #BBF7D0",
                     borderRadius: 10,
                   }}>
-                    <div style={{ font: "600 12px/1 Inter Variable, sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", color: "#065F46", marginBottom: 8 }}>
-                      Получатель
+                    <div style={{ font: "600 12px/1 Inter Variable, sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", color: "#065F46", marginBottom: 6 }}>
+                      Успешно доставлено
                     </div>
-                    <div style={{ font: "600 14px/1.3 Inter Variable, sans-serif", color: "#111827", marginBottom: 4 }}>
-                      {delivery.recipient_name}
-                    </div>
-                    <div style={{ font: "400 13px/1.4 Inter Variable, sans-serif", color: "#374151", marginBottom: 6 }}>
-                      {delivery.recipient_address}
-                    </div>
-                    <div style={{ font: "400 12px/1 Inter Variable, sans-serif", color: "#6B7280" }}>
-                      Доставлено: {formatDate(delivery.delivered_at)}
+                    <div style={{ font: "500 13px/1.4 Inter Variable, sans-serif", color: "#065F46" }}>
+                      {formatDate(delivery.delivered_at)}
                     </div>
                   </div>
                 )}

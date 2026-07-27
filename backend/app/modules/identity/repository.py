@@ -116,15 +116,15 @@ class IdentityRepository:
         db: Session,
         *,
         profile: CustomerProfile,
-        company_name: str | None = None,
-        billing_mode: BillingMode | None = None,
-        tax_id: str | None = None,
+        fields: dict,
     ) -> CustomerProfile:
-        profile.company_name = company_name
-        if billing_mode is not None:
-            profile.billing_mode = billing_mode
-        if tax_id is not None:
-            profile.tax_id = tax_id
+        # Пишем только те поля, которые клиент реально прислал (сервис уже
+        # отфильтровал через model_dump(exclude_unset=True)). Присвоение None
+        # трактуется как "явно очистить" — differs от "поле не пришло".
+        allowed = {"company_name", "tax_id", "billing_mode"}
+        for key, value in fields.items():
+            if key in allowed:
+                setattr(profile, key, value)
         db.add(profile)
         db.flush()
         return profile

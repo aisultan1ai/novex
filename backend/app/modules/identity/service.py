@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import secrets
 from pydantic import BaseModel, EmailStr
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.common.time_utils import utcnow
@@ -261,14 +262,26 @@ class IdentityService:
         # ролей платёжную логику — сейчас он ими не читается.
         profile = user.customer_profile
         if profile is None:
-            profile = self.repository.create_customer_profile(
-                db,
-                user_id=user.id,
-                customer_type=CustomerType.INDIVIDUAL,
-                company_name=payload.company_name,
-                billing_mode=payload.billing_mode or BillingMode.PREPAID,
-                tax_id=payload.tax_id,
-            )
+            # Race: два конкурентных PATCH /profile (double-click, две вкладки)
+            # оба видят profile=None и оба пытаются INSERT. UNIQUE(user_id)
+            # роняет второй запрос с IntegrityError и 500. Ловим и перечитываем
+            # — второй запрос просто продолжает работать с уже созданным
+            # профилем.
+            try:
+                profile = self.repository.create_customer_profile(
+                    db,
+                    user_id=user.id,
+                    customer_type=CustomerType.INDIVIDUAL,
+                    company_name=payload.company_name,
+                    billing_mode=payload.billing_mode or BillingMode.PREPAID,
+                    tax_id=payload.tax_id,
+                )
+            except IntegrityError:
+                db.rollback()
+                user = self.repository.get_user_by_id(db, user_id)
+                if user is None or user.customer_profile is None:
+                    raise NotFoundError("Failed to load customer profile after race")
+                profile = user.customer_profile
 
         self.repository.update_user(
             db,
@@ -277,13 +290,20 @@ class IdentityService:
             phone=payload.phone,
         )
 
-        self.repository.update_customer_profile(
-            db,
-            profile=profile,
-            company_name=payload.company_name,
-            billing_mode=payload.billing_mode,
-            tax_id=payload.tax_id,
+        # exclude_unset даёт только те ключи, которые клиент реально прислал.
+        # Так частичный PATCH (например только full_name) не будет случайно
+        # зануять company_name / tax_id / billing_mode. Если клиент осознанно
+        # прислал `"company_name": null` — поле очистится (ключ в fields_set).
+        profile_updates = payload.model_dump(
+            exclude_unset=True,
+            include={"company_name", "tax_id", "billing_mode"},
         )
+        if profile_updates:
+            self.repository.update_customer_profile(
+                db,
+                profile=profile,
+                fields=profile_updates,
+            )
 
         db.commit()
 
