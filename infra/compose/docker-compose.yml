@@ -202,6 +202,11 @@ services:
       SMTP_FROM: ${SMTP_FROM}
       SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Novex}
       SMTP_TLS: ${SMTP_TLS:-true}
+      # Email templates use FRONTEND_URL for the "Открыть заказ" / "Отследить"
+      # CTA button. Default in config.py is http://localhost:3000, so without
+      # this pass-through the button in prod emails points to localhost.
+      FRONTEND_URL: https://${DOMAIN}
+      BACKEND_URL: https://${DOMAIN}
     healthcheck:
       test: ["CMD", "python", "-c", "import os,redis; redis.from_url(os.environ['REDIS_URL']).get('worker:alive') or exit(1)"]
       interval: 60s

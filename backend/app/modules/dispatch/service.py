@@ -248,16 +248,23 @@ class DispatchWorker:
             # Customer notification: this is the first moment we have a real
             # carrier tracking number, so we include it in the push/email
             # instead of relying on the customer to reopen the order.
-            # `outcome.tracking_number` may be None for carriers that don't
-            # return one (rare) — the notification still fires with a generic
-            # body via the fallback branch in NotificationsService.
+            #
+            # NB: use `outcome.barcode`, not `outcome.tracking_number`.
+            # For carriers that separate internal orderno from physical
+            # barcode (Exline: NOVEX-000022 vs EXLINE-1WHONGC4RW5E), the
+            # customer needs the *barcode* — it's what's printed on the
+            # package and what tracks on the carrier's public site.
+            # `tracking_number` (=waybill_number) is our internal API key.
+            # `barcode` falls back to `tracking_number` for carriers that
+            # don't distinguish (CSE: single waybill number).
+            customer_tracking = outcome.barcode or outcome.tracking_number
             try:
                 _notifications_svc.notify_order_status(
                     db,
                     user_id=order.user_id,
                     order_id=order.id,
                     status="sent_to_carrier",
-                    tracking_number=outcome.tracking_number,
+                    tracking_number=customer_tracking,
                 )
             except Exception:
                 # Notification failures must not roll back the dispatch —
