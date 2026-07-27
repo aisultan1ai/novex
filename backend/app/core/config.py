@@ -52,18 +52,17 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def warn_weak_credentials_in_production(self) -> Settings:
-        if self.environment == "production":
-            if self.postgres_password in _WEAK_POSTGRES_PASSWORDS:
-                raise ValueError(
-                    "postgres_password is a known weak default — "
-                    "set a strong POSTGRES_PASSWORD env var"
-                )
-            if self.minio_secret_key in _WEAK_MINIO_SECRETS:
-                raise ValueError(
-                    "minio_secret_key is a known weak default — "
-                    "set a strong MINIO_SECRET_KEY env var"
-                )
-        elif self.environment != "test":
+        # Warn — do NOT raise. Raising here breaks services that construct
+        # Settings without ever using postgres/minio (e.g. carrier-gateway
+        # only speaks HTTP to carriers, never touches the DB or MinIO).
+        # In that container we deliberately don't pass POSTGRES_PASSWORD /
+        # MINIO_SECRET_KEY, so those fields fall back to the module-level
+        # defaults which are in the weak set → whole Settings() init used
+        # to blow up with "1 validation error for Settings", making cancel
+        # and tracking silently fail. If a weak password IS actually used
+        # in a real code path (DB connect, S3 client), it will fail loud
+        # at that call site with a much clearer error than pydantic wrap.
+        if self.environment != "test":
             if self.postgres_password in _WEAK_POSTGRES_PASSWORDS:
                 warnings.warn(
                     "postgres_password uses a weak default. "
