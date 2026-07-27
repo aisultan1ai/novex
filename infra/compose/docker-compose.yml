@@ -192,6 +192,16 @@ services:
       CSE_LOGIN: ${CSE_LOGIN:-}
       CSE_PASSWORD: ${CSE_PASSWORD:-}
       CSE_API_URL: ${CSE_API_URL:-http://web.cse.ru/1c/ws/Web1C.1cws}
+      # Email consumer lives in this container — needs SMTP creds to
+      # actually send. Without them send_email() logs "SMTP не настроен"
+      # and returns silently while the consumer still logs "sent".
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Novex}
+      SMTP_TLS: ${SMTP_TLS:-true}
     healthcheck:
       test: ["CMD", "python", "-c", "import os,redis; redis.from_url(os.environ['REDIS_URL']).get('worker:alive') or exit(1)"]
       interval: 60s
