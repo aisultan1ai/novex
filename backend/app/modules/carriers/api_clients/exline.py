@@ -376,12 +376,19 @@ class ExlineAPIClient(CarrierAPIClient):
                 return False
             err = order_node.attrib.get("error", "1")
             if err != "0":
+                # Full raw XML for debugging — Exline sometimes puts a hint in
+                # attributes we don't parse (errormsg vs errormsgru, extra
+                # fields, etc.). PII-masked for safety.
+                raw = mask_pii_text(ET.tostring(root, encoding="unicode"))
                 logger.warning(
-                    "Exline cancel_invoice failed: orderno=%s error=%s msg=%s",
+                    "Exline cancel_invoice failed: orderno=%s error=%s "
+                    "msgru=%s msg=%s attribs=%s raw=%s",
                     invoice_id,
                     err,
-                    order_node.attrib.get("errormsgru")
-                    or order_node.attrib.get("errormsg", ""),
+                    order_node.attrib.get("errormsgru", ""),
+                    order_node.attrib.get("errormsg", ""),
+                    dict(order_node.attrib),
+                    raw,
                 )
                 return False
             return True
