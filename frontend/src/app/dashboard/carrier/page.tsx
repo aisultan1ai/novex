@@ -3,17 +3,22 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
-import { getCarrierMe } from "@/lib/api/carrier";
+import { getCarrierMe, getCarrierReviewsSummary, type CarrierReviewsSummary } from "@/lib/api/carrier";
 import type { CarrierMeResponse } from "@/types/carrier";
 
 export default function CarrierOverviewPage() {
   const [data, setData] = useState<CarrierMeResponse | null>(null);
+  const [reviews, setReviews] = useState<CarrierReviewsSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     getCarrierMe()
       .then(setData)
       .catch((e: Error) => setError(e.message));
+    // Отзывы — некритичная секция; ошибка не должна ломать всю страницу.
+    getCarrierReviewsSummary()
+      .then(setReviews)
+      .catch(() => setReviews({ carrier_code: "", avg_rating: null, count: 0 }));
   }, []);
 
   if (error) {
@@ -58,6 +63,23 @@ export default function CarrierOverviewPage() {
               </div>
             </div>
           </div>
+          {reviews && (
+            <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #f1f5f9", display: "flex", alignItems: "center", gap: 10 }}>
+              {reviews.count > 0 && reviews.avg_rating != null ? (
+                <>
+                  <div style={{ display: "flex", gap: 2 }}>
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <span key={s} style={{ fontSize: 16, color: s <= Math.round(reviews.avg_rating!) ? "#f59e0b" : "#e5e7eb", lineHeight: 1 }}>★</span>
+                    ))}
+                  </div>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>{reviews.avg_rating.toFixed(1)}</span>
+                  <span style={{ fontSize: 12, color: "#94a3b8" }}>· {reviews.count} {reviews.count === 1 ? "отзыв" : reviews.count < 5 ? "отзыва" : "отзывов"}</span>
+                </>
+              ) : (
+                <span style={{ fontSize: 12, color: "#94a3b8" }}>Отзывов пока нет</span>
+              )}
+            </div>
+          )}
           {carrier.description && <p style={{ margin: "14px 0 0", fontSize: 13, color: "#64748b" }}>{carrier.description}</p>}
         </div>
 
@@ -73,17 +95,14 @@ export default function CarrierOverviewPage() {
       </div>
 
       {/* Quick actions */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
         {[
           { href: "/dashboard/carrier/integration", title: "Настройка интеграции", desc: "Методы подключения, ключи HMAC, тесты", color: "#4338ca" },
           { href: "/dashboard/carrier/docs", title: "API Документация", desc: "Форматы запросов, примеры кода, трекинг", color: "#0891b2" },
-          { href: "/docs", title: "Swagger UI", desc: "Интерактивная документация всего API", color: "#059669", external: true },
-        ].map(({ href, title, desc, color, external }) => (
+        ].map(({ href, title, desc, color }) => (
           <Link
             key={href}
             href={href}
-            target={external ? "_blank" : undefined}
-            rel={external ? "noopener noreferrer" : undefined}
             style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 14, padding: "20px 22px", textDecoration: "none", display: "block", transition: "border-color 0.15s" }}
           >
             <div style={{ width: 36, height: 36, borderRadius: 8, background: `${color}18`, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>

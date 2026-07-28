@@ -28,6 +28,7 @@ from app.modules.documents.models import Document, DocumentType
 from app.modules.identity.models import User
 from app.modules.notifications.repository import NotificationsRepository
 from app.modules.orders.models import OrderDraft, ShipmentPackage, ShipmentParty
+from app.modules.reviews.repository import ReviewsRepository
 from app.modules.shipments.models import Shipment
 from app.modules.tracking.models import TrackingEvent
 
@@ -46,6 +47,8 @@ _notif_repo = NotificationsRepository()
 _webhook_repo = CarrierWebhookRepository()
 
 _commissions_service = CommissionsService()
+
+_reviews_repo = ReviewsRepository()
 
 
 def _mask_secret(secret: str | None) -> str | None:
@@ -435,6 +438,18 @@ def get_order(
         }
         for e in events
     ]
+
+    review = _reviews_repo.get_by_order_id(db, order.id)
+    result["review"] = (
+        {
+            "rating": review.rating,
+            "comment": review.comment,
+            "created_at": review.created_at.isoformat(),
+        }
+        if review
+        else None
+    )
+
     return result
 
 
@@ -627,7 +642,7 @@ def list_own_commissions(
     carrier_id: int = Depends(get_current_carrier_id),
 ) -> dict:
     carrier = _get_carrier_or_404(db, carrier_id)
-    return _commissions_service.list_commissions(
+    result = _commissions_service.list_commissions(
         db,
         page=page,
         size=size,
@@ -635,6 +650,27 @@ def list_own_commissions(
         date_to=date_to,
         carrier_code=carrier.code,
     )
+
+    # Обогащаем список идентификаторами отправки (наш tracking_number,
+    # orderno перевозчика, физический штрих-код). Один запрос по IN — админский
+    # /admin/commissions не трогаем, чтобы не менять общую CommissionResponse.
+    items = result.get("items") or []
+    if items:
+        order_ids = [c.order_draft_id for c in items]
+        shipments = db.scalars(
+            select(Shipment).where(Shipment.order_draft_id.in_(order_ids))
+        ).all()
+        by_order = {s.order_draft_id: s for s in shipments}
+        enriched: list[dict] = []
+        for c in items:
+            row = c.model_dump()
+            s = by_order.get(c.order_draft_id)
+            row["tracking_number"] = s.tracking_number if s else None
+            row["carrier_tracking_number"] = s.carrier_tracking_number if s else None
+            row["carrier_barcode"] = s.carrier_barcode if s else None
+            enriched.append(row)
+        result["items"] = enriched
+    return result
 
 
 @router.get(
@@ -689,4 +725,61 @@ def own_commission_config(
         "fixed_amount": str(config.fixed_amount) if config.fixed_amount is not None else None,
         "currency": config.currency,
         "is_set": True,
+    }
+
+
+# ── Reviews (read-only, scoped to this carrier) ──────────────────────────────
+
+@router.get(
+    "/reviews/summary",
+    summary="Средняя оценка и количество отзывов по своим заказам",
+)
+def own_reviews_summary(
+    db: Session = Depends(get_db),
+    carrier_id: int = Depends(get_current_carrier_id),
+) -> dict:
+    carrier = _get_carrier_or_404(db, carrier_id)
+    # avg_rating_by_carrier() отдаёт агрегаты по всем перевозчикам одним
+    # запросом; фильтруем в Python — таблица reviews мала и это дешевле, чем
+    # плодить отдельный метод в репозитории.
+    for row in _reviews_repo.avg_rating_by_carrier(db):
+        if row["carrier_code"] == carrier.code:
+            return {
+                "carrier_code": carrier.code,
+                "avg_rating": round(row["avg_rating"], 2),
+                "count": row["count"],
+            }
+    return {"carrier_code": carrier.code, "avg_rating": None, "count": 0}
+
+
+@router.get("/reviews", summary="Список отзывов клиентов по своим заказам")
+def own_reviews_list(
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    carrier_id: int = Depends(get_current_carrier_id),
+) -> dict:
+    carrier = _get_carrier_or_404(db, carrier_id)
+    items, total = _reviews_repo.list_for_admin(
+        db,
+        carrier_code=carrier.code,
+        offset=(page - 1) * size,
+        limit=size,
+    )
+    pages = math.ceil(total / size) if total > 0 else 1
+    return {
+        "items": [
+            {
+                "id": r.id,
+                "order_draft_id": r.order_draft_id,
+                "rating": r.rating,
+                "comment": r.comment,
+                "created_at": r.created_at.isoformat(),
+            }
+            for r in items
+        ],
+        "total": total,
+        "page": page,
+        "size": size,
+        "pages": pages,
     }

@@ -91,8 +91,20 @@ export default function IntegrationPage() {
 
           <ConfigRow label="Формат подписи">
             <span style={{ fontSize: 13, color: "#334155" }}>
-              <code style={{ fontFamily: "monospace", fontSize: 13, background: "#f1f5f9", padding: "2px 6px", borderRadius: 4 }}>HMAC-SHA256(secret, body_bytes)</code> → hex → заголовок <code style={{ fontFamily: "monospace", fontSize: 13, background: "#f1f5f9", padding: "2px 6px", borderRadius: 4 }}>{outbound.hmac_header}</code>
+              <code style={{ fontFamily: "monospace", fontSize: 13, background: "#f1f5f9", padding: "2px 6px", borderRadius: 4 }}>HMAC-SHA256(secret, timestamp + raw_body)</code> → hex → заголовок <code style={{ fontFamily: "monospace", fontSize: 13, background: "#f1f5f9", padding: "2px 6px", borderRadius: 4 }}>{outbound.hmac_header}</code>
+              <br />
+              <span style={{ fontSize: 12, color: "#64748b" }}>
+                Строка для подписи — конкатенация значения заголовка <code style={{ fontFamily: "monospace", fontSize: 12, background: "#f1f5f9", padding: "1px 5px", borderRadius: 4 }}>X-Novex-Timestamp</code> и байтов тела без разделителя.
+              </span>
             </span>
+          </ConfigRow>
+
+          <ConfigRow label="Обязательные заголовки">
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 13, color: "#334155" }}>
+              <div><code style={{ fontFamily: "monospace", fontSize: 13, background: "#f1f5f9", padding: "2px 6px", borderRadius: 4 }}>X-Novex-Timestamp</code> — unix-time (сек). Проверяйте окно ±5 мин для защиты от replay.</div>
+              <div><code style={{ fontFamily: "monospace", fontSize: 13, background: "#f1f5f9", padding: "2px 6px", borderRadius: 4 }}>X-Novex-Event-Id</code> — UUID запроса. Используйте для идемпотентности повторов.</div>
+              <div><code style={{ fontFamily: "monospace", fontSize: 13, background: "#f1f5f9", padding: "2px 6px", borderRadius: 4 }}>X-Novex-Platform</code> — всегда <code style={{ fontFamily: "monospace", fontSize: 12 }}>novex-logistics</code>.</div>
+            </div>
           </ConfigRow>
 
           <details style={{ cursor: "pointer" }}>

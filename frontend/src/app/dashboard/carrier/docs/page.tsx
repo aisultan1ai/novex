@@ -36,7 +36,7 @@ const ENDPOINTS: Endpoint[] = [
     method: "POST",
     path: "YOUR_PUSH_URL (настраивается администратором)",
     title: "Принять заказ от Novex",
-    auth: "Проверьте HMAC-SHA256 подпись из заголовка X-Novex-Signature",
+    auth: "HMAC-SHA256(secret, timestamp + raw_body) → hex → заголовок X-Novex-Signature",
     description: "Novex вызовет ваш API автоматически после оплаты заказа клиентом. Вам нужно обработать заказ и вернуть трекинг-номер.",
     requestBody: JSON.stringify({
       novex_order_id: 1042,
@@ -75,7 +75,7 @@ const ENDPOINTS: Endpoint[] = [
       tracking_number: "AZM-20260513-1042",
       barcode: "AZM-BC-20260513-1042",
     }, null, 2),
-    notes: "Обязательно только tracking_number, поле barcode (или carrier_invoice_id) — опционально: отдельный физический баркод, который печатается на этикетке. Ответ должен прийти в течение timeout_seconds. При ошибке Novex повторит запрос retry_count раз с backoff.",
+    notes: "Обязательные заголовки: X-Novex-Timestamp (unix-time, окно ±5 мин) и X-Novex-Signature (HMAC-SHA256(secret, timestamp + raw_body) → hex). Дополнительно: X-Novex-Event-Id (UUID запроса, используйте для идемпотентности повторов) и X-Novex-Platform: novex-logistics. В ответе обязателен tracking_number; barcode (или carrier_invoice_id) — опционально, отдельный физический штрих-код для этикетки. Ответ должен прийти в течение timeout_seconds. При ошибке Novex повторит запрос retry_count раз с backoff.",
   },
 ];
 
@@ -149,16 +149,32 @@ fetch(NOVEX_WEBHOOK, {
 }).then(r => r.json()).then(console.log);`,
 
   verify: `# Проверка подписи входящего запроса от Novex (Python)
-import hashlib, hmac
+import hashlib, hmac, time
 
-def verify_novex_signature(body: bytes, signature: str, secret: str) -> bool:
-    expected = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+SECRET = "ваш_webhook_secret"
+REPLAY_WINDOW_SECONDS = 300  # окно ±5 мин
+
+def verify_novex_signature(body: bytes, timestamp: str, signature: str, secret: str) -> bool:
+    # 1. Anti-replay: timestamp обязателен и должен попадать в окно ±5 мин
+    try:
+        ts = int(timestamp)
+    except (TypeError, ValueError):
+        return False
+    if abs(time.time() - ts) > REPLAY_WINDOW_SECONDS:
+        return False
+
+    # 2. Подпись считается от конкатенации timestamp + raw_body
+    sig_input = (timestamp + body.decode()).encode()
+    expected = hmac.new(secret.encode(), sig_input, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature)
 
 # В вашем обработчике:
+# ts  = request.headers.get("X-Novex-Timestamp", "")
 # sig = request.headers.get("X-Novex-Signature", "")
-# if not verify_novex_signature(request.body, sig, SECRET):
-#     return {"error": "Invalid signature"}, 401`,
+# if not verify_novex_signature(request.body, ts, sig, SECRET):
+#     return {"error": "Invalid signature or expired timestamp"}, 401
+#
+# Идемпотентность: X-Novex-Event-Id — сохраните и игнорируйте повторы.`,
 };
 
 function EndpointCard({ ep }: { ep: Endpoint }) {

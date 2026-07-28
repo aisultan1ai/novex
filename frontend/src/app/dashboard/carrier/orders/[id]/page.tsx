@@ -18,9 +18,32 @@ const STATUS_LABELS: Record<string, string> = {
   dispatch_failed: "Ошибка отправки",
   picked_up: "Принят",
   in_transit: "В пути",
+  out_for_delivery: "Выезд на доставку",
   arrived: "Прибыл",
   delivered: "Доставлен",
+  delivery_failed: "Попытка не удалась",
+  return_in_progress: "Возврат в пути",
+  returned: "Возвращён",
+  cancelled: "Отменён",
+  customs_hold: "Задержан на таможне",
 };
+
+// Same treatment as public/customer tracking pages: for carriers whose native
+// description is more informative than our normalized labels, show the raw
+// carrier text. Also protects against "carrier_unknown" leaking to UI for
+// legacy events stored before the current status mapper was in place.
+const RAW_DESCRIPTION_CARRIERS = new Set(["azimuth"]);
+
+function eventLabel(
+  event: { status: string; description: string | null },
+  carrierCode: string | null,
+): string {
+  const raw = event.description?.trim();
+  if (carrierCode && RAW_DESCRIPTION_CARRIERS.has(carrierCode) && raw) return raw;
+  const normalized = STATUS_LABELS[event.status];
+  if (normalized) return normalized;
+  return raw || "Обновление статуса";
+}
 
 const ACCEPT_STATUSES = new Set(["sent_to_carrier", "pending_manual", "pending_manual_dispatch", "dispatch_failed"]);
 const REJECT_STATUSES = new Set(["sent_to_carrier", "pending_manual", "pending_manual_dispatch"]);
@@ -294,18 +317,45 @@ export default function CarrierOrderDetailPage() {
         </div>
       )}
 
+      {/* Customer review */}
+      {order.review && (
+        <div style={styles.card}>
+          <div style={styles.cardTitle}>Отзыв клиента</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: order.review.comment ? 8 : 0 }}>
+            {[1, 2, 3, 4, 5].map((s) => (
+              <span key={s} style={{ fontSize: 22, color: s <= order.review!.rating ? "#f59e0b" : "#e5e7eb", lineHeight: 1 }}>★</span>
+            ))}
+            <span style={{ fontSize: 13, color: "#64748b", marginLeft: 6 }}>
+              {order.review.rating} / 5
+            </span>
+          </div>
+          {order.review.comment && (
+            <p style={{ margin: "6px 0 0", fontSize: 13, color: "#374151", lineHeight: 1.5, borderTop: "1px solid #f3f4f6", paddingTop: 8 }}>
+              {order.review.comment}
+            </p>
+          )}
+          <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 8 }}>
+            {new Date(order.review.created_at).toLocaleString("ru-KZ")}
+          </div>
+        </div>
+      )}
+
       {/* Tracking events */}
       {(order.tracking_events?.length ?? 0) > 0 && (
         <div style={styles.card}>
           <div style={styles.cardTitle}>История статусов</div>
-          {order.tracking_events!.map((e, i) => (
-            <div key={i} style={{ padding: "6px 0", borderBottom: "1px solid #f3f4f6", fontSize: 13 }}>
-              <span style={{ fontWeight: 600 }}>{STATUS_LABELS[e.status] ?? e.status}</span>
-              {e.location && <span style={{ color: "#6b7280", marginLeft: 8 }}>📍 {e.location}</span>}
-              {e.description && <div style={{ color: "#6b7280", fontSize: 12 }}>{e.description}</div>}
-              <div style={{ fontSize: 11, color: "#9ca3af" }}>{new Date(e.occurred_at).toLocaleString("ru-KZ")}</div>
-            </div>
-          ))}
+          {order.tracking_events!.map((e, i) => {
+            const label = eventLabel(e, order.carrier_code);
+            const subtitle = e.description && e.description.trim() !== label ? e.description : null;
+            return (
+              <div key={i} style={{ padding: "6px 0", borderBottom: "1px solid #f3f4f6", fontSize: 13 }}>
+                <span style={{ fontWeight: 600 }}>{label}</span>
+                {e.location && <span style={{ color: "#6b7280", marginLeft: 8 }}>📍 {e.location}</span>}
+                {subtitle && <div style={{ color: "#6b7280", fontSize: 12 }}>{subtitle}</div>}
+                <div style={{ fontSize: 11, color: "#9ca3af" }}>{new Date(e.occurred_at).toLocaleString("ru-KZ")}</div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

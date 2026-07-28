@@ -6,9 +6,10 @@ import {
   getCarrierCommissionsSummary,
   getCarrierCommissionConfig,
   listCarrierCommissions,
+  type CarrierCommission,
   type CarrierCommissionConfig,
 } from "@/lib/api/carrier";
-import type { AdminCommission, CommissionSummary } from "@/types/admin";
+import type { CommissionSummary } from "@/types/admin";
 
 const TYPE_LABELS: Record<string, string> = {
   percentage: "Процент",
@@ -33,6 +34,29 @@ function formatRate(config: CarrierCommissionConfig): string {
   return `${label ? label + ": " : ""}${parts.join(" + ")}`;
 }
 
+// 9 столбцов: ID · Заказ · Номер заказа · Штрих-код · ID Novex ·
+// Сумма · К выплате · Комиссия · Дата. Идентификаторы шире, суммы уже.
+const TABLE_COLS = "60px 80px 140px 120px 180px 130px 130px 150px 110px";
+
+function IdCell({ value }: { value: string | null }) {
+  if (!value) return <span style={{ fontSize: 12, color: "#cbd5e1" }}>—</span>;
+  return (
+    <span
+      title={value}
+      style={{
+        fontFamily: "monospace",
+        fontSize: 12,
+        color: "#334155",
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+      }}
+    >
+      {value}
+    </span>
+  );
+}
+
 function SummaryCard({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) {
   return (
     <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 14, padding: "20px 24px", flex: 1, minWidth: 220 }}>
@@ -46,7 +70,7 @@ function SummaryCard({ label, value, sub, color }: { label: string; value: strin
 }
 
 export default function CarrierCommissionsPage() {
-  const [items, setItems] = useState<AdminCommission[]>([]);
+  const [items, setItems] = useState<CarrierCommission[]>([]);
   const [summary, setSummary] = useState<CommissionSummary | null>(null);
   const [config, setConfig] = useState<CarrierCommissionConfig | null>(null);
   const [total, setTotal] = useState(0);
@@ -158,39 +182,52 @@ export default function CarrierCommissionsPage() {
       )}
 
       {/* ── History table ─────────────────────────────────────── */}
-      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "80px 100px 160px 160px 160px 120px", gap: 12, padding: "12px 24px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-          <span>ID</span><span>Заказ</span><span>Сумма заказа</span><span>К выплате</span><span>Комиссия</span><span>Дата</span>
-        </div>
-
-        {loading ? (
-          <div style={{ padding: 48, textAlign: "center", color: "#64748b", fontSize: 14 }}>Загружаем…</div>
-        ) : items.length === 0 ? (
-          <div style={{ padding: "48px 24px", textAlign: "center", color: "#64748b", fontSize: 14 }}>
-            Записей пока нет — появятся после первой оплаты
+      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, overflow: "auto" }}>
+        <div style={{ minWidth: 1180 }}>
+          <div style={{ display: "grid", gridTemplateColumns: TABLE_COLS, gap: 12, padding: "12px 24px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            <span>ID</span>
+            <span>Заказ</span>
+            <span>Номер заказа</span>
+            <span>Штрих-код</span>
+            <span>ID Novex</span>
+            <span>Сумма заказа</span>
+            <span>К выплате</span>
+            <span>Комиссия</span>
+            <span>Дата</span>
           </div>
-        ) : (
-          items.map((c, idx) => (
-            <div
-              key={c.id}
-              style={{ display: "grid", gridTemplateColumns: "80px 100px 160px 160px 160px 120px", gap: 12, padding: "14px 24px", borderBottom: idx === items.length - 1 ? "none" : "1px solid #f1f5f9", alignItems: "center" }}
-            >
-              <span style={{ fontFamily: "monospace", fontSize: 12, color: "#94a3b8" }}>#{c.id}</span>
-              <span style={{ fontFamily: "monospace", fontSize: 13, color: "#475569", fontWeight: 600 }}>#{c.order_draft_id}</span>
-              <span style={{ fontSize: 13, color: "#475569" }}>{formatPrice(c.gross_amount, c.currency)}</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "#0369a1" }}>
-                {c.carrier_payout != null ? formatPrice(c.carrier_payout, c.currency) : "—"}
-              </span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#64748b" }}>
-                {formatPrice(c.commission_amount, c.currency)}
-                <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400, marginLeft: 6 }}>
-                  ({(Number(c.commission_rate) * 100).toFixed(0)}%)
-                </span>
-              </span>
-              <span style={{ fontSize: 12, color: "#94a3b8" }}>{formatDate(c.created_at)}</span>
+
+          {loading ? (
+            <div style={{ padding: 48, textAlign: "center", color: "#64748b", fontSize: 14 }}>Загружаем…</div>
+          ) : items.length === 0 ? (
+            <div style={{ padding: "48px 24px", textAlign: "center", color: "#64748b", fontSize: 14 }}>
+              Записей пока нет — появятся после первой оплаты
             </div>
-          ))
-        )}
+          ) : (
+            items.map((c, idx) => (
+              <div
+                key={c.id}
+                style={{ display: "grid", gridTemplateColumns: TABLE_COLS, gap: 12, padding: "14px 24px", borderBottom: idx === items.length - 1 ? "none" : "1px solid #f1f5f9", alignItems: "center" }}
+              >
+                <span style={{ fontFamily: "monospace", fontSize: 12, color: "#94a3b8" }}>#{c.id}</span>
+                <span style={{ fontFamily: "monospace", fontSize: 13, color: "#475569", fontWeight: 600 }}>#{c.order_draft_id}</span>
+                <IdCell value={c.carrier_tracking_number} />
+                <IdCell value={c.carrier_barcode} />
+                <IdCell value={c.tracking_number} />
+                <span style={{ fontSize: 13, color: "#475569" }}>{formatPrice(c.gross_amount, c.currency)}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#0369a1" }}>
+                  {c.carrier_payout != null ? formatPrice(c.carrier_payout, c.currency) : "—"}
+                </span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#64748b" }}>
+                  {formatPrice(c.commission_amount, c.currency)}
+                  <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400, marginLeft: 6 }}>
+                    ({(Number(c.commission_rate) * 100).toFixed(0)}%)
+                  </span>
+                </span>
+                <span style={{ fontSize: 12, color: "#94a3b8" }}>{formatDate(c.created_at)}</span>
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
       {pages > 1 && (

@@ -75,6 +75,15 @@ export interface CarrierOrderItem {
   tracking_number: string | null;
   carrier_tracking_number: string | null;
   carrier_barcode: string | null;
+  // Present on the detail endpoint (GET /carrier/orders/{id}); null when the
+  // customer has not left a review yet.
+  review?: { rating: number; comment: string | null; created_at: string } | null;
+}
+
+export interface CarrierReviewsSummary {
+  carrier_code: string;
+  avg_rating: number | null;
+  count: number;
 }
 
 export interface CarrierOrdersResponse {
@@ -141,7 +150,17 @@ export interface CarrierCommissionConfig {
   is_set: boolean;
 }
 
-export const listCarrierCommissions = (page = 1, size = 50): Promise<PaginatedResponse<AdminCommission>> =>
+// Carrier-scoped variant of AdminCommission: same fields plus the three
+// shipment identifiers (Novex internal + carrier orderno + physical barcode)
+// so the finance table can double as a cross-reference with the carrier's own
+// back-office system. Admin API keeps the leaner AdminCommission shape.
+export interface CarrierCommission extends AdminCommission {
+  tracking_number: string | null;
+  carrier_tracking_number: string | null;
+  carrier_barcode: string | null;
+}
+
+export const listCarrierCommissions = (page = 1, size = 50): Promise<PaginatedResponse<CarrierCommission>> =>
   apiRequest(`/carrier/commissions?page=${page}&size=${size}`);
 
 export const getCarrierCommissionsSummary = (): Promise<CommissionSummary> =>
@@ -149,3 +168,7 @@ export const getCarrierCommissionsSummary = (): Promise<CommissionSummary> =>
 
 export const getCarrierCommissionConfig = (): Promise<CarrierCommissionConfig> =>
   apiRequest("/carrier/commissions/config");
+
+// ── Reviews (read-only, scoped to this carrier) ────────────────────────────
+export const getCarrierReviewsSummary = (): Promise<CarrierReviewsSummary> =>
+  apiRequest("/carrier/reviews/summary");
