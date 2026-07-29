@@ -32,7 +32,7 @@ function typeNeedsRate(t: CommissionType) { return t === "percentage" || t === "
 function typeNeedsFixed(t: CommissionType) { return t === "fixed" || t === "combined"; }
 
 function formatPrice(n: number, currency = "KZT") {
-  return `${new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 0, maximumFractionDigits: 0, signDisplay: "auto" }).format(n)} ${currency}`;
+  return `${new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2, signDisplay: "auto" }).format(n)} ${currency}`;
 }
 
 function formatDate(iso: string) {
@@ -425,7 +425,7 @@ export default function AdminCommissionsPage() {
                         <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 3 }}>
                           {cfg.commission_rate != null && `${(Number(cfg.commission_rate) * 100).toFixed(2)}%`}
                           {cfg.commission_rate != null && cfg.fixed_amount != null && " + "}
-                          {cfg.fixed_amount != null && `${Number(cfg.fixed_amount).toLocaleString("ru-RU")} ${cfg.currency}`}
+                          {cfg.fixed_amount != null && `${Number(cfg.fixed_amount).toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${cfg.currency}`}
                         </div>
                       </div>
                       <div style={{ display: "flex", gap: 6 }}>

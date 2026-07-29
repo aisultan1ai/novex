@@ -79,8 +79,8 @@ const BADGE_LABELS: Record<string, string> = {
 
 function formatPrice(price: number, currency: string): string {
   return `${new Intl.NumberFormat("ru-RU", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(price)} ${currency}`;
 }
 

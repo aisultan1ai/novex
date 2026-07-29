@@ -124,10 +124,10 @@ export default function CarrierTariffsPage() {
                     <span style={{ color: "#475569" }}>{rate.weight_from_kg}</span>
                     <span style={{ color: "#475569" }}>{rate.weight_to_kg ?? "∞"}</span>
                     <span style={{ fontWeight: 600, color: "#0f172a" }}>
-                      {Number(rate.base_price).toLocaleString("ru-RU")} {rate.currency}
+                      {Number(rate.base_price).toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {rate.currency}
                     </span>
                     <span style={{ color: "#64748b" }}>
-                      {rate.per_unit_price != null ? Number(rate.per_unit_price).toLocaleString("ru-RU") : "-"}
+                      {rate.per_unit_price != null ? Number(rate.per_unit_price).toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "-"}
                     </span>
                     <span style={{ color: "#64748b" }}>
                       {rate.per_unit_weight_kg != null ? rate.per_unit_weight_kg : "-"}

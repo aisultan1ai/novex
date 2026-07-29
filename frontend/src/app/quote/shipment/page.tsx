@@ -85,7 +85,7 @@ const emptyPackage = (): PackageFormState => ({
 });
 
 function formatPrice(price: number, currency: string): string {
-  return `${new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(price)} ${currency}`;
+  return `${new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(price)} ${currency}`;
 }
 
 function mapPartyFormToPayload(party: PartyFormState): ShipmentPartyInput {

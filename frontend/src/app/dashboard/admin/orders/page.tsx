@@ -73,7 +73,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function formatPrice(price: number, currency: string) {
-  return `${new Intl.NumberFormat("ru-RU").format(price)} ${currency}`;
+  return `${new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(price)} ${currency}`;
 }
 
 function isImage(mime: string) {
@@ -338,11 +338,11 @@ function OrderDetailPanel({ orderId }: { orderId: number }) {
       <div style={dp.section}>
         <div style={dp.sectionTitle}>Финансовая разбивка</div>
         <div style={dp.grid3}>
-          <dp.Field label="Оплатил клиент" value={`${detail.price.toLocaleString("ru-RU")} ${detail.currency}`} />
-          <dp.Field label="Перевозчику" value={`${detail.carrier_price.toLocaleString("ru-RU")} ${detail.currency}`} />
+          <dp.Field label="Оплатил клиент" value={formatPrice(detail.price, detail.currency)} />
+          <dp.Field label="Перевозчику" value={formatPrice(detail.carrier_price, detail.currency)} />
           <dp.Field
             label="Прибыль Novex"
-            value={`${detail.markup_amount.toLocaleString("ru-RU")} ${detail.currency}`}
+            value={formatPrice(detail.markup_amount, detail.currency)}
           />
         </div>
       </div>

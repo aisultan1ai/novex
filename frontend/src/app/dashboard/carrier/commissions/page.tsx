@@ -18,7 +18,7 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 function formatPrice(n: number, currency = "KZT") {
-  return `${new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 0, maximumFractionDigits: 0, signDisplay: "auto" }).format(n)} ${currency}`;
+  return `${new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2, signDisplay: "auto" }).format(n)} ${currency}`;
 }
 
 function formatDate(iso: string) {

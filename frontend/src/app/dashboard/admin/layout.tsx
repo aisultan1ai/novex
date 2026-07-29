@@ -17,7 +17,6 @@ const ALL_ADMIN_TABS = [
   { label: "Комиссии",        href: "/dashboard/admin/commissions",    adminOnly: false },
   { label: "Очередь заказов", href: "/dashboard/admin/dispatch-queue", adminOnly: false },
   { label: "Настройки",       href: "/dashboard/admin/settings",       adminOnly: false },
-  { label: "API",             href: "/dashboard/admin/api",            adminOnly: true  },
   { label: "Аудит",           href: "/dashboard/admin/audit-logs",     adminOnly: true  },
 ];
 

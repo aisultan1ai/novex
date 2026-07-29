@@ -92,7 +92,7 @@ function formatDate(iso: string): string {
 }
 
 function formatPrice(price: number, currency: string): string {
-  return `${new Intl.NumberFormat("ru-RU").format(price)} ${currency}`;
+  return `${new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(price)} ${currency}`;
 }
 
 function StatusBadge({ status }: { status: string }) {

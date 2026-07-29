@@ -288,7 +288,7 @@ export default function AdminCommissionConfigsPage() {
               </span>
               <span style={{ fontSize: 13, color: "#0f172a", fontWeight: 600 }}>
                 {cfg.fixed_amount != null
-                  ? `${Number(cfg.fixed_amount).toLocaleString("ru-RU")} ${cfg.currency}`
+                  ? `${Number(cfg.fixed_amount).toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${cfg.currency}`
                   : "-"}
               </span>
               <span style={{ fontSize: 13, color: "#64748b" }}>{cfg.currency}</span>

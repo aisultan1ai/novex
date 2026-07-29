@@ -20,7 +20,7 @@ const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
 };
 
 function formatPrice(price: number, currency: string) {
-  return `${new Intl.NumberFormat("ru-RU").format(price)} ${currency}`;
+  return `${new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(price)} ${currency}`;
 }
 
 function getInitials(name: string | null, email: string) {

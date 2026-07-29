@@ -283,8 +283,8 @@ export default function AdminCarrierTariffsPage() {
                           <span style={{ fontWeight: 700, color: "#0f172a" }}>Зона {rate.zone}</span>
                           <span style={{ color: "#475569" }}>{rate.weight_from_kg}</span>
                           <span style={{ color: "#475569" }}>{rate.weight_to_kg ?? "∞"}</span>
-                          <span style={{ fontWeight: 600, color: "#0f172a" }}>{Number(rate.base_price).toLocaleString("ru-RU")}</span>
-                          <span style={{ color: "#64748b" }}>{rate.per_unit_price ? Number(rate.per_unit_price).toLocaleString("ru-RU") : "-"}</span>
+                          <span style={{ fontWeight: 600, color: "#0f172a" }}>{Number(rate.base_price).toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          <span style={{ color: "#64748b" }}>{rate.per_unit_price ? Number(rate.per_unit_price).toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "-"}</span>
                           <span style={{ color: "#64748b" }}>{rate.eta_days_min ?? "-"}</span>
                           <span style={{ color: "#64748b" }}>{rate.eta_days_max ?? "-"}</span>
                           <div style={{ display: "flex", gap: 4 }}>

@@ -95,7 +95,7 @@ function formatDate(isoString: string): string {
 }
 
 function formatPrice(price: number, currency: string): string {
-  return `${new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(price)} ${currency}`;
+  return `${new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(price)} ${currency}`;
 }
 
 function IconTruck() {
@@ -210,6 +210,9 @@ function MyOrdersPageInner() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<string>("all");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const PAGE_SIZE = 20;
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) router.push("/login");
@@ -217,10 +220,12 @@ function MyOrdersPageInner() {
 
   useEffect(() => {
     if (!isAuthenticated) return;
+    setIsLoading(true);
     async function fetchOrders() {
       try {
-        const data = await listOrders();
+        const data = await listOrders(page, PAGE_SIZE);
         setOrders(data.items);
+        setTotal(data.total);
       } catch (err) {
         setError(err instanceof ApiError ? err.detail : "Не удалось загрузить заказы.");
       } finally {
@@ -228,7 +233,15 @@ function MyOrdersPageInner() {
       }
     }
     void fetchOrders();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, page]);
+
+  // Filter switching resets to page 1 so users don't land on an empty page
+  // when they had paginated deep into "all" and then narrow the view.
+  useEffect(() => {
+    setPage(1);
+  }, [activeFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   // Stable identity so React.memo'd row components can skip re-render when
   // the filter or auth state changes without affecting a given order.
@@ -339,6 +352,20 @@ function MyOrdersPageInner() {
               isLast={idx === filteredOrders.length - 1}
               onOpen={openOrder}
             />
+          ))}
+        </div>
+      )}
+
+      {!isLoading && !error && totalPages > 1 && (
+        <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 24, flexWrap: "wrap" }}>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+            <button
+              key={p}
+              onClick={() => setPage(p)}
+              style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid #e5e7eb", background: p === page ? "#0f172a" : "#ffffff", color: p === page ? "#ffffff" : "#0f172a", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+            >
+              {p}
+            </button>
           ))}
         </div>
       )}
