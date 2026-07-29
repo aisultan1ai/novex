@@ -119,11 +119,62 @@ class CommissionsService:
         )
         return CommissionResponse.model_validate(c)
 
+    def reverse_for_order(
+        self,
+        db: Session,
+        order_draft_id: int,
+        *,
+        reason: str | None = None,
+    ) -> CommissionResponse | None:
+        """Create a storno row that offsets the active commission for an order.
+
+        Double-entry style: the original stays (marked 'reversed'), and a
+        mirror row with negative amounts is inserted ('reversal'). Summary
+        SUMs everything, so the net effect on turnover/payout/profit is zero.
+
+        Idempotent: calling twice on the same order is a no-op (no active
+        row remains after the first call).
+        """
+        original = self.repo.get_active_for_order(db, order_draft_id)
+        if original is None:
+            logger.info(
+                "Commission reverse skipped — no active row for order_id=%s", order_draft_id
+            )
+            return None
+
+        original.status = "reversed"
+        original.reversed_at = datetime.utcnow()
+        original.reversal_reason = reason
+        db.flush()
+
+        neg_payout = (
+            -original.carrier_payout if original.carrier_payout is not None else None
+        )
+        storno = self.repo.create(
+            db,
+            order_draft_id=original.order_draft_id,
+            carrier_code=original.carrier_code,
+            gross_amount=-original.gross_amount,
+            commission_rate=original.commission_rate,
+            commission_amount=-original.commission_amount,
+            currency=original.currency,
+            carrier_payout=neg_payout,
+            status="reversal",
+            reverses_commission_id=original.id,
+            reversal_reason=reason,
+        )
+        logger.info(
+            "Commission reversed: order_id=%s original_id=%s storno_id=%s reason=%s",
+            order_draft_id,
+            original.id,
+            storno.id,
+            reason,
+        )
+        return CommissionResponse.model_validate(storno)
+
+    # Kept as a deprecated alias so any external callers keep working.
     def void_for_order(self, db: Session, order_draft_id: int) -> bool:
-        deleted = self.repo.delete_for_order(db, order_draft_id)
-        if deleted:
-            logger.info("Commission voided on refund: order_id=%s", order_draft_id)
-        return deleted
+        return self.reverse_for_order(db, order_draft_id, reason="void") is not None
 
     def _calculate(
         self,

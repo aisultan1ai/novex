@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.modules.commissions.models import Commission
@@ -22,6 +22,9 @@ class CommissionsRepository:
         commission_amount: Decimal,
         currency: str = "KZT",
         carrier_payout: Decimal | None = None,
+        status: str = "active",
+        reverses_commission_id: int | None = None,
+        reversal_reason: str | None = None,
     ) -> Commission:
         c = Commission(
             order_draft_id=order_draft_id,
@@ -31,18 +34,21 @@ class CommissionsRepository:
             commission_amount=commission_amount,
             carrier_payout=carrier_payout,
             currency=currency,
+            status=status,
+            reverses_commission_id=reverses_commission_id,
+            reversal_reason=reversal_reason,
         )
         db.add(c)
         db.flush()
         return c
 
-    def delete_for_order(self, db: Session, order_draft_id: int) -> bool:
-        c = db.scalar(select(Commission).where(Commission.order_draft_id == order_draft_id))
-        if c is None:
-            return False
-        db.delete(c)
-        db.flush()
-        return True
+    def get_active_for_order(self, db: Session, order_draft_id: int) -> Commission | None:
+        return db.scalar(
+            select(Commission).where(
+                Commission.order_draft_id == order_draft_id,
+                Commission.status == "active",
+            )
+        )
 
     def list_all(
         self,
@@ -76,6 +82,15 @@ class CommissionsRepository:
         date_to: datetime | None = None,
         carrier_code: str | None = None,
     ) -> dict:
+        # Net totals — reversal rows carry negative amounts, so a plain SUM
+        # gives the true post-refund position without extra filtering.
+        # `count` = number of currently-active paid orders (net of refunds):
+        # +1 for active, -1 for each reversal row.
+        active_delta = case(
+            (Commission.status == "active", 1),
+            (Commission.status == "reversal", -1),
+            else_=0,
+        )
         stmt = select(
             func.coalesce(func.sum(Commission.gross_amount), 0).label("total_gross"),
             func.coalesce(func.sum(Commission.commission_amount), 0).label("total_commission"),
@@ -88,7 +103,7 @@ class CommissionsRepository:
                 ),
                 0,
             ).label("total_carrier_payout"),
-            func.count(Commission.id).label("count"),
+            func.coalesce(func.sum(active_delta), 0).label("count"),
         )
         if date_from:
             stmt = stmt.where(Commission.created_at >= date_from)
@@ -101,5 +116,5 @@ class CommissionsRepository:
             "total_gross": row.total_gross,
             "total_commission": row.total_commission,
             "total_carrier_payout": row.total_carrier_payout,
-            "count": row.count,
+            "count": max(int(row.count), 0),
         }

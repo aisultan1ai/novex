@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.common.status_machine import can_transition
 from app.core.exceptions import ForbiddenError, NotFoundError
+from app.modules.commissions.service import CommissionsService
 from app.modules.dispatch.models import OrderStatusHistory
 from app.modules.orders.repository import OrdersRepository
 from app.modules.tracking.repository import TrackingRepository
@@ -88,6 +89,14 @@ class TrackingService:
                     source="tracking_event",
                     comment=f"Carrier status: {payload.carrier_status or payload.status}",
                 ))
+                # Reverse commission if carrier reported the order as cancelled
+                # (CSE/Exline can drop the order on their side; we mirror it).
+                if new_order_status == "cancelled":
+                    CommissionsService().reverse_for_order(
+                        db,
+                        order_draft_id,
+                        reason=f"carrier tracking: {payload.carrier_status or payload.status}",
+                    )
                 logger.info(
                     "Order status synced via tracking: order_id=%s %s → %s",
                     order_draft_id,

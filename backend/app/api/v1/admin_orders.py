@@ -13,6 +13,7 @@ from app.core.db import get_db
 from app.core.dependencies import require_admin, require_admin_or_operator
 from app.core.limiter import limiter
 from app.modules.audit.service import AuditService
+from app.modules.commissions.service import CommissionsService
 from app.modules.dispatch.models import OrderStatusHistory
 from app.modules.dispatch.service import DispatchWorker
 from app.modules.identity.models import User
@@ -31,6 +32,7 @@ _shipments_repo = ShipmentsRepository()
 _shipments_svc = ShipmentsService()
 _dispatch_svc = DispatchWorker()
 _audit_svc = AuditService()
+_commissions_svc = CommissionsService()
 
 VALID_STATUSES = {
     "draft",
@@ -337,6 +339,14 @@ def update_order_status(
             order_id, old_status, payload.status,
         )
     order.status = payload.status
+    # When the order is moved into 'cancelled' from any other state, offset
+    # the recorded commission with a storno row so admin totals stay honest.
+    # reverse_for_order is idempotent — if the refund flow already reversed
+    # it, this is a no-op.
+    if payload.status == "cancelled" and old_status != "cancelled":
+        _commissions_svc.reverse_for_order(
+            db, order.id, reason="admin status change → cancelled"
+        )
     db.add(OrderStatusHistory(
         order_id=order.id,
         old_status=old_status,

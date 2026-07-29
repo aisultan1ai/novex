@@ -32,7 +32,7 @@ function typeNeedsRate(t: CommissionType) { return t === "percentage" || t === "
 function typeNeedsFixed(t: CommissionType) { return t === "fixed" || t === "combined"; }
 
 function formatPrice(n: number, currency = "KZT") {
-  return `${new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n)} ${currency}`;
+  return `${new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 0, maximumFractionDigits: 0, signDisplay: "auto" }).format(n)} ${currency}`;
 }
 
 function formatDate(iso: string) {
@@ -261,24 +261,46 @@ export default function AdminCommissionsPage() {
             Записей пока нет - появятся после первой оплаты
           </div>
         ) : (
-          items.map((c, idx) => (
-            <div
-              key={c.id}
-              style={{ display: "grid", gridTemplateColumns: "80px 100px 140px 160px 160px 120px", gap: 12, padding: "14px 24px", borderBottom: idx === items.length - 1 ? "none" : "1px solid #f1f5f9", alignItems: "center" }}
-            >
-              <span style={{ fontFamily: "monospace", fontSize: 12, color: "#94a3b8" }}>#{c.id}</span>
-              <span style={{ fontFamily: "monospace", fontSize: 13, color: "#475569", fontWeight: 600 }}>#{c.order_draft_id}</span>
-              <span style={{ fontSize: 13, color: "#0f172a", fontWeight: 500 }}>{c.carrier_code}</span>
-              <span style={{ fontSize: 13, color: "#475569" }}>{formatPrice(c.gross_amount, c.currency)}</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "#16a34a" }}>
-                {formatPrice(c.commission_amount, c.currency)}
-                <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400, marginLeft: 6 }}>
-                  ({(Number(c.commission_rate) * 100).toFixed(0)}%)
+          items.map((c, idx) => {
+            const isReversal = c.status === "reversal";
+            const isReversed = c.status === "reversed";
+            const amountColor = isReversal ? "#dc2626" : "#16a34a";
+            const rowBg = isReversal ? "#fef2f2" : isReversed ? "#fafafa" : "transparent";
+            const grossColor = isReversal ? "#dc2626" : "#475569";
+            return (
+              <div
+                key={c.id}
+                style={{ display: "grid", gridTemplateColumns: "80px 100px 140px 160px 160px 120px", gap: 12, padding: "14px 24px", borderBottom: idx === items.length - 1 ? "none" : "1px solid #f1f5f9", alignItems: "center", background: rowBg }}
+                title={c.reversal_reason ?? undefined}
+              >
+                <span style={{ fontFamily: "monospace", fontSize: 12, color: "#94a3b8" }}>#{c.id}</span>
+                <span style={{ fontFamily: "monospace", fontSize: 13, color: "#475569", fontWeight: 600 }}>
+                  #{c.order_draft_id}
+                  {isReversal && (
+                    <span style={{ display: "inline-block", marginLeft: 6, padding: "1px 6px", background: "#fee2e2", color: "#b91c1c", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.03em" }}>
+                      СТОРНО
+                    </span>
+                  )}
+                  {isReversed && (
+                    <span style={{ display: "inline-block", marginLeft: 6, padding: "1px 6px", background: "#f1f5f9", color: "#64748b", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.03em", textDecoration: "line-through" }}>
+                      ОТМ.
+                    </span>
+                  )}
                 </span>
-              </span>
-              <span style={{ fontSize: 12, color: "#94a3b8" }}>{formatDate(c.created_at)}</span>
-            </div>
-          ))
+                <span style={{ fontSize: 13, color: "#0f172a", fontWeight: 500, textDecoration: isReversed ? "line-through" : "none", opacity: isReversed ? 0.6 : 1 }}>{c.carrier_code}</span>
+                <span style={{ fontSize: 13, color: grossColor, fontWeight: isReversal ? 600 : 400, textDecoration: isReversed ? "line-through" : "none", opacity: isReversed ? 0.6 : 1 }}>
+                  {formatPrice(c.gross_amount, c.currency)}
+                </span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: amountColor, textDecoration: isReversed ? "line-through" : "none", opacity: isReversed ? 0.6 : 1 }}>
+                  {formatPrice(c.commission_amount, c.currency)}
+                  <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400, marginLeft: 6 }}>
+                    ({(Number(c.commission_rate) * 100).toFixed(0)}%)
+                  </span>
+                </span>
+                <span style={{ fontSize: 12, color: "#94a3b8" }}>{formatDate(c.created_at)}</span>
+              </div>
+            );
+          })
         )}
       </div>
 

@@ -8,6 +8,7 @@ from app.common.pagination import PageParams
 from app.common.time_utils import utcnow as _utcnow
 from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
 from app.modules.address_book.repository import AddressBookRepository
+from app.modules.commissions.service import CommissionsService
 from app.modules.orders.models import OrderDraft, ShipmentPackage, ShipmentParty
 from app.modules.orders.repository import OrdersRepository
 from app.modules.orders.schemas import (
@@ -581,6 +582,15 @@ class OrdersService:
             status="cancelled",
             description=f"Заказ отменён клиентом: {reason}",
         ))
+
+        # 3a) Reverse the recorded commission immediately. The refund itself
+        # is still admin-driven (money moves in step 4), but the ledger must
+        # reflect the cancellation the moment it happens — otherwise admin
+        # totals and payout summaries lie until the refund is processed.
+        # Idempotent: if the order was never paid there is no active row.
+        CommissionsService().reverse_for_order(
+            db, order.id, reason=f"customer cancel: {reason}"
+        )
 
         # 4) Mark the paid payment(s) as refund_pending so admin can initiate refund.
         paid_txs = db.scalars(

@@ -22,6 +22,10 @@ class CommissionResponse(BaseModel):
     commission_amount: Decimal
     currency: str
     created_at: datetime
+    status: str = "active"
+    reverses_commission_id: int | None = None
+    reversed_at: datetime | None = None
+    reversal_reason: str | None = None
 
     model_config = {"from_attributes": True}
 

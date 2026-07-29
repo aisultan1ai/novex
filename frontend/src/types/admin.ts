@@ -116,6 +116,10 @@ export interface AdminCommission {
   commission_amount: number;
   currency: string;
   created_at: string;
+  status: "active" | "reversed" | "reversal";
+  reverses_commission_id: number | null;
+  reversed_at: string | null;
+  reversal_reason: string | null;
 }
 
 export interface CommissionSummary {

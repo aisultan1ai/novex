@@ -14,6 +14,7 @@ from app.core.dependencies import get_current_user_id, require_verified_email
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.limiter import limiter
 from app.core.storage import MAX_FILE_SIZE, get_storage
+from app.modules.commissions.service import CommissionsService
 from app.modules.dispatch.models import OrderStatusHistory
 from app.modules.orders.repository import OrdersRepository
 from app.modules.payments.payment_service import PaymentService
@@ -23,6 +24,7 @@ router = APIRouter(prefix="/payments", tags=["payments"])
 
 order_repo = OrdersRepository()
 payment_svc = PaymentService()
+_commissions_svc = CommissionsService()
 
 
 # ─── Schemas ──────────────────────────────────────────────────────────────────
@@ -331,6 +333,9 @@ async def kaspi_webhook(request: Request, db: Session = Depends(get_db)) -> dict
                 source="kaspi_webhook",
                 comment="Cancelled via Kaspi webhook",
             ))
+            _commissions_svc.reverse_for_order(
+                db, order.id, reason="kaspi webhook: cancelled"
+            )
         else:
             logger.warning(
                 "Kaspi webhook: cannot cancel order %s from status '%s'",

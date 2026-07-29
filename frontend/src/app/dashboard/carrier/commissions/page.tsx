@@ -18,7 +18,7 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 function formatPrice(n: number, currency = "KZT") {
-  return `${new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n)} ${currency}`;
+  return `${new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 0, maximumFractionDigits: 0, signDisplay: "auto" }).format(n)} ${currency}`;
 }
 
 function formatDate(iso: string) {
@@ -203,29 +203,50 @@ export default function CarrierCommissionsPage() {
               Записей пока нет — появятся после первой оплаты
             </div>
           ) : (
-            items.map((c, idx) => (
-              <div
-                key={c.id}
-                style={{ display: "grid", gridTemplateColumns: TABLE_COLS, gap: 12, padding: "14px 24px", borderBottom: idx === items.length - 1 ? "none" : "1px solid #f1f5f9", alignItems: "center" }}
-              >
-                <span style={{ fontFamily: "monospace", fontSize: 12, color: "#94a3b8" }}>#{c.id}</span>
-                <span style={{ fontFamily: "monospace", fontSize: 13, color: "#475569", fontWeight: 600 }}>#{c.order_draft_id}</span>
-                <IdCell value={c.carrier_tracking_number} />
-                <IdCell value={c.carrier_barcode} />
-                <IdCell value={c.tracking_number} />
-                <span style={{ fontSize: 13, color: "#475569" }}>{formatPrice(c.gross_amount, c.currency)}</span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: "#0369a1" }}>
-                  {c.carrier_payout != null ? formatPrice(c.carrier_payout, c.currency) : "—"}
-                </span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "#64748b" }}>
-                  {formatPrice(c.commission_amount, c.currency)}
-                  <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400, marginLeft: 6 }}>
-                    ({(Number(c.commission_rate) * 100).toFixed(0)}%)
+            items.map((c, idx) => {
+              const isReversal = c.status === "reversal";
+              const isReversed = c.status === "reversed";
+              const rowBg = isReversal ? "#fef2f2" : isReversed ? "#fafafa" : "transparent";
+              const strike = isReversed ? "line-through" : "none";
+              const dim = isReversed ? 0.6 : 1;
+              const payoutColor = isReversal ? "#dc2626" : "#0369a1";
+              return (
+                <div
+                  key={c.id}
+                  style={{ display: "grid", gridTemplateColumns: TABLE_COLS, gap: 12, padding: "14px 24px", borderBottom: idx === items.length - 1 ? "none" : "1px solid #f1f5f9", alignItems: "center", background: rowBg }}
+                  title={c.reversal_reason ?? undefined}
+                >
+                  <span style={{ fontFamily: "monospace", fontSize: 12, color: "#94a3b8" }}>#{c.id}</span>
+                  <span style={{ fontFamily: "monospace", fontSize: 13, color: "#475569", fontWeight: 600 }}>
+                    #{c.order_draft_id}
+                    {isReversal && (
+                      <span style={{ display: "inline-block", marginLeft: 6, padding: "1px 6px", background: "#fee2e2", color: "#b91c1c", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.03em" }}>
+                        СТОРНО
+                      </span>
+                    )}
+                    {isReversed && (
+                      <span style={{ display: "inline-block", marginLeft: 6, padding: "1px 6px", background: "#f1f5f9", color: "#64748b", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.03em" }}>
+                        ОТМ.
+                      </span>
+                    )}
                   </span>
-                </span>
-                <span style={{ fontSize: 12, color: "#94a3b8" }}>{formatDate(c.created_at)}</span>
-              </div>
-            ))
+                  <IdCell value={c.carrier_tracking_number} />
+                  <IdCell value={c.carrier_barcode} />
+                  <IdCell value={c.tracking_number} />
+                  <span style={{ fontSize: 13, color: isReversal ? "#dc2626" : "#475569", textDecoration: strike, opacity: dim }}>{formatPrice(c.gross_amount, c.currency)}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: payoutColor, textDecoration: strike, opacity: dim }}>
+                    {c.carrier_payout != null ? formatPrice(c.carrier_payout, c.currency) : "—"}
+                  </span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: isReversal ? "#dc2626" : "#64748b", textDecoration: strike, opacity: dim }}>
+                    {formatPrice(c.commission_amount, c.currency)}
+                    <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400, marginLeft: 6 }}>
+                      ({(Number(c.commission_rate) * 100).toFixed(0)}%)
+                    </span>
+                  </span>
+                  <span style={{ fontSize: 12, color: "#94a3b8" }}>{formatDate(c.created_at)}</span>
+                </div>
+              );
+            })
           )}
         </div>
       </div>

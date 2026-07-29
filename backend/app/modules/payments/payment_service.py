@@ -532,7 +532,9 @@ class PaymentService:
                     "перед оформлением возврата средств."
                 )
             transition_order(old_order_status, "cancelled")
-            _commissions_svc.void_for_order(db, order.id)
+            _commissions_svc.reverse_for_order(
+                db, order.id, reason=f"refund: {reason}"
+            )
             order.status = "cancelled"
             db.add(
                 OrderStatusHistory(
