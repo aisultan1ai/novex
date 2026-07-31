@@ -78,6 +78,9 @@ export interface CarrierOrderItem {
   // Present on the detail endpoint (GET /carrier/orders/{id}); null when the
   // customer has not left a review yet.
   review?: { rating: number; comment: string | null; created_at: string } | null;
+  // Active (pending) cancellation request на этот заказ. resolved-статусы
+  // сюда не попадают - их видно на странице «Отмены».
+  cancellation_request?: { id: number; status: string; reason: string; created_at: string } | null;
 }
 
 export interface CarrierReviewsSummary {

@@ -34,6 +34,10 @@ _dispatch_svc = DispatchWorker()
 _audit_svc = AuditService()
 _commissions_svc = CommissionsService()
 
+# Держим синхронно с OrderDraftStatus Literal (backend/app/modules/orders/schemas.py)
+# и ALLOWED_ORDER_TRANSITIONS (backend/app/common/status_machine.py). Пропустишь
+# статус — админ не сможет выставить его вручную даже когда система уже его
+# знает (например, customs_hold приходит через carrier_tracking автоматически).
 VALID_STATUSES = {
     "draft",
     "shipment_details_completed",
@@ -53,6 +57,7 @@ VALID_STATUSES = {
     "arrived",
     "delivered",
     "delivery_failed",
+    "customs_hold",
     "return_requested",
     "return_in_progress",
     "returned",

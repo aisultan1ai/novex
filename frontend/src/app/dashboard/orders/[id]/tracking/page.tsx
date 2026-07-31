@@ -8,36 +8,11 @@ import { useAuth } from "@/components/providers/auth-provider";
 import { getOrderDraft } from "@/lib/api/orders";
 import { getOrderTracking } from "@/lib/api/tracking";
 import { createReview, getOrderReview, type ReviewResponse } from "@/lib/api/reviews";
+import { ORDER_STATUS_LABELS } from "@/lib/status-labels";
 import type { TrackingEvent } from "@/types/tracking";
 
-const STATUS_LABELS: Record<string, string> = {
-  draft:                      "Черновик",
-  shipment_details_completed: "Детали заполнены",
-  ready_for_checkout:         "Готов к оплате",
-  awaiting_payment:           "Ожидает оплаты",
-  payment_under_review:       "Чек на проверке",
-  payment_rejected:           "Чек отклонён",
-  paid:                       "Оплата подтверждена",
-  dispatch_queued:            "Ожидает отправки",
-  dispatch_failed:            "Уточняем детали",
-  pending_manual:             "Передаётся перевозчику",
-  pending_manual_dispatch:    "Ожидает ручной отправки",
-  sent_to_carrier:            "Передан перевозчику",
-  picked_up:                  "Забран перевозчиком",
-  in_transit:                 "В пути",
-  out_for_delivery:           "Выезд на доставку",
-  arrived:                    "Прибыл в пункт выдачи",
-  delivered:                  "Доставлен",
-  delivery_failed:            "Попытка доставки не удалась",
-  return_requested:           "Запрос возврата",
-  return_in_progress:         "Возврат в пути",
-  returned:                   "Возвращён",
-  return:                     "Возврат",
-  customs_hold:               "Задержан на таможне",
-  cancelled:                  "Отменён",
-};
-
-
+// Timeline-specific цвета (dot/line, а не bg/color, как в обычных бейджах),
+// поэтому оставлены локальными - единый ORDER_STATUS_COLORS сюда не подходит.
 const STATUS_COLORS: Record<string, { dot: string; line: string }> = {
   paid:             { dot: "#16a34a", line: "#bbf7d0" },
   sent_to_carrier:  { dot: "#2563eb", line: "#bfdbfe" },
@@ -53,10 +28,11 @@ const STATUS_COLORS: Record<string, { dot: string; line: string }> = {
   customs_hold:     { dot: "#d97706", line: "#fde68a" },
 };
 
-const REVIEWABLE_STATUSES = new Set(["delivered", "return", "returned"]);
+const REVIEWABLE_STATUSES = new Set(["delivered", "returned"]);
 
-// See public tracking page — carriers whose native description is more
-// informative than our normalized STATUS_LABELS.
+// Карrier'ы, у которых родное описание события информативнее нашего
+// нормализованного лейбла. Для Azimuth перевозчик просил показывать сырой
+// текст напрямую - не переводим и не нормализуем.
 const RAW_DESCRIPTION_CARRIERS = new Set(["azimuth"]);
 
 function eventLabel(
@@ -65,7 +41,7 @@ function eventLabel(
 ): string {
   const raw = event.description?.trim();
   if (carrierCode && RAW_DESCRIPTION_CARRIERS.has(carrierCode) && raw) return raw;
-  const normalized = STATUS_LABELS[event.status];
+  const normalized = ORDER_STATUS_LABELS[event.status];
   if (normalized) return normalized;
   return raw || "Обновление статуса";
 }

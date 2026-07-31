@@ -39,6 +39,24 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("ru-RU", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+function InfoDot({ tooltip, color = "#94a3b8" }: { tooltip: string; color?: string }) {
+  return (
+    <span
+      title={tooltip}
+      aria-label={tooltip}
+      style={{
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        width: 14, height: 14, borderRadius: "50%",
+        border: `1.5px solid ${color}`, color,
+        fontSize: 10, fontWeight: 700, fontFamily: "serif",
+        cursor: "help", lineHeight: 1,
+      }}
+    >
+      i
+    </span>
+  );
+}
+
 function SummaryCard({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) {
   return (
     <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 14, padding: "20px 24px", flex: 1 }}>
@@ -267,24 +285,23 @@ export default function AdminCommissionsPage() {
             const amountColor = isReversal ? "#dc2626" : "#16a34a";
             const rowBg = isReversal ? "#fef2f2" : isReversed ? "#fafafa" : "transparent";
             const grossColor = isReversal ? "#dc2626" : "#475569";
+            // Полный текст для tooltip'а - сам факт (возврат / погашение)
+            // плюс причина, если она сохранена в reversal_reason.
+            const iconTooltip = isReversal
+              ? `Возврат по отменённому заказу${c.reversal_reason ? `: ${c.reversal_reason}` : ""}`
+              : isReversed
+                ? `Начисление отменено (возврат средств клиенту)${c.reversal_reason ? `: ${c.reversal_reason}` : ""}`
+                : "";
             return (
               <div
                 key={c.id}
                 style={{ display: "grid", gridTemplateColumns: "80px 100px 140px 160px 160px 120px", gap: 12, padding: "14px 24px", borderBottom: idx === items.length - 1 ? "none" : "1px solid #f1f5f9", alignItems: "center", background: rowBg }}
-                title={c.reversal_reason ?? undefined}
               >
                 <span style={{ fontFamily: "monospace", fontSize: 12, color: "#94a3b8" }}>#{c.id}</span>
-                <span style={{ fontFamily: "monospace", fontSize: 13, color: "#475569", fontWeight: 600 }}>
+                <span style={{ fontFamily: "monospace", fontSize: 13, color: "#475569", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 6 }}>
                   #{c.order_draft_id}
-                  {isReversal && (
-                    <span style={{ display: "inline-block", marginLeft: 6, padding: "1px 6px", background: "#fee2e2", color: "#b91c1c", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.03em" }}>
-                      СТОРНО
-                    </span>
-                  )}
-                  {isReversed && (
-                    <span style={{ display: "inline-block", marginLeft: 6, padding: "1px 6px", background: "#f1f5f9", color: "#64748b", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.03em", textDecoration: "line-through" }}>
-                      ОТМ.
-                    </span>
+                  {(isReversal || isReversed) && (
+                    <InfoDot color={isReversal ? "#dc2626" : "#94a3b8"} tooltip={iconTooltip} />
                   )}
                 </span>
                 <span style={{ fontSize: 13, color: "#0f172a", fontWeight: 500, textDecoration: isReversed ? "line-through" : "none", opacity: isReversed ? 0.6 : 1 }}>{c.carrier_code}</span>

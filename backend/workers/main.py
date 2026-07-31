@@ -20,6 +20,7 @@ _ALIVE_TTL = 90  # seconds — must be > main loop interval (30s)
 # raise NoReferencedTableError at flush time.
 import app.modules.address_book.models  # noqa: F401
 import app.modules.audit.models  # noqa: F401
+import app.modules.cancellations.models  # noqa: F401
 import app.modules.carriers.api_credentials  # noqa: F401
 import app.modules.carriers.integration_log  # noqa: F401
 import app.modules.carriers.models  # noqa: F401
@@ -41,6 +42,7 @@ from workers.jobs import (
     cleanup_expired_files,
     dispatch_orders,
     refresh_quote_cache,
+    retry_cancellations,
     retry_failed_callbacks,
     send_email_notifications,
     sync_azimuth_regions,
@@ -104,6 +106,11 @@ def run() -> None:
     scheduler.register(send_email_notifications.run, 60)
     scheduler.register(cleanup_expired_files.run, 3600)
     scheduler.register(retry_failed_callbacks.run, 300)
+    # Мелкий шаг — 30s. Backoff внутри самой задачи (см. _RETRY_BACKOFF в
+    # cancellations/service.py). Первый ретрай запланирован через 30s после
+    # первичного API-отказа, так что более быстрый тик просто пропустит
+    # ещё-не-готовые заявки.
+    scheduler.register(retry_cancellations.run, 30)
     scheduler.register(refresh_quote_cache.run, 1800)
     # Azimuth /regions catalogue refresh — weekly is enough for a national
     # courier's region list (rarely changes). Job is idempotent + Redis-locked.

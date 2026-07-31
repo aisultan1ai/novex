@@ -30,7 +30,7 @@ const ENDPOINTS: Endpoint[] = [
       event_id: "opt-uuid-for-dedup",
     }, null, 2),
     responseBody: JSON.stringify({ ok: true }, null, 2),
-    notes: "status регистронезависимо. event_id опционален (нужен для идемпотентности при ретраях). Если novex_order_id не найден — возвращаем 200 OK без ошибки. Заголовок X-Novex-Timestamp обязателен когда настроен webhook_secret — окно ±5 минут.",
+    notes: "status регистронезависимо. event_id опционален (нужен для идемпотентности при ретраях). Если novex_order_id не найден - возвращаем 200 OK без ошибки. Заголовок X-Novex-Timestamp обязателен когда настроен webhook_secret - окно ±5 минут.",
   },
   {
     method: "POST",
@@ -75,7 +75,7 @@ const ENDPOINTS: Endpoint[] = [
       tracking_number: "AZM-20260513-1042",
       barcode: "AZM-BC-20260513-1042",
     }, null, 2),
-    notes: "Обязательные заголовки: X-Novex-Timestamp (unix-time, окно ±5 мин) и X-Novex-Signature (HMAC-SHA256(secret, timestamp + raw_body) → hex). Дополнительно: X-Novex-Event-Id (UUID запроса, используйте для идемпотентности повторов) и X-Novex-Platform: novex-logistics. В ответе обязателен tracking_number; barcode (или carrier_invoice_id) — опционально, отдельный физический штрих-код для этикетки. Ответ должен прийти в течение timeout_seconds. При ошибке Novex повторит запрос retry_count раз с backoff.",
+    notes: "Обязательные заголовки: X-Novex-Timestamp (unix-time, окно ±5 мин) и X-Novex-Signature (HMAC-SHA256(secret, timestamp + raw_body) → hex). Дополнительно: X-Novex-Event-Id (UUID запроса, используйте для идемпотентности повторов) и X-Novex-Platform: novex-logistics. В ответе обязателен tracking_number; barcode (или carrier_invoice_id) - опционально, отдельный физический штрих-код для этикетки. Ответ должен прийти в течение timeout_seconds. При ошибке Novex повторит запрос retry_count раз с backoff.",
   },
 ];
 
@@ -174,7 +174,7 @@ def verify_novex_signature(body: bytes, timestamp: str, signature: str, secret: 
 # if not verify_novex_signature(request.body, ts, sig, SECRET):
 #     return {"error": "Invalid signature or expired timestamp"}, 401
 #
-# Идемпотентность: X-Novex-Event-Id — сохраните и игнорируйте повторы.`,
+# Идемпотентность: X-Novex-Event-Id - сохраните и игнорируйте повторы.`,
 };
 
 function EndpointCard({ ep }: { ep: Endpoint }) {

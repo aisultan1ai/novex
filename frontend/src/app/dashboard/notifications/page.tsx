@@ -149,7 +149,7 @@ export default function NotificationsPage() {
           {items.map((n, idx) => {
             const isLast = idx === items.length - 1;
             const icon = TYPE_ICONS[n.type] ?? "🔔";
-            // Row is clickable when it has a target OR is still unread —
+            // Row is clickable when it has a target OR is still unread -
             // either action counts as user intent. Fully read + no link is
             // rendered as static text.
             const clickable = Boolean(n.link_url) || !n.is_read;

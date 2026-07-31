@@ -8,55 +8,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { ApiError, listOrders } from "@/lib/api/orders";
+import { orderStatusColors, orderStatusLabel } from "@/lib/status-labels";
 import type { OrderDraftResponse } from "@/types/order";
-
-const STATUS_LABELS: Record<string, string> = {
-  draft:                      "Черновик",
-  shipment_details_completed: "Детали заполнены",
-  ready_for_checkout:         "Готов к оплате",
-  awaiting_payment:           "Ожидает оплаты",
-  payment_under_review:       "Чек на проверке",
-  payment_rejected:           "Чек отклонён",
-  paid:                       "Оплачен",
-  dispatch_queued:            "Ожидает отправки",
-  dispatch_failed:            "Уточняем детали",
-  pending_manual:             "Передаётся перевозчику",
-  pending_manual_dispatch:    "Передаётся перевозчику",
-  sent_to_carrier:            "Передан курьеру",
-  picked_up:                  "Забран",
-  in_transit:                 "В пути",
-  arrived:                    "Прибыл",
-  delivered:                  "Доставлен",
-  return_requested:           "Запрос возврата",
-  return_in_progress:         "Возврат в пути",
-  returned:                   "Возвращён",
-  cancelled:                  "Отменён",
-  return:                     "Возврат",
-};
-
-const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
-  draft:                      { bg: "#f1f5f9", color: "#475569" },
-  shipment_details_completed: { bg: "#dbeafe", color: "#1e40af" },
-  ready_for_checkout:         { bg: "#ede9fe", color: "#5b21b6" },
-  awaiting_payment:           { bg: "#fef3c7", color: "#92400e" },
-  payment_under_review:       { bg: "#dbeafe", color: "#1e40af" },
-  payment_rejected:           { bg: "#fee2e2", color: "#991b1b" },
-  paid:                       { bg: "#dcfce7", color: "#166534" },
-  dispatch_queued:            { bg: "#fef3c7", color: "#92400e" },
-  dispatch_failed:            { bg: "#fef3c7", color: "#92400e" },
-  pending_manual:             { bg: "#fef3c7", color: "#92400e" },
-  pending_manual_dispatch:    { bg: "#fef3c7", color: "#92400e" },
-  sent_to_carrier:            { bg: "#dbeafe", color: "#1e40af" },
-  picked_up:                  { bg: "#dbeafe", color: "#1e40af" },
-  in_transit:                 { bg: "#ede9fe", color: "#5b21b6" },
-  arrived:                    { bg: "#ede9fe", color: "#5b21b6" },
-  delivered:                  { bg: "#dcfce7", color: "#166534" },
-  return_requested:           { bg: "#fee2e2", color: "#991b1b" },
-  return_in_progress:         { bg: "#fee2e2", color: "#991b1b" },
-  returned:                   { bg: "#f1f5f9", color: "#475569" },
-  cancelled:                  { bg: "#fee2e2", color: "#991b1b" },
-  return:                     { bg: "#fee2e2", color: "#991b1b" },
-};
 
 const FILTER_GROUPS: Record<string, string[]> = {
   all: [],
@@ -64,10 +17,11 @@ const FILTER_GROUPS: Record<string, string[]> = {
     "draft", "shipment_details_completed", "ready_for_checkout",
     "awaiting_payment", "payment_under_review", "payment_rejected",
     "dispatch_queued", "dispatch_failed", "pending_manual", "pending_manual_dispatch",
-    "sent_to_carrier", "picked_up", "in_transit", "arrived",
+    "sent_to_carrier", "picked_up", "in_transit", "out_for_delivery",
+    "arrived", "delivery_failed", "customs_hold",
   ],
   completed: ["delivered", "paid"],
-  cancelled: ["cancelled", "return", "return_requested", "return_in_progress", "returned"],
+  cancelled: ["cancelled", "return_requested", "return_in_progress", "returned"],
 };
 
 const FILTER_LABELS: Record<string, string> = {
@@ -77,11 +31,26 @@ const FILTER_LABELS: Record<string, string> = {
   cancelled: "Отменённые",
 };
 
+function CancelPendingBadge() {
+  return (
+    <span
+      title="Заявка на отмену ожидает подтверждения перевозчика"
+      style={{
+        display: "inline-flex", alignItems: "center", padding: "2px 8px",
+        borderRadius: 999, background: "#fef3c7", color: "#92400e",
+        fontSize: 11, fontWeight: 700, letterSpacing: "0.02em",
+      }}
+    >
+      Запрошена отмена
+    </span>
+  );
+}
+
 function StatusBadge({ status }: { status: string }) {
-  const colors = STATUS_COLORS[status] ?? { bg: "#f1f5f9", color: "#475569" };
+  const colors = orderStatusColors(status);
   return (
     <span style={{ display: "inline-block", padding: "4px 12px", borderRadius: 999, fontSize: 12, fontWeight: 600, background: colors.bg, color: colors.color, whiteSpace: "nowrap" }}>
-      {STATUS_LABELS[status] ?? status}
+      {orderStatusLabel(status)}
     </span>
   );
 }
@@ -142,7 +111,10 @@ const MobileOrderCard = memo(function MobileOrderCard({ order, onOpen }: OrderRo
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-        <StatusBadge status={order.status} />
+        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+          <StatusBadge status={order.status} />
+          {order.cancellation_request?.status === "pending" && <CancelPendingBadge />}
+        </div>
         <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>
           {formatPrice(order.price_snapshot, order.currency_snapshot)}
         </div>
@@ -185,7 +157,10 @@ const DesktopOrderRow = memo(function DesktopOrderRow({ order, isLast, onOpen }:
         </div>
       </div>
 
-      <StatusBadge status={order.status} />
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-start" }}>
+        <StatusBadge status={order.status} />
+        {order.cancellation_request?.status === "pending" && <CancelPendingBadge />}
+      </div>
 
       <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>
         {formatPrice(order.price_snapshot, order.currency_snapshot)}
@@ -251,7 +226,7 @@ function MyOrdersPageInner() {
   );
 
   // Recompute only when the source array or the active filter actually
-  // change — previously this was O(N) on every render.
+  // change - previously this was O(N) on every render.
   const filteredOrders = useMemo(() => (
     activeFilter === "all"
       ? orders

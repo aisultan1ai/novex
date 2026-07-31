@@ -3,29 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { listCarrierOrders, type CarrierOrderItem } from "@/lib/api/carrier";
+import { ORDER_STATUS_LABELS, orderStatusColors, orderStatusLabel } from "@/lib/status-labels";
 import { useIsMobile } from "@/hooks/use-is-mobile";
-
-const STATUS_LABELS: Record<string, string> = {
-  sent_to_carrier: "Передан перевозчику",
-  pending_manual: "Ожидает обработки",
-  pending_manual_dispatch: "Ожидает отправки",
-  dispatch_failed: "Ошибка отправки",
-  picked_up: "Принят",
-  in_transit: "В пути",
-  arrived: "Прибыл",
-  delivered: "Доставлен",
-};
-
-const STATUS_STYLE: Record<string, React.CSSProperties> = {
-  sent_to_carrier: { background: "#dbeafe", color: "#1e40af" },
-  pending_manual: { background: "#fef9c3", color: "#854d0e" },
-  pending_manual_dispatch: { background: "#fef9c3", color: "#854d0e" },
-  dispatch_failed: { background: "#fee2e2", color: "#991b1b" },
-  picked_up: { background: "#dcfce7", color: "#166534" },
-  in_transit: { background: "#dbeafe", color: "#1e40af" },
-  arrived: { background: "#ede9fe", color: "#5b21b6" },
-  delivered: { background: "#dcfce7", color: "#166534" },
-};
 
 const badge: React.CSSProperties = {
   padding: "2px 10px",
@@ -38,9 +17,10 @@ const badge: React.CSSProperties = {
 const PAGE_SIZE = 20;
 
 function StatusBadge({ status }: { status: string }) {
+  const c = orderStatusColors(status);
   return (
-    <span style={{ ...badge, ...(STATUS_STYLE[status] ?? { background: "#f1f5f9" }) }}>
-      {STATUS_LABELS[status] ?? status}
+    <span style={{ ...badge, background: c.bg, color: c.color }}>
+      {orderStatusLabel(status)}
     </span>
   );
 }
@@ -111,7 +91,7 @@ export default function CarrierOrdersPage() {
   useEffect(() => { load(); }, [load]);
 
   // Correct "next" gate: derived from `total`, not from the local page size.
-  // Previously we blocked next when `orders.length < 20` — which mis-fired on
+  // Previously we blocked next when `orders.length < 20` - which mis-fired on
   // exactly-20-item last pages and left users clicking through to an empty page.
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const hasPrev = page > 1;
@@ -128,7 +108,7 @@ export default function CarrierOrdersPage() {
           style={styles.select}
         >
           <option value="">Все статусы</option>
-          {Object.entries(STATUS_LABELS).map(([v, l]) => (
+          {Object.entries(ORDER_STATUS_LABELS).map(([v, l]) => (
             <option key={v} value={v}>{l}</option>
           ))}
         </select>
@@ -143,7 +123,7 @@ export default function CarrierOrdersPage() {
           Заказы не найдены
         </div>
       ) : isMobile ? (
-        /* Mobile: card list — the desktop table would horizontally overflow */
+        /* Mobile: card list - the desktop table would horizontally overflow */
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {orders.map((o) => <OrderMobileCard key={o.id} order={o} />)}
         </div>

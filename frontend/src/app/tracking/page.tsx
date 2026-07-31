@@ -49,7 +49,7 @@ const RECENT_KEY = "novex_recent_tracking";
 const MAX_RECENT = 3;
 
 // Carriers whose native status text is more informative than our normalized
-// labels (e.g. Azimuth returns "Распределено на маршрут" — nuance we would
+// labels (e.g. Azimuth returns "Распределено на маршрут" - nuance we would
 // otherwise flatten into `in_transit`). For these, the timeline prefers the
 // raw carrier description, falling back to STATUS_LABELS only when empty.
 const RAW_DESCRIPTION_CARRIERS = new Set(["azimuth"]);

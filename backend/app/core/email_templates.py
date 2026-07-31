@@ -153,6 +153,50 @@ def _tpl_arrived(order_id: int, user_name: str | None) -> tuple[str, str]:
     return subject, html
 
 
+def _tpl_out_for_delivery(order_id: int, user_name: str | None) -> tuple[str, str]:
+    subject = f"Курьер выехал к вам — #{order_id}"
+    html = _wrap(f"""
+      <h2 style="{_HEADER_STYLE}">{_greeting(user_name)}</h2>
+      <span style="{_BADGE_BLUE}">Выезд на доставку</span>
+      <p style="{_BODY_STYLE}">
+        Курьер выехал к получателю по заказу <b>#{order_id}</b>. Убедитесь, что
+        получатель на связи по указанному номеру телефона.
+      </p>
+      {_cta(order_id, 'Открыть заказ')}
+    """)
+    return subject, html
+
+
+def _tpl_delivery_failed(order_id: int, user_name: str | None) -> tuple[str, str]:
+    subject = f"Попытка доставки не удалась — #{order_id}"
+    html = _wrap(f"""
+      <h2 style="{_HEADER_STYLE}">{_greeting(user_name)}</h2>
+      <span style="{_BADGE_RED}">Попытка доставки не удалась</span>
+      <p style="{_BODY_STYLE}">
+        Курьер не смог доставить заказ <b>#{order_id}</b>. Обычно перевозчик
+        связывается с получателем и назначает новую попытку — проверьте
+        историю статусов в кабинете.
+      </p>
+      {_cta(order_id, 'Открыть заказ')}
+    """)
+    return subject, html
+
+
+def _tpl_customs_hold(order_id: int, user_name: str | None) -> tuple[str, str]:
+    subject = f"Заказ задержан на таможне — #{order_id}"
+    html = _wrap(f"""
+      <h2 style="{_HEADER_STYLE}">{_greeting(user_name)}</h2>
+      <span style="{_BADGE_GRAY}">Задержан на таможне</span>
+      <p style="{_BODY_STYLE}">
+        Ваш заказ <b>#{order_id}</b> проходит таможенное оформление. Обычно
+        это занимает несколько дней. Если понадобятся дополнительные
+        документы — перевозчик или мы свяжемся с вами.
+      </p>
+      {_cta(order_id, 'Открыть заказ')}
+    """)
+    return subject, html
+
+
 def _tpl_delivered(order_id: int, user_name: str | None) -> tuple[str, str]:
     subject = f"Заказ доставлен - #{order_id}"
     html = _wrap(f"""
@@ -193,6 +237,124 @@ def _tpl_returned(order_id: int, user_name: str | None) -> tuple[str, str]:
     return subject, html
 
 
+# ── Cancellation-request templates ─────────────────────────────────────────
+
+
+def _tpl_cancellation_to_carrier(
+    order_id: int,
+    request_id: int,
+    reason: str,
+    tracking_number: str | None,
+    carrier_tracking_number: str | None,
+    customer_email: str | None,
+    customer_phone: str | None,
+) -> tuple[str, str]:
+    """Ops-письмо перевозчику: клиент просит отменить заказ.
+
+    Все user-supplied поля экранируем — reason приходит от клиента,
+    контакты — из его профиля. Ссылка ведёт в карrier-кабинет.
+    """
+    subject = f"Novex: запрос на отмену заказа #{order_id}"
+    portal_url = f"{get_settings().frontend_url}/dashboard/carrier/cancellation-requests/{request_id}"
+    safe_reason = _html.escape(reason)
+    safe_tn = _html.escape(tracking_number or "—")
+    safe_ctn = _html.escape(carrier_tracking_number or "—")
+    safe_email = _html.escape(customer_email or "—")
+    safe_phone = _html.escape(customer_phone or "—")
+    html = _wrap(f"""
+      <h2 style="{_HEADER_STYLE}">Запрос на отмену от клиента</h2>
+      <span style="{_BADGE_RED}">Требуется действие</span>
+      <p style="{_BODY_STYLE}">
+        Клиент запросил отмену заказа <b>#{order_id}</b>. Проверьте статус
+        заказа у себя и подтвердите либо отклоните заявку в кабинете Novex.
+      </p>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:14px;color:#334155;">
+        <tr><td style="padding:6px 0;color:#64748b;">Трек Novex</td><td style="padding:6px 0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">{safe_tn}</td></tr>
+        <tr><td style="padding:6px 0;color:#64748b;">Ваш номер</td><td style="padding:6px 0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">{safe_ctn}</td></tr>
+        <tr><td style="padding:6px 0;color:#64748b;">Email клиента</td><td style="padding:6px 0;">{safe_email}</td></tr>
+        <tr><td style="padding:6px 0;color:#64748b;">Телефон клиента</td><td style="padding:6px 0;">{safe_phone}</td></tr>
+      </table>
+      <p style="background:#fff1f2;border-left:3px solid #f43f5e;padding:12px 16px;border-radius:0 8px 8px 0;color:#9f1239;font-size:14px;margin-bottom:20px;">
+        <b>Причина клиента:</b> {safe_reason}
+      </p>
+      <a href="{portal_url}" style="{_BTN_STYLE}">Открыть заявку в кабинете</a>
+    """)
+    return subject, html
+
+
+def _tpl_cancellation_approved_to_customer(
+    order_id: int, user_name: str | None
+) -> tuple[str, str]:
+    """Клиенту: перевозчик подтвердил отмену — заказ теперь cancelled."""
+    subject = f"Отмена подтверждена — Заказ #{order_id}"
+    html = _wrap(f"""
+      <h2 style="{_HEADER_STYLE}">{_greeting(user_name)}</h2>
+      <span style="{_BADGE_GREEN}">Заказ отменён</span>
+      <p style="{_BODY_STYLE}">
+        Перевозчик подтвердил отмену вашего заказа <b>#{order_id}</b>.
+        Мы уже начали процедуру возврата средств — подробности появятся в
+        карточке заказа.
+      </p>
+      {_cta(order_id, 'Открыть заказ')}
+    """)
+    return subject, html
+
+
+def _tpl_cancellation_rejected_to_customer(
+    order_id: int,
+    user_name: str | None,
+    carrier_response: str | None,
+) -> tuple[str, str]:
+    """Клиенту: перевозчик/админ отклонил заявку, заказ жив."""
+    subject = f"Заявка на отмену отклонена — Заказ #{order_id}"
+    safe_response = _html.escape(carrier_response) if carrier_response else ""
+    response_block = (
+        f'<p style="background:#fff1f2;border-left:3px solid #f43f5e;padding:12px 16px;border-radius:0 8px 8px 0;color:#9f1239;font-size:14px;margin-bottom:20px;"><b>Комментарий перевозчика:</b> {safe_response}</p>'
+        if carrier_response else ""
+    )
+    html = _wrap(f"""
+      <h2 style="{_HEADER_STYLE}">{_greeting(user_name)}</h2>
+      <span style="{_BADGE_RED}">Заявка отклонена</span>
+      <p style="{_BODY_STYLE}">
+        К сожалению, заявку на отмену заказа <b>#{order_id}</b> отклонили.
+        Заказ продолжает движение по обычному маршруту.
+      </p>
+      {response_block}
+      <p style="{_BODY_STYLE}">Если у вас остались вопросы — ответьте на это письмо, мы поможем.</p>
+      {_cta(order_id, 'Открыть заказ')}
+    """)
+    return subject, html
+
+
+def cancellation_email(
+    event_type: str,
+    order_id: int,
+    payload: dict,
+    user_name: str | None = None,
+) -> tuple[str, str] | None:
+    """Отдельный dispatcher — cancellation-события не привязаны к статусу
+    заказа, у них своя семантика и свои плейсхолдеры."""
+    match event_type:
+        case "cancellation_requested_to_carrier":
+            return _tpl_cancellation_to_carrier(
+                order_id=order_id,
+                request_id=int(payload.get("request_id") or 0),
+                reason=str(payload.get("reason") or ""),
+                tracking_number=payload.get("tracking_number"),
+                carrier_tracking_number=payload.get("carrier_tracking_number"),
+                customer_email=payload.get("customer_email"),
+                customer_phone=payload.get("customer_phone"),
+            )
+        case "cancellation_approved_to_customer":
+            return _tpl_cancellation_approved_to_customer(order_id, user_name)
+        case "cancellation_rejected_to_customer":
+            return _tpl_cancellation_rejected_to_customer(
+                order_id, user_name, payload.get("carrier_response"),
+            )
+        case _:
+            return None
+
+
 # ── public API ─────────────────────────────────────────────────────────────
 
 def order_status_email(
@@ -214,8 +376,14 @@ def order_status_email(
             return _tpl_dispatched(order_id, user_name, tracking_number)
         case "in_transit":
             return _tpl_in_transit(order_id, user_name)
+        case "out_for_delivery":
+            return _tpl_out_for_delivery(order_id, user_name)
         case "arrived":
             return _tpl_arrived(order_id, user_name)
+        case "delivery_failed":
+            return _tpl_delivery_failed(order_id, user_name)
+        case "customs_hold":
+            return _tpl_customs_hold(order_id, user_name)
         case "delivered":
             return _tpl_delivered(order_id, user_name)
         case "cancelled":

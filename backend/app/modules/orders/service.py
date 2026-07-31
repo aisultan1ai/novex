@@ -6,9 +6,8 @@ from sqlalchemy.orm import Session
 
 from app.common.pagination import PageParams
 from app.common.time_utils import utcnow as _utcnow
-from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
+from app.core.exceptions import ForbiddenError, NotFoundError, ValidationError
 from app.modules.address_book.repository import AddressBookRepository
-from app.modules.commissions.service import CommissionsService
 from app.modules.orders.models import OrderDraft, ShipmentPackage, ShipmentParty
 from app.modules.orders.repository import OrdersRepository
 from app.modules.orders.schemas import (
@@ -254,9 +253,19 @@ class OrdersService:
             raise ForbiddenError("Order draft does not belong to the current user")
 
         from sqlalchemy import select as _select
+
+        from app.modules.cancellations.repository import (
+            CancellationRequestsRepository,
+        )
+
         shipment = db.scalar(_select(Shipment).where(Shipment.order_draft_id == draft_id))
+        # На detail-view отдаём последнюю заявку любого статуса — pending для
+        # блока «ожидание», rejected — чтобы клиент увидел причину отказа.
+        cr = CancellationRequestsRepository().get_latest_for_order(db, draft_id)
         return self._build_order_draft_response(
-            order_draft, tracking_number=shipment.tracking_number if shipment else None
+            order_draft,
+            tracking_number=shipment.tracking_number if shipment else None,
+            cancellation_request=cr,
         )
 
     def list_order_drafts(
@@ -282,15 +291,41 @@ class OrdersService:
             total,
         )
         from sqlalchemy import select as _select
+
+        from app.modules.cancellations.models import CancellationRequest
+        from app.modules.cancellations.repository import (
+            CancellationRequestsRepository,
+        )
+
         draft_ids = [d.id for d in items]
         shipments = (
             db.scalars(_select(Shipment).where(Shipment.order_draft_id.in_(draft_ids))).all()
             if draft_ids else []
         )
         tracking_map = {s.order_draft_id: s.tracking_number for s in shipments}
+
+        # В листе показываем только pending — этого достаточно для бейджа
+        # «Запрошена отмена». Полную историю берём только на detail-view.
+        pending_ids = CancellationRequestsRepository().order_ids_with_pending(
+            db, draft_ids
+        )
+        pending_rows = (
+            db.scalars(
+                _select(CancellationRequest).where(
+                    CancellationRequest.order_draft_id.in_(pending_ids),
+                    CancellationRequest.status == "pending",
+                )
+            ).all()
+            if pending_ids else []
+        )
+        pending_map = {r.order_draft_id: r for r in pending_rows}
         return OrderDraftListResponse(
             items=[
-                self._build_order_draft_response(d, tracking_number=tracking_map.get(d.id))
+                self._build_order_draft_response(
+                    d,
+                    tracking_number=tracking_map.get(d.id),
+                    cancellation_request=pending_map.get(d.id),
+                )
                 for d in items
             ],
             total=total,
@@ -441,235 +476,67 @@ class OrdersService:
         user_id: int,
         order_id: int,
         reason: str,
-    ) -> OrderDraftResponse:
-        """Cancel a paid order at the customer's request.
+    ):
+        """Клиентская отмена заказа — тонкая обёртка над
+        CancellationRequestsService.request_cancellation.
 
-        Cancellable statuses:
-          paid, dispatch_queued, dispatch_failed, pending_manual,
-          pending_manual_dispatch, sent_to_carrier.
+        Возможные исходы (см. CancelOrderResponse.outcome):
+          • "cancelled" — заказ прямо сейчас в статусе cancelled. Так бывает,
+            когда у перевозчика есть API отмены (CSE/Exline) и запрос прошёл.
+          • "requested" — создали заявку, ждём подтверждения перевозчика или
+            админа. Актуально для Azimuth (у него нет API) и для CSE/Exline,
+            когда API отказал (например, «ожидает синхронизации» у Exline).
 
-        For sent_to_carrier we call the carrier API via carrier-gateway. If the
-        carrier refuses (already in transit / not supported) we surface 409 and
-        instruct the customer to contact support.
+        Все дальнейшие шаги (сторно комиссии, refund_pending, уведомления)
+        живут внутри CancellationRequestsService.
         """
+        from app.modules.cancellations.service import CancellationRequestsService
+        from app.modules.orders.schemas import (
+            CancellationRequestSnippet,
+            CancelOrderResponse,
+        )
+
+        outcome = CancellationRequestsService().request_cancellation(
+            db, user_id=user_id, order_id=order_id, reason=reason,
+        )
+
+        # Заново читаем заказ и последнюю заявку — статус мог измениться
+        # (cancelled) либо появился pending, который нужно отдать клиенту в
+        # карточке заказа.
         from sqlalchemy import select as _select
 
-        from app.common.status_machine import can_transition
-        from app.core.carrier_gateway_client import get_gateway_client
-        from app.modules.carriers.api_credentials import CarrierAPICredentialsRepository
-        from app.modules.dispatch.models import (
-            DispatchJob,
-            DispatchJobStatus,
-            OrderStatusHistory,
+        from app.modules.cancellations.repository import (
+            CancellationRequestsRepository,
         )
-        from app.modules.identity.models import Role, RoleCode, User
-        from app.modules.notifications.repository import NotificationsRepository
-        from app.modules.notifications.service import NotificationsService
-        from app.modules.payments.transaction_models import (
-            PaymentStatusHistory,
-            PaymentTransaction,
-            TxStatus,
-        )
-        from app.modules.tracking.models import TrackingEvent
-
-        _CANCELLABLE = {
-            "paid",
-            "dispatch_queued",
-            "dispatch_failed",
-            "pending_manual",
-            "pending_manual_dispatch",
-            "sent_to_carrier",
-        }
-
-        reason = (reason or "").strip()
-        if len(reason) < 3:
-            raise ValidationError("Причина отмены должна содержать минимум 3 символа")
-        if len(reason) > 500:
-            raise ValidationError("Причина отмены не должна превышать 500 символов")
-
-        order = self.repository.get_order_draft_by_id(db, order_id)
-        if order is None:
-            raise NotFoundError("Заказ не найден")
-        if order.user_id != user_id:
-            raise ForbiddenError("Заказ не принадлежит текущему пользователю")
-
-        if order.status not in _CANCELLABLE:
-            raise ValidationError(
-                f"Отмена невозможна для статуса «{order.status}». "
-                "Если посылка уже в пути, обратитесь в поддержку."
-            )
-        if not can_transition(order.status, "cancelled"):
-            raise ValidationError(
-                f"Переход из статуса «{order.status}» в «cancelled» не разрешён"
-            )
-
-        old_status = order.status
-
-        # 1) sent_to_carrier — need to cancel on the carrier's side first.
-        if old_status == "sent_to_carrier":
-            from app.modules.shipments.models import Shipment as _Shipment
-            shipment = db.scalar(
-                _select(_Shipment).where(_Shipment.order_draft_id == order.id)
-            )
-            invoice_id = None
-            if shipment:
-                invoice_id = (
-                    shipment.carrier_tracking_number or shipment.tracking_number
-                )
-            if not invoice_id:
-                raise ValidationError(
-                    "Не удалось определить номер накладной перевозчика. "
-                    "Обратитесь в поддержку."
-                )
-
-            creds = CarrierAPICredentialsRepository().get_by_carrier_code(
-                db, order.carrier_code_snapshot
-            )
-            if not creds or not creds.is_active:
-                raise ValidationError(
-                    "Отмена через API перевозчика недоступна. Обратитесь в поддержку."
-                )
-            api_creds = {
-                "api_url": creds.api_url,
-                "api_token": creds.api_token,
-                **(creds.extra_config or {}),
-            }
-            try:
-                ok = get_gateway_client().cancel_invoice(
-                    order.carrier_code_snapshot, invoice_id, api_creds
-                )
-            except Exception as exc:
-                logger.warning(
-                    "cancel_order: carrier API refused: order_id=%s carrier=%s error=%s",
-                    order.id, order.carrier_code_snapshot, exc,
-                )
-                raise ConflictError(
-                    "Перевозчик отклонил отмену. Возможно, заказ уже в пути. "
-                    "Обратитесь в поддержку."
-                ) from exc
-            if not ok:
-                raise ConflictError(
-                    "Перевозчик отклонил отмену. Обратитесь в поддержку."
-                )
-
-        # 2) Cancel queued dispatch job so the worker does not fire after cancel.
-        if old_status in ("dispatch_queued", "dispatch_failed", "pending_manual", "pending_manual_dispatch"):
-            active_jobs = db.scalars(
-                _select(DispatchJob).where(
-                    DispatchJob.order_id == order.id,
-                    DispatchJob.status.in_(
-                        [DispatchJobStatus.QUEUED, DispatchJobStatus.FAILED]
-                    ),
-                )
-            ).all()
-            for job in active_jobs:
-                job.status = DispatchJobStatus.CANCELLED
-
-        # 3) Flip the order to cancelled.
-        self.repository.update_order_draft_status(
-            db, order_draft=order, status="cancelled"
-        )
-        db.add(OrderStatusHistory(
-            order_id=order.id,
-            old_status=old_status,
-            new_status="cancelled",
-            changed_by_user_id=user_id,
-            source="customer_cancel",
-            comment=reason,
-        ))
-        db.add(TrackingEvent(
-            order_draft_id=order.id,
-            status="cancelled",
-            description=f"Заказ отменён клиентом: {reason}",
-        ))
-
-        # 3a) Reverse the recorded commission immediately. The refund itself
-        # is still admin-driven (money moves in step 4), but the ledger must
-        # reflect the cancellation the moment it happens — otherwise admin
-        # totals and payout summaries lie until the refund is processed.
-        # Idempotent: if the order was never paid there is no active row.
-        CommissionsService().reverse_for_order(
-            db, order.id, reason=f"customer cancel: {reason}"
-        )
-
-        # 4) Mark the paid payment(s) as refund_pending so admin can initiate refund.
-        paid_txs = db.scalars(
-            _select(PaymentTransaction).where(
-                PaymentTransaction.order_id == order.id,
-                PaymentTransaction.status == TxStatus.PAID,
-            )
-        ).all()
-        for tx in paid_txs:
-            db.add(PaymentStatusHistory(
-                payment_id=tx.id,
-                old_status=tx.status.value if hasattr(tx.status, "value") else str(tx.status),
-                new_status=TxStatus.REFUND_PENDING.value,
-                changed_by_user_id=user_id,
-                comment=f"Клиент отменил заказ: {reason}",
-            ))
-            tx.status = TxStatus.REFUND_PENDING
-
-        # 5) Notify admins so they can process the refund. Batch INSERT — one
-        # query for the whole fan-out instead of N (one per admin).
-        from sqlalchemy import insert as _sa_insert
-        from app.modules.notifications.models import Notification as _Notification
-        admin_ids = db.scalars(
-            _select(User.id).join(User.role).where(
-                Role.code == RoleCode.ADMIN, User.is_active.is_(True)
-            )
-        ).all()
-        admin_notif_body = (
-            f"Причина: {reason}. "
-            + ("Требуется оформить возврат средств." if paid_txs
-               else "Возврат средств не требуется.")
-        )
-        if admin_ids:
-            db.execute(
-                _sa_insert(_Notification),
-                [
-                    {
-                        "user_id": aid,
-                        "type": "order_cancelled_by_customer",
-                        "title": f"Клиент отменил заказ #{order.id}",
-                        "body": admin_notif_body,
-                        "is_read": False,
-                    }
-                    for aid in admin_ids
-                ],
-            )
-
-        # 6) Commit the whole order-level change atomically. Do this BEFORE
-        # user-facing notifications so a failed commit does not leave the
-        # customer with an inbox notification about an order that was never
-        # actually cancelled.
-        db.commit()
-
-        # 7) Notify the customer post-commit. NotificationsService opens its
-        # own repo write + email send; wrap in try/except so an email backend
-        # blip does not surface as a 500 to a user whose order is already
-        # cancelled successfully.
-        try:
-            NotificationsService().notify_order_status(
-                db, user_id=order.user_id, order_id=order.id, status="cancelled"
-            )
-            db.commit()
-        except Exception as exc:
-            logger.exception(
-                "cancel_order: post-commit notification failed for order=%s: %s",
-                order.id, exc,
-            )
-            db.rollback()
 
         refreshed = self.repository.get_order_draft_by_id(db, order_id)
         if refreshed is None:
             raise NotFoundError("Failed to reload order")
+        shipment = db.scalar(
+            _select(Shipment).where(Shipment.order_draft_id == order_id)
+        )
+        latest_req = CancellationRequestsRepository().get_latest_for_order(db, order_id)
+        order_response = self._build_order_draft_response(
+            refreshed,
+            tracking_number=shipment.tracking_number if shipment else None,
+            cancellation_request=latest_req,
+        )
+
+        snippet = None
+        if outcome.request is not None:
+            snippet = CancellationRequestSnippet.model_validate(
+                outcome.request.model_dump()
+            )
 
         logger.info(
-            "Order cancelled by customer: order_id=%s user_id=%s from_status=%s "
-            "refund_pending=%d admins_notified=%d",
-            order.id, user_id, old_status, len(paid_txs), len(admin_ids),
+            "cancel_order → %s: order_id=%s user_id=%s status=%s",
+            outcome.kind, order_id, user_id, refreshed.status,
         )
-        return self._build_order_draft_response(refreshed)
+        return CancelOrderResponse(
+            outcome=outcome.kind,
+            order=order_response,
+            request=snippet,
+        )
 
     def update_shipment_details(
         self,
@@ -1170,10 +1037,19 @@ class OrdersService:
         )
 
     def _build_order_draft_response(
-        self, order_draft: OrderDraft, tracking_number: str | None = None
+        self,
+        order_draft: OrderDraft,
+        tracking_number: str | None = None,
+        cancellation_request=None,
     ) -> OrderDraftResponse:
+        from app.modules.orders.schemas import CancellationRequestSnippet
+
         sender = self._find_party(order_draft.parties, "sender")
         recipient = self._find_party(order_draft.parties, "recipient")
+
+        snippet = None
+        if cancellation_request is not None:
+            snippet = CancellationRequestSnippet.model_validate(cancellation_request)
 
         return OrderDraftResponse(
             draft_id=order_draft.id,
@@ -1211,6 +1087,7 @@ class OrdersService:
             recipient=self._map_party(recipient) if recipient else None,
             packages=[self._map_package(item) for item in order_draft.packages],
             tracking_number=tracking_number,
+            cancellation_request=snippet,
         )
 
     def _find_party(

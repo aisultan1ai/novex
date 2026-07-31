@@ -14,64 +14,8 @@ import {
   downloadOrderLabel,
   getOrderDraft,
 } from "@/lib/api/orders";
+import { orderStatusColors, orderStatusLabel } from "@/lib/status-labels";
 import type { OrderDraftResponse } from "@/types/order";
-
-const STATUS_LABELS: Record<string, string> = {
-  draft:                      "Черновик",
-  shipment_details_completed: "Детали заполнены",
-  ready_for_checkout:         "Готов к оплате",
-  awaiting_payment:           "Ожидает оплаты",
-  payment_under_review:       "Чек на проверке",
-  payment_rejected:           "Чек отклонён",
-  paid:                       "Оплачен",
-  dispatch_queued:            "Ожидает отправки",
-  dispatch_failed:            "Уточняем детали",
-  // Оба «pending_manual*» для клиента означают одно и то же: заказ у нас,
-  // ждём подтверждения от перевозчика. Внутренняя разница (auto-dispatch vs
-  // manual push) видна только админам и перевозчику в их порталах.
-  pending_manual:             "Передаётся перевозчику",
-  pending_manual_dispatch:    "Передаётся перевозчику",
-  sent_to_carrier:            "Передан курьеру",
-  picked_up:                  "Забран",
-  out_for_delivery:           "Выезд на доставку",
-  in_transit:                 "В пути",
-  arrived:                    "Прибыл",
-  delivery_failed:            "Попытка не удалась",
-  customs_hold:               "Таможня",
-  delivered:                  "Доставлен",
-  return_requested:           "Запрос возврата",
-  return_in_progress:         "Возврат в пути",
-  returned:                   "Возвращён",
-  cancelled:                  "Отменён",
-  return:                     "Возврат",
-};
-
-const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
-  draft:                      { bg: "#f1f5f9", color: "#475569" },
-  shipment_details_completed: { bg: "#dbeafe", color: "#1e40af" },
-  ready_for_checkout:         { bg: "#ede9fe", color: "#5b21b6" },
-  awaiting_payment:           { bg: "#fef3c7", color: "#92400e" },
-  payment_under_review:       { bg: "#dbeafe", color: "#1e40af" },
-  payment_rejected:           { bg: "#fee2e2", color: "#991b1b" },
-  paid:                       { bg: "#dcfce7", color: "#166534" },
-  dispatch_queued:            { bg: "#fef3c7", color: "#92400e" },
-  dispatch_failed:            { bg: "#fef3c7", color: "#92400e" },
-  pending_manual:             { bg: "#fef3c7", color: "#92400e" },
-  pending_manual_dispatch:    { bg: "#fef3c7", color: "#92400e" },
-  sent_to_carrier:            { bg: "#dbeafe", color: "#1e40af" },
-  picked_up:                  { bg: "#dbeafe", color: "#1e40af" },
-  out_for_delivery:           { bg: "#dbeafe", color: "#1e40af" },
-  in_transit:                 { bg: "#ede9fe", color: "#5b21b6" },
-  arrived:                    { bg: "#ede9fe", color: "#5b21b6" },
-  delivery_failed:            { bg: "#fef3c7", color: "#92400e" },
-  customs_hold:               { bg: "#fef3c7", color: "#92400e" },
-  delivered:                  { bg: "#dcfce7", color: "#166534" },
-  return_requested:           { bg: "#fee2e2", color: "#991b1b" },
-  return_in_progress:         { bg: "#fee2e2", color: "#991b1b" },
-  returned:                   { bg: "#f1f5f9", color: "#475569" },
-  cancelled:                  { bg: "#fee2e2", color: "#991b1b" },
-  return:                     { bg: "#fee2e2", color: "#991b1b" },
-};
 
 const CHECKOUT_STATUSES = new Set(["shipment_details_completed", "ready_for_checkout"]);
 const PAYMENT_PENDING_STATUSES = new Set(["awaiting_payment", "payment_rejected"]);
@@ -80,7 +24,8 @@ const TRACKABLE_STATUSES = new Set(["paid", "sent_to_carrier", "picked_up", "out
 // even before tracking events exist (covers manual/queued dispatch states).
 const LABEL_STATUSES = new Set([
   "paid", "dispatch_queued", "dispatch_failed", "pending_manual", "pending_manual_dispatch",
-  "sent_to_carrier", "picked_up", "in_transit", "arrived", "delivered",
+  "sent_to_carrier", "picked_up", "in_transit", "out_for_delivery",
+  "arrived", "delivery_failed", "customs_hold", "delivered",
 ]);
 
 function parseUTC(iso: string): Date {
@@ -96,10 +41,10 @@ function formatPrice(price: number, currency: string): string {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const colors = STATUS_COLORS[status] ?? { bg: "#f1f5f9", color: "#475569" };
+  const colors = orderStatusColors(status);
   return (
     <span style={{ display: "inline-block", padding: "5px 14px", borderRadius: 999, fontSize: 13, fontWeight: 600, background: colors.bg, color: colors.color }}>
-      {STATUS_LABELS[status] ?? status}
+      {orderStatusLabel(status)}
     </span>
   );
 }
@@ -132,6 +77,9 @@ export default function OrderDetailPage() {
   const [cancelReason, setCancelReason] = useState("");
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  // Non-blocking success/info banner - используем для сообщения о создании
+  // заявки на отмену (не error, но заказ ещё не cancelled).
+  const [info, setInfo] = useState<string | null>(null);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -200,10 +148,20 @@ export default function OrderDetailPage() {
     setIsCancelling(true);
     setCancelError(null);
     try {
-      const updated = await cancelOrder(draftId, trimmed);
-      setOrder(updated);
+      // Backend возвращает два исхода:
+      //   • "cancelled" - заказ уже cancelled (CSE/Exline подтвердил через API)
+      //   • "requested" - создали заявку, ждём подтверждения перевозчика
+      // В обоих случаях в `order` возвращается свежее состояние заказа
+      // (включая последнюю заявку), просто применяем его к state.
+      const resp = await cancelOrder(draftId, trimmed);
+      setOrder(resp.order);
       setShowCancelModal(false);
       setCancelReason("");
+      if (resp.outcome === "requested") {
+        setInfo(
+          "Заявка на отмену отправлена перевозчику. Мы уведомим вас, как только будет решение."
+        );
+      }
     } catch (err) {
       setCancelError(err instanceof ApiError ? err.detail : "Не удалось отменить заказ.");
     } finally {
@@ -233,6 +191,17 @@ export default function OrderDetailPage() {
       {error && (
         <div style={{ marginBottom: 20, background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: "14px 20px", color: "#b91c1c", fontSize: 14 }}>
           {error}
+        </div>
+      )}
+
+      {info && (
+        <div style={{ marginBottom: 20, background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 12, padding: "14px 20px", color: "#1e40af", fontSize: 14, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+          <span style={{ flex: 1 }}>{info}</span>
+          <button
+            onClick={() => setInfo(null)}
+            style={{ background: "transparent", border: "none", cursor: "pointer", color: "#1e40af", fontSize: 18, lineHeight: 1, padding: 0, fontFamily: "inherit" }}
+            aria-label="Скрыть"
+          >×</button>
         </div>
       )}
 
@@ -294,13 +263,56 @@ export default function OrderDetailPage() {
               {CANCELLABLE_STATUSES.includes(order.status) && (
                 <button
                   onClick={() => { setCancelError(null); setShowCancelModal(true); }}
-                  style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid #fecaca", background: "#fff", color: "#ef4444", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                  // Блокируем повторное нажатие, если заявка уже ожидает решения -
+                  // сервер вернёт 409, но лучше не давать пользователю кликать.
+                  disabled={order.cancellation_request?.status === "pending"}
+                  title={order.cancellation_request?.status === "pending"
+                    ? "Заявка на отмену уже отправлена, ожидает подтверждения"
+                    : undefined}
+                  style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid #fecaca", background: "#fff", color: "#ef4444", fontSize: 14, fontWeight: 600, cursor: order.cancellation_request?.status === "pending" ? "not-allowed" : "pointer", opacity: order.cancellation_request?.status === "pending" ? 0.5 : 1, fontFamily: "inherit" }}
                 >
                   Отменить заявку
                 </button>
               )}
             </div>
           </div>
+
+          {/* Cancellation request block - виден и в pending, и в rejected.
+              approved/api_cancelled почти всегда означают order.status === 'cancelled',
+              поэтому там UI пользователя уже покажет обычную «Отменён» вывеску. */}
+          {order.cancellation_request && (
+            <div style={{
+              ...card,
+              borderColor: order.cancellation_request.status === "pending"
+                ? "#fde68a"
+                : order.cancellation_request.status === "rejected"
+                  ? "#fecaca"
+                  : "#e5e7eb",
+              background: order.cancellation_request.status === "pending"
+                ? "#fffbeb"
+                : order.cancellation_request.status === "rejected"
+                  ? "#fef2f2"
+                  : "#fff",
+            }}>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8, color: order.cancellation_request.status === "pending" ? "#92400e" : order.cancellation_request.status === "rejected" ? "#991b1b" : "#64748b" }}>
+                {order.cancellation_request.status === "pending" && "Заявка на отмену - ожидает подтверждения"}
+                {order.cancellation_request.status === "rejected" && "Заявка на отмену - отклонена"}
+                {(order.cancellation_request.status === "approved" || order.cancellation_request.status === "api_cancelled") && "Заявка на отмену - подтверждена"}
+              </div>
+              <div style={{ fontSize: 13, color: "#334155", marginBottom: order.cancellation_request.carrier_response ? 10 : 0 }}>
+                <b>Причина:</b> {order.cancellation_request.reason}
+              </div>
+              {order.cancellation_request.carrier_response && (
+                <div style={{ fontSize: 13, color: "#334155", borderTop: "1px solid #f3f4f6", paddingTop: 10 }}>
+                  <b>Ответ перевозчика:</b> {order.cancellation_request.carrier_response}
+                </div>
+              )}
+              <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 8 }}>
+                Отправлена {formatDate(order.cancellation_request.created_at)}
+                {order.cancellation_request.resolved_at && ` · Решение ${formatDate(order.cancellation_request.resolved_at)}`}
+              </div>
+            </div>
+          )}
 
           {/* Tracking number */}
           {order.tracking_number && (

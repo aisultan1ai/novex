@@ -94,16 +94,16 @@ export default function IntegrationPage() {
               <code style={{ fontFamily: "monospace", fontSize: 13, background: "#f1f5f9", padding: "2px 6px", borderRadius: 4 }}>HMAC-SHA256(secret, timestamp + raw_body)</code> → hex → заголовок <code style={{ fontFamily: "monospace", fontSize: 13, background: "#f1f5f9", padding: "2px 6px", borderRadius: 4 }}>{outbound.hmac_header}</code>
               <br />
               <span style={{ fontSize: 12, color: "#64748b" }}>
-                Строка для подписи — конкатенация значения заголовка <code style={{ fontFamily: "monospace", fontSize: 12, background: "#f1f5f9", padding: "1px 5px", borderRadius: 4 }}>X-Novex-Timestamp</code> и байтов тела без разделителя.
+                Строка для подписи - конкатенация значения заголовка <code style={{ fontFamily: "monospace", fontSize: 12, background: "#f1f5f9", padding: "1px 5px", borderRadius: 4 }}>X-Novex-Timestamp</code> и байтов тела без разделителя.
               </span>
             </span>
           </ConfigRow>
 
           <ConfigRow label="Обязательные заголовки">
             <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 13, color: "#334155" }}>
-              <div><code style={{ fontFamily: "monospace", fontSize: 13, background: "#f1f5f9", padding: "2px 6px", borderRadius: 4 }}>X-Novex-Timestamp</code> — unix-time (сек). Проверяйте окно ±5 мин для защиты от replay.</div>
-              <div><code style={{ fontFamily: "monospace", fontSize: 13, background: "#f1f5f9", padding: "2px 6px", borderRadius: 4 }}>X-Novex-Event-Id</code> — UUID запроса. Используйте для идемпотентности повторов.</div>
-              <div><code style={{ fontFamily: "monospace", fontSize: 13, background: "#f1f5f9", padding: "2px 6px", borderRadius: 4 }}>X-Novex-Platform</code> — всегда <code style={{ fontFamily: "monospace", fontSize: 12 }}>novex-logistics</code>.</div>
+              <div><code style={{ fontFamily: "monospace", fontSize: 13, background: "#f1f5f9", padding: "2px 6px", borderRadius: 4 }}>X-Novex-Timestamp</code> - unix-time (сек). Проверяйте окно ±5 мин для защиты от replay.</div>
+              <div><code style={{ fontFamily: "monospace", fontSize: 13, background: "#f1f5f9", padding: "2px 6px", borderRadius: 4 }}>X-Novex-Event-Id</code> - UUID запроса. Используйте для идемпотентности повторов.</div>
+              <div><code style={{ fontFamily: "monospace", fontSize: 13, background: "#f1f5f9", padding: "2px 6px", borderRadius: 4 }}>X-Novex-Platform</code> - всегда <code style={{ fontFamily: "monospace", fontSize: 12 }}>novex-logistics</code>.</div>
             </div>
           </ConfigRow>
 
@@ -151,7 +151,7 @@ export default function IntegrationPage() {
               barcode: "AZM-BC-20260513-1042",
             }, null, 2)}</pre>
             <p style={{ margin: "8px 0 0", font: "400 12px/1.5 Inter Variable, sans-serif", color: "#64748b" }}>
-              tracking_number обязателен. barcode (или carrier_invoice_id) — опциональное физическое штрих-код на этикетке.
+              tracking_number обязателен. barcode (или carrier_invoice_id) - опциональное физическое штрих-код на этикетке.
             </p>
           </details>
         </div>
@@ -199,7 +199,7 @@ export default function IntegrationPage() {
               event_id: "opt-uuid-for-dedup",
             }, null, 2)}</pre>
             <p style={{ margin: "8px 0 0", font: "400 12px/1.5 Inter Variable, sans-serif", color: "#64748b" }}>
-              event_id опционален — используется для идемпотентности (если ретраите, ставьте один и тот же). Обязательные заголовки: <code>X-Novex-Timestamp</code> (unix-time, окно ±5 мин) и <code>X-Carrier-Signature</code> (HMAC-SHA256 от body).
+              event_id опционален - используется для идемпотентности (если ретраите, ставьте один и тот же). Обязательные заголовки: <code>X-Novex-Timestamp</code> (unix-time, окно ±5 мин) и <code>X-Carrier-Signature</code> (HMAC-SHA256 от body).
             </p>
           </details>
 

@@ -1,5 +1,6 @@
 import { apiRequest, ApiError } from "./client";
 import type {
+  CancelOrderResponse,
   CreateDraftFromQuoteRequest,
   DeliveryType,
   OrderDraftResponse,
@@ -92,8 +93,8 @@ export async function deleteOrderDraft(draftId: number): Promise<void> {
 export async function cancelOrder(
   orderId: number,
   reason: string,
-): Promise<OrderDraftResponse> {
-  return apiRequest<OrderDraftResponse>(`/orders/${orderId}/cancel`, {
+): Promise<CancelOrderResponse> {
+  return apiRequest<CancelOrderResponse>(`/orders/${orderId}/cancel`, {
     method: "POST",
     body: JSON.stringify({ reason }),
   });

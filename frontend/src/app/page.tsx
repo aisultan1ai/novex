@@ -581,7 +581,7 @@ export default function HomePage() {
               can bump them without a code push. Carrier count falls back to the
               length of SUPPORTED_CARRIERS so it can never claim more services
               than we actually show in the partners strip below. Optional stats
-              (shipments/rating) render only when their env var is set — hides
+              (shipments/rating) render only when their env var is set - hides
               placeholders in fresh envs. */}
           {(() => {
             const carriersLabel = LANDING_STATS.carriersLabel || `${SUPPORTED_CARRIERS.length}+`;
@@ -890,7 +890,7 @@ export default function HomePage() {
             </section>
 
             {/* Partners / carriers. Rendered from SUPPORTED_CARRIERS so the strip
-                always matches the "N+ служб доставки" claim in the hero — one
+                always matches the "N+ служб доставки" claim in the hero - one
                 source of truth. */}
             <section style={{ background: "#FAFAFA", borderTop: "1px solid #E5E7EB", padding: isMobile ? "48px 20px" : "56px 48px", textAlign: "center" }}>
               <p style={{ font: "400 15px/1 Inter Variable, sans-serif", color: "#6B7280", margin: "0 0 28px" }}>
@@ -1133,12 +1133,12 @@ export default function HomePage() {
             <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
               <DetailRow label="Тариф" value={selectedRate.tariff_name} />
               <DetailRow label="Срок доставки" value={`${selectedRate.eta_days_min}-${selectedRate.eta_days_max} рабочих дней`} />
-              {/* Доп. услуги (страхование, хрупкий груз, звонок перед доставкой) — все
+              {/* Доп. услуги (страхование, хрупкий груз, звонок перед доставкой) - все
                   три интегрированных перевозчика их поддерживают, конкретный набор и
                   цена уточняются на шаге оформления. Раньше здесь был хардкод
                   "Страховка: Нет" и "Ограничения: 30 кг · 150×150×150 см", что не
                   соответствовало реальности ни одного из перевозчиков. */}
-              <DetailRow label="Доп. услуги" value="Страхование, хрупкий груз — на след. шаге" muted />
+              <DetailRow label="Доп. услуги" value="Страхование, хрупкий груз - на след. шаге" muted />
             </div>
 
             <hr style={{ border: "none", borderTop: "1px solid #E5E7EB", margin: "0 0 20px" }} />

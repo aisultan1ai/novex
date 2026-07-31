@@ -12,78 +12,142 @@ logger = logging.getLogger(__name__)
 # Map CSE status names → internal Novex statuses.
 #
 # `_map_status` picks the FIRST key whose substring appears in the CSE
-# status string. Order matters: put SPECIFIC phrases before shorter
-# generic ones. Example: "прибыл в пункт выдачи" must come before "прибыл",
-# otherwise the short key would match first and short-circuit to arrived
-# for every "прибыл*" event including transit hops.
+# status string (case-insensitive). Order matters: put SPECIFIC phrases
+# before shorter generic ones. Two rules to keep straight:
+#
+#   1. "отказ" must come before "отправлен", иначе "Отказ в приеме
+#      отправления" получит in_transit вместо delivery_failed.
+#   2. "доставл" must come before "отправлен", иначе "Отправление
+#      доставлено" получит in_transit.
+#
+# Список пополняется по факту прогона живого CargoStates:
+#   backend/scripts/sync_carrier_states.py
+# — раз в месяц запустите и сверьте новые фразы.
 _STATUS_MAP: dict[str, str] = {
-    # ── Registered with carrier (paperwork done, not yet picked up) ────────
+    # ── Cancelled (проверяем ПЕРВЫМ: "Отмена заказа", "Отменён клиентом",
+    # "Запрос на отмену", "Аннулировано" — все хотим ловить до "отправлен"
+    # и "заказ"). ────────────────────────────────────────────────────────
+    "отмена":                       "cancelled",
+    "отменен":                      "cancelled",
+    "отменён":                      "cancelled",
+    "отменено":                     "cancelled",
+    "аннулировано":                 "cancelled",
+    "запрос на отмену":             "cancelled",
+
+    # ── Customs — таможня приоритетнее любых "отправлен/груз в пути". ────
+    "таможенном оформлении":        "customs_hold",
+    "таможне":                      "customs_hold",
+    "таможенн":                     "customs_hold",
+    "перевозка/таможня":            "customs_hold",
+
+    # ── Delivered — специфичные фразы ПЕРЕД общим "доставлен", а те до
+    # "отправлен", чтобы "Отправление доставлено" ловилось верно. ─────────
+    "доставка успешно выполнена":   "delivered",
+    "доставка завершена":           "delivered",
+    "груз передан клиенту":         "delivered",
+    "отправление доставлено":       "delivered",
+    "доставлено инициатору":        "delivered",
+    "вручено":                      "delivered",
+    "вручен":                       "delivered",
+    "доставлено":                   "delivered",
+    "доставлен":                    "delivered",
+    "выдано":                       "delivered",
+    "выдан получателю":             "delivered",
+
+    # ── Delivery failed — "отказ" ЛОВИМ раньше "отправлен". Также
+    # включаем: истёк срок хранения, попытки исчерпаны, утеряно/утилизация. ─
+    "отказ":                        "delivery_failed",
+    "неудачная попытка":            "delivery_failed",
+    "не доставлен":                 "delivery_failed",
+    "вручение отправления невозможно": "delivery_failed",
+    "истек срок хранения":          "delivery_failed",
+    "истёк срок хранения":          "delivery_failed",
+    "истекло количество попыток":   "delivery_failed",
+    "не успели":                    "delivery_failed",
+    "утерян":                       "delivery_failed",
+    "утеряно":                      "delivery_failed",
+    "утилизация":                   "delivery_failed",
+    "невозможно принять":           "delivery_failed",
+    "получатель не может принять":  "delivery_failed",
+    "сбор не осуществлен":          "delivery_failed",
+    "сбор невозможен":              "delivery_failed",
+
+    # ── Return ────────────────────────────────────────────────────────────
+    "возврат отправителю":          "return_in_progress",
+    "возврат инициатору":           "return_in_progress",
+    "возврат":                      "return_in_progress",
+    "возвращено":                   "return_in_progress",
+    "возвращается":                 "return_in_progress",
+    "отправление изъято":           "return_in_progress",
+
+    # ── Arrived at destination (перед "отправлен" и "прибыл") ─────────────
+    "прибыл в пункт выдачи":        "arrived",
+    "прибыл в пвз":                 "arrived",
+    "прибыл в город":               "arrived",
+    "прибыло в город":              "arrived",
+    "поступил в город назначения":  "arrived",
+    "на складе назначения":         "arrived",
+    "в пункте выдачи":              "arrived",
+    "ожидает в пункте выдачи":      "arrived",
+    "готов к выдаче":               "arrived",
+    "готов к получению":            "arrived",
+    "ожидает получения":            "arrived",
+    "ожидает получателя":           "arrived",
+    "принят на пвз для доставки":   "arrived",
+    "получатель самостоятельно заберет": "arrived",
+
+    # ── Out for delivery (перед "отправлен") ─────────────────────────────
+    "передан на доставку":          "out_for_delivery",
+    "передан курьеру для доставки": "out_for_delivery",
+    "выехал на доставку":           "out_for_delivery",
+    "выезд на доставку":            "out_for_delivery",
+    "курьер уже в пути":            "out_for_delivery",
+    "курьер выехал":                "out_for_delivery",
+    "курьер в пути":                "out_for_delivery",
+    "ожидайте курьера":             "out_for_delivery",
+    "груз выбыл из пвз":            "out_for_delivery",
+
+    # ── Picked up (перед "отправлен" и "принят") ─────────────────────────
+    "отправление получено курьером": "picked_up",
+    "груз забран":                  "picked_up",
+    "отправление забрано":          "picked_up",
+    "забран":                       "picked_up",
+    "забрано":                      "picked_up",
+
+    # ── Registered with carrier — общее «принят/оформлен» (после cancel!)
+    # 'Заказ подтвержден клиентом' / 'Заказ утвержден.' / 'Заказ проверяется.'
+    # / 'Назначен курьер' — всё это ранние стадии, до picked_up. ─────────
+    "заказ подтвержден":            "sent_to_carrier",
+    "заказ утвержден":              "sent_to_carrier",
+    "заказ проверяется":            "sent_to_carrier",
+    "на утверждении клиента":       "sent_to_carrier",
+    "назначен курьер":              "sent_to_carrier",
+    "принят. идет обработка":       "sent_to_carrier",
     "оформлен":                     "sent_to_carrier",
     "принят":                       "sent_to_carrier",
     "принято":                      "sent_to_carrier",
     "поступил":                     "sent_to_carrier",
 
-    # ── Courier picked it up at the sender ────────────────────────────────
-    "забран":                       "picked_up",
-    "забрано":                      "picked_up",
-    "забор":                        "picked_up",
-
-    # ── At destination pickup point, waiting for recipient (arrived) ──────
-    # Specific phrases go first so they win over the shorter "прибыл" below.
-    "прибыл в пункт выдачи":        "arrived",
-    "прибыл в пвз":                 "arrived",
-    "прибыл в город":               "arrived",
-    "прибыло в город":              "arrived",
-    "на складе назначения":         "arrived",
-    "в пункте выдачи":              "arrived",
-    "готов к выдаче":               "arrived",
-    "готов к получению":            "arrived",
-    "ожидает получения":            "arrived",
-    "ожидает получателя":           "arrived",
-
-    # ── Out for delivery (courier is on the way to the recipient) ─────────
-    "передан на доставку":          "out_for_delivery",
-    "передан курьеру для доставки": "out_for_delivery",
-    "выехал на доставку":           "out_for_delivery",
-    "выезд на доставку":            "out_for_delivery",
-    "курьер выехал":                "out_for_delivery",
-    "курьер в пути":                "out_for_delivery",
-
-    # ── In transit between warehouses ─────────────────────────────────────
+    # ── In transit between warehouses (fallback for бесчисленных
+    # «груз в транзите X→Y», «отправлен из ... в ...», «получен на склад») ─
     "в пути":                       "in_transit",
     "в транзите":                   "in_transit",
     "транзит":                      "in_transit",
-    "отправлен":                    "in_transit",
     "отгружен":                     "in_transit",
+    "перемещ":                      "in_transit",  # перемещён/перемещено
+    "получен на склад":             "in_transit",
+    "склада на другой":             "in_transit",
+    "распределительного центра":    "in_transit",
+    "включен в мастер-накладную":   "in_transit",
+    "выбыл со склада":              "in_transit",
+    "подготовлен к отправке":       "in_transit",
+    "процессе транспортировки":     "in_transit",
+    "отправлен":                    "in_transit",
 
-    # Bare "прибыл" without context — treated as arrived (client-facing:
-    # more informative than a generic "in_transit"). Placed AFTER all
-    # specific "прибыл ..." keys so those win when applicable.
+    # Bare "прибыл" без контекста — считаем arrived. После всех
+    # специфичных "прибыл ..." — те выигрывают. ────────────────────────
     "прибыл":                       "arrived",
     "прибыло":                      "arrived",
-
-    # ── Delivered ─────────────────────────────────────────────────────────
-    "вручено":                      "delivered",
-    "вручен":                       "delivered",
-    "доставлено":                   "delivered",
-    "доставлен":                    "delivered",
-    "получено":                     "delivered",
-    "выдано":                       "delivered",
-
-    # ── Delivery attempt failed ──────────────────────────────────────────
-    "отказ":                        "delivery_failed",
-    "неудачная попытка":            "delivery_failed",
-    "не доставлен":                 "delivery_failed",
-
-    # ── Return ────────────────────────────────────────────────────────────
-    "возврат":                      "return_in_progress",
-    "возвращено":                   "return_in_progress",
-    "возвращается":                 "return_in_progress",
-
-    # ── Cancelled ─────────────────────────────────────────────────────────
-    "отменено":                     "cancelled",
-    "отменен":                      "cancelled",
-    "аннулировано":                 "cancelled",
 }
 
 

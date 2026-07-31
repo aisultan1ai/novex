@@ -9,6 +9,7 @@ from app.core.db import get_db
 from app.core.dependencies import get_current_user_id, require_verified_email
 from app.core.limiter import limiter
 from app.modules.orders.schemas import (
+    CancelOrderResponse,
     CreateDraftFromQuoteRequest,
     CseRecalcRequest,
     CseRecalcResponse,
@@ -132,7 +133,7 @@ class CancelOrderRequest(BaseModel):
 
 @router.post(
     "/{order_id}/cancel",
-    response_model=OrderDraftResponse,
+    response_model=CancelOrderResponse,
     status_code=200,
     summary="Отменить заказ (клиент)",
 )
@@ -143,12 +144,17 @@ def cancel_order(
     request: Request,
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
-) -> OrderDraftResponse:
+) -> CancelOrderResponse:
     """Отменить заказ по инициативе клиента.
 
-    Допустимые статусы для отмены: paid, dispatch_queued, dispatch_failed,
-    pending_manual, pending_manual_dispatch, sent_to_carrier. Если заказ уже
-    отправлен перевозчику — пробуем отменить у него по API, иначе 409.
+    Два возможных исхода:
+      • outcome="cancelled" — заказ уже cancelled (CSE/Exline подтвердил
+        отмену через API). Комиссия сторнирована, платежи переведены в
+        refund_pending для последующей обработки админом.
+      • outcome="requested" — создали заявку на отмену для перевозчика
+        (Azimuth — всегда; CSE/Exline — если API отказал или недоступен).
+        Заказ остаётся в текущем статусе, пока перевозчик или админ не
+        подтвердит заявку.
     """
     return orders_service.cancel_order(
         db,

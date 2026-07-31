@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.core.db import Base
+from app.modules.cancellations.models import CancellationRequest
 from app.modules.carriers.models import (
     Carrier,
     CarrierCommissionConfig,
@@ -38,6 +39,7 @@ __all__ = [
     "CarrierTariffRate",
     "CarrierZoneCity",
     "CarrierCommissionConfig",
+    "CancellationRequest",
     "Review",
     "PaymentTransaction",
     "PaymentProof",

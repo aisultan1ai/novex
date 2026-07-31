@@ -4,6 +4,7 @@ from app.api.v1.address_book import router as address_book_router
 from app.api.v1.admin_audit import router as admin_audit_router
 from app.api.v1.admin_carrier_api import router as admin_carrier_api_router
 from app.api.v1.admin_carrier_webhooks import router as admin_carrier_webhooks_router
+from app.api.v1.admin_cancellations import router as admin_cancellations_router
 from app.api.v1.admin_carriers import router as admin_carriers_router
 from app.api.v1.admin_commission_configs import (
     router as admin_commission_configs_router,
@@ -41,6 +42,7 @@ api_router.include_router(tracking_router)
 api_router.include_router(payments_router)
 api_router.include_router(notifications_router)
 api_router.include_router(admin_carriers_router)
+api_router.include_router(admin_cancellations_router)
 api_router.include_router(admin_customers_router)
 api_router.include_router(admin_orders_router)
 api_router.include_router(admin_commissions_router)

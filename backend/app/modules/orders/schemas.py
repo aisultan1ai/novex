@@ -237,6 +237,20 @@ class ShipmentPackageResponse(BaseModel):
     declared_value_currency: str | None
 
 
+class CancellationRequestSnippet(BaseModel):
+    """Мини-проекция CancellationRequest — только то, что нужно клиенту в
+    карточке заказа. Полная схема живёт в app.modules.cancellations.schemas."""
+
+    id: int
+    status: str
+    reason: str
+    carrier_response: str | None = None
+    created_at: datetime
+    resolved_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
 class OrderDraftResponse(BaseModel):
     draft_id: int
     user_id: int
@@ -284,6 +298,11 @@ class OrderDraftResponse(BaseModel):
 
     tracking_number: str | None = None
 
+    # Заявка на отмену: pending → блок «ожидает решения» в UI, resolved-статусы
+    # тоже полезны (клиент видит комментарий перевозчика при rejected).
+    # None — либо клиент никогда не запрашивал отмену, либо это старый заказ.
+    cancellation_request: CancellationRequestSnippet | None = None
+
 
 class OrderDraftListResponse(BaseModel):
     items: list[OrderDraftResponse]
@@ -291,6 +310,21 @@ class OrderDraftListResponse(BaseModel):
     page: int
     size: int
     pages: int
+
+
+class CancelOrderResponse(BaseModel):
+    """Тонкая оболочка над результатом POST /orders/{id}/cancel.
+
+    outcome:
+      • "cancelled" — заказ прямо сейчас cancelled (например, успешный API у
+        CSE/Exline). request всегда None.
+      • "requested" — создали заявку, ждём решения перевозчика/админа. Заказ
+        остаётся в старом статусе, request заполнен.
+    """
+
+    outcome: str
+    order: OrderDraftResponse
+    request: CancellationRequestSnippet | None = None
 
 
 class CseRecalcRequest(BaseModel):

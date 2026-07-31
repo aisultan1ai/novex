@@ -40,24 +40,32 @@ interface PaymentDetail {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
+// TxStatus enum в backend/app/modules/payments/transaction_models.py:40.
+// Все 9 значений покрыты: unpaid и refund_pending обязательны, иначе после
+// клиентской отмены (см. cancellations/service.py) админ видит сырой slug.
 const STATUS_LABELS: Record<string, string> = {
+  unpaid: "Не оплачено",
   awaiting_payment: "Ожидает оплаты",
   payment_under_review: "На проверке",
   paid: "Оплачено",
   payment_rejected: "Отклонено",
-  refunded: "Возврат",
+  refund_pending: "Возврат в обработке",
+  refunded: "Возврат оформлен",
   cancelled: "Отменён",
   expired: "Истёк",
 };
 
 function statusStyle(status: string): React.CSSProperties {
   const map: Record<string, React.CSSProperties> = {
+    unpaid: { background: "#f1f5f9", color: "#475569" },
     awaiting_payment: { background: "#fef9c3", color: "#854d0e" },
     payment_under_review: { background: "#dbeafe", color: "#1e40af" },
     paid: { background: "#dcfce7", color: "#166534" },
     payment_rejected: { background: "#fee2e2", color: "#991b1b" },
+    refund_pending: { background: "#fed7aa", color: "#9a3412" },
     refunded: { background: "#ede9fe", color: "#5b21b6" },
     cancelled: { background: "#f1f5f9", color: "#475569" },
+    expired: { background: "#f1f5f9", color: "#475569" },
   };
   return { ...badgeBase, ...(map[status] ?? { background: "#f1f5f9" }) };
 }

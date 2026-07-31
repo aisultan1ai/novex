@@ -25,7 +25,7 @@ export default function AdminCarrierOverviewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [form, setForm] = useState({ name: "", description: "", is_active: true });
+  const [form, setForm] = useState({ name: "", description: "", is_active: true, notification_email: "" });
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
@@ -39,7 +39,12 @@ export default function AdminCarrierOverviewPage() {
     getAdminCarrier(carrierId)
       .then((c) => {
         setCarrier(c);
-        setForm({ name: c.name, description: c.description ?? "", is_active: c.is_active });
+        setForm({
+          name: c.name,
+          description: c.description ?? "",
+          is_active: c.is_active,
+          notification_email: c.notification_email ?? "",
+        });
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
@@ -56,6 +61,9 @@ export default function AdminCarrierOverviewPage() {
         name: form.name,
         description: form.description || undefined,
         is_active: form.is_active,
+        // Пустая строка = очистить; строка с email = задать. Всегда шлём
+        // явное значение, иначе backend не отличит «не менять» от «очистить».
+        notification_email: form.notification_email.trim(),
       });
       setSaveMsg({ text: "Сохранено", ok: true });
       load();
@@ -108,6 +116,19 @@ export default function AdminCarrierOverviewPage() {
           <div style={{ gridColumn: "1 / -1" }}>
             <label style={lbl}>Описание</label>
             <input style={inp} value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Необязательно" />
+          </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <label style={lbl}>Email для уведомлений об отменах</label>
+            <input
+              style={inp}
+              type="email"
+              value={form.notification_email}
+              onChange={(e) => setForm(f => ({ ...f, notification_email: e.target.value }))}
+              placeholder="ops@carrier.example - необязательно"
+            />
+            <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 6 }}>
+              На этот адрес будем присылать заявки на отмену от клиентов. Оставьте пустым, если не нужно.
+            </div>
           </div>
         </div>
 

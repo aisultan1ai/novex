@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 
 import httpx
 
+from app.common.log_ratelimit import log_once_per
 from app.core.config import get_settings
 from app.modules.carriers.polling.base import CarrierPollingAdapter, TrackingEventData
 
@@ -21,15 +22,89 @@ _DEFAULT_API_URL = "https://home.courierexe.ru/api/"
 # on one shipment cannot block the entire polling tick.
 _TIMEOUT = httpx.Timeout(connect=5.0, read=15.0, write=10.0, pool=5.0)
 
-# Маппинг статусов Exline → внутренние статусы Novex
+# Маппинг статусов Exline (MeaSoft Courier XML API) → внутренние статусы
+# Novex. Полный enum задокументирован в
+# https://wiki.courierexe.ru/index.php?title=API (31 значение). Раньше у нас
+# было только 6 ключей, а всё неизвестное силент-fallback'ом уходило в
+# in_transit — что скрывало реальные проблемы (LOST → «В пути» у клиента,
+# UNCONFIRM → «В пути» вместо «Попытка не удалась» и т.п.).
+#
+# Semantic corrections vs старого маппинга:
+#   ACCEPTED  picked_up → in_transit  (это «получен складом», не забор)
+#   DELIVERY  in_transit → out_for_delivery  (это «выдан курьеру»)
+#   RETURN    удалён — такого кода нет в docs, был легаси
 _STATUS_MAP: dict[str, str] = {
-    "NEW":      "sent_to_carrier",
-    "ACCEPTED": "picked_up",
-    "DELIVERY": "in_transit",
-    "COMPLETE": "delivered",
-    "CANCELED": "cancelled",
-    "RETURN":   "return_in_progress",
+    # ── Начальные ──────────────────────────────────────────────────────
+    "NEW":             "sent_to_carrier",   # успешно создан, передан в КС
+    "NEWPICKUP":       "sent_to_carrier",   # создан забор
+    "AWAITING_SYNC":   "sent_to_carrier",   # ожидает синхронизации
+
+    # ── Забор / склад ─────────────────────────────────────────────────
+    "PICKUP":          "picked_up",         # забран у отправителя
+    "ACCEPTED":        "in_transit",        # получен складом (НЕ забор)
+    "STORETAKE":       "in_transit",
+    "PICKUPTRANS":     "in_transit",
+    "WMSASSEMBLED":    "in_transit",
+    "WMSDISASSEMBLED": "in_transit",
+    "INVENTORY":       "in_transit",
+
+    # ── Перемещение между складами ────────────────────────────────────
+    "DEPARTURING":     "in_transit",
+    "DEPARTURE":       "in_transit",
+    "TRANSACCEPTED":   "in_transit",
+    "DEPARTUREDELAY":  "in_transit",
+
+    # ── Таможня ───────────────────────────────────────────────────────
+    "CUSTOMSPROCESS":  "customs_hold",
+    "CUSTOMSDELAY":    "customs_hold",
+    "CUSTOMSFINISHED": "in_transit",
+
+    # ── Согласование / подготовка ─────────────────────────────────────
+    "CONFIRM":         "in_transit",
+    "DATECHANGE":      "in_transit",
+    "UNCONFIRM":       "delivery_failed",   # не удалось согласовать
+    "PICKUPREADY":     "arrived",           # готов к выдаче в ПВЗ
+
+    # ── Доставка ──────────────────────────────────────────────────────
+    "DELIVERY":         "out_for_delivery", # выдан курьеру (НЕ in_transit)
+    "COURIERDELIVERED": "out_for_delivery",
+    "COMPLETE":         "delivered",
+    "PARTIALLY":        "delivered",
+    "COURIERPARTIALLY": "delivered",
+
+    # ── Проблемы ──────────────────────────────────────────────────────
+    "COURIERCANCELED": "delivery_failed",
+    "LOST":            "delivery_failed",
+
+    # ── Возврат ───────────────────────────────────────────────────────
+    "COURIERRETURN":               "return_in_progress",
+    "WITHDRAWN_FROM_PICKUP_POINT": "return_in_progress",
+    "RETURNING":                   "return_in_progress",
+    "PARTLYRETURNING":             "return_in_progress",
+    "CANCELED":                    "cancelled",
+    "RETURNED":                    "returned",
+    "PARTLYRETURNED":              "returned",
 }
+
+
+def _map_status(carrier_status: str) -> str:
+    """Exline → Novex status. Unknown → carrier_unknown (safe: not in state
+    machine, so can_transition returns False and order status stays put).
+
+    Раньше здесь был silent fallback на in_transit — тот же баг, от которого
+    ушли в CSE. Rate-limited log помогает поймать новый код и добавить в
+    _STATUS_MAP без флуда в проде.
+    """
+    mapped = _STATUS_MAP.get(carrier_status)
+    if mapped:
+        return mapped
+    log_once_per(
+        logger,
+        f"exline-unmapped:{carrier_status!r}",
+        "ExlineAdapter: unmapped carrier status %r → keeping order status unchanged",
+        carrier_status,
+    )
+    return "carrier_unknown"
 
 
 class ExlineAdapter(CarrierPollingAdapter):
@@ -117,7 +192,7 @@ class ExlineAdapter(CarrierPollingAdapter):
                 if occurred_at.tzinfo is not None:
                     occurred_at = occurred_at.astimezone(UTC).replace(tzinfo=None)
 
-                mapped = _STATUS_MAP.get(carrier_status, "in_transit")
+                mapped = _map_status(carrier_status)
                 events.append(TrackingEventData(
                     status=mapped,
                     carrier_status=carrier_status,

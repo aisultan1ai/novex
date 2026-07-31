@@ -11,6 +11,7 @@ import { useIsMobile } from "@/hooks/use-is-mobile";
 const ALL_ADMIN_TABS = [
   { label: "Обзор",           href: "/dashboard/admin",                adminOnly: true  },
   { label: "Заказы",          href: "/dashboard/admin/orders",         adminOnly: false },
+  { label: "Отмены",          href: "/dashboard/admin/cancellation-requests", adminOnly: false },
   { label: "Пользователи",    href: "/dashboard/admin/users",          adminOnly: false },
   { label: "Перевозчики",     href: "/dashboard/admin/carriers",       adminOnly: false },
   { label: "Отзывы",          href: "/dashboard/admin/reviews",        adminOnly: true  },

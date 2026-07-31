@@ -11,7 +11,7 @@ from datetime import date
 
 import httpx
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from sqlalchemy import func, select
 from sqlalchemy import update as sa_update
 from sqlalchemy.orm import Session, selectinload
@@ -48,12 +48,16 @@ class CarrierCreate(BaseModel):
     name: str
     description: str | None = None
     is_active: bool = True
+    notification_email: EmailStr | None = None
 
 
 class CarrierUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
     is_active: bool | None = None
+    # None on the wire means "не изменять". To clear the address, send an
+    # empty string; we translate that to NULL below in update_carrier.
+    notification_email: str | None = None
 
 
 class ServiceCreate(BaseModel):
@@ -108,6 +112,7 @@ def _carrier_dict(c: Carrier) -> dict:
         "name": c.name,
         "description": c.description,
         "is_active": c.is_active,
+        "notification_email": c.notification_email,
     }
 
 
@@ -199,7 +204,24 @@ def update_carrier(
     carrier = db.get(Carrier, carrier_id)
     if not carrier:
         raise HTTPException(404, "Перевозчик не найден")
-    for k, v in payload.model_dump(exclude_none=True).items():
+    updates = payload.model_dump(exclude_none=True)
+    # Empty string on notification_email means «очистить»; normalize before
+    # writing so we don't store " " that later masquerades as a valid email.
+    if "notification_email" in updates:
+        stripped = updates["notification_email"].strip()
+        if stripped == "":
+            updates["notification_email"] = None
+        else:
+            # Validate on set — reuse pydantic EmailStr so behavior matches CREATE.
+            from pydantic import TypeAdapter
+            from pydantic import ValidationError as _PyValidationError
+
+            try:
+                TypeAdapter(EmailStr).validate_python(stripped)
+            except _PyValidationError as exc:
+                raise HTTPException(422, f"Неверный email: {exc.errors()[0]['msg']}") from exc
+            updates["notification_email"] = stripped
+    for k, v in updates.items():
         setattr(carrier, k, v)
     db.commit()
     db.refresh(carrier)

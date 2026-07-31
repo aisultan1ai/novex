@@ -5,19 +5,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 
 import { getAdminUser, updateAdminUser } from "@/lib/api/admin";
+import { orderStatusColors, orderStatusLabel } from "@/lib/status-labels";
 import type { AdminUserDetail } from "@/types/admin";
-
-const STATUS_LABELS: Record<string, string> = {
-  draft: "Черновик", shipment_details_completed: "Детали", ready_for_checkout: "К оплате",
-  awaiting_payment: "Ожидает оплаты", paid: "Оплачен", sent_to_carrier: "Передан",
-  picked_up: "Забран", in_transit: "В пути", arrived: "Прибыл",
-  delivered: "Доставлен", cancelled: "Отменён", return: "Возврат",
-};
-const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
-  paid: { bg: "#dcfce7", color: "#166534" }, delivered: { bg: "#dcfce7", color: "#166534" },
-  cancelled: { bg: "#fee2e2", color: "#991b1b" }, return: { bg: "#fee2e2", color: "#991b1b" },
-  in_transit: { bg: "#ede9fe", color: "#5b21b6" },
-};
 
 function formatPrice(price: number, currency: string) {
   return `${new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(price)} ${currency}`;
@@ -123,7 +112,7 @@ export default function AdminUserDetailPage() {
               <span>№</span><span>Маршрут</span><span>Перевозчик</span><span>Сумма</span><span>Статус</span>
             </div>
             {user.orders.map((order, idx) => {
-              const sc = STATUS_COLORS[order.status] ?? { bg: "#f1f5f9", color: "#475569" };
+              const sc = orderStatusColors(order.status);
               return (
                 <div key={order.id} style={{ display: "grid", gridTemplateColumns: "80px 1fr 160px 120px 120px", gap: 12, padding: "14px 24px", borderBottom: idx < user.orders.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center" }}>
                   <span style={{ fontFamily: "monospace", fontSize: 13, color: "#94a3b8", fontWeight: 600 }}>#{order.id}</span>
@@ -134,7 +123,7 @@ export default function AdminUserDetailPage() {
                   <div style={{ fontSize: 13, color: "#475569" }}>{order.carrier_name}</div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>{formatPrice(order.price, order.currency)}</div>
                   <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600, background: sc.bg, color: sc.color }}>
-                    {STATUS_LABELS[order.status] ?? order.status}
+                    {orderStatusLabel(order.status)}
                   </span>
                 </div>
               );

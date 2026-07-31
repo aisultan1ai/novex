@@ -11,63 +11,26 @@ import {
   approveAdminPayment,
   rejectAdminPayment,
 } from "@/lib/api/admin";
+import {
+  ORDER_STATUS_LABELS,
+  ORDER_STATUSES,
+  orderStatusColors,
+  orderStatusLabel,
+} from "@/lib/status-labels";
 import type { AdminOrderRow, AdminOrderDetail, AdminPaymentDetail } from "@/types/admin";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
-const STATUS_LABELS: Record<string, string> = {
-  draft: "Черновик",
-  shipment_details_completed: "Детали заполнены",
-  ready_for_checkout: "Готов к оплате",
-  awaiting_payment: "Ожидает оплаты",
-  payment_under_review: "Чек на проверке",
-  payment_rejected: "Чек отклонён",
-  paid: "Оплачен",
-  dispatch_queued: "Ожидает отправки",
-  dispatch_failed: "Уточняем детали",
-  pending_manual: "Передаётся перевозчику",
-  pending_manual_dispatch: "Ожидает ручной отправки",
-  sent_to_carrier: "Передан курьеру",
-  picked_up: "Забран",
-  in_transit: "В пути",
-  out_for_delivery: "Выезд на доставку",
-  arrived: "Прибыл",
-  delivered: "Доставлен",
-  delivery_failed: "Попытка доставки не удалась",
-  customs_hold: "Удержан на таможне",
-  return_requested: "Запрос возврата",
-  return_in_progress: "Возврат в пути",
-  returned: "Возвращён",
-  cancelled: "Отменён",
-};
-
-const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
-  draft:                      { bg: "#f1f5f9", color: "#475569" },
-  shipment_details_completed: { bg: "#dbeafe", color: "#1e40af" },
-  ready_for_checkout:         { bg: "#ede9fe", color: "#5b21b6" },
-  awaiting_payment:           { bg: "#fef3c7", color: "#92400e" },
-  payment_under_review:       { bg: "#dbeafe", color: "#1e40af" },
-  payment_rejected:           { bg: "#fee2e2", color: "#991b1b" },
-  paid:                       { bg: "#dcfce7", color: "#166534" },
-  sent_to_carrier:            { bg: "#dbeafe", color: "#1e40af" },
-  picked_up:                  { bg: "#dbeafe", color: "#1e40af" },
-  in_transit:                 { bg: "#ede9fe", color: "#5b21b6" },
-  arrived:                    { bg: "#ede9fe", color: "#5b21b6" },
-  delivered:                  { bg: "#dcfce7", color: "#166534" },
-  delivery_failed:            { bg: "#fee2e2", color: "#991b1b" },
-  customs_hold:               { bg: "#fef3c7", color: "#92400e" },
-  cancelled:                  { bg: "#fee2e2", color: "#991b1b" },
-  dispatch_failed:            { bg: "#fee2e2", color: "#991b1b" },
-  pending_manual:             { bg: "#fef3c7", color: "#92400e" },
-};
-
-const ALL_STATUSES = Object.keys(STATUS_LABELS);
+// Кроме канонического списка используем как есть - админский селект статусов
+// должен покрывать все возможные варианты.
+const ALL_STATUSES = ORDER_STATUSES;
+const STATUS_LABELS = ORDER_STATUS_LABELS;
 
 function StatusBadge({ status }: { status: string }) {
-  const c = STATUS_COLORS[status] ?? { bg: "#f1f5f9", color: "#475569" };
+  const c = orderStatusColors(status);
   return (
     <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600, background: c.bg, color: c.color, whiteSpace: "nowrap" }}>
-      {STATUS_LABELS[status] ?? status}
+      {orderStatusLabel(status)}
     </span>
   );
 }

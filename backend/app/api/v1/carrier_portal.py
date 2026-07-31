@@ -34,9 +34,19 @@ from app.modules.tracking.models import TrackingEvent
 
 router = APIRouter(prefix="/carrier", tags=["carrier-portal"])
 
+# Полный набор статусов, которые заказ проходит после передачи перевозчику.
+# out_for_delivery / delivery_failed / customs_hold / return_* приходят через
+# webhook или tracking poller — заказ по-прежнему «принадлежит» перевозчику,
+# и он должен видеть его в кабинете, иначе рабочая карточка исчезает при
+# первом же нештатном событии.
 _CARRIER_VISIBLE_STATUSES = {
     "sent_to_carrier", "pending_manual", "pending_manual_dispatch",
-    "dispatch_failed", "picked_up", "in_transit", "arrived", "delivered",
+    "dispatch_failed",
+    "picked_up", "in_transit", "out_for_delivery",
+    "arrived", "delivered",
+    "delivery_failed", "customs_hold",
+    "return_requested", "return_in_progress", "returned",
+    "cancelled",
 }
 _ACCEPT_ALLOWED_STATUSES = {"sent_to_carrier", "pending_manual", "pending_manual_dispatch", "dispatch_failed"}
 _REJECT_ALLOWED_STATUSES = {"sent_to_carrier", "pending_manual", "pending_manual_dispatch"}
@@ -450,6 +460,20 @@ def get_order(
         else None
     )
 
+    # Активная заявка на отмену — перевозчику важно увидеть её прямо в детали
+    # заказа, чтобы не пришлось переключаться на страницу «Отмены».
+    _cancel_req_for_view = _cancel_repo.get_pending_for_order(db, order.id)
+    result["cancellation_request"] = (
+        {
+            "id": _cancel_req_for_view.id,
+            "status": _cancel_req_for_view.status,
+            "reason": _cancel_req_for_view.reason,
+            "created_at": _cancel_req_for_view.created_at.isoformat(),
+        }
+        if _cancel_req_for_view
+        else None
+    )
+
     return result
 
 
@@ -465,6 +489,15 @@ def accept_order(
 
     if order.status not in _ACCEPT_ALLOWED_STATUSES:
         raise HTTPException(400, f"Нельзя принять заказ со статусом «{order.status}»")
+    # Двойная защита от «оживления» отменённых/доставленных заказов: если у
+    # перевозчика открыта старая карточка и он жмёт «Принять» на заказ, который
+    # уже уехал в cancelled/delivered, граф переходов должен нам это запретить.
+    from app.common.status_machine import can_transition
+    if not can_transition(order.status, "picked_up"):
+        raise HTTPException(
+            409,
+            f"Переход из «{order.status}» в «picked_up» не разрешён — обновите страницу.",
+        )
 
     old_status = order.status
     order.status = "picked_up"
@@ -509,6 +542,12 @@ def reject_order(
 
     if order.status not in _REJECT_ALLOWED_STATUSES:
         raise HTTPException(400, f"Нельзя отклонить заказ со статусом «{order.status}»")
+    from app.common.status_machine import can_transition
+    if not can_transition(order.status, "dispatch_failed"):
+        raise HTTPException(
+            409,
+            f"Переход из «{order.status}» в «dispatch_failed» не разрешён — обновите страницу.",
+        )
 
     old_status = order.status
     order.status = "dispatch_failed"
@@ -591,6 +630,15 @@ async def upload_pod(
 
     if order.status != "delivered":
         old_status = order.status
+        # Без can_transition POD от заказа, который уже уехал в cancelled или
+        # returned, «оживит» его обратно в delivered — POD-документ сохраняем,
+        # но статус не двигаем.
+        from app.common.status_machine import can_transition
+        if not can_transition(old_status, "delivered"):
+            raise HTTPException(
+                409,
+                f"Заказ в статусе «{old_status}» — POD можно загрузить, но перевод в «delivered» невозможен. Обновите страницу.",
+            )
         order.status = "delivered"
         db.add(OrderStatusHistory(
             order_id=order.id,
@@ -783,3 +831,115 @@ def own_reviews_list(
         "size": size,
         "pages": pages,
     }
+
+
+# ── Cancellation requests (carrier-scoped) ─────────────────────────────────
+
+from app.modules.cancellations.repository import (  # noqa: E402
+    CancellationRequestsRepository,
+)
+from app.modules.cancellations.schemas import (  # noqa: E402
+    CancellationRequestListResponse,
+    CancellationRequestResolve,
+    CancellationRequestResponse,
+)
+from app.modules.cancellations.service import (  # noqa: E402
+    CancellationRequestsService,
+)
+
+_cancel_repo = CancellationRequestsRepository()
+_cancel_service = CancellationRequestsService()
+
+
+@router.get(
+    "/cancellation-requests",
+    response_model=CancellationRequestListResponse,
+    summary="Заявки на отмену — свои (по carrier_code)",
+)
+def list_own_cancellation_requests(
+    status: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    carrier_id: int = Depends(get_current_carrier_id),
+) -> CancellationRequestListResponse:
+    carrier = _get_carrier_or_404(db, carrier_id)
+    items, total = _cancel_repo.list_paginated(
+        db,
+        offset=(page - 1) * size,
+        limit=size,
+        status=status,
+        carrier_code=carrier.code,
+    )
+    pages = math.ceil(total / size) if total > 0 else 1
+    return CancellationRequestListResponse(
+        items=[CancellationRequestResponse.model_validate(r) for r in items],
+        total=total,
+        page=page,
+        size=size,
+        pages=pages,
+    )
+
+
+@router.get(
+    "/cancellation-requests/{request_id}",
+    response_model=CancellationRequestResponse,
+)
+def get_own_cancellation_request(
+    request_id: int,
+    db: Session = Depends(get_db),
+    carrier_id: int = Depends(get_current_carrier_id),
+) -> CancellationRequestResponse:
+    from app.core.exceptions import ForbiddenError, NotFoundError
+
+    carrier = _get_carrier_or_404(db, carrier_id)
+    req = _cancel_repo.get(db, request_id)
+    if req is None:
+        raise NotFoundError("Заявка на отмену не найдена")
+    if req.carrier_code != carrier.code:
+        raise ForbiddenError("Заявка относится к другому перевозчику")
+    return CancellationRequestResponse.model_validate(req)
+
+
+@router.post(
+    "/cancellation-requests/{request_id}/approve",
+    response_model=CancellationRequestResponse,
+)
+def approve_own_cancellation_request(
+    request_id: int,
+    payload: CancellationRequestResolve,
+    db: Session = Depends(get_db),
+    carrier_id: int = Depends(get_current_carrier_id),
+    current_user: User = Depends(require_carrier),
+) -> CancellationRequestResponse:
+    carrier = _get_carrier_or_404(db, carrier_id)
+    return _cancel_service.approve_by_carrier(
+        db,
+        request_id=request_id,
+        carrier_user_id=current_user.id,
+        carrier_code=carrier.code,
+        comment=payload.comment,
+    )
+
+
+@router.post(
+    "/cancellation-requests/{request_id}/reject",
+    response_model=CancellationRequestResponse,
+)
+def reject_own_cancellation_request(
+    request_id: int,
+    payload: CancellationRequestResolve,
+    db: Session = Depends(get_db),
+    carrier_id: int = Depends(get_current_carrier_id),
+    current_user: User = Depends(require_carrier),
+) -> CancellationRequestResponse:
+    carrier = _get_carrier_or_404(db, carrier_id)
+    return _cancel_service.reject(
+        db,
+        request_id=request_id,
+        actor_user_id=current_user.id,
+        actor_is_admin=False,
+        actor_carrier_code=carrier.code,
+        comment=payload.comment or "",
+    )
+

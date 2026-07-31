@@ -74,7 +74,7 @@ export interface UpdateShipmentDetailsRequest {
   delivery_type?: DeliveryType;
   sender_pvz_guid?: string | null;
   recipient_pvz_guid?: string | null;
-  // Optional courier pickup — consumed by the Azimuth /order-courier flow
+  // Optional courier pickup - consumed by the Azimuth /order-courier flow
   // in the dispatch worker. When pickup_requested is true the backend
   // requires pickup_date + pickup_time_slot. contact_person / phone default
   // to the sender on the server side when left blank.
@@ -156,6 +156,28 @@ export type OrderDraftResponse = {
   packages: ShipmentPackageResponse[];
 
   tracking_number: string | null;
+
+  // Заявка на отмену: pending → блок «Ожидает решения» в UI;
+  // rejected → сохраняем, чтобы клиент увидел комментарий перевозчика;
+  // approved / api_cancelled - обычно уже order.status === 'cancelled'.
+  cancellation_request?: CancellationRequestSnippet | null;
+};
+
+export type CancellationRequestStatus = "pending" | "approved" | "api_cancelled" | "rejected";
+
+export type CancellationRequestSnippet = {
+  id: number;
+  status: CancellationRequestStatus;
+  reason: string;
+  carrier_response: string | null;
+  created_at: string;
+  resolved_at: string | null;
+};
+
+export type CancelOrderResponse = {
+  outcome: "cancelled" | "requested";
+  order: OrderDraftResponse;
+  request: CancellationRequestSnippet | null;
 };
 
 export type OrderDraftListResponse = {

@@ -175,7 +175,14 @@ async def carrier_tracking_webhook(
             description=description,
         )
 
-        if novex_status and can_transition(order.status, novex_status):
+        # carrier_unknown приходит из status_mapper для нераспознанных
+        # кодов — событие в TrackingEvent уже добавили (клиент увидит запись
+        # в timeline), а статус заказа не трогаем и клиенту push не шлём.
+        if (
+            novex_status
+            and novex_status != "carrier_unknown"
+            and can_transition(order.status, novex_status)
+        ):
             old_order_status = order.status
             order.status = novex_status
             db.add(OrderStatusHistory(
@@ -185,18 +192,20 @@ async def carrier_tracking_webhook(
                 source="carrier_webhook",
                 comment=f"Carrier status update: {raw_status}",
             ))
-        elif novex_status and novex_status != order.status:
+            # Уведомление ТОЛЬКО когда транзишн реально применился. Иначе
+            # клиент получал бы push «Доставлен» на webhook'е, который
+            # state machine отвергла — прямой обман пользователя.
+            _notifications_svc.notify_order_status(
+                db,
+                user_id=order.user_id,
+                order_id=order.id,
+                status=novex_status,
+            )
+        elif novex_status and novex_status != order.status and novex_status != "carrier_unknown":
             logger.warning(
                 "carrier_tracking: invalid transition order_id=%s %s → %s (carrier_status=%s)",
                 order.id, order.status, novex_status, raw_status,
             )
-
-        _notifications_svc.notify_order_status(
-            db,
-            user_id=order.user_id,
-            order_id=order.id,
-            status=novex_status,
-        )
 
         # Mark event as processed
         from datetime import UTC, datetime

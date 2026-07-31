@@ -26,7 +26,7 @@ function formatDate(iso: string) {
 }
 
 function formatRate(config: CarrierCommissionConfig): string {
-  if (!config.is_set) return "не установлена — используется глобальная ставка платформы";
+  if (!config.is_set) return "не установлена - используется глобальная ставка платформы";
   const parts: string[] = [];
   if (config.commission_rate) parts.push(`${(Number(config.commission_rate) * 100).toFixed(2)}%`);
   if (config.fixed_amount) parts.push(`${config.fixed_amount} ${config.currency}`);
@@ -39,7 +39,7 @@ function formatRate(config: CarrierCommissionConfig): string {
 const TABLE_COLS = "60px 80px 140px 120px 180px 130px 130px 150px 110px";
 
 function IdCell({ value }: { value: string | null }) {
-  if (!value) return <span style={{ fontSize: 12, color: "#cbd5e1" }}>—</span>;
+  if (!value) return <span style={{ fontSize: 12, color: "#cbd5e1" }}>-</span>;
   return (
     <span
       title={value}
@@ -53,6 +53,24 @@ function IdCell({ value }: { value: string | null }) {
       }}
     >
       {value}
+    </span>
+  );
+}
+
+function InfoDot({ tooltip, color = "#94a3b8" }: { tooltip: string; color?: string }) {
+  return (
+    <span
+      title={tooltip}
+      aria-label={tooltip}
+      style={{
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        width: 14, height: 14, borderRadius: "50%",
+        border: `1.5px solid ${color}`, color,
+        fontSize: 10, fontWeight: 700, fontFamily: "serif",
+        cursor: "help", lineHeight: 1,
+      }}
+    >
+      i
     </span>
   );
 }
@@ -200,7 +218,7 @@ export default function CarrierCommissionsPage() {
             <div style={{ padding: 48, textAlign: "center", color: "#64748b", fontSize: 14 }}>Загружаем…</div>
           ) : items.length === 0 ? (
             <div style={{ padding: "48px 24px", textAlign: "center", color: "#64748b", fontSize: 14 }}>
-              Записей пока нет — появятся после первой оплаты
+              Записей пока нет - появятся после первой оплаты
             </div>
           ) : (
             items.map((c, idx) => {
@@ -210,24 +228,21 @@ export default function CarrierCommissionsPage() {
               const strike = isReversed ? "line-through" : "none";
               const dim = isReversed ? 0.6 : 1;
               const payoutColor = isReversal ? "#dc2626" : "#0369a1";
+              const iconTooltip = isReversal
+                ? `Возврат по отменённому заказу${c.reversal_reason ? `: ${c.reversal_reason}` : ""}`
+                : isReversed
+                  ? `Начисление отменено${c.reversal_reason ? `: ${c.reversal_reason}` : ""}`
+                  : "";
               return (
                 <div
                   key={c.id}
                   style={{ display: "grid", gridTemplateColumns: TABLE_COLS, gap: 12, padding: "14px 24px", borderBottom: idx === items.length - 1 ? "none" : "1px solid #f1f5f9", alignItems: "center", background: rowBg }}
-                  title={c.reversal_reason ?? undefined}
                 >
                   <span style={{ fontFamily: "monospace", fontSize: 12, color: "#94a3b8" }}>#{c.id}</span>
-                  <span style={{ fontFamily: "monospace", fontSize: 13, color: "#475569", fontWeight: 600 }}>
+                  <span style={{ fontFamily: "monospace", fontSize: 13, color: "#475569", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 6 }}>
                     #{c.order_draft_id}
-                    {isReversal && (
-                      <span style={{ display: "inline-block", marginLeft: 6, padding: "1px 6px", background: "#fee2e2", color: "#b91c1c", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.03em" }}>
-                        СТОРНО
-                      </span>
-                    )}
-                    {isReversed && (
-                      <span style={{ display: "inline-block", marginLeft: 6, padding: "1px 6px", background: "#f1f5f9", color: "#64748b", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: "0.03em" }}>
-                        ОТМ.
-                      </span>
+                    {(isReversal || isReversed) && (
+                      <InfoDot color={isReversal ? "#dc2626" : "#94a3b8"} tooltip={iconTooltip} />
                     )}
                   </span>
                   <IdCell value={c.carrier_tracking_number} />
@@ -235,7 +250,7 @@ export default function CarrierCommissionsPage() {
                   <IdCell value={c.tracking_number} />
                   <span style={{ fontSize: 13, color: isReversal ? "#dc2626" : "#475569", textDecoration: strike, opacity: dim }}>{formatPrice(c.gross_amount, c.currency)}</span>
                   <span style={{ fontSize: 13, fontWeight: 700, color: payoutColor, textDecoration: strike, opacity: dim }}>
-                    {c.carrier_payout != null ? formatPrice(c.carrier_payout, c.currency) : "—"}
+                    {c.carrier_payout != null ? formatPrice(c.carrier_payout, c.currency) : "-"}
                   </span>
                   <span style={{ fontSize: 13, fontWeight: 600, color: isReversal ? "#dc2626" : "#64748b", textDecoration: strike, opacity: dim }}>
                     {formatPrice(c.commission_amount, c.currency)}

@@ -14,7 +14,7 @@ export class ApiError extends Error {
 }
 
 // Endpoints where a 401 is a normal outcome (bad credentials, already logged
-// out) — do NOT trigger the global session-expired flow. Match by URL suffix
+// out) - do NOT trigger the global session-expired flow. Match by URL suffix
 // against the request path (already stripped of API_BASE_URL).
 const AUTH_ENDPOINTS_NO_REDIRECT = [
   "/auth/login",
@@ -32,7 +32,7 @@ async function handleSessionExpired(): Promise<void> {
   sessionExpiredHandled = true;
 
   // Best-effort: ask the server to clear the httpOnly cookie. Ignore failures
-  // — we redirect regardless so the user is never stuck on a stale page.
+  // - we redirect regardless so the user is never stuck on a stale page.
   try {
     await fetch(`${API_BASE_URL}/auth/logout`, {
       method: "POST",
@@ -108,7 +108,7 @@ export async function apiRequest<T>(
       !AUTH_ENDPOINTS_NO_REDIRECT.some((p) => path.startsWith(p))
     ) {
       // Fire the session-expired flow but still throw so callers can bail
-      // out of their current work — the browser will navigate away shortly.
+      // out of their current work - the browser will navigate away shortly.
       void handleSessionExpired();
     }
     throw new ApiError(response.status, extractErrorDetail(data, response.status));
@@ -136,7 +136,7 @@ export async function apiFormDataRequest<T>(
       !AUTH_ENDPOINTS_NO_REDIRECT.some((p) => path.startsWith(p))
     ) {
       // Fire the session-expired flow but still throw so callers can bail
-      // out of their current work — the browser will navigate away shortly.
+      // out of their current work - the browser will navigate away shortly.
       void handleSessionExpired();
     }
     throw new ApiError(response.status, extractErrorDetail(data, response.status));

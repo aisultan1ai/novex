@@ -70,6 +70,7 @@ export interface AdminCarrier {
   name: string;
   description: string | null;
   is_active: boolean;
+  notification_email: string | null;
 }
 
 export interface AdminCarrierDetail extends AdminCarrier {

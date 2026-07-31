@@ -167,7 +167,7 @@ function mergeSenderWithCurrentUser(sender: PartyFormState, user: ProfileRespons
 }
 
 // Overwrites party fields with values from a saved address book entry. Keeps
-// `comment` and `save_to_address_book` — those are per-order flags the user
+// `comment` and `save_to_address_book` - those are per-order flags the user
 // wouldn't want reset by picking a saved contact.
 function applyAddressEntry(party: PartyFormState, entry: AddressEntry): PartyFormState {
   return {
@@ -557,7 +557,7 @@ function AddressBookPicker({ entries, onPick }: {
 
   if (entries.length === 0) return null;
 
-  // На мобилке рендерим попап во всю ширину карточки — при hard-coded
+  // На мобилке рендерим попап во всю ширину карточки - при hard-coded
   // right:0 / minWidth:300 узкие экраны (~340px) обрезали дропдаун за
   // левый край окна.
   const popoverStyle: React.CSSProperties = isMobile
@@ -941,7 +941,7 @@ function ShipmentPageInner() {
   // disable warehouse delivery options; the former must not.
   const [pvzChecked, setPvzChecked] = useState<{ sender: boolean; recipient: boolean }>({ sender: false, recipient: false });
 
-  // Saved address book entries — loaded once for both sender & recipient pickers.
+  // Saved address book entries - loaded once for both sender & recipient pickers.
   // On failure we silently keep an empty list; the picker button just hides itself.
   const [addressBook, setAddressBook] = useState<AddressEntry[]>([]);
 
@@ -999,7 +999,7 @@ function ShipmentPageInner() {
     let cancelled = false;
     listAddresses()
       .then((list) => { if (!cancelled) setAddressBook(list); })
-      .catch(() => { /* silent — picker just won't appear */ });
+      .catch(() => { /* silent - picker just won't appear */ });
     return () => { cancelled = true; };
   }, [isAuthenticated]);
 
@@ -1605,7 +1605,7 @@ function ShipmentPageInner() {
                                 cursor: "pointer",
                               }}
                             >
-                              <option value="">— Выберите интервал —</option>
+                              <option value="">- Выберите интервал -</option>
                               {PICKUP_TIME_SLOTS.map((slot) => (
                                 <option key={slot} value={slot}>{slot}</option>
                               ))}

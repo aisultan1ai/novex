@@ -10,28 +10,13 @@ import {
   uploadCarrierPod,
   type CarrierOrderItem,
 } from "@/lib/api/carrier";
-
-const STATUS_LABELS: Record<string, string> = {
-  sent_to_carrier: "Передан перевозчику",
-  pending_manual: "Ожидает обработки",
-  pending_manual_dispatch: "Ожидает отправки",
-  dispatch_failed: "Ошибка отправки",
-  picked_up: "Принят",
-  in_transit: "В пути",
-  out_for_delivery: "Выезд на доставку",
-  arrived: "Прибыл",
-  delivered: "Доставлен",
-  delivery_failed: "Попытка не удалась",
-  return_in_progress: "Возврат в пути",
-  returned: "Возвращён",
-  cancelled: "Отменён",
-  customs_hold: "Задержан на таможне",
-};
+import { ORDER_STATUS_LABELS, orderStatusColors } from "@/lib/status-labels";
 
 // Same treatment as public/customer tracking pages: for carriers whose native
 // description is more informative than our normalized labels, show the raw
-// carrier text. Also protects against "carrier_unknown" leaking to UI for
-// legacy events stored before the current status mapper was in place.
+// carrier text. Azimuth просил показывать свой сырой текст на trackingе -
+// сохраняем поведение. Также страхует от "carrier_unknown", которое могло
+// оседать в старых событиях до появления status_mapper.
 const RAW_DESCRIPTION_CARRIERS = new Set(["azimuth"]);
 
 function eventLabel(
@@ -40,7 +25,7 @@ function eventLabel(
 ): string {
   const raw = event.description?.trim();
   if (carrierCode && RAW_DESCRIPTION_CARRIERS.has(carrierCode) && raw) return raw;
-  const normalized = STATUS_LABELS[event.status];
+  const normalized = ORDER_STATUS_LABELS[event.status];
   if (normalized) return normalized;
   return raw || "Обновление статуса";
 }
@@ -155,7 +140,7 @@ export default function CarrierOrderDetailPage() {
           Заказ #{order.id}
         </h2>
         <span style={{ ...styles.badge, ...(statusStyle(order.status)) }}>
-          {STATUS_LABELS[order.status] ?? order.status}
+          {ORDER_STATUS_LABELS[order.status] ?? order.status}
         </span>
       </div>
 
@@ -317,6 +302,28 @@ export default function CarrierOrderDetailPage() {
         </div>
       )}
 
+      {/* Pending cancellation request - обращает внимание перевозчика
+          прямо в детали заказа, чтобы не пришлось идти на страницу «Отмены». */}
+      {order.cancellation_request && order.cancellation_request.status === "pending" && (
+        <div style={{ ...styles.card, borderColor: "#fde68a", background: "#fffbeb" }}>
+          <div style={{ ...styles.cardTitle, color: "#92400e", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span>Клиент запросил отмену заказа</span>
+            <a
+              href="/dashboard/carrier/cancellation-requests"
+              style={{ fontSize: 12, fontWeight: 600, color: "#92400e", textDecoration: "underline" }}
+            >
+              Открыть заявку →
+            </a>
+          </div>
+          <div style={{ fontSize: 13, color: "#78350f", marginTop: 6 }}>
+            <b>Причина:</b> {order.cancellation_request.reason}
+          </div>
+          <div style={{ fontSize: 11, color: "#b45309", marginTop: 8 }}>
+            Отправлена {new Date(order.cancellation_request.created_at).toLocaleString("ru-KZ")}
+          </div>
+        </div>
+      )}
+
       {/* Customer review */}
       {order.review && (
         <div style={styles.card}>
@@ -363,16 +370,8 @@ export default function CarrierOrderDetailPage() {
 }
 
 function statusStyle(status: string): React.CSSProperties {
-  const map: Record<string, React.CSSProperties> = {
-    sent_to_carrier: { background: "#dbeafe", color: "#1e40af" },
-    pending_manual: { background: "#fef9c3", color: "#854d0e" },
-    dispatch_failed: { background: "#fee2e2", color: "#991b1b" },
-    picked_up: { background: "#dcfce7", color: "#166534" },
-    in_transit: { background: "#dbeafe", color: "#1e40af" },
-    arrived: { background: "#ede9fe", color: "#5b21b6" },
-    delivered: { background: "#dcfce7", color: "#166534" },
-  };
-  return map[status] ?? { background: "#f1f5f9", color: "#475569" };
+  const c = orderStatusColors(status);
+  return { background: c.bg, color: c.color };
 }
 
 const styles: Record<string, React.CSSProperties> = {

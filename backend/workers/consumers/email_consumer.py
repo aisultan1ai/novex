@@ -65,14 +65,50 @@ def _recover_pending(r) -> None:
 def _process(data: dict) -> None:
     from app.core.db import SessionLocal
     from app.core.email import send_email
-    from app.core.email_templates import order_status_email
+    from app.core.email_templates import cancellation_email, order_status_email
     from app.modules.identity.models import User
 
     user_id = int(data["user_id"])
     order_id = int(data["order_id"])
     event_type = data["event_type"]
     payload = json.loads(data.get("payload", "{}"))
+    # Override для писем, которые уходят НЕ клиенту (например, ops-адрес
+    # перевозчика). user_id тогда чаще всего = 0 (sentinel).
+    to_email_override: str | None = data.get("to_email_override") or None
 
+    # Cancellation events route through a separate template dispatcher: those
+    # emails carry per-event fields (reason, contacts, portal URL) that don't
+    # map cleanly to order_status_email's kwargs.
+    if event_type.startswith("cancellation_"):
+        with SessionLocal() as db:
+            recipient: str | None = to_email_override
+            user_name: str | None = None
+            if not recipient:
+                user = db.get(User, user_id) if user_id else None
+                if user and user.email:
+                    recipient = user.email
+                    user_name = user.full_name
+            if not recipient:
+                logger.warning(
+                    "Email consumer: cancellation event %s without recipient (user_id=%d, override=%r), skipping",
+                    event_type, user_id, to_email_override,
+                )
+                return
+
+            rendered = cancellation_email(
+                event_type, order_id, payload, user_name=user_name
+            )
+            if rendered is None:
+                return
+            subject, html_body = rendered
+            send_email(to=recipient, subject=subject, html=html_body)
+            logger.info(
+                "Email consumer: cancellation event %s → %s (order_id=%d)",
+                event_type, recipient, order_id,
+            )
+        return
+
+    # Обычный флоу — статусы заказа, письмо клиенту.
     with SessionLocal() as db:
         user = db.get(User, user_id)
         if not user or not user.email:

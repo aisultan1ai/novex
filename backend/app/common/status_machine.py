@@ -10,6 +10,7 @@ ALLOWED_ORDER_TRANSITIONS: dict[str, list[str]] = {
     "dispatch_queued": ["sent_to_carrier", "dispatch_failed", "cancelled"],
     "sent_to_carrier": [
         "picked_up", "out_for_delivery", "in_transit",
+        "arrived",
         "delivered", "return_requested", "delivery_failed", "customs_hold",
         "cancelled",
     ],

@@ -15,7 +15,7 @@ export default function CarrierOverviewPage() {
     getCarrierMe()
       .then(setData)
       .catch((e: Error) => setError(e.message));
-    // Отзывы — некритичная секция; ошибка не должна ломать всю страницу.
+    // Отзывы - некритичная секция; ошибка не должна ломать всю страницу.
     getCarrierReviewsSummary()
       .then(setReviews)
       .catch(() => setReviews({ carrier_code: "", avg_rating: null, count: 0 }));

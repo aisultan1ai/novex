@@ -8,7 +8,7 @@ import { useRouter, useSearchParams } from "next/navigation";
  * Legacy compatibility redirect. Old links used `?orderId=…`; the current
  * checkout screen lives at `/checkout?draftId=…`. Historically this page
  * silently `router.replace()`-d and, on a bad link, dumped the user on
- * `/dashboard/orders` with no explanation — leaving them wondering why the
+ * `/dashboard/orders` with no explanation - leaving them wondering why the
  * "pay now" email/notification led nowhere. Now we always render a brief
  * status card so the redirect is visible, and provide a manual escape hatch
  * if the auto-navigation is blocked (e.g. by a stricter browser policy).
@@ -26,7 +26,7 @@ function PaymentRedirect() {
   const [redirected, setRedirected] = useState(false);
 
   useEffect(() => {
-    // Short delay so the "Открываем оплату…" card is visible for a beat —
+    // Short delay so the "Открываем оплату…" card is visible for a beat -
     // the user gets confirmation that something is happening before the URL
     // changes underneath them.
     const t = setTimeout(() => {
@@ -71,7 +71,7 @@ function PaymentRedirect() {
           color: "#6B7280",
         }}>
           {draftId
-            ? "Если страница не открылась автоматически — нажмите кнопку ниже."
+            ? "Если страница не открылась автоматически - нажмите кнопку ниже."
             : "В ссылке не указан номер заказа. Откройте список заказов и продолжите оплату оттуда."}
         </p>
 

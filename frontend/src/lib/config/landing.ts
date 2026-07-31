@@ -19,7 +19,7 @@ export const LANDING_STATS = {
 } as const;
 
 // Carriers we currently integrate with. This drives both the "trusted-by"
-// strip and any counts on the landing page — keep it as the single source of
+// strip and any counts on the landing page - keep it as the single source of
 // truth so we cannot claim "10+" while showing 3 logos below.
 export interface SupportedCarrier {
   code: string;         // lower-case internal code

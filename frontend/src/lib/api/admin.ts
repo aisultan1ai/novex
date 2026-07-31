@@ -78,13 +78,14 @@ export const updateOrderStatus = (id: number, status: string): Promise<{ id: num
 export const listAdminCarriers = (): Promise<AdminCarrier[]> =>
   req("/admin/carriers");
 
-export const createAdminCarrier = (body: { code: string; name: string; description?: string; is_active?: boolean }): Promise<AdminCarrier> =>
+export const createAdminCarrier = (body: { code: string; name: string; description?: string; is_active?: boolean; notification_email?: string | null }): Promise<AdminCarrier> =>
   req("/admin/carriers", { method: "POST", body: JSON.stringify(body) });
 
 export const getAdminCarrier = (id: number): Promise<AdminCarrierDetail> =>
   req(`/admin/carriers/${id}`);
 
-export const updateAdminCarrier = (id: number, body: { name?: string; description?: string; is_active?: boolean }): Promise<AdminCarrier> =>
+// notification_email: `null` - не менять; пустая строка - очистить; валидный email - задать.
+export const updateAdminCarrier = (id: number, body: { name?: string; description?: string; is_active?: boolean; notification_email?: string }): Promise<AdminCarrier> =>
   req(`/admin/carriers/${id}`, { method: "PATCH", body: JSON.stringify(body) });
 
 // Services

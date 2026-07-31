@@ -24,6 +24,11 @@ class Carrier(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
+    # Ops mailbox for cancellation-request notifications. Deliberately
+    # separate from any User.email — a carrier may have several staff
+    # accounts, but a single address should receive ops emails so nothing
+    # gets missed while people rotate on shift.
+    notification_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     services: Mapped[list[CarrierService]] = relationship(
         "CarrierService", back_populates="carrier", cascade="all, delete-orphan"
