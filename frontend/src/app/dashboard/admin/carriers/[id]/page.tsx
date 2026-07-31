@@ -1,8 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
-import { createCarrierAccount, getAdminCarrier, updateAdminCarrier } from "@/lib/api/admin";
+import {
+  createCarrierAccount,
+  getAdminCarrier,
+  listCarrierAccounts,
+  updateAdminCarrier,
+  type CarrierAccount,
+} from "@/lib/api/admin";
 import type { AdminCarrierDetail } from "@/types/admin";
 
 const inp: React.CSSProperties = {
@@ -33,6 +40,13 @@ export default function AdminCarrierOverviewPage() {
   const [accountForm, setAccountForm] = useState(EMPTY_ACCOUNT);
   const [savingAccount, setSavingAccount] = useState(false);
   const [accountMsg, setAccountMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [accounts, setAccounts] = useState<CarrierAccount[] | null>(null);
+
+  function loadAccounts() {
+    listCarrierAccounts(carrierId)
+      .then(setAccounts)
+      .catch(() => setAccounts([]));
+  }
 
   function load() {
     setLoading(true);
@@ -50,7 +64,7 @@ export default function AdminCarrierOverviewPage() {
       .finally(() => setLoading(false));
   }
 
-  useEffect(() => { load(); }, [carrierId]); // eslint-disable-line
+  useEffect(() => { load(); loadAccounts(); }, [carrierId]); // eslint-disable-line
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -87,6 +101,7 @@ export default function AdminCarrierOverviewPage() {
       setAccountMsg({ text: "Аккаунт создан", ok: true });
       setAccountForm(EMPTY_ACCOUNT);
       setShowAccountForm(false);
+      loadAccounts();
     } catch (err: unknown) {
       setAccountMsg({ text: (err as Error).message, ok: false });
     } finally {
@@ -160,7 +175,9 @@ export default function AdminCarrierOverviewPage() {
       <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 14, padding: "22px 24px" }}>
         <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 6 }}>Аккаунт перевозчика</div>
         <p style={{ fontSize: 13, color: "#64748b", marginTop: 0, marginBottom: 16 }}>
-          Создайте учётную запись, чтобы перевозчик мог войти в личный кабинет и управлять заказами.
+          {accounts && accounts.length > 0
+            ? "Сотрудники этого перевозчика, у которых есть доступ в личный кабинет."
+            : "Создайте учётную запись, чтобы перевозчик мог войти в личный кабинет и управлять заказами."}
         </p>
 
         {accountMsg && (
@@ -169,12 +186,47 @@ export default function AdminCarrierOverviewPage() {
           </div>
         )}
 
+        {accounts && accounts.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+            {accounts.map((a) => (
+              <Link
+                key={a.id}
+                href={`/dashboard/admin/users/${a.id}`}
+                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "10px 12px", background: "#f8fafc", border: "1px solid #e5e7eb", borderRadius: 10, textDecoration: "none", cursor: "pointer", transition: "background 0.15s" }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "#f1f5f9"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "#f8fafc"; }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {a.full_name || a.email}
+                  </div>
+                  {a.full_name && (
+                    <div style={{ fontSize: 11, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {a.email}
+                    </div>
+                  )}
+                </div>
+                <span
+                  style={{
+                    fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 999,
+                    background: a.is_active ? "#dcfce7" : "#f1f5f9",
+                    color: a.is_active ? "#166534" : "#94a3b8",
+                    flexShrink: 0,
+                  }}
+                >
+                  {a.is_active ? "Активен" : "Заблок."}
+                </span>
+              </Link>
+            ))}
+          </div>
+        )}
+
         {!showAccountForm ? (
           <button
             onClick={() => setShowAccountForm(true)}
             style={{ padding: "9px 18px", borderRadius: 10, border: "1px solid #c7d2fe", background: "#eef2ff", color: "#4338ca", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
           >
-            + Создать аккаунт
+            {accounts && accounts.length > 0 ? "+ Добавить ещё аккаунт" : "+ Создать аккаунт"}
           </button>
         ) : (
           <form onSubmit={handleCreateAccount} style={{ display: "flex", flexDirection: "column", gap: 12 }}>

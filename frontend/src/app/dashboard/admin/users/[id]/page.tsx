@@ -71,6 +71,14 @@ export default function AdminUserDetailPage() {
               <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600, background: "#ede9fe", color: "#5b21b6" }}>{user.role}</span>
               <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600, background: user.is_active ? "#dcfce7" : "#fee2e2", color: user.is_active ? "#166534" : "#991b1b" }}>{user.is_active ? "Активен" : "Заблокирован"}</span>
               {user.customer_type && <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600, background: "#dbeafe", color: "#1e40af" }}>{user.customer_type === "company" ? "Компания" : "Физ. лицо"}</span>}
+              {user.carrier && (
+                <Link
+                  href={`/dashboard/admin/carriers/${user.carrier.id}`}
+                  style={{ padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600, background: "#dbeafe", color: "#1e40af", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}
+                >
+                  Сотрудник: {user.carrier.name} ↗
+                </Link>
+              )}
             </div>
           </div>
           <button

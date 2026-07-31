@@ -13,7 +13,8 @@ from app.core.db import get_db
 from app.core.dependencies import require_admin
 from app.core.security import get_password_hash
 from app.modules.audit.service import AuditService
-from app.modules.identity.models import CustomerProfile, Role, RoleCode, User
+from app.modules.carriers.models import Carrier
+from app.modules.identity.models import CarrierProfile, CustomerProfile, Role, RoleCode, User
 from app.modules.orders.models import OrderDraft
 
 logger = logging.getLogger(__name__)
@@ -222,6 +223,16 @@ def get_user(
         .limit(50)
     ).all()
 
+    # Если это сотрудник перевозчика — подтягиваем carrier для навигации в UI.
+    carrier_info: dict | None = None
+    profile = db.scalar(
+        select(CarrierProfile).where(CarrierProfile.user_id == user_id)
+    )
+    if profile:
+        c = db.get(Carrier, profile.carrier_id)
+        if c:
+            carrier_info = {"id": c.id, "code": c.code, "name": c.name}
+
     return {
         "id": user.id,
         "email": user.email,
@@ -238,6 +249,7 @@ def get_user(
         "billing_mode": (
             user.customer_profile.billing_mode.value if user.customer_profile else None
         ),
+        "carrier": carrier_info,
         "created_at": user.created_at.isoformat(),
         "orders": [
             {

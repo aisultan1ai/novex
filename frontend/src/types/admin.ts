@@ -21,6 +21,7 @@ export interface AdminUser {
 export interface AdminUserDetail extends AdminUser {
   billing_mode: string | null;
   orders: AdminOrderRow[];
+  carrier: { id: number; code: string; name: string } | null;
 }
 
 export interface AdminOrderCancellation {
@@ -51,6 +52,18 @@ export interface AdminOrderRow {
   carrier_tracking_number: string | null;
   carrier_barcode: string | null;
   cancellation?: Omit<AdminOrderCancellation, "cancelled_by_email" | "cancelled_by_name"> | null;
+  has_pending_cancellation?: boolean;
+}
+
+export interface AdminOrderCancellationRequest {
+  id: number;
+  status: "pending" | "approved" | "api_cancelled" | "rejected";
+  reason: string;
+  carrier_code: string;
+  api_attempted: boolean;
+  api_error: string | null;
+  carrier_response: string | null;
+  created_at: string;
 }
 
 export interface AdminOrderDetail extends AdminOrderRow {
@@ -62,6 +75,7 @@ export interface AdminOrderDetail extends AdminOrderRow {
   packages: { quantity: number; weight_kg: number; description: string }[];
   cancellation: AdminOrderCancellation | null;
   refund_status: "refund_pending" | "refunded" | null;
+  cancellation_request: AdminOrderCancellationRequest | null;
 }
 
 export interface AdminCarrier {

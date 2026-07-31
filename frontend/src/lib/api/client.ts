@@ -83,7 +83,20 @@ function extractErrorDetail(data: unknown, status: number): string {
       if (messages.length > 0) return messages.join(". ");
     }
   }
-  return `Request failed with status ${status}`;
+  // Fallbacks для типовых статусов, где сервер не прислал понятного detail
+  // (например slowapi 429 отдаёт свой формат без detail).
+  switch (status) {
+    case 429:
+      return "Слишком много попыток. Подождите немного и попробуйте снова.";
+    case 500:
+      return "Сервер временно недоступен. Попробуйте позже.";
+    case 502:
+    case 503:
+    case 504:
+      return "Сервис временно недоступен. Попробуйте через минуту.";
+    default:
+      return `Request failed with status ${status}`;
+  }
 }
 
 export async function apiRequest<T>(

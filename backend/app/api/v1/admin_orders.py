@@ -13,6 +13,7 @@ from app.core.db import get_db
 from app.core.dependencies import require_admin, require_admin_or_operator
 from app.core.limiter import limiter
 from app.modules.audit.service import AuditService
+from app.modules.cancellations.repository import CancellationRequestsRepository
 from app.modules.commissions.service import CommissionsService
 from app.modules.dispatch.models import OrderStatusHistory
 from app.modules.dispatch.service import DispatchWorker
@@ -33,6 +34,7 @@ _shipments_svc = ShipmentsService()
 _dispatch_svc = DispatchWorker()
 _audit_svc = AuditService()
 _commissions_svc = CommissionsService()
+_cancel_repo = CancellationRequestsRepository()
 
 # Держим синхронно с OrderDraftStatus Literal (backend/app/modules/orders/schemas.py)
 # и ALLOWED_ORDER_TRANSITIONS (backend/app/common/status_machine.py). Пропустишь
@@ -165,6 +167,10 @@ def list_all_orders(
                     "cancelled_at": row.created_at.isoformat(),
                 }
 
+    # Один запрос на страницу — чтобы в списке рядом со статусом показать
+    # badge «Заявка на отмену» без N+1.
+    pending_cancel_ids = _cancel_repo.order_ids_with_pending(db, order_ids)
+
     items = [
         {
             "id": o.id,
@@ -198,6 +204,7 @@ def list_all_orders(
             "carrier_tracking_number": shipments_map[o.id].carrier_tracking_number if o.id in shipments_map else None,
             "carrier_barcode": shipments_map[o.id].carrier_barcode if o.id in shipments_map else None,
             "cancellation": cancel_map.get(o.id),
+            "has_pending_cancellation": o.id in pending_cancel_ids,
         }
         for o in orders
     ]
@@ -268,6 +275,22 @@ def get_order(
         if tx_status in ("refund_pending", "refunded"):
             refund_status = tx_status
 
+    # Активная (pending) заявка на отмену — показывается прямо в карточке
+    # заказа, чтобы админ мог принять решение без перехода на отдельный экран.
+    pending_cancel = _cancel_repo.get_pending_for_order(db, order_id)
+    cancellation_request: dict | None = None
+    if pending_cancel:
+        cancellation_request = {
+            "id": pending_cancel.id,
+            "status": pending_cancel.status,
+            "reason": pending_cancel.reason,
+            "carrier_code": pending_cancel.carrier_code,
+            "api_attempted": pending_cancel.api_attempted,
+            "api_error": pending_cancel.api_error,
+            "carrier_response": pending_cancel.carrier_response,
+            "created_at": pending_cancel.created_at.isoformat(),
+        }
+
     return {
         "id": order.id,
         "status": order.status,
@@ -317,6 +340,7 @@ def get_order(
         ],
         "cancellation": cancellation,
         "refund_status": refund_status,
+        "cancellation_request": cancellation_request,
     }
 
 

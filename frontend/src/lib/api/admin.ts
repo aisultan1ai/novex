@@ -111,6 +111,17 @@ export const uploadTariffGrid = (carrierId: number, serviceId: number, file: Fil
   upload(`/admin/carriers/${carrierId}/services/${serviceId}/rates/upload`, file);
 
 // Carrier account
+export interface CarrierAccount {
+  id: number;
+  email: string;
+  full_name: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export const listCarrierAccounts = (carrierId: number): Promise<CarrierAccount[]> =>
+  req(`/admin/carriers/${carrierId}/accounts`);
+
 export const createCarrierAccount = (
   carrierId: number,
   body: { email: string; full_name?: string; temp_password: string },

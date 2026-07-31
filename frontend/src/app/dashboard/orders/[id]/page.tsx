@@ -157,11 +157,6 @@ export default function OrderDetailPage() {
       setOrder(resp.order);
       setShowCancelModal(false);
       setCancelReason("");
-      if (resp.outcome === "requested") {
-        setInfo(
-          "Заявка на отмену отправлена перевозчику. Мы уведомим вас, как только будет решение."
-        );
-      }
     } catch (err) {
       setCancelError(err instanceof ApiError ? err.detail : "Не удалось отменить заказ.");
     } finally {

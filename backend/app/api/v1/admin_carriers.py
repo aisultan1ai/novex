@@ -30,6 +30,7 @@ from app.modules.carriers.webhook_config import (
     CarrierWebhookRepository,
     CarrierWebhookUpdate,
 )
+from app.modules.identity.models import CarrierProfile, User
 from app.modules.identity.service import CreateCarrierAccountRequest, IdentityService
 
 _webhook_repo = CarrierWebhookRepository()
@@ -476,6 +477,33 @@ def add_zone_city(
 
 
 # ── Carrier portal account ─────────────────────────────────────────────────────
+
+
+@router.get("/{carrier_id}/accounts")
+def list_carrier_accounts(
+    carrier_id: int,
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+) -> list[dict]:
+    """Список пользователей-сотрудников этого перевозчика (по carrier_profiles)."""
+    if not db.get(Carrier, carrier_id):
+        raise HTTPException(404, "Перевозчик не найден")
+    rows = db.execute(
+        select(User)
+        .join(CarrierProfile, CarrierProfile.user_id == User.id)
+        .where(CarrierProfile.carrier_id == carrier_id)
+        .order_by(User.created_at.desc())
+    ).scalars().all()
+    return [
+        {
+            "id": u.id,
+            "email": u.email,
+            "full_name": u.full_name,
+            "is_active": u.is_active,
+            "created_at": u.created_at.isoformat(),
+        }
+        for u in rows
+    ]
 
 
 @router.post("/{carrier_id}/account", status_code=201)

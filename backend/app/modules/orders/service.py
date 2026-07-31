@@ -274,6 +274,7 @@ class OrdersService:
         *,
         user_id: int,
         page_params: PageParams,
+        statuses: list[str] | None = None,
     ) -> OrderDraftListResponse:
         import math
 
@@ -282,6 +283,7 @@ class OrdersService:
             user_id=user_id,
             offset=page_params.offset,
             limit=page_params.size,
+            statuses=statuses,
         )
         logger.debug(
             "Listed order drafts: user_id=%s page=%s size=%s total=%s",

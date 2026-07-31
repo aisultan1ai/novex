@@ -12,6 +12,11 @@ import {
   rejectAdminPayment,
 } from "@/lib/api/admin";
 import {
+  adminApproveCancellation,
+  adminRejectCancellation,
+  adminRetryApiCancellation,
+} from "@/lib/api/cancellations";
+import {
   ORDER_STATUS_LABELS,
   ORDER_STATUSES,
   orderStatusColors,
@@ -26,11 +31,20 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 const ALL_STATUSES = ORDER_STATUSES;
 const STATUS_LABELS = ORDER_STATUS_LABELS;
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, cancellationSource }: { status: string; cancellationSource?: string | null }) {
   const c = orderStatusColors(status);
+  let label = orderStatusLabel(status);
+  if (status === "cancelled" && cancellationSource) {
+    const suffix =
+      cancellationSource === "customer_cancel" ? "клиентом"
+      : cancellationSource === "admin" ? "администратором"
+      : cancellationSource === "system_worker" ? "системой"
+      : null;
+    if (suffix) label = `Отменён ${suffix}`;
+  }
   return (
     <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600, background: c.bg, color: c.color, whiteSpace: "nowrap" }}>
-      {orderStatusLabel(status)}
+      {label}
     </span>
   );
 }
@@ -197,12 +211,16 @@ function PaymentPanel({ orderId, onAction }: PaymentPanelProps) {
 const ROLE_LABELS: Record<string, string> = { sender: "Отправитель", recipient: "Получатель" };
 const SHIPMENT_TYPE_LABELS: Record<string, string> = { parcel: "Посылка", document: "Документ" };
 
-function OrderDetailPanel({ orderId }: { orderId: number }) {
+function OrderDetailPanel({ orderId, onCancellationResolved }: { orderId: number; onCancellationResolved?: () => void }) {
   const [detail, setDetail] = useState<AdminOrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
+  const [cancelBusy, setCancelBusy] = useState<"approve" | "reject" | "retry" | null>(null);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [cancelMsg, setCancelMsg] = useState<string | null>(null);
 
-  useEffect(() => {
+  const reload = useCallback(() => {
     setLoading(true);
     getAdminOrder(orderId)
       .then(setDetail)
@@ -210,12 +228,66 @@ function OrderDetailPanel({ orderId }: { orderId: number }) {
       .finally(() => setLoading(false));
   }, [orderId]);
 
+  useEffect(() => { reload(); }, [reload]);
+
+  async function handleApproveCancellation(requestId: number) {
+    if (!window.confirm("Подтвердить отмену? Заказ будет переведён в статус «Отменён», комиссия сторнируется, платежи — в refund_pending.")) return;
+    setCancelBusy("approve");
+    setCancelMsg(null);
+    try {
+      await adminApproveCancellation(requestId);
+      reload();
+      onCancellationResolved?.();
+    } catch (e) {
+      setCancelMsg(e instanceof Error ? e.message : "Ошибка");
+    } finally {
+      setCancelBusy(null);
+    }
+  }
+
+  async function handleRejectCancellation(requestId: number) {
+    const trimmed = rejectReason.trim();
+    if (trimmed.length < 3) {
+      setCancelMsg("Причина обязательна (минимум 3 символа)");
+      return;
+    }
+    setCancelBusy("reject");
+    setCancelMsg(null);
+    try {
+      await adminRejectCancellation(requestId, trimmed);
+      setRejectOpen(false);
+      setRejectReason("");
+      reload();
+      onCancellationResolved?.();
+    } catch (e) {
+      setCancelMsg(e instanceof Error ? e.message : "Ошибка");
+    } finally {
+      setCancelBusy(null);
+    }
+  }
+
+  async function handleRetryCancellation(requestId: number) {
+    setCancelBusy("retry");
+    setCancelMsg(null);
+    try {
+      await adminRetryApiCancellation(requestId);
+      reload();
+      onCancellationResolved?.();
+    } catch (e) {
+      setCancelMsg(e instanceof Error ? e.message : "Ошибка");
+    } finally {
+      setCancelBusy(null);
+    }
+  }
+
   if (loading) return <div style={dp.wrap}><span style={{ color: "#64748b", fontSize: 13 }}>Загружаем детали…</span></div>;
   if (error)   return <div style={dp.wrap}><span style={{ color: "#dc2626", fontSize: 13 }}>{error}</span></div>;
   if (!detail) return null;
 
   const sender    = detail.parties.find((p) => p.role === "sender");
   const recipient = detail.parties.find((p) => p.role === "recipient");
+  const cReq      = detail.cancellation_request;
+  const canRetry  = cReq && (cReq.carrier_code === "cse" || cReq.carrier_code === "exline");
 
   const sourceLabel =
     detail.cancellation?.source === "customer_cancel" ? "клиентом"
@@ -224,6 +296,87 @@ function OrderDetailPanel({ orderId }: { orderId: number }) {
 
   return (
     <div style={dp.wrap}>
+      {/* ── Активная заявка на отмену ───────────────────────────────── */}
+      {cReq && cReq.status === "pending" && (
+        <div style={{ marginBottom: 16, padding: "14px 18px", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#92400E" }}>
+              Клиент запросил отмену заказа
+            </div>
+            <div style={{ fontSize: 12, color: "#B45309" }}>
+              {new Date(cReq.created_at).toLocaleString("ru-RU")}
+            </div>
+          </div>
+          <div style={{ fontSize: 13, color: "#78350F", marginBottom: 10 }}>
+            <b>Причина:</b> {cReq.reason}
+          </div>
+          {cReq.api_attempted && cReq.api_error && (
+            <div style={{ marginBottom: 10, padding: "8px 12px", background: "#FEF3C7", borderRadius: 8, fontSize: 12, color: "#92400E" }}>
+              <b>API-отмена пробовалась:</b>{" "}
+              <span style={{ fontFamily: "monospace" }}>{cReq.api_error}</span>
+            </div>
+          )}
+          {cancelMsg && (
+            <div style={{ marginBottom: 10, padding: "7px 12px", background: "#FEE2E2", border: "1px solid #FCA5A5", borderRadius: 8, fontSize: 12, color: "#991B1B" }}>
+              {cancelMsg}
+            </div>
+          )}
+          {!rejectOpen ? (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                onClick={() => handleApproveCancellation(cReq.id)}
+                disabled={cancelBusy !== null}
+                style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#16A34A", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: cancelBusy ? 0.6 : 1 }}
+              >
+                {cancelBusy === "approve" ? "Подтверждаем…" : "Подтвердить отмену"}
+              </button>
+              {canRetry && (
+                <button
+                  onClick={() => handleRetryCancellation(cReq.id)}
+                  disabled={cancelBusy !== null}
+                  style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #C7D2FE", background: "#EEF2FF", color: "#4338CA", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: cancelBusy ? 0.6 : 1 }}
+                >
+                  {cancelBusy === "retry" ? "Пробуем…" : "Повторить API-отмену"}
+                </button>
+              )}
+              <button
+                onClick={() => setRejectOpen(true)}
+                disabled={cancelBusy !== null}
+                style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #FECACA", background: "#fff", color: "#DC2626", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: cancelBusy ? 0.6 : 1 }}
+              >
+                Отклонить
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Причина отклонения (клиент увидит этот текст) — минимум 3 символа"
+                rows={2}
+                style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #E5E7EB", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "vertical" }}
+              />
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => handleRejectCancellation(cReq.id)}
+                  disabled={cancelBusy !== null}
+                  style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#DC2626", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: cancelBusy ? 0.6 : 1 }}
+                >
+                  {cancelBusy === "reject" ? "Отправляем…" : "Отправить отказ"}
+                </button>
+                <button
+                  onClick={() => { setRejectOpen(false); setRejectReason(""); setCancelMsg(null); }}
+                  disabled={cancelBusy !== null}
+                  style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #E5E7EB", background: "#fff", color: "#64748B", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+                >
+                  Отмена
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Отмена (показываем сразу вверху, если есть) ─────────────── */}
       {detail.cancellation && (
         <div style={{ marginBottom: 16, padding: "14px 18px", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10 }}>
@@ -467,19 +620,22 @@ const OrderRow = memo(function OrderRow({
           )}
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4 }}>
-          <StatusBadge status={order.status} />
-          {order.cancellation?.source === "customer_cancel" && (
+        <div
+          style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4 }}
+          title={order.cancellation?.reason ? `Причина: ${order.cancellation.reason}` : undefined}
+        >
+          <StatusBadge status={order.status} cancellationSource={order.cancellation?.source} />
+          {order.has_pending_cancellation && (
             <span
-              title={`Клиент отменил: ${order.cancellation.reason}`}
+              title="Клиент запросил отмену — откройте детали"
               style={{
                 fontSize: 10, fontWeight: 700, letterSpacing: "0.03em",
                 padding: "2px 8px", borderRadius: 999,
-                background: "#FEE2E2", color: "#991B1B",
+                background: "#FEF3C7", color: "#92400E",
                 textTransform: "uppercase",
               }}
             >
-              Клиент
+              Заявка на отмену
             </span>
           )}
         </div>
@@ -520,7 +676,7 @@ const OrderRow = memo(function OrderRow({
         <PaymentPanel orderId={order.id} onAction={onPaymentAction} />
       )}
 
-      {isDetailOpen && <OrderDetailPanel orderId={order.id} />}
+      {isDetailOpen && <OrderDetailPanel orderId={order.id} onCancellationResolved={onPaymentAction} />}
 
       {isEditing && (
         <div style={{ padding: "12px 20px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>

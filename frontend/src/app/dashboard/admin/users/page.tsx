@@ -243,6 +243,9 @@ export default function AdminUsersPage() {
               </label>
               <div style={{ display: "flex", gap: 8 }}>
                 {(["customer", "operator", "admin"] as const).map((r) => {
+                  // «Перевозчик» намеренно не в списке — учётка сотрудника
+                  // перевозчика привязывается к carrier_id и создаётся из
+                  // раздела «Перевозчики» → детали → «+ Добавить аккаунт».
                   const s = ROLE_STYLES[r];
                   const active = form.role === r;
                   return (
@@ -268,6 +271,13 @@ export default function AdminUsersPage() {
                     </button>
                   );
                 })}
+              </div>
+              <div style={{ marginTop: 8, fontSize: 11, color: "#94a3b8", lineHeight: 1.5 }}>
+                Сотрудника перевозчика создавайте в{" "}
+                <Link href="/dashboard/admin/carriers" style={{ color: "#4338ca", textDecoration: "underline" }}>
+                  разделе «Перевозчики»
+                </Link>
+                {" "}→ откройте нужного перевозчика → «+ Добавить аккаунт».
               </div>
             </div>
 

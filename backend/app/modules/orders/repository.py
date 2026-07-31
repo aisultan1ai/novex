@@ -316,10 +316,14 @@ class OrdersRepository:
         user_id: int,
         offset: int = 0,
         limit: int = 20,
+        statuses: list[str] | None = None,
     ) -> tuple[list[OrderDraft], int]:
         base_where = OrderDraft.user_id == user_id
 
-        total: int = db.scalar(select(func.count(OrderDraft.id)).where(base_where)) or 0
+        count_stmt = select(func.count(OrderDraft.id)).where(base_where)
+        if statuses:
+            count_stmt = count_stmt.where(OrderDraft.status.in_(statuses))
+        total: int = db.scalar(count_stmt) or 0
 
         stmt = (
             select(OrderDraft)
@@ -328,7 +332,11 @@ class OrdersRepository:
                 selectinload(OrderDraft.packages),
             )
             .where(base_where)
-            .order_by(OrderDraft.created_at.desc())
+        )
+        if statuses:
+            stmt = stmt.where(OrderDraft.status.in_(statuses))
+        stmt = (
+            stmt.order_by(OrderDraft.created_at.desc())
             .offset(offset)
             .limit(limit)
         )

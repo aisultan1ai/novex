@@ -49,13 +49,27 @@ def create_order_draft_from_quote(
 def list_orders(
     page: int = Query(default=1, ge=1, description="Номер страницы"),
     size: int = Query(default=20, ge=1, le=100, description="Элементов на странице"),
+    statuses: list[str] | None = Query(
+        default=None,
+        description="Фильтр по статусам (можно передавать несколько раз или через запятую)",
+    ),
     current_user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> OrderDraftListResponse:
+    # Разрешаем клиенту прислать `statuses=a,b,c` одной строкой или несколько
+    # `statuses=` параметров подряд — в обоих случаях получаем плоский список.
+    flat_statuses: list[str] | None = None
+    if statuses:
+        flat_statuses = []
+        for entry in statuses:
+            flat_statuses.extend(s.strip() for s in entry.split(",") if s.strip())
+        if not flat_statuses:
+            flat_statuses = None
     return orders_service.list_order_drafts(
         db,
         user_id=current_user_id,
         page_params=PageParams(page=page, size=size),
+        statuses=flat_statuses,
     )
 
 

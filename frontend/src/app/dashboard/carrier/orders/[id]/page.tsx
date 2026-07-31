@@ -10,6 +10,10 @@ import {
   uploadCarrierPod,
   type CarrierOrderItem,
 } from "@/lib/api/carrier";
+import {
+  carrierApproveCancellation,
+  carrierRejectCancellation,
+} from "@/lib/api/cancellations";
 import { ORDER_STATUS_LABELS, orderStatusColors } from "@/lib/status-labels";
 
 // Same treatment as public/customer tracking pages: for carriers whose native
@@ -51,6 +55,11 @@ export default function CarrierOrderDetailPage() {
   const [podFile, setPodFile] = useState<File | null>(null);
   const [podLoading, setPodLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const [cancelBusy, setCancelBusy] = useState<"approve" | "reject" | null>(null);
+  const [cancelRejectOpen, setCancelRejectOpen] = useState(false);
+  const [cancelRejectReason, setCancelRejectReason] = useState("");
+  const [cancelMsg, setCancelMsg] = useState<string | null>(null);
 
   const reload = async () => {
     try {
@@ -99,6 +108,40 @@ export default function CarrierOrderDetailPage() {
       setActionErr(e instanceof Error ? e.message : "Ошибка");
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleApproveCancellation = async (requestId: number) => {
+    if (!window.confirm("Подтверждаете отмену? Заказ будет закрыт у Novex, клиент получит уведомление.")) return;
+    setCancelBusy("approve");
+    setCancelMsg(null);
+    try {
+      await carrierApproveCancellation(requestId);
+      await reload();
+    } catch (e) {
+      setCancelMsg(e instanceof Error ? e.message : "Ошибка");
+    } finally {
+      setCancelBusy(null);
+    }
+  };
+
+  const handleRejectCancellation = async (requestId: number) => {
+    const trimmed = cancelRejectReason.trim();
+    if (trimmed.length < 3) {
+      setCancelMsg("Причина обязательна (минимум 3 символа)");
+      return;
+    }
+    setCancelBusy("reject");
+    setCancelMsg(null);
+    try {
+      await carrierRejectCancellation(requestId, trimmed);
+      setCancelRejectOpen(false);
+      setCancelRejectReason("");
+      await reload();
+    } catch (e) {
+      setCancelMsg(e instanceof Error ? e.message : "Ошибка");
+    } finally {
+      setCancelBusy(null);
     }
   };
 
@@ -302,25 +345,67 @@ export default function CarrierOrderDetailPage() {
         </div>
       )}
 
-      {/* Pending cancellation request - обращает внимание перевозчика
-          прямо в детали заказа, чтобы не пришлось идти на страницу «Отмены». */}
+      {/* Pending cancellation request — inline actions прямо в карточке заказа. */}
       {order.cancellation_request && order.cancellation_request.status === "pending" && (
         <div style={{ ...styles.card, borderColor: "#fde68a", background: "#fffbeb" }}>
           <div style={{ ...styles.cardTitle, color: "#92400e", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <span>Клиент запросил отмену заказа</span>
-            <a
-              href="/dashboard/carrier/cancellation-requests"
-              style={{ fontSize: 12, fontWeight: 600, color: "#92400e", textDecoration: "underline" }}
-            >
-              Открыть заявку →
-            </a>
+            <span style={{ fontSize: 11, color: "#b45309", fontWeight: 500 }}>
+              {new Date(order.cancellation_request.created_at).toLocaleString("ru-KZ")}
+            </span>
           </div>
-          <div style={{ fontSize: 13, color: "#78350f", marginTop: 6 }}>
+          <div style={{ fontSize: 13, color: "#78350f", marginBottom: 12 }}>
             <b>Причина:</b> {order.cancellation_request.reason}
           </div>
-          <div style={{ fontSize: 11, color: "#b45309", marginTop: 8 }}>
-            Отправлена {new Date(order.cancellation_request.created_at).toLocaleString("ru-KZ")}
-          </div>
+          {cancelMsg && (
+            <div style={{ marginBottom: 10, padding: "7px 12px", background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 8, fontSize: 12, color: "#991b1b" }}>
+              {cancelMsg}
+            </div>
+          )}
+          {!cancelRejectOpen ? (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                onClick={() => handleApproveCancellation(order.cancellation_request!.id)}
+                disabled={cancelBusy !== null}
+                style={{ padding: "8px 18px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: cancelBusy ? 0.6 : 1 }}
+              >
+                {cancelBusy === "approve" ? "Подтверждаем…" : "Подтверждаю, отменил у себя"}
+              </button>
+              <button
+                onClick={() => setCancelRejectOpen(true)}
+                disabled={cancelBusy !== null}
+                style={{ padding: "8px 18px", borderRadius: 8, border: "1px solid #fecaca", background: "#fff", color: "#dc2626", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: cancelBusy ? 0.6 : 1 }}
+              >
+                Отклонить
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <textarea
+                value={cancelRejectReason}
+                onChange={(e) => setCancelRejectReason(e.target.value)}
+                placeholder="Причина отказа — клиент увидит этот текст (минимум 3 символа)"
+                rows={2}
+                style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "vertical" }}
+              />
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => handleRejectCancellation(order.cancellation_request!.id)}
+                  disabled={cancelBusy !== null}
+                  style={{ padding: "8px 18px", borderRadius: 8, border: "none", background: "#dc2626", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: cancelBusy ? 0.6 : 1 }}
+                >
+                  {cancelBusy === "reject" ? "Отправляем…" : "Отправить отказ"}
+                </button>
+                <button
+                  onClick={() => { setCancelRejectOpen(false); setCancelRejectReason(""); setCancelMsg(null); }}
+                  disabled={cancelBusy !== null}
+                  style={{ padding: "8px 18px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", color: "#64748b", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+                >
+                  Отмена
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

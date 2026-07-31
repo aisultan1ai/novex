@@ -49,7 +49,7 @@ function CancelPendingBadge() {
 function StatusBadge({ status }: { status: string }) {
   const colors = orderStatusColors(status);
   return (
-    <span style={{ display: "inline-block", padding: "4px 12px", borderRadius: 999, fontSize: 12, fontWeight: 600, background: colors.bg, color: colors.color, whiteSpace: "nowrap" }}>
+    <span style={{ display: "inline-block", padding: "4px 12px", borderRadius: 999, fontSize: 12, fontWeight: 600, lineHeight: 1.35, background: colors.bg, color: colors.color, maxWidth: "100%", whiteSpace: "normal", wordBreak: "break-word" }}>
       {orderStatusLabel(status)}
     </span>
   );
@@ -131,7 +131,7 @@ const DesktopOrderRow = memo(function DesktopOrderRow({ order, isLast, onOpen }:
   return (
     <div
       onClick={() => onOpen(order.draft_id)}
-      style={{ display: "grid", gridTemplateColumns: "120px 1fr 180px 140px 140px 32px", gap: 12, padding: "16px 24px", borderBottom: isLast ? "none" : "1px solid #f1f5f9", alignItems: "center", cursor: "pointer", transition: "background 0.1s" }}
+      style={{ display: "grid", gridTemplateColumns: "100px 1fr 170px 180px 130px 32px", gap: 12, padding: "16px 24px", borderBottom: isLast ? "none" : "1px solid #f1f5f9", alignItems: "center", cursor: "pointer", transition: "background 0.1s" }}
       onMouseEnter={(e) => { e.currentTarget.style.background = "#f8fafc"; }}
       onMouseLeave={(e) => { e.currentTarget.style.background = ""; }}
     >
@@ -198,7 +198,14 @@ function MyOrdersPageInner() {
     setIsLoading(true);
     async function fetchOrders() {
       try {
-        const data = await listOrders(page, PAGE_SIZE);
+        // Фильтр по статусам передаём на бэк, чтобы total и pages были
+        // согласованы с тем, что видит пользователь на текущей вкладке.
+        const statuses = FILTER_GROUPS[activeFilter];
+        const data = await listOrders(
+          page,
+          PAGE_SIZE,
+          statuses.length > 0 ? statuses : undefined,
+        );
         setOrders(data.items);
         setTotal(data.total);
       } catch (err) {
@@ -208,7 +215,7 @@ function MyOrdersPageInner() {
       }
     }
     void fetchOrders();
-  }, [isAuthenticated, page]);
+  }, [isAuthenticated, page, activeFilter]);
 
   // Filter switching resets to page 1 so users don't land on an empty page
   // when they had paginated deep into "all" and then narrow the view.
@@ -225,13 +232,9 @@ function MyOrdersPageInner() {
     [router],
   );
 
-  // Recompute only when the source array or the active filter actually
-  // change - previously this was O(N) on every render.
-  const filteredOrders = useMemo(() => (
-    activeFilter === "all"
-      ? orders
-      : orders.filter((o) => FILTER_GROUPS[activeFilter]?.includes(o.status))
-  ), [orders, activeFilter]);
+  // Фильтрация делается на бэке (см. fetchOrders выше). Здесь просто
+  // отдаём то, что пришло с сервера.
+  const filteredOrders = orders;
 
   if (authLoading || (!isAuthenticated && !authLoading)) return null;
 
@@ -311,7 +314,7 @@ function MyOrdersPageInner() {
       ) : (
         /* ── Desktop: table ── */
         <div style={cardStyle}>
-          <div style={{ display: "grid", gridTemplateColumns: "120px 1fr 180px 140px 140px 32px", gap: 12, padding: "12px 24px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", alignItems: "center" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "100px 1fr 170px 180px 130px 32px", gap: 12, padding: "12px 24px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", alignItems: "center" }}>
             <span>Реф. №</span>
             <span>Адрес получателя</span>
             <span>Служба / Тариф</span>

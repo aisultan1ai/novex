@@ -112,9 +112,16 @@ export const CANCELLABLE_STATUSES: readonly string[] = [
 export async function listOrders(
   page = 1,
   size = 20,
+  statuses?: readonly string[],
 ): Promise<OrderDraftListResponse> {
+  const qs = new URLSearchParams();
+  qs.set("page", String(page));
+  qs.set("size", String(size));
+  if (statuses && statuses.length > 0) {
+    qs.set("statuses", statuses.join(","));
+  }
   return apiRequest<OrderDraftListResponse>(
-    `/orders?page=${page}&size=${size}`,
+    `/orders?${qs.toString()}`,
     { method: "GET" },
   );
 }

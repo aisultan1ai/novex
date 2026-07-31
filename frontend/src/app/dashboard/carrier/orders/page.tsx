@@ -180,11 +180,19 @@ export default function CarrierOrdersPage() {
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 8, marginTop: 16, alignItems: "center", flexWrap: "wrap" }}>
-        <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={!hasPrev} style={styles.pageBtn}>← Назад</button>
-        <span style={{ fontSize: 13 }}>Стр. {page} из {totalPages} · всего {total}</span>
-        <button onClick={() => setPage((p) => p + 1)} disabled={!hasNext} style={styles.pageBtn}>Вперёд →</button>
-      </div>
+      {totalPages > 1 && (
+        <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 24, flexWrap: "wrap" }}>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+            <button
+              key={p}
+              onClick={() => setPage(p)}
+              style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid #e5e7eb", background: p === page ? "#0f172a" : "#ffffff", color: p === page ? "#ffffff" : "#0f172a", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
