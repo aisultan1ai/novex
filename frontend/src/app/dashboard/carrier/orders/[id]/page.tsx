@@ -15,24 +15,7 @@ import {
   carrierRejectCancellation,
 } from "@/lib/api/cancellations";
 import { ORDER_STATUS_LABELS, orderStatusColors } from "@/lib/status-labels";
-
-// Same treatment as public/customer tracking pages: for carriers whose native
-// description is more informative than our normalized labels, show the raw
-// carrier text. Azimuth просил показывать свой сырой текст на trackingе -
-// сохраняем поведение. Также страхует от "carrier_unknown", которое могло
-// оседать в старых событиях до появления status_mapper.
-const RAW_DESCRIPTION_CARRIERS = new Set(["azimuth"]);
-
-function eventLabel(
-  event: { status: string; description: string | null },
-  carrierCode: string | null,
-): string {
-  const raw = event.description?.trim();
-  if (carrierCode && RAW_DESCRIPTION_CARRIERS.has(carrierCode) && raw) return raw;
-  const normalized = ORDER_STATUS_LABELS[event.status];
-  if (normalized) return normalized;
-  return raw || "Обновление статуса";
-}
+import { TrackingTimeline } from "@/components/orders/tracking-timeline";
 
 const ACCEPT_STATUSES = new Set(["sent_to_carrier", "pending_manual", "pending_manual_dispatch", "dispatch_failed"]);
 const REJECT_STATUSES = new Set(["sent_to_carrier", "pending_manual", "pending_manual_dispatch"]);
@@ -60,6 +43,8 @@ export default function CarrierOrderDetailPage() {
   const [cancelRejectOpen, setCancelRejectOpen] = useState(false);
   const [cancelRejectReason, setCancelRejectReason] = useState("");
   const [cancelMsg, setCancelMsg] = useState<string | null>(null);
+
+  const [trackingOpen, setTrackingOpen] = useState(false);
 
   const reload = async () => {
     try {
@@ -432,22 +417,38 @@ export default function CarrierOrderDetailPage() {
         </div>
       )}
 
-      {/* Tracking events */}
+      {/* Tracking events — аккордеон, по умолчанию закрыт. */}
       {(order.tracking_events?.length ?? 0) > 0 && (
-        <div style={styles.card}>
-          <div style={styles.cardTitle}>История статусов</div>
-          {order.tracking_events!.map((e, i) => {
-            const label = eventLabel(e, order.carrier_code);
-            const subtitle = e.description && e.description.trim() !== label ? e.description : null;
-            return (
-              <div key={i} style={{ padding: "6px 0", borderBottom: "1px solid #f3f4f6", fontSize: 13 }}>
-                <span style={{ fontWeight: 600 }}>{label}</span>
-                {e.location && <span style={{ color: "#6b7280", marginLeft: 8 }}>📍 {e.location}</span>}
-                {subtitle && <div style={{ color: "#6b7280", fontSize: 12 }}>{subtitle}</div>}
-                <div style={{ fontSize: 11, color: "#9ca3af" }}>{new Date(e.occurred_at).toLocaleString("ru-KZ")}</div>
-              </div>
-            );
-          })}
+        <div style={{ ...styles.card, padding: trackingOpen ? "20px 24px" : "12px 16px" }}>
+          <button
+            type="button"
+            onClick={() => setTrackingOpen((v) => !v)}
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 8,
+              padding: 0,
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              fontFamily: "inherit",
+              textAlign: "left",
+            }}
+          >
+            <span style={{ ...styles.cardTitle, marginBottom: 0 }}>
+              История статусов ({order.tracking_events!.length})
+            </span>
+            <span style={{ fontSize: 14, color: "#94a3b8", transform: trackingOpen ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.15s" }}>
+              ▾
+            </span>
+          </button>
+          {trackingOpen && (
+            <div style={{ marginTop: 16 }}>
+              <TrackingTimeline events={order.tracking_events!} carrierCode={order.carrier_code} />
+            </div>
+          )}
         </div>
       )}
     </div>

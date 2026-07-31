@@ -8,50 +8,10 @@ import { useAuth } from "@/components/providers/auth-provider";
 import { getOrderDraft } from "@/lib/api/orders";
 import { getOrderTracking } from "@/lib/api/tracking";
 import { createReview, getOrderReview, type ReviewResponse } from "@/lib/api/reviews";
-import { ORDER_STATUS_LABELS } from "@/lib/status-labels";
+import { TrackingTimeline } from "@/components/orders/tracking-timeline";
 import type { TrackingEvent } from "@/types/tracking";
 
-// Timeline-specific цвета (dot/line, а не bg/color, как в обычных бейджах),
-// поэтому оставлены локальными - единый ORDER_STATUS_COLORS сюда не подходит.
-const STATUS_COLORS: Record<string, { dot: string; line: string }> = {
-  paid:             { dot: "#16a34a", line: "#bbf7d0" },
-  sent_to_carrier:  { dot: "#2563eb", line: "#bfdbfe" },
-  picked_up:        { dot: "#2563eb", line: "#bfdbfe" },
-  in_transit:       { dot: "#7c3aed", line: "#ddd6fe" },
-  out_for_delivery: { dot: "#7c3aed", line: "#ddd6fe" },
-  arrived:          { dot: "#7c3aed", line: "#ddd6fe" },
-  delivered:        { dot: "#16a34a", line: "#bbf7d0" },
-  delivery_failed:  { dot: "#dc2626", line: "#fecaca" },
-  returned:         { dot: "#dc2626", line: "#fecaca" },
-  return:           { dot: "#dc2626", line: "#fecaca" },
-  cancelled:        { dot: "#dc2626", line: "#fecaca" },
-  customs_hold:     { dot: "#d97706", line: "#fde68a" },
-};
-
 const REVIEWABLE_STATUSES = new Set(["delivered", "returned"]);
-
-// Карrier'ы, у которых родное описание события информативнее нашего
-// нормализованного лейбла. Для Azimuth перевозчик просил показывать сырой
-// текст напрямую - не переводим и не нормализуем.
-const RAW_DESCRIPTION_CARRIERS = new Set(["azimuth"]);
-
-function eventLabel(
-  event: { status: string; description: string | null },
-  carrierCode: string | null,
-): string {
-  const raw = event.description?.trim();
-  if (carrierCode && RAW_DESCRIPTION_CARRIERS.has(carrierCode) && raw) return raw;
-  const normalized = ORDER_STATUS_LABELS[event.status];
-  if (normalized) return normalized;
-  return raw || "Обновление статуса";
-}
-
-function formatDateTime(iso: string) {
-  return new Date(iso).toLocaleString("ru-RU", {
-    day: "2-digit", month: "short", year: "numeric",
-    hour: "2-digit", minute: "2-digit",
-  });
-}
 
 function StarRating({ value, onChange }: { value: number; onChange: (n: number) => void }) {
   const [hovered, setHovered] = useState(0);
@@ -257,38 +217,7 @@ export default function OrderTrackingPage() {
         </div>
       ) : (
         <div style={{ background: "#fff", border: "1px solid #E5E7EB", borderRadius: 16, padding: "32px 40px", maxWidth: 640, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
-          {events.map((event, idx) => {
-            const colors = STATUS_COLORS[event.status] ?? { dot: "#94a3b8", line: "#e5e7eb" };
-            const isLast = idx === events.length - 1;
-            const label = eventLabel(event, carrierCode);
-            const subtitle = event.description && event.description.trim() !== label
-              ? event.description
-              : null;
-            return (
-              <div key={event.id} style={{ display: "flex", gap: 16, paddingBottom: isLast ? 0 : 20 }}>
-                {/* dot + line */}
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
-                  <div style={{ width: 14, height: 14, borderRadius: "50%", background: colors.dot, boxShadow: `0 0 0 4px ${colors.line}`, flexShrink: 0, marginTop: 3 }} />
-                  {!isLast && (
-                    <div style={{ width: 2, flex: 1, background: "#e5e7eb", marginTop: 6, marginBottom: 6, minHeight: 24 }} />
-                  )}
-                </div>
-                {/* content */}
-                <div style={{ flex: 1, paddingBottom: isLast ? 0 : 4 }}>
-                  <div style={{ font: "600 14px/1.3 Inter Variable, sans-serif", color: "#111827", marginBottom: 2 }}>
-                    {label}
-                  </div>
-                  {subtitle && (
-                    <div style={{ font: "400 13px/1.4 Inter Variable, sans-serif", color: "#6B7280", marginBottom: 2 }}>{subtitle}</div>
-                  )}
-                  {event.location && (
-                    <div style={{ font: "400 12px/1 Inter Variable, sans-serif", color: "#9CA3AF", marginBottom: 2 }}>{event.location}</div>
-                  )}
-                  <div style={{ font: "400 12px/1 Inter Variable, sans-serif", color: "#9CA3AF" }}>{formatDateTime(event.occurred_at)}</div>
-                </div>
-              </div>
-            );
-          })}
+          <TrackingTimeline events={events} carrierCode={carrierCode} />
         </div>
       )}
 
@@ -315,7 +244,7 @@ export default function OrderTrackingPage() {
             </p>
           )}
           <div style={{ marginTop: 10, fontSize: 12, color: "#94a3b8" }}>
-            {formatDateTime(review.created_at)}
+            {new Date(review.created_at).toLocaleString("ru-RU", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
           </div>
         </div>
       )}

@@ -19,7 +19,7 @@ const PAGE_SIZE = 20;
 function StatusBadge({ status }: { status: string }) {
   const c = orderStatusColors(status);
   return (
-    <span style={{ ...badge, background: c.bg, color: c.color }}>
+    <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600, lineHeight: 1.35, background: c.bg, color: c.color, maxWidth: "100%", whiteSpace: "normal", wordBreak: "break-word" }}>
       {orderStatusLabel(status)}
     </span>
   );
@@ -97,15 +97,19 @@ export default function CarrierOrdersPage() {
   const hasPrev = page > 1;
   const hasNext = page < totalPages;
 
-  return (
-    <div style={{ padding: "0 0 24px" }}>
-      <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, color: "#111827" }}>Заказы</h2>
+  const GRID = "70px 1fr 160px 130px 180px 110px 100px";
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+  return (
+    <>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0f172a" }}>Заказы</h2>
+          <p style={{ margin: "4px 0 0", fontSize: 14, color: "#64748b" }}>Все заказы · {total} всего</p>
+        </div>
         <select
           value={statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          style={styles.select}
+          style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#ffffff", fontSize: 14, cursor: "pointer", fontFamily: "inherit", color: "#0f172a" }}
         >
           <option value="">Все статусы</option>
           {Object.entries(ORDER_STATUS_LABELS).map(([v, l]) => (
@@ -114,69 +118,77 @@ export default function CarrierOrdersPage() {
         </select>
       </div>
 
-      {error && <div style={styles.error}>{error}</div>}
+      {error && <div style={{ padding: "12px 16px", borderRadius: 10, background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c", fontSize: 14, marginBottom: 20 }}>{error}</div>}
 
-      {loading ? (
-        <p style={{ color: "#6b7280" }}>Загрузка...</p>
-      ) : orders.length === 0 ? (
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "48px 24px", textAlign: "center", color: "#94a3b8", fontSize: 14 }}>
-          Заказы не найдены
-        </div>
-      ) : isMobile ? (
-        /* Mobile: card list - the desktop table would horizontally overflow */
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {orders.map((o) => <OrderMobileCard key={o.id} order={o} />)}
-        </div>
+      {isMobile ? (
+        loading ? (
+          <p style={{ color: "#64748b" }}>Загружаем…</p>
+        ) : orders.length === 0 ? (
+          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: "48px 24px", textAlign: "center", color: "#94a3b8", fontSize: 14 }}>
+            Заказы не найдены
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {orders.map((o) => <OrderMobileCard key={o.id} order={o} />)}
+          </div>
+        )
       ) : (
-        /* Desktop: same table as before, wrapped in an overflow container so
-           narrow viewports scroll horizontally instead of clipping. */
-        <div style={{ overflowX: "auto" }}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                {["ID", "Маршрут", "Вес/Тариф", "Сумма", "Статус", "Дата", ""].map((h) => (
-                  <th key={h} style={styles.th}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {orders.map((o) => {
-                const pkg = o.packages[0];
-                const sender = o.parties.find((p) => p.role === "sender");
-                const recipient = o.parties.find((p) => p.role === "recipient");
-                return (
-                  <tr key={o.id} style={styles.tr}>
-                    <td style={styles.td}>
-                      <span style={{ fontWeight: 600 }}>#{o.id}</span>
-                    </td>
-                    <td style={styles.td}>
-                      <div style={{ fontWeight: 600 }}>{o.from_city} → {o.to_city}</div>
-                      {sender && <div style={{ fontSize: 11, color: "#6b7280" }}>От: {sender.full_name}</div>}
-                      {recipient && <div style={{ fontSize: 11, color: "#6b7280" }}>Кому: {recipient.full_name}</div>}
-                    </td>
-                    <td style={styles.td}>
-                      <div>{pkg ? `${pkg.weight_kg} кг` : "-"}</div>
-                      <div style={{ fontSize: 11, color: "#6b7280" }}>{o.tariff_name}</div>
-                    </td>
-                    <td style={styles.td}>
-                      <span style={{ fontWeight: 700 }}>{o.price.toLocaleString()} {o.currency}</span>
-                    </td>
-                    <td style={styles.td}>
-                      <StatusBadge status={o.status} />
-                    </td>
-                    <td style={styles.td}>
-                      {new Date(o.created_at).toLocaleDateString("ru-KZ")}
-                    </td>
-                    <td style={styles.td}>
-                      <Link href={`/dashboard/carrier/orders/${o.id}`} style={styles.btn}>
-                        Открыть
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, overflow: "hidden" }}>
+          <div style={{ display: "grid", gridTemplateColumns: GRID, gap: 12, padding: "12px 20px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            <span>№</span>
+            <span>Маршрут</span>
+            <span>Тариф / вес</span>
+            <span>Сумма</span>
+            <span>Статус</span>
+            <span>Дата</span>
+            <span>Действие</span>
+          </div>
+
+          {loading ? (
+            <div style={{ padding: 48, textAlign: "center", color: "#64748b", fontSize: 14 }}>Загружаем…</div>
+          ) : orders.length === 0 ? (
+            <div style={{ padding: 48, textAlign: "center", color: "#94a3b8", fontSize: 14 }}>Заказы не найдены</div>
+          ) : (
+            orders.map((o, idx) => {
+              const pkg = o.packages[0];
+              const sender = o.parties.find((p) => p.role === "sender");
+              const recipient = o.parties.find((p) => p.role === "recipient");
+              return (
+                <div
+                  key={o.id}
+                  style={{ display: "grid", gridTemplateColumns: GRID, gap: 12, padding: "14px 20px", borderBottom: idx < orders.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center", fontSize: 14 }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = "#f8fafc"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = ""; }}
+                >
+                  <span style={{ fontFamily: "monospace", fontSize: 13, color: "#475569", fontWeight: 600 }}>#{o.id}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{o.from_city} → {o.to_city}</div>
+                    {sender && <div style={{ fontSize: 11, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>От: {sender.full_name}</div>}
+                    {recipient && <div style={{ fontSize: 11, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Кому: {recipient.full_name}</div>}
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: "#0f172a" }}>{o.tariff_name}</div>
+                    <div style={{ fontSize: 11, color: "#94a3b8" }}>{pkg ? `${pkg.weight_kg} кг` : "—"}</div>
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>
+                    {o.price.toLocaleString()} {o.currency}
+                  </div>
+                  <div>
+                    <StatusBadge status={o.status} />
+                  </div>
+                  <span style={{ fontSize: 12, color: "#94a3b8" }}>
+                    {new Date(o.created_at).toLocaleDateString("ru-KZ")}
+                  </span>
+                  <Link
+                    href={`/dashboard/carrier/orders/${o.id}`}
+                    style={{ padding: "6px 12px", borderRadius: 8, border: "none", fontSize: 12, fontWeight: 600, background: "#0f172a", color: "#ffffff", textDecoration: "none", textAlign: "center", fontFamily: "inherit" }}
+                  >
+                    Открыть
+                  </Link>
+                </div>
+              );
+            })
+          )}
         </div>
       )}
 
@@ -193,7 +205,7 @@ export default function CarrierOrdersPage() {
           ))}
         </div>
       )}
-    </div>
+    </>
   );
 }
 

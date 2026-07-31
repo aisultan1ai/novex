@@ -4,18 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   getCarrierCommissionsSummary,
-  getCarrierCommissionConfig,
   listCarrierCommissions,
   type CarrierCommission,
-  type CarrierCommissionConfig,
 } from "@/lib/api/carrier";
 import type { CommissionSummary } from "@/types/admin";
-
-const TYPE_LABELS: Record<string, string> = {
-  percentage: "Процент",
-  fixed:      "Фиксированная",
-  combined:   "Комбинированная",
-};
 
 function formatPrice(n: number, currency = "KZT") {
   return `${new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2, signDisplay: "auto" }).format(n)} ${currency}`;
@@ -25,18 +17,9 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("ru-RU", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-function formatRate(config: CarrierCommissionConfig): string {
-  if (!config.is_set) return "не установлена - используется глобальная ставка платформы";
-  const parts: string[] = [];
-  if (config.commission_rate) parts.push(`${(Number(config.commission_rate) * 100).toFixed(2)}%`);
-  if (config.fixed_amount) parts.push(`${config.fixed_amount} ${config.currency}`);
-  const label = config.commission_type ? TYPE_LABELS[config.commission_type] ?? config.commission_type : "";
-  return `${label ? label + ": " : ""}${parts.join(" + ")}`;
-}
-
-// 9 столбцов: ID · Заказ · Номер заказа · Штрих-код · ID Novex ·
-// Сумма · К выплате · Комиссия · Дата. Идентификаторы шире, суммы уже.
-const TABLE_COLS = "60px 80px 140px 120px 180px 130px 130px 150px 110px";
+// 7 столбцов: ID · Заказ · Номер заказа · Штрих-код · ID Novex ·
+// К выплате · Дата. Оборот и комиссия скрыты — это внутренние цифры Novex.
+const TABLE_COLS = "60px 80px 160px 140px 200px 150px 120px";
 
 function IdCell({ value }: { value: string | null }) {
   if (!value) return <span style={{ fontSize: 12, color: "#cbd5e1" }}>-</span>;
@@ -90,7 +73,6 @@ function SummaryCard({ label, value, sub, color }: { label: string; value: strin
 export default function CarrierCommissionsPage() {
   const [items, setItems] = useState<CarrierCommission[]>([]);
   const [summary, setSummary] = useState<CommissionSummary | null>(null);
-  const [config, setConfig] = useState<CarrierCommissionConfig | null>(null);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -103,13 +85,11 @@ export default function CarrierCommissionsPage() {
     Promise.all([
       listCarrierCommissions(page, SIZE),
       page === 1 ? getCarrierCommissionsSummary() : Promise.resolve(summary),
-      page === 1 ? getCarrierCommissionConfig() : Promise.resolve(config),
     ])
-      .then(([res, sum, cfg]) => {
+      .then(([res, sum]) => {
         setItems(res.items);
         setTotal(res.total);
         if (sum) setSummary(sum);
-        if (cfg) setConfig(cfg);
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
@@ -122,50 +102,10 @@ export default function CarrierCommissionsPage() {
 
   return (
     <>
-      {/* ── Read-only rate card ─────────────────────────────────── */}
-      <div style={{
-        background: "#fff",
-        border: "1px solid #e5e7eb",
-        borderRadius: 14,
-        padding: "18px 24px",
-        marginBottom: 16,
-        display: "flex",
-        alignItems: "center",
-        gap: 16,
-        flexWrap: "wrap",
-      }}>
-        <div style={{
-          width: 40, height: 40, borderRadius: 10,
-          background: "#eef2ff",
-          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-        }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4338ca" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-          </svg>
-        </div>
-        <div style={{ flex: 1, minWidth: 220 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
-            Ваша ставка комиссии
-          </div>
-          <div style={{ fontSize: 15, fontWeight: 600, color: "#0f172a" }}>
-            {config ? formatRate(config) : "Загружаем…"}
-          </div>
-          <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>
-            Устанавливается администратором платформы
-          </div>
-        </div>
-      </div>
-
       {/* ── Summary cards ─────────────────────────────────────── */}
       <div style={{ display: "flex", gap: 16, alignItems: "stretch", marginBottom: 20, flexWrap: "wrap" }}>
         {summary ? (
           <>
-            <SummaryCard
-              label="Оборот по вашим заказам"
-              value={formatPrice(summary.total_gross, summary.currency)}
-              sub={`${summary.count} оплаченных заказов`}
-            />
             <SummaryCard
               label="Ваша выручка"
               value={formatPrice(summary.total_carrier_payout, summary.currency)}
@@ -173,19 +113,14 @@ export default function CarrierCommissionsPage() {
               color="#0369a1"
             />
             <SummaryCard
-              label="Комиссия платформы"
-              value={formatPrice(summary.total_commission, summary.currency)}
-              sub={
-                summary.total_gross > 0
-                  ? `${((summary.total_commission / summary.total_gross) * 100).toFixed(2)}% от оборота`
-                  : "удержано"
-              }
-              color="#16a34a"
+              label="Оплачено заказов"
+              value={String(summary.count)}
+              sub="учтено в выручке"
             />
           </>
         ) : (
           <>
-            {[0,1,2].map(i => (
+            {[0, 1].map(i => (
               <div key={i} style={{ flex: 1, background: "#f8fafc", border: "1px solid #e5e7eb", borderRadius: 14, padding: "20px 24px", minHeight: 80, minWidth: 220 }} />
             ))}
           </>
@@ -201,16 +136,14 @@ export default function CarrierCommissionsPage() {
 
       {/* ── History table ─────────────────────────────────────── */}
       <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, overflow: "auto" }}>
-        <div style={{ minWidth: 1180 }}>
+        <div style={{ minWidth: 940 }}>
           <div style={{ display: "grid", gridTemplateColumns: TABLE_COLS, gap: 12, padding: "12px 24px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
             <span>ID</span>
             <span>Заказ</span>
             <span>Номер заказа</span>
             <span>Штрих-код</span>
             <span>ID Novex</span>
-            <span>Сумма заказа</span>
             <span>К выплате</span>
-            <span>Комиссия</span>
             <span>Дата</span>
           </div>
 
@@ -248,15 +181,16 @@ export default function CarrierCommissionsPage() {
                   <IdCell value={c.carrier_tracking_number} />
                   <IdCell value={c.carrier_barcode} />
                   <IdCell value={c.tracking_number} />
-                  <span style={{ fontSize: 13, color: isReversal ? "#dc2626" : "#475569", textDecoration: strike, opacity: dim }}>{formatPrice(c.gross_amount, c.currency)}</span>
                   <span style={{ fontSize: 13, fontWeight: 700, color: payoutColor, textDecoration: strike, opacity: dim }}>
-                    {c.carrier_payout != null ? formatPrice(c.carrier_payout, c.currency) : "-"}
-                  </span>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: isReversal ? "#dc2626" : "#64748b", textDecoration: strike, opacity: dim }}>
-                    {formatPrice(c.commission_amount, c.currency)}
-                    <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400, marginLeft: 6 }}>
-                      ({(Number(c.commission_rate) * 100).toFixed(0)}%)
-                    </span>
+                    {/* Для старых записей carrier_payout мог не проставиться —
+                       используем тот же fallback, что и backend в summary:
+                       gross_amount − commission_amount. */}
+                    {formatPrice(
+                      c.carrier_payout != null
+                        ? Number(c.carrier_payout)
+                        : Number(c.gross_amount) - Number(c.commission_amount),
+                      c.currency,
+                    )}
                   </span>
                   <span style={{ fontSize: 12, color: "#94a3b8" }}>{formatDate(c.created_at)}</span>
                 </div>

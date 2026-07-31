@@ -71,6 +71,15 @@ export const listAdminOrders = (params: { page?: number; size?: number; status?:
 export const getAdminOrder = (id: number): Promise<AdminOrderDetail> =>
   req(`/admin/orders/${id}`);
 
+export interface AdminTrackingResponse {
+  order_draft_id: number;
+  carrier_code: string | null;
+  events: { id: number; status: string; description: string | null; location: string | null; occurred_at: string }[];
+}
+
+export const getAdminOrderTracking = (id: number): Promise<AdminTrackingResponse> =>
+  req(`/admin/orders/${id}/tracking`);
+
 export const updateOrderStatus = (id: number, status: string): Promise<{ id: number; status: string }> =>
   req(`/admin/orders/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
 

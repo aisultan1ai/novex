@@ -6,11 +6,14 @@ import {
   listAdminOrders,
   updateOrderStatus,
   getAdminOrder,
+  getAdminOrderTracking,
   getAdminOrderPayments,
   getAdminPayment,
   approveAdminPayment,
   rejectAdminPayment,
+  type AdminTrackingResponse,
 } from "@/lib/api/admin";
+import { TrackingTimeline } from "@/components/orders/tracking-timeline";
 import {
   adminApproveCancellation,
   adminRejectCancellation,
@@ -220,12 +223,17 @@ function OrderDetailPanel({ orderId, onCancellationResolved }: { orderId: number
   const [rejectReason, setRejectReason] = useState("");
   const [cancelMsg, setCancelMsg] = useState<string | null>(null);
 
+  const [tracking, setTracking] = useState<AdminTrackingResponse | null>(null);
+  const [trackingOpen, setTrackingOpen] = useState(false);
+
   const reload = useCallback(() => {
     setLoading(true);
     getAdminOrder(orderId)
       .then(setDetail)
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
+    // Трекинг качаем параллельно — необязателен для отрисовки остальной панели.
+    getAdminOrderTracking(orderId).then(setTracking).catch(() => setTracking(null));
   }, [orderId]);
 
   useEffect(() => { reload(); }, [reload]);
@@ -396,9 +404,9 @@ function OrderDetailPanel({ orderId, onCancellationResolved }: { orderId: number
               Инициатор: {detail.cancellation.cancelled_by_name || detail.cancellation.cancelled_by_email}
             </div>
           )}
-          {detail.refund_status && (
-            <div style={{ marginTop: 10, padding: "6px 12px", background: detail.refund_status === "refunded" ? "#DCFCE7" : "#FEF3C7", borderRadius: 6, fontSize: 12, fontWeight: 600, color: detail.refund_status === "refunded" ? "#166534" : "#92400E", display: "inline-block" }}>
-              {detail.refund_status === "refunded" ? "✓ Возврат оформлен" : "⏳ Ожидает возврата средств"}
+          {detail.refund_status === "refunded" && (
+            <div style={{ marginTop: 10, padding: "6px 12px", background: "#DCFCE7", borderRadius: 6, fontSize: 12, fontWeight: 600, color: "#166534", display: "inline-block" }}>
+              ✓ Возврат оформлен
             </div>
           )}
         </div>
@@ -484,7 +492,7 @@ function OrderDetailPanel({ orderId, onCancellationResolved }: { orderId: number
 
       {/* ── Посылки ─────────────────────────────────────────────────── */}
       {detail.packages.length > 0 && (
-        <div style={{ ...dp.section, borderBottom: "none" }}>
+        <div style={dp.section}>
           <div style={dp.sectionTitle}>Посылки ({detail.packages.length})</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {detail.packages.map((pkg, i) => (
@@ -495,6 +503,42 @@ function OrderDetailPanel({ orderId, onCancellationResolved }: { orderId: number
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* ── История статусов (аккордеон) ─────────────────────────────── */}
+      {tracking && tracking.events.length > 0 && (
+        <div style={{ ...dp.section, borderBottom: "none" }}>
+          <button
+            type="button"
+            onClick={() => setTrackingOpen((v) => !v)}
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 8,
+              padding: "10px 14px",
+              background: "#ffffff",
+              border: "1px solid #e5e7eb",
+              borderRadius: 10,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              textAlign: "left",
+            }}
+          >
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
+              История статусов ({tracking.events.length})
+            </span>
+            <span style={{ fontSize: 14, color: "#94a3b8", transform: trackingOpen ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.15s" }}>
+              ▾
+            </span>
+          </button>
+          {trackingOpen && (
+            <div style={{ padding: "16px 4px 4px" }}>
+              <TrackingTimeline events={tracking.events} carrierCode={tracking.carrier_code} />
+            </div>
+          )}
         </div>
       )}
     </div>

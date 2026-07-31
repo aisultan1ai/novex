@@ -116,13 +116,13 @@ export default function AdminUserDetailPage() {
           <div style={{ padding: 40, textAlign: "center", color: "#94a3b8", fontSize: 14 }}>Заказов нет</div>
         ) : (
           <>
-            <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 160px 120px 120px", gap: 12, padding: "10px 24px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "70px 1fr 140px 130px 180px", gap: 12, padding: "10px 24px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
               <span>№</span><span>Маршрут</span><span>Перевозчик</span><span>Сумма</span><span>Статус</span>
             </div>
             {user.orders.map((order, idx) => {
               const sc = orderStatusColors(order.status);
               return (
-                <div key={order.id} style={{ display: "grid", gridTemplateColumns: "80px 1fr 160px 120px 120px", gap: 12, padding: "14px 24px", borderBottom: idx < user.orders.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center" }}>
+                <div key={order.id} style={{ display: "grid", gridTemplateColumns: "70px 1fr 140px 130px 180px", gap: 12, padding: "14px 24px", borderBottom: idx < user.orders.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center" }}>
                   <span style={{ fontFamily: "monospace", fontSize: 13, color: "#94a3b8", fontWeight: 600 }}>#{order.id}</span>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{order.from_city} → {order.to_city}</div>
@@ -130,7 +130,7 @@ export default function AdminUserDetailPage() {
                   </div>
                   <div style={{ fontSize: 13, color: "#475569" }}>{order.carrier_name}</div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>{formatPrice(order.price, order.currency)}</div>
-                  <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600, background: sc.bg, color: sc.color }}>
+                  <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600, lineHeight: 1.35, background: sc.bg, color: sc.color, maxWidth: "100%", whiteSpace: "normal", wordBreak: "break-word" }}>
                     {orderStatusLabel(order.status)}
                   </span>
                 </div>

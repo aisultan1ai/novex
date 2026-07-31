@@ -344,6 +344,33 @@ def get_order(
     }
 
 
+@router.get("/{order_id}/tracking")
+def get_order_tracking_admin(
+    order_id: int,
+    db: Session = Depends(get_db),
+    _=Depends(require_admin_or_operator),
+) -> dict:
+    """История трекинга для админа/оператора (без проверки owner)."""
+    order = db.get(OrderDraft, order_id)
+    if not order:
+        raise HTTPException(404, "Заказ не найден")
+    events = _tracking_repo.list_events(db, order_draft_id=order_id)
+    return {
+        "order_draft_id": order_id,
+        "carrier_code": order.carrier_code_snapshot,
+        "events": [
+            {
+                "id": e.id,
+                "status": e.status,
+                "description": e.description,
+                "location": e.location,
+                "occurred_at": e.occurred_at.isoformat(),
+            }
+            for e in events
+        ],
+    }
+
+
 @router.patch("/{order_id}/status")
 @limiter.limit("60/minute")
 def update_order_status(
