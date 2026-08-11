@@ -148,7 +148,7 @@ export default function CarrierOrderDetailPage() {
     }
   };
 
-  if (loading) return <p style={{ color: "#6b7280" }}>Загрузка...</p>;
+  if (loading) return <p style={{ color: "#5F6E7E" }}>Загрузка...</p>;
   if (error || !order) return <div style={styles.errorBox}>{error ?? "Заказ не найден"}</div>;
 
   const sender = order.parties.find((p) => p.role === "sender");
@@ -164,7 +164,7 @@ export default function CarrierOrderDetailPage() {
           ← Все заказы
         </Link>
         <span style={{ color: "#d1d5db" }}>|</span>
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#111827" }}>
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#0E1826" }}>
           Заказ #{order.id}
         </h2>
         <span style={{ ...styles.badge, ...(statusStyle(order.status)) }}>
@@ -280,7 +280,7 @@ export default function CarrierOrderDetailPage() {
         {order.packages.map((pkg, i) => (
           <div key={i} style={{ paddingBottom: 8, marginBottom: 8, borderBottom: i < order.packages.length - 1 ? "1px solid #f3f4f6" : "none" }}>
             <div style={{ fontWeight: 600, marginBottom: 4 }}>#{i + 1} - {pkg.description}</div>
-            <div style={{ fontSize: 12, color: "#6b7280", display: "flex", gap: 16, flexWrap: "wrap" }}>
+            <div style={{ fontSize: 12, color: "#5F6E7E", display: "flex", gap: 16, flexWrap: "wrap" }}>
               <span>Кол-во: {pkg.quantity}</span>
               <span>Вес: {pkg.weight_kg} кг</span>
               <span>Размер: {pkg.width_cm}×{pkg.height_cm}×{pkg.depth_cm} см</span>
@@ -294,7 +294,7 @@ export default function CarrierOrderDetailPage() {
       {canUploadPod && (
         <div style={styles.card}>
           <div style={styles.cardTitle}>Подтверждение доставки (POD)</div>
-          <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 12 }}>
+          <p style={{ fontSize: 13, color: "#5F6E7E", marginBottom: 12 }}>
             Загрузите фото или PDF с подписью получателя. После загрузки заказ перейдёт в статус «Доставлен».
           </p>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -371,7 +371,7 @@ export default function CarrierOrderDetailPage() {
                 onChange={(e) => setCancelRejectReason(e.target.value)}
                 placeholder="Причина отказа — клиент увидит этот текст (минимум 3 символа)"
                 rows={2}
-                style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "vertical" }}
+                style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #E2E8EE", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "vertical" }}
               />
               <div style={{ display: "flex", gap: 8 }}>
                 <button
@@ -384,7 +384,7 @@ export default function CarrierOrderDetailPage() {
                 <button
                   onClick={() => { setCancelRejectOpen(false); setCancelRejectReason(""); setCancelMsg(null); }}
                   disabled={cancelBusy !== null}
-                  style={{ padding: "8px 18px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", color: "#64748b", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+                  style={{ padding: "8px 18px", borderRadius: 8, border: "1px solid #E2E8EE", background: "#fff", color: "#64748b", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
                 >
                   Отмена
                 </button>
@@ -400,7 +400,7 @@ export default function CarrierOrderDetailPage() {
           <div style={styles.cardTitle}>Отзыв клиента</div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: order.review.comment ? 8 : 0 }}>
             {[1, 2, 3, 4, 5].map((s) => (
-              <span key={s} style={{ fontSize: 22, color: s <= order.review!.rating ? "#f59e0b" : "#e5e7eb", lineHeight: 1 }}>★</span>
+              <span key={s} style={{ fontSize: 22, color: s <= order.review!.rating ? "#f59e0b" : "#E2E8EE", lineHeight: 1 }}>★</span>
             ))}
             <span style={{ fontSize: 13, color: "#64748b", marginLeft: 6 }}>
               {order.review.rating} / 5
@@ -462,16 +462,16 @@ function statusStyle(status: string): React.CSSProperties {
 
 const styles: Record<string, React.CSSProperties> = {
   badge: { padding: "2px 10px", borderRadius: 12, fontSize: 12, fontWeight: 600, display: "inline-block" },
-  card: { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 16, marginBottom: 12 },
-  cardTitle: { fontSize: 14, fontWeight: 700, color: "#111827", marginBottom: 10 },
+  card: { background: "#fff", border: "1px solid #E2E8EE", borderRadius: 10, padding: 16, marginBottom: 12 },
+  cardTitle: { fontSize: 14, fontWeight: 700, color: "#0E1826", marginBottom: 10 },
   row: { display: "flex", gap: 20, flexWrap: "wrap" },
   col: { minWidth: 100 },
   label: { fontSize: 11, color: "#9ca3af", marginBottom: 2, marginTop: 6 },
-  value: { fontSize: 14, color: "#111827" },
+  value: { fontSize: 14, color: "#0E1826" },
   successBox: { background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "8px 14px", fontSize: 13, color: "#166534", marginBottom: 12 },
   errorBox: { background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 8, padding: "8px 14px", fontSize: 13, color: "#991b1b", marginBottom: 12 },
   btnAccept: { background: "#166534", color: "#fff", border: "none", borderRadius: 6, padding: "8px 18px", fontSize: 13, cursor: "pointer", fontWeight: 600 },
   btnReject: { background: "#991b1b", color: "#fff", border: "none", borderRadius: 6, padding: "8px 18px", fontSize: 13, cursor: "pointer", fontWeight: 600 },
-  btnCancel: { background: "#f1f5f9", color: "#475569", border: "1px solid #e5e7eb", borderRadius: 6, padding: "8px 14px", fontSize: 13, cursor: "pointer" },
-  input: { border: "1px solid #e5e7eb", borderRadius: 6, padding: "6px 10px", fontSize: 13, outline: "none", minWidth: 220 },
+  btnCancel: { background: "#f1f5f9", color: "#475569", border: "1px solid #E2E8EE", borderRadius: 6, padding: "8px 14px", fontSize: 13, cursor: "pointer" },
+  input: { border: "1px solid #E2E8EE", borderRadius: 6, padding: "6px 10px", fontSize: 13, outline: "none", minWidth: 220 },
 };

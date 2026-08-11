@@ -13,11 +13,11 @@ import { ApiError } from "@/lib/api/client";
 /* ─── Status badge config ──────────────────────────────────────────────────── */
 
 const STATUS_BADGE: Record<string, { bg: string; color: string; label: string }> = {
-  draft:                      { bg: "#F3F4F6", color: "#6B7280", label: "Черновик" },
-  awaiting_payment:           { bg: "#EFF6FF", color: "#1D4ED8", label: "Ожидает оплаты" },
+  draft:                      { bg: "#F3F4F6", color: "#5F6E7E", label: "Черновик" },
+  awaiting_payment:           { bg: "#F1F5F9", color: "#0E2E5C", label: "Ожидает оплаты" },
   paid:                       { bg: "#D1FAE5", color: "#065F46", label: "Оплата подтверждена" },
-  dispatch_queued:            { bg: "#EFF6FF", color: "#1D4ED8", label: "Готовится к отправке" },
-  sent_to_carrier:            { bg: "#EFF6FF", color: "#1D4ED8", label: "Передан перевозчику" },
+  dispatch_queued:            { bg: "#F1F5F9", color: "#0E2E5C", label: "Готовится к отправке" },
+  sent_to_carrier:            { bg: "#F1F5F9", color: "#0E2E5C", label: "Передан перевозчику" },
   picked_up:                  { bg: "#EDE9FE", color: "#5B21B6", label: "Забран курьером" },
   in_transit:                 { bg: "#FEF3C7", color: "#92400E", label: "В пути" },
   out_for_delivery:           { bg: "#EDE9FE", color: "#5B21B6", label: "Выезд на доставку" },
@@ -125,8 +125,8 @@ function Timeline({ data }: { data: PublicTrackingResponse }) {
   })();
   if (events.length === 0) {
     return (
-      <div style={{ background: "#fff", border: "1px solid #E5E7EB", borderRadius: 16, padding: "28px 30px", boxShadow: "0 1px 3px rgba(0,0,0,.08)" }}>
-        <div style={{ font: "600 16px/1 Inter Variable, sans-serif", color: "#111827", marginBottom: 12 }}>
+      <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 16, padding: "28px 30px", boxShadow: "0 1px 3px rgba(0,0,0,.08)" }}>
+        <div style={{ font: "600 16px/1 Inter Variable, sans-serif", color: "#0E1826", marginBottom: 12 }}>
           История перемещений
         </div>
         <p style={{ font: "400 14px/1.5 Inter Variable, sans-serif", color: "#9CA3AF", margin: 0 }}>
@@ -137,8 +137,8 @@ function Timeline({ data }: { data: PublicTrackingResponse }) {
   }
 
   return (
-    <div style={{ background: "#fff", border: "1px solid #E5E7EB", borderRadius: 16, boxShadow: "0 1px 3px rgba(0,0,0,.08)", padding: "28px 30px" }}>
-      <div style={{ font: "600 16px/1 Inter Variable, sans-serif", color: "#111827", marginBottom: 22 }}>
+    <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 16, boxShadow: "0 1px 3px rgba(0,0,0,.08)", padding: "28px 30px" }}>
+      <div style={{ font: "600 16px/1 Inter Variable, sans-serif", color: "#0E1826", marginBottom: 22 }}>
         История перемещений
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
@@ -159,8 +159,8 @@ function Timeline({ data }: { data: PublicTrackingResponse }) {
                 {isCurrent ? (
                   <div style={{
                     width: 26, height: 26, borderRadius: "50%",
-                    background: "#2563EB",
-                    boxShadow: "0 0 0 4px rgba(37,99,235,.18)",
+                    background: "#0B2545",
+                    boxShadow: "0 0 0 4px rgba(11,37,69,.18)",
                     color: "#fff",
                     font: "700 11px/1 Inter Variable, sans-serif",
                     display: "flex", alignItems: "center", justifyContent: "center",
@@ -177,21 +177,21 @@ function Timeline({ data }: { data: PublicTrackingResponse }) {
                   }}>✓</div>
                 )}
                 {!isLast && (
-                  <div style={{ width: 2, flex: 1, minHeight: 34, background: isDone ? "#10B981" : "#E5E7EB", marginTop: 4, marginBottom: 4 }} />
+                  <div style={{ width: 2, flex: 1, minHeight: 34, background: isDone ? "#10B981" : "#E2E8EE", marginTop: 4, marginBottom: 4 }} />
                 )}
               </div>
               {/* content */}
               <div style={{ paddingBottom: isLast ? 0 : 24, flex: 1 }}>
-                <div style={{ font: `600 15px/1.3 Inter Variable, sans-serif`, color: isCurrent ? "#2563EB" : "#111827" }}>
+                <div style={{ font: `600 15px/1.3 Inter Variable, sans-serif`, color: isCurrent ? "#0B2545" : "#0E1826" }}>
                   {label}
                 </div>
                 {subtitle && (
-                  <div style={{ font: "400 13px/1.4 Inter Variable, sans-serif", color: "#6B7280", marginTop: 2 }}>
+                  <div style={{ font: "400 13px/1.4 Inter Variable, sans-serif", color: "#5F6E7E", marginTop: 2 }}>
                     {subtitle}
                   </div>
                 )}
                 {event.location && (
-                  <div style={{ font: "400 13px/1 Inter Variable, sans-serif", color: "#6B7280", marginTop: 2 }}>
+                  <div style={{ font: "400 13px/1 Inter Variable, sans-serif", color: "#5F6E7E", marginTop: 2 }}>
                     {event.location}
                   </div>
                 )}
@@ -234,7 +234,7 @@ function TrackingResults({
   onReset: () => void;
   isMobile: boolean;
 }) {
-  const badge = STATUS_BADGE[data.order_status] ?? { bg: "#F3F4F6", color: "#6B7280", label: data.order_status };
+  const badge = STATUS_BADGE[data.order_status] ?? { bg: "#F3F4F6", color: "#5F6E7E", label: data.order_status };
   const lastLocation = [...data.events].reverse().find((e) => e.location)?.location;
   const etaLabel = formatEta(data.created_at, data.eta_days_min);
   const initials = data.carrier_name
@@ -259,21 +259,21 @@ function TrackingResults({
       {/* Left: status card + timeline */}
       <div style={{ flex: 1, minWidth: 0 }}>
         {/* Status card */}
-        <div style={{ background: "#fff", border: "1px solid #E5E7EB", borderRadius: 16, boxShadow: "0 1px 3px rgba(0,0,0,.08)", padding: "28px 30px", marginBottom: 16 }}>
+        <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 16, boxShadow: "0 1px 3px rgba(0,0,0,.08)", padding: "28px 30px", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
               <div style={{
                 width: 48, height: 48, borderRadius: 12,
-                background: "#FAFAFA", border: "1px solid #E5E7EB",
+                background: "#FAFAFA", border: "1px solid #E2E8EE",
                 display: "flex", alignItems: "center", justifyContent: "center",
-                font: "700 11px/1 Inter Variable, sans-serif", color: "#6B7280",
+                font: "700 11px/1 Inter Variable, sans-serif", color: "#5F6E7E",
                 textAlign: "center", flexShrink: 0,
               }}>{initials}</div>
               <div>
-                <div style={{ font: "600 18px/1.2 Inter Variable, sans-serif", color: "#111827" }}>
+                <div style={{ font: "600 18px/1.2 Inter Variable, sans-serif", color: "#0E1826" }}>
                   Заказ {data.tracking_number}
                 </div>
-                <div style={{ font: "500 14px/1 Inter Variable, sans-serif", color: "#6B7280", marginTop: 4 }}>
+                <div style={{ font: "500 14px/1 Inter Variable, sans-serif", color: "#5F6E7E", marginTop: 4 }}>
                   {data.from_city} → {data.to_city} · {data.carrier_name}
                 </div>
               </div>
@@ -288,30 +288,30 @@ function TrackingResults({
             }}>{badge.label}</span>
           </div>
 
-          <div style={{ display: "flex", gap: 40, marginTop: 24, paddingTop: 22, borderTop: "1px solid #E5E7EB", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 40, marginTop: 24, paddingTop: 22, borderTop: "1px solid #E2E8EE", flexWrap: "wrap" }}>
             <div>
-              <div style={{ font: "500 12px/1 Inter Variable, sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", color: "#6B7280", marginBottom: 6 }}>
+              <div style={{ font: "500 12px/1 Inter Variable, sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", color: "#5F6E7E", marginBottom: 6 }}>
                 Прибудет
               </div>
-              <div style={{ font: "600 16px/1 Inter Variable, sans-serif", color: "#111827" }}>
+              <div style={{ font: "600 16px/1 Inter Variable, sans-serif", color: "#0E1826" }}>
                 {etaLabel}
               </div>
             </div>
             {lastLocation && (
               <div>
-                <div style={{ font: "500 12px/1 Inter Variable, sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", color: "#6B7280", marginBottom: 6 }}>
+                <div style={{ font: "500 12px/1 Inter Variable, sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", color: "#5F6E7E", marginBottom: 6 }}>
                   Текущий пункт
                 </div>
-                <div style={{ font: "600 16px/1 Inter Variable, sans-serif", color: "#111827" }}>
+                <div style={{ font: "600 16px/1 Inter Variable, sans-serif", color: "#0E1826" }}>
                   {lastLocation}
                 </div>
               </div>
             )}
             <div>
-              <div style={{ font: "500 12px/1 Inter Variable, sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", color: "#6B7280", marginBottom: 6 }}>
+              <div style={{ font: "500 12px/1 Inter Variable, sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", color: "#5F6E7E", marginBottom: 6 }}>
                 Срок доставки
               </div>
-              <div style={{ font: "600 16px/1 Inter Variable, sans-serif", color: "#111827" }}>
+              <div style={{ font: "600 16px/1 Inter Variable, sans-serif", color: "#0E1826" }}>
                 {data.eta_days_min === data.eta_days_max
                   ? `${data.eta_days_min} дн.`
                   : `${data.eta_days_min}-${data.eta_days_max} дн.`}
@@ -328,11 +328,11 @@ function TrackingResults({
           style={{
             marginTop: 20,
             background: "none",
-            border: "1.5px solid #E5E7EB",
+            border: "1.5px solid #E2E8EE",
             borderRadius: 10,
             padding: "10px 20px",
             font: "500 14px/1 Inter Variable, sans-serif",
-            color: "#6B7280",
+            color: "#5F6E7E",
             cursor: "pointer",
             fontFamily: "inherit",
           }}
@@ -343,18 +343,18 @@ function TrackingResults({
 
       {/* Right: actions */}
       <div style={{ flexShrink: 0, width: isMobile ? "100%" : 340 }}>
-        <div style={{ background: "#fff", border: "1px solid #E5E7EB", borderRadius: 16, boxShadow: "0 1px 3px rgba(0,0,0,.08)", padding: 24 }}>
-          <div style={{ font: "600 15px/1 Inter Variable, sans-serif", color: "#111827", marginBottom: 8 }}>
+        <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 16, boxShadow: "0 1px 3px rgba(0,0,0,.08)", padding: 24 }}>
+          <div style={{ font: "600 15px/1 Inter Variable, sans-serif", color: "#0E1826", marginBottom: 8 }}>
             Уведомления о статусе
           </div>
-          <p style={{ font: "400 14px/1.5 Inter Variable, sans-serif", color: "#6B7280", margin: "0 0 16px" }}>
+          <p style={{ font: "400 14px/1.5 Inter Variable, sans-serif", color: "#5F6E7E", margin: "0 0 16px" }}>
             Войдите в аккаунт, чтобы получать уведомления о каждом этапе доставки.
           </p>
           <Link
             href="/login"
             style={{
               display: "block",
-              background: "#2563EB",
+              background: "#0B2545",
               color: "#fff",
               font: "600 14px/1 Inter Variable, sans-serif",
               padding: 12,
@@ -371,9 +371,9 @@ function TrackingResults({
             onClick={handleCopyLink}
             style={{
               width: "100%",
-              border: "1.5px solid #E5E7EB",
+              border: "1.5px solid #E2E8EE",
               background: "#fff",
-              color: "#111827",
+              color: "#0E1826",
               font: "600 14px/1 Inter Variable, sans-serif",
               padding: 12,
               borderRadius: 10,
@@ -459,14 +459,14 @@ function TrackingPageInner() {
       <Navbar />
       <main style={{ minHeight: "100vh", background: "#FAFAFA" }}>
         {/* Search hero */}
-        <div style={{ padding: isMobile ? "40px 20px 32px" : "56px 48px 44px", background: "#FAFAFA", textAlign: "center", borderBottom: "1px solid #E5E7EB" }}>
-          <div style={{ font: "500 13px/1 Inter Variable, sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", color: "#2563EB", marginBottom: 14 }}>
+        <div style={{ padding: isMobile ? "40px 20px 32px" : "56px 48px 44px", background: "#FAFAFA", textAlign: "center", borderBottom: "1px solid #E2E8EE" }}>
+          <div style={{ font: "500 13px/1 Inter Variable, sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", color: "#0B2545", marginBottom: 14 }}>
             Отслеживание посылки
           </div>
-          <h1 style={{ font: `700 ${isMobile ? "28px" : "40px"}/1.12 Inter Variable, sans-serif`, letterSpacing: "-0.02em", color: "#111827", margin: "0 auto 14px", maxWidth: 560 }}>
+          <h1 style={{ font: `700 ${isMobile ? "28px" : "40px"}/1.12 'Space Grotesk Variable', 'Inter Variable', sans-serif`, letterSpacing: "-0.02em", color: "#0E1826", margin: "0 auto 14px", maxWidth: 560 }}>
             Где моя посылка?
           </h1>
-          <p style={{ font: "400 17px/1.55 Inter Variable, sans-serif", color: "#6B7280", margin: "0 auto 28px", maxWidth: 480 }}>
+          <p style={{ font: "400 17px/1.55 Inter Variable, sans-serif", color: "#5F6E7E", margin: "0 auto 28px", maxWidth: 480 }}>
             Введите трек-номер - покажем статус и текущий пункт по всем службам сразу.
           </p>
 
@@ -481,14 +481,14 @@ function TrackingPageInner() {
               onBlur={() => setFocused(false)}
               style={{
                 flex: 1,
-                border: focused ? "1.5px solid #2563EB" : "1.5px solid #E5E7EB",
+                border: focused ? "1.5px solid #0B2545" : "1.5px solid #E2E8EE",
                 borderRadius: 10,
                 padding: "15px 18px",
                 font: "400 16px/1 Inter Variable, sans-serif",
-                color: "#111827",
+                color: "#0E1826",
                 background: "#fff",
                 outline: "none",
-                boxShadow: focused ? "0 0 0 3px rgba(37,99,235,.15)" : "none",
+                boxShadow: focused ? "0 0 0 3px rgba(11,37,69,.15)" : "none",
                 transition: "border-color 0.15s, box-shadow 0.15s",
                 fontFamily: "inherit",
               }}
@@ -497,7 +497,7 @@ function TrackingPageInner() {
               type="submit"
               disabled={isLoading}
               style={{
-                background: isLoading ? "#93C5FD" : "#2563EB",
+                background: isLoading ? "#94A6C0" : "#0B2545",
                 color: "#fff",
                 font: "600 15px/1 Inter Variable, sans-serif",
                 padding: "15px 32px",
@@ -524,7 +524,7 @@ function TrackingPageInner() {
                     style={{
                       background: "none", border: "none", cursor: "pointer",
                       font: "400 13px/1 Inter Variable, sans-serif",
-                      color: "#6B7280", padding: 0, fontFamily: "inherit",
+                      color: "#5F6E7E", padding: 0, fontFamily: "inherit",
                     }}
                   >
                     {num}
@@ -556,7 +556,7 @@ function TrackingPageInner() {
         {!result && !isLoading && !error && (
           <div style={{ padding: isMobile ? "40px 20px" : "64px 48px", textAlign: "center" }}>
             <div style={{ marginBottom: 16, fontSize: 48 }}>📦</div>
-            <p style={{ font: "500 16px/1.5 Inter Variable, sans-serif", color: "#6B7280", margin: 0 }}>
+            <p style={{ font: "500 16px/1.5 Inter Variable, sans-serif", color: "#5F6E7E", margin: 0 }}>
               Введите трек-номер выше, чтобы узнать статус посылки
             </p>
             <p style={{ font: "400 14px/1.5 Inter Variable, sans-serif", color: "#9CA3AF", margin: "8px 0 0" }}>

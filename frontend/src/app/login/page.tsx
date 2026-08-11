@@ -58,10 +58,10 @@ function Field({
             width: "100%",
             padding: right ? "12px 44px 12px 14px" : "12px 14px",
             borderRadius: 10,
-            border: focused ? "1.5px solid #2563EB" : "1.5px solid #E5E7EB",
-            boxShadow: focused ? "0 0 0 3px rgba(37,99,235,0.15)" : "none",
+            border: focused ? "1.5px solid #0B2545" : "1.5px solid #E2E8EE",
+            boxShadow: focused ? "0 0 0 3px rgba(11,37,69,0.15)" : "none",
             font: "400 15px/1 Inter Variable, sans-serif",
-            color: "#111827",
+            color: "#0E1826",
             background: "#fff",
             outline: "none",
             boxSizing: "border-box",
@@ -166,20 +166,20 @@ function LoginPageInner() {
             alignItems: "center",
             gap: 6,
             font: "500 13px/1 Inter Variable, sans-serif",
-            color: "#6B7280",
+            color: "#5F6E7E",
             textDecoration: "none",
             marginBottom: 28,
             transition: "color 0.15s",
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = "#111827")}
-          onMouseLeave={(e) => (e.currentTarget.style.color = "#6B7280")}
+          onMouseEnter={(e) => (e.currentTarget.style.color = "#0E1826")}
+          onMouseLeave={(e) => (e.currentTarget.style.color = "#5F6E7E")}
         >
           <ArrowLeft size={14} />
           На главную
         </Link>
 
         {/* Logo */}
-        <div style={{ textAlign: "center", marginBottom: 28 }}>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 28 }}>
           <Link
             href="/"
             style={{
@@ -187,21 +187,29 @@ function LoginPageInner() {
               alignItems: "center",
               gap: 8,
               textDecoration: "none",
-              font: "700 24px/1 Inter Variable, sans-serif",
+              font: "700 24px/1 'Space Grotesk Variable', 'Inter Variable', sans-serif",
               letterSpacing: "-0.02em",
-              color: "#111827",
+              color: "#0E1826",
             }}
           >
-            <span
-              style={{
-                width: 10,
-                height: 10,
-                borderRadius: "50%",
-                background: "#2563EB",
-                flexShrink: 0,
-              }}
-            />
-            novex
+            <svg
+              width="30"
+              height="27"
+              viewBox="10 11 38 34"
+              fill="none"
+              role="img"
+              aria-hidden="true"
+              style={{ flexShrink: 0, display: "block" }}
+            >
+              <circle cx="17" cy="28" r="5" fill="#22C9E0" />
+              <line x1="20" y1="25.5" x2="37" y2="17" stroke="#3E6E8A" strokeWidth="2.2" strokeLinecap="round" />
+              <line x1="21" y1="28" x2="38" y2="28" stroke="#22C9E0" strokeWidth="2.4" strokeLinecap="round" />
+              <line x1="20" y1="30.5" x2="37" y2="39" stroke="#3E6E8A" strokeWidth="2.2" strokeLinecap="round" />
+              <circle cx="40" cy="16" r="3.4" fill="#3E6E8A" />
+              <circle cx="41" cy="28" r="4.6" fill="#22C9E0" />
+              <circle cx="40" cy="40" r="3.4" fill="#3E6E8A" />
+            </svg>
+            <span>n<span style={{ color: "#22C9E0" }}>o</span>vex</span>
           </Link>
         </div>
 
@@ -217,7 +225,7 @@ function LoginPageInner() {
           <h1
             style={{
               font: "700 22px/1.2 Inter Variable, sans-serif",
-              color: "#111827",
+              color: "#0E1826",
               margin: "0 0 4px",
               textAlign: "center",
             }}
@@ -227,7 +235,7 @@ function LoginPageInner() {
           <p
             style={{
               font: "400 14px/1 Inter Variable, sans-serif",
-              color: "#6B7280",
+              color: "#5F6E7E",
               textAlign: "center",
               margin: "0 0 28px",
             }}
@@ -292,12 +300,12 @@ function LoginPageInner() {
                   href="/forgot-password"
                   style={{
                     font: "500 13px/1 Inter Variable, sans-serif",
-                    color: "#6B7280",
+                    color: "#5F6E7E",
                     textDecoration: "none",
                     transition: "color 0.15s",
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = "#2563EB")}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = "#6B7280")}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "#0B2545")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = "#5F6E7E")}
                 >
                   Забыли пароль?
                 </Link>
@@ -352,7 +360,7 @@ function LoginPageInner() {
                 height: 48,
                 borderRadius: 10,
                 border: "none",
-                background: isSubmitting ? "#93C5FD" : "#2563EB",
+                background: isSubmitting ? "#94A6C0" : "#0B2545",
                 color: "#ffffff",
                 font: "600 15px/1 Inter Variable, sans-serif",
                 cursor: isSubmitting ? "not-allowed" : "pointer",
@@ -361,10 +369,10 @@ function LoginPageInner() {
                 transition: "background 0.15s",
               }}
               onMouseEnter={(e) => {
-                if (!isSubmitting) e.currentTarget.style.background = "#1D4ED8";
+                if (!isSubmitting) e.currentTarget.style.background = "#0E2E5C";
               }}
               onMouseLeave={(e) => {
-                if (!isSubmitting) e.currentTarget.style.background = "#2563EB";
+                if (!isSubmitting) e.currentTarget.style.background = "#0B2545";
               }}
             >
               {isSubmitting ? "Входим..." : "Войти"}
@@ -377,7 +385,7 @@ function LoginPageInner() {
           style={{
             textAlign: "center",
             font: "400 14px/1 Inter Variable, sans-serif",
-            color: "#6B7280",
+            color: "#5F6E7E",
             margin: "20px 0 0",
           }}
         >
@@ -386,7 +394,7 @@ function LoginPageInner() {
             href="/register"
             style={{
               font: "600 14px/1 Inter Variable, sans-serif",
-              color: "#2563EB",
+              color: "#0B2545",
               textDecoration: "none",
             }}
           >

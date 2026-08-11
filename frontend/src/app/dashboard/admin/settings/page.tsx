@@ -51,7 +51,7 @@ export default function AdminSettingsPage() {
   return (
     <>
       <div style={{ marginBottom: 24 }}>
-        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0f172a" }}>Настройки платформы</h2>
+        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0B2545" }}>Настройки платформы</h2>
         <p style={{ margin: "4px 0 0", fontSize: 14, color: "#64748b" }}>Комиссия и реквизиты для банковских переводов</p>
       </div>
 
@@ -144,7 +144,7 @@ export default function AdminSettingsPage() {
 const s: Record<string, React.CSSProperties> = {
   card: {
     background: "#ffffff",
-    border: "1px solid #e5e7eb",
+    border: "1px solid #E2E8EE",
     borderRadius: 16,
     padding: 24,
   },
@@ -152,7 +152,7 @@ const s: Record<string, React.CSSProperties> = {
     margin: "0 0 16px",
     fontSize: 16,
     fontWeight: 700,
-    color: "#0f172a",
+    color: "#0B2545",
   },
   hint: {
     margin: "-8px 0 16px",
@@ -177,18 +177,18 @@ const s: Record<string, React.CSSProperties> = {
     width: "100%",
     padding: "10px 12px",
     borderRadius: 10,
-    border: "1px solid #e5e7eb",
+    border: "1px solid #E2E8EE",
     fontSize: 14,
     fontFamily: "inherit",
     outline: "none",
     boxSizing: "border-box",
-    color: "#0f172a",
+    color: "#0B2545",
   },
   btn: {
     padding: "12px 28px",
     borderRadius: 12,
     border: "none",
-    background: "#0f172a",
+    background: "#0B2545",
     color: "#ffffff",
     fontSize: 14,
     fontWeight: 700,

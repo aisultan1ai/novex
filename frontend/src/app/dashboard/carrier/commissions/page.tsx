@@ -8,6 +8,7 @@ import {
   type CarrierCommission,
 } from "@/lib/api/carrier";
 import type { CommissionSummary } from "@/types/admin";
+import ExportXlsxButton from "@/components/ui/ExportXlsxButton";
 
 function formatPrice(n: number, currency = "KZT") {
   return `${new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2, signDisplay: "auto" }).format(n)} ${currency}`;
@@ -60,11 +61,11 @@ function InfoDot({ tooltip, color = "#94a3b8" }: { tooltip: string; color?: stri
 
 function SummaryCard({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) {
   return (
-    <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 14, padding: "20px 24px", flex: 1, minWidth: 220 }}>
+    <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 14, padding: "20px 24px", flex: 1, minWidth: 220 }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
         {label}
       </div>
-      <div style={{ fontSize: 28, fontWeight: 800, color: color ?? "#0f172a", lineHeight: 1 }}>{value}</div>
+      <div style={{ fontSize: 28, fontWeight: 800, color: color ?? "#0B2545", lineHeight: 1 }}>{value}</div>
       {sub && <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 6 }}>{sub}</div>}
     </div>
   );
@@ -121,10 +122,15 @@ export default function CarrierCommissionsPage() {
         ) : (
           <>
             {[0, 1].map(i => (
-              <div key={i} style={{ flex: 1, background: "#f8fafc", border: "1px solid #e5e7eb", borderRadius: 14, padding: "20px 24px", minHeight: 80, minWidth: 220 }} />
+              <div key={i} style={{ flex: 1, background: "#f8fafc", border: "1px solid #E2E8EE", borderRadius: 14, padding: "20px 24px", minHeight: 80, minWidth: 220 }} />
             ))}
           </>
         )}
+      </div>
+
+      {/* ── Export button ─────────────────────────────────────── */}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 20 }}>
+        <ExportXlsxButton endpoint="/carrier/commissions/export" />
       </div>
 
       {/* ── Error ─────────────────────────────────────────────── */}
@@ -135,9 +141,9 @@ export default function CarrierCommissionsPage() {
       )}
 
       {/* ── History table ─────────────────────────────────────── */}
-      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, overflow: "auto" }}>
+      <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 16, overflow: "auto" }}>
         <div style={{ minWidth: 940 }}>
-          <div style={{ display: "grid", gridTemplateColumns: TABLE_COLS, gap: 12, padding: "12px 24px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          <div style={{ display: "grid", gridTemplateColumns: TABLE_COLS, gap: 12, padding: "12px 24px", background: "#f8fafc", borderBottom: "1px solid #E2E8EE", fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
             <span>ID</span>
             <span>Заказ</span>
             <span>Номер заказа</span>
@@ -204,12 +210,12 @@ export default function CarrierCommissionsPage() {
         <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 20 }}>
           <button
             onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
-            style={{ padding: "7px 16px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", color: "#475569", fontSize: 13, fontWeight: 500, cursor: page === 1 ? "not-allowed" : "pointer", opacity: page === 1 ? 0.4 : 1, fontFamily: "inherit" }}
+            style={{ padding: "7px 16px", borderRadius: 8, border: "1px solid #E2E8EE", background: "#fff", color: "#475569", fontSize: 13, fontWeight: 500, cursor: page === 1 ? "not-allowed" : "pointer", opacity: page === 1 ? 0.4 : 1, fontFamily: "inherit" }}
           >← Назад</button>
           <span style={{ padding: "7px 16px", fontSize: 13, color: "#64748b" }}>{page} / {pages}</span>
           <button
             onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page === pages}
-            style={{ padding: "7px 16px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", color: "#475569", fontSize: 13, fontWeight: 500, cursor: page === pages ? "not-allowed" : "pointer", opacity: page === pages ? 0.4 : 1, fontFamily: "inherit" }}
+            style={{ padding: "7px 16px", borderRadius: 8, border: "1px solid #E2E8EE", background: "#fff", color: "#475569", fontSize: 13, fontWeight: 500, cursor: page === pages ? "not-allowed" : "pointer", opacity: page === pages ? 0.4 : 1, fontFamily: "inherit" }}
           >Вперёд →</button>
         </div>
       )}

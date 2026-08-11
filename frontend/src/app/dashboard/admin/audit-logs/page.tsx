@@ -7,10 +7,10 @@ import { listAuditLogs, type AuditLogItem } from "@/lib/api/admin";
 const ACTION_LABELS: Record<string, { label: string; color: string; bg: string }> = {
   "payment.approve":      { label: "Оплата подтверждена",        color: "#15803d", bg: "#f0fdf4" },
   "payment.reject":       { label: "Оплата отклонена",           color: "#b91c1c", bg: "#fef2f2" },
-  "order.status_change":  { label: "Статус заказа изменён",      color: "#1d4ed8", bg: "#eff6ff" },
+  "order.status_change":  { label: "Статус заказа изменён",      color: "#0E2E5C", bg: "#F1F5F9" },
   "order.retry_dispatch": { label: "Повторная отправка",         color: "#7c3aed", bg: "#f5f3ff" },
   "order.mark_dispatched":{ label: "Отмечен как отправленный",   color: "#0369a1", bg: "#f0f9ff" },
-  "user.create":          { label: "Пользователь создан",        color: "#0f172a", bg: "#f8fafc" },
+  "user.create":          { label: "Пользователь создан",        color: "#0B2545", bg: "#f8fafc" },
   "user.update":          { label: "Пользователь обновлён",      color: "#475569", bg: "#f8fafc" },
   "settings.update":      { label: "Настройки изменены",         color: "#92400e", bg: "#fffbeb" },
 };
@@ -141,7 +141,7 @@ export default function AdminAuditLogsPage() {
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0f172a" }}>Журнал действий</h2>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0B2545" }}>Журнал действий</h2>
           <p style={{ margin: "4px 0 0", fontSize: 14, color: "#64748b" }}>
             {total > 0 ? `${total} записей` : "Записи действий администраторов"}
           </p>
@@ -154,8 +154,8 @@ export default function AdminAuditLogsPage() {
           value={filterAction}
           onChange={(e) => { setFilterAction(e.target.value); handleFilterChange(); }}
           style={{
-            padding: "8px 14px", borderRadius: 10, border: "1px solid #e5e7eb",
-            background: "#fff", fontSize: 13, color: "#0f172a", fontFamily: "inherit", cursor: "pointer",
+            padding: "8px 14px", borderRadius: 10, border: "1px solid #E2E8EE",
+            background: "#fff", fontSize: 13, color: "#0B2545", fontFamily: "inherit", cursor: "pointer",
           }}
         >
           <option value="">Все действия</option>
@@ -168,8 +168,8 @@ export default function AdminAuditLogsPage() {
           value={filterResource}
           onChange={(e) => { setFilterResource(e.target.value); handleFilterChange(); }}
           style={{
-            padding: "8px 14px", borderRadius: 10, border: "1px solid #e5e7eb",
-            background: "#fff", fontSize: 13, color: "#0f172a", fontFamily: "inherit", cursor: "pointer",
+            padding: "8px 14px", borderRadius: 10, border: "1px solid #E2E8EE",
+            background: "#fff", fontSize: 13, color: "#0B2545", fontFamily: "inherit", cursor: "pointer",
           }}
         >
           <option value="">Все ресурсы</option>
@@ -182,7 +182,7 @@ export default function AdminAuditLogsPage() {
           <button
             onClick={() => { setFilterAction(""); setFilterResource(""); handleFilterChange(); }}
             style={{
-              padding: "8px 14px", borderRadius: 10, border: "1px solid #e5e7eb",
+              padding: "8px 14px", borderRadius: 10, border: "1px solid #E2E8EE",
               background: "#fff", fontSize: 13, color: "#64748b", cursor: "pointer", fontFamily: "inherit",
             }}
           >
@@ -199,13 +199,13 @@ export default function AdminAuditLogsPage() {
       )}
 
       {/* Table */}
-      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, overflow: "hidden" }}>
+      <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 16, overflow: "hidden" }}>
         {/* Header */}
         <div style={{
           display: "grid",
           gridTemplateColumns: "150px 180px 200px 110px 80px 1fr",
           gap: 12, padding: "12px 24px",
-          background: "#f8fafc", borderBottom: "1px solid #e5e7eb",
+          background: "#f8fafc", borderBottom: "1px solid #E2E8EE",
           fontSize: 11, fontWeight: 700, color: "#94a3b8",
           textTransform: "uppercase", letterSpacing: "0.05em",
         }}>
@@ -224,7 +224,7 @@ export default function AdminAuditLogsPage() {
         ) : items.length === 0 ? (
           <div style={{ padding: "64px 24px", textAlign: "center" }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>📋</div>
-            <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a" }}>Записей нет</p>
+            <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0B2545" }}>Записей нет</p>
             <p style={{ margin: "6px 0 0", fontSize: 14, color: "#64748b" }}>
               {filterAction || filterResource ? "Попробуйте сбросить фильтры" : "Журнал будет пополняться по мере действий администраторов"}
             </p>
@@ -246,7 +246,7 @@ export default function AdminAuditLogsPage() {
               </div>
 
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#0B2545" }}>
                   {log.actor_email}
                 </div>
                 {log.actor_id && (
@@ -283,7 +283,7 @@ export default function AdminAuditLogsPage() {
             <button
               key={p}
               onClick={() => setPage(p)}
-              style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid #e5e7eb", background: p === page ? "#0f172a" : "#ffffff", color: p === page ? "#ffffff" : "#0f172a", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+              style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid #E2E8EE", background: p === page ? "#0B2545" : "#ffffff", color: p === page ? "#ffffff" : "#0B2545", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
             >
               {p}
             </button>

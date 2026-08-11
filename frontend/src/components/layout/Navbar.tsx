@@ -11,7 +11,6 @@ const NAV_LINKS = [
   { label: "Доставка",      href: "/" },
   { label: "Отслеживание",  href: "/tracking" },
   { label: "Партнёрам",     href: "/partners" },
-  { label: "Помощь",        href: "/#help" },
 ];
 
 export default function Navbar() {
@@ -52,7 +51,7 @@ export default function Navbar() {
           background: menuOpen ? "#ffffff" : scrolled ? "rgba(255,255,255,0.85)" : "#ffffff",
           backdropFilter: scrolled && !menuOpen ? "blur(8px)" : "none",
           WebkitBackdropFilter: scrolled && !menuOpen ? "blur(8px)" : "none",
-          borderBottom: "1px solid #E5E7EB",
+          borderBottom: "1px solid #E2E8EE",
           transition: "background 0.2s, box-shadow 0.2s",
           boxShadow: scrolled && !menuOpen ? "0 1px 8px rgba(0,0,0,0.06)" : "none",
         }}
@@ -69,26 +68,35 @@ export default function Navbar() {
               router.push("/");
             }
           }}
+          aria-label="Novex — на главную"
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 9,
+            gap: 10,
             textDecoration: "none",
-            font: "700 22px/1 Inter Variable, sans-serif",
+            font: "700 22px/1 'Space Grotesk Variable', 'Inter Variable', sans-serif",
             letterSpacing: "-0.02em",
-            color: "#111827",
+            color: "#0B2545",
           }}
         >
-          <span
-            style={{
-              width: 11,
-              height: 11,
-              borderRadius: "50%",
-              background: "#2563EB",
-              flexShrink: 0,
-            }}
-          />
-          novex
+          <svg
+            width="30"
+            height="27"
+            viewBox="10 11 38 34"
+            fill="none"
+            role="img"
+            aria-hidden="true"
+            style={{ flexShrink: 0, display: "block" }}
+          >
+            <circle cx="17" cy="28" r="5" fill="#22C9E0" />
+            <line x1="20" y1="25.5" x2="37" y2="17" stroke="#3E6E8A" strokeWidth="2.2" strokeLinecap="round" />
+            <line x1="21" y1="28" x2="38" y2="28" stroke="#22C9E0" strokeWidth="2.4" strokeLinecap="round" />
+            <line x1="20" y1="30.5" x2="37" y2="39" stroke="#3E6E8A" strokeWidth="2.2" strokeLinecap="round" />
+            <circle cx="40" cy="16" r="3.4" fill="#3E6E8A" />
+            <circle cx="41" cy="28" r="4.6" fill="#22C9E0" />
+            <circle cx="40" cy="40" r="3.4" fill="#3E6E8A" />
+          </svg>
+          <span>n<span style={{ color: "#22C9E0" }}>o</span>vex</span>
         </Link>
 
         {/* Desktop nav links */}
@@ -103,15 +111,15 @@ export default function Navbar() {
                   href={href}
                   style={{
                     font: "500 15px/1 Inter Variable, sans-serif",
-                    color: active ? "#111827" : "#6B7280",
+                    color: active ? "#0E1826" : "#5F6E7E",
                     textDecoration: "none",
                     display: "flex",
                     alignItems: "center",
-                    borderBottom: active ? "2px solid #2563EB" : "2px solid transparent",
+                    borderBottom: active ? "2px solid #22C9E0" : "2px solid transparent",
                     transition: "color 0.15s, border-color 0.15s",
                   }}
-                  onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = "#111827"; }}
-                  onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = "#6B7280"; }}
+                  onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = "#0E1826"; }}
+                  onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = "#5F6E7E"; }}
                 >
                   {label}
                 </Link>
@@ -129,14 +137,14 @@ export default function Navbar() {
                 style={{
                   font: "600 15px/1 Inter Variable, sans-serif",
                   color: "#ffffff",
-                  background: "#2563EB",
+                  background: "#0B2545",
                   padding: "10px 18px",
                   borderRadius: 10,
                   textDecoration: "none",
                   transition: "background 0.15s",
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "#1D4ED8")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "#2563EB")}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "#0E2E5C")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "#0B2545")}
               >
                 {currentUser?.full_name
                   ? currentUser.full_name.split(" ")[0]
@@ -148,12 +156,12 @@ export default function Navbar() {
                   href="/login"
                   style={{
                     font: "600 15px/1 Inter Variable, sans-serif",
-                    color: "#111827",
+                    color: "#0E1826",
                     textDecoration: "none",
                     transition: "color 0.15s",
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = "#2563EB")}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = "#111827")}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "#0B2545")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = "#0E1826")}
                 >
                   Войти
                 </Link>
@@ -162,14 +170,14 @@ export default function Navbar() {
                   style={{
                     font: "600 15px/1 Inter Variable, sans-serif",
                     color: "#ffffff",
-                    background: "#2563EB",
+                    background: "#0B2545",
                     padding: "10px 18px",
                     borderRadius: 10,
                     textDecoration: "none",
                     transition: "background 0.15s",
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "#1D4ED8")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "#2563EB")}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "#0E2E5C")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "#0B2545")}
                 >
                   Регистрация
                 </Link>
@@ -193,7 +201,7 @@ export default function Navbar() {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              color: "#111827",
+              color: "#0E1826",
               borderRadius: 8,
             }}
           >
@@ -218,7 +226,7 @@ export default function Navbar() {
             overflowY: "auto",
             display: "flex",
             flexDirection: "column",
-            borderTop: "1px solid #E5E7EB",
+            borderTop: "1px solid #E2E8EE",
           }}
         >
           {/* Nav links */}
@@ -235,10 +243,10 @@ export default function Navbar() {
                     alignItems: "center",
                     padding: "17px 20px",
                     font: "500 17px/1 Inter Variable, sans-serif",
-                    color: active ? "#2563EB" : "#111827",
+                    color: active ? "#0B2545" : "#0E1826",
                     textDecoration: "none",
-                    borderBottom: "1px solid #F3F4F6",
-                    background: active ? "#EFF6FF" : "transparent",
+                    borderBottom: `1px solid ${active ? "#22C9E0" : "#F1F5F9"}`,
+                    background: active ? "#F1F5F9" : "transparent",
                   }}
                 >
                   {label}
@@ -259,7 +267,7 @@ export default function Navbar() {
                     justifyContent: "center",
                     height: 52,
                     borderRadius: 10,
-                    background: "#2563EB",
+                    background: "#0B2545",
                     color: "#ffffff",
                     font: "600 16px/1 Inter Variable, sans-serif",
                     textDecoration: "none",
@@ -279,7 +287,7 @@ export default function Navbar() {
                       justifyContent: "center",
                       height: 52,
                       borderRadius: 10,
-                      background: "#2563EB",
+                      background: "#0B2545",
                       color: "#ffffff",
                       font: "600 16px/1 Inter Variable, sans-serif",
                       textDecoration: "none",
@@ -296,8 +304,8 @@ export default function Navbar() {
                       height: 52,
                       borderRadius: 10,
                       background: "#ffffff",
-                      border: "1.5px solid #E5E7EB",
-                      color: "#111827",
+                      border: "1.5px solid #E2E8EE",
+                      color: "#0E1826",
                       font: "600 16px/1 Inter Variable, sans-serif",
                       textDecoration: "none",
                     }}

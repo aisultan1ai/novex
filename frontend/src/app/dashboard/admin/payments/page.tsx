@@ -59,7 +59,7 @@ function statusStyle(status: string): React.CSSProperties {
   const map: Record<string, React.CSSProperties> = {
     unpaid: { background: "#f1f5f9", color: "#475569" },
     awaiting_payment: { background: "#fef9c3", color: "#854d0e" },
-    payment_under_review: { background: "#dbeafe", color: "#1e40af" },
+    payment_under_review: { background: "#E6EEF7", color: "#1e40af" },
     paid: { background: "#dcfce7", color: "#166534" },
     payment_rejected: { background: "#fee2e2", color: "#991b1b" },
     refund_pending: { background: "#fed7aa", color: "#9a3412" },
@@ -108,24 +108,24 @@ function ProofModal({ paymentId, onClose }: { paymentId: number; onClose: () => 
           <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Чек оплаты #{paymentId}</h2>
           <button
             onClick={onClose}
-            style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#6b7280", lineHeight: 1 }}
+            style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#5F6E7E", lineHeight: 1 }}
           >
             ×
           </button>
         </div>
 
-        {loading && <p style={{ color: "#6b7280", textAlign: "center" }}>Загрузка...</p>}
+        {loading && <p style={{ color: "#5F6E7E", textAlign: "center" }}>Загрузка...</p>}
 
         {!loading && detail && (
           <>
             {/* Payment info */}
             <div style={{ background: "#f9fafb", borderRadius: 10, padding: "12px 16px", marginBottom: 20, fontSize: 13 }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 16px" }}>
-                <div><span style={{ color: "#6b7280" }}>Заказ:</span> <strong>#{detail.payment.order_id}</strong></div>
-                <div><span style={{ color: "#6b7280" }}>Провайдер:</span> <strong>{detail.payment.provider}</strong></div>
-                <div><span style={{ color: "#6b7280" }}>Сумма:</span> <strong>{detail.payment.amount.toLocaleString()} {detail.payment.currency}</strong></div>
+                <div><span style={{ color: "#5F6E7E" }}>Заказ:</span> <strong>#{detail.payment.order_id}</strong></div>
+                <div><span style={{ color: "#5F6E7E" }}>Провайдер:</span> <strong>{detail.payment.provider}</strong></div>
+                <div><span style={{ color: "#5F6E7E" }}>Сумма:</span> <strong>{detail.payment.amount.toLocaleString()} {detail.payment.currency}</strong></div>
                 <div>
-                  <span style={{ color: "#6b7280" }}>Статус:</span>{" "}
+                  <span style={{ color: "#5F6E7E" }}>Статус:</span>{" "}
                   <span style={statusStyle(detail.payment.status)}>{STATUS_LABELS[detail.payment.status] ?? detail.payment.status}</span>
                 </div>
               </div>
@@ -143,7 +143,7 @@ function ProofModal({ paymentId, onClose }: { paymentId: number; onClose: () => 
                   <div
                     key={proof.id}
                     style={{
-                      border: "1px solid #e5e7eb", borderRadius: 10, padding: "12px 14px",
+                      border: "1px solid #E2E8EE", borderRadius: 10, padding: "12px 14px",
                       display: "flex", alignItems: "center", gap: 12,
                     }}
                   >
@@ -166,7 +166,7 @@ function ProofModal({ paymentId, onClose }: { paymentId: number; onClose: () => 
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{
-                        background: "#2563eb", color: "#fff", borderRadius: 8, padding: "6px 14px",
+                        background: "#0B2545", color: "#fff", borderRadius: 8, padding: "6px 14px",
                         fontSize: 12, fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap", flexShrink: 0,
                       }}
                     >
@@ -183,7 +183,7 @@ function ProofModal({ paymentId, onClose }: { paymentId: number; onClose: () => 
                 <h3 style={{ fontSize: 14, fontWeight: 700, marginTop: 20, marginBottom: 10 }}>История статусов</h3>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {detail.history.map((h, i) => (
-                    <div key={i} style={{ fontSize: 12, color: "#6b7280", display: "flex", gap: 8 }}>
+                    <div key={i} style={{ fontSize: 12, color: "#5F6E7E", display: "flex", gap: 8 }}>
                       <span>{new Date(h.created_at).toLocaleString("ru-KZ")}</span>
                       <span>
                         <span style={statusStyle(h.old_status)}>{STATUS_LABELS[h.old_status] ?? h.old_status}</span>
@@ -324,7 +324,7 @@ export default function AdminPaymentsPage() {
 
       {/* Table */}
       {loading ? (
-        <p style={{ color: "#6b7280" }}>Загрузка...</p>
+        <p style={{ color: "#5F6E7E" }}>Загрузка...</p>
       ) : (
         <table style={styles.table}>
           <thead>
@@ -480,7 +480,7 @@ export default function AdminPaymentsPage() {
 
 const styles: Record<string, React.CSSProperties> = {
   select: {
-    border: "1px solid #e5e7eb",
+    border: "1px solid #E2E8EE",
     borderRadius: 6,
     padding: "6px 12px",
     fontSize: 13,
@@ -490,7 +490,7 @@ const styles: Record<string, React.CSSProperties> = {
   th: {
     textAlign: "left",
     padding: "8px 12px",
-    borderBottom: "2px solid #e5e7eb",
+    borderBottom: "2px solid #E2E8EE",
     fontWeight: 600,
     color: "#374151",
     whiteSpace: "nowrap",
@@ -520,7 +520,7 @@ const styles: Record<string, React.CSSProperties> = {
   btnProof: {
     background: "#f3f4f6",
     color: "#374151",
-    border: "1px solid #e5e7eb",
+    border: "1px solid #E2E8EE",
     borderRadius: 6,
     padding: "5px 10px",
     fontSize: 12,
@@ -528,7 +528,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
   },
   input: {
-    border: "1px solid #e5e7eb",
+    border: "1px solid #E2E8EE",
     borderRadius: 6,
     padding: "4px 8px",
     fontSize: 12,
@@ -555,7 +555,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
   },
   pageBtn: {
-    border: "1px solid #e5e7eb",
+    border: "1px solid #E2E8EE",
     borderRadius: 6,
     padding: "6px 12px",
     fontSize: 12,

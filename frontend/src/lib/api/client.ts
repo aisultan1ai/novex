@@ -61,6 +61,76 @@ async function parseJsonSafely(response: Response): Promise<unknown> {
   }
 }
 
+// Понятные русские имена для полей API (в порядке появления в UI). Используется
+// в переводе Pydantic-ошибок: без этой карты сообщение "String should have at
+// least 1 character" не подсказывает пользователю какое именно поле пустое.
+const FIELD_LABELS_RU: Record<string, string> = {
+  from_city: "город отправления",
+  to_city: "город доставки",
+  from_country: "страна отправления",
+  to_country: "страна доставки",
+  shipment_type: "тип отправления",
+  weight_kg: "вес",
+  quantity: "количество",
+  width_cm: "ширина",
+  height_cm: "высота",
+  depth_cm: "глубина",
+  email: "email",
+  password: "пароль",
+  full_name: "имя",
+  phone: "телефон",
+  iin: "ИИН",
+  bin: "БИН",
+  company_name: "название компании",
+  contact_name: "контактное лицо",
+  comment: "комментарий",
+  cities: "города",
+  tracking_number: "трек-номер",
+  address: "адрес",
+  city: "город",
+  postal_code: "индекс",
+  recipient_name: "получатель",
+  sender_name: "отправитель",
+  rate_quote_id: "тариф",
+};
+
+function translatePydanticMsg(msg: string, fieldLabel: string | null): string {
+  const field = fieldLabel ?? "поле";
+  const cap = field.charAt(0).toUpperCase() + field.slice(1);
+  // Все шаблоны через двоеточие или тире - чтобы не согласовывать род/падеж
+  // русских имён полей ("Вес" м / "Ширина" ж / "Количество" ср).
+  if (/^Field required$/i.test(msg)) return `Заполните поле: ${field}.`;
+  if (/^String should have at least 1 character$/i.test(msg))
+    return `Заполните поле: ${field}.`;
+  if (/^String should have at least (\d+) characters?$/i.test(msg)) {
+    const n = msg.match(/\d+/)?.[0];
+    return `${cap} — минимум ${n} симв.`;
+  }
+  if (/^String should have at most (\d+) characters?$/i.test(msg)) {
+    const n = msg.match(/\d+/)?.[0];
+    return `${cap} — максимум ${n} симв.`;
+  }
+  if (/valid email/i.test(msg)) return `Некорректный email.`;
+  if (/^Input should be greater than 0$/i.test(msg))
+    return `${cap}: значение больше 0.`;
+  if (/^Input should be greater than or equal to ([\d.]+)/i.test(msg)) {
+    const n = msg.match(/[\d.]+/)?.[0];
+    return `${cap}: не меньше ${n}.`;
+  }
+  if (/^Input should be less than or equal to ([\d.]+)/i.test(msg)) {
+    const n = msg.match(/[\d.]+/)?.[0];
+    return `${cap}: не больше ${n}.`;
+  }
+  if (/^Input should be a valid (integer|number)/i.test(msg))
+    return `${cap}: нужно число.`;
+  if (/^Input should be a valid boolean/i.test(msg))
+    return `${cap}: неверное значение.`;
+  if (/^Input should be/i.test(msg))
+    return `${cap}: неверное значение.`;
+  // Value-level ошибки уже часто идут по-русски - оставляем как есть.
+  return msg;
+}
+
 // FastAPI/Pydantic returns `detail` as either a plain string OR an array of
 // validation errors: [{loc: ["body","phone"], msg: "Value error, ...", type: "..."}].
 // Extract a user-facing message that keeps the actual field-level messages.
@@ -74,10 +144,19 @@ function extractErrorDetail(data: unknown, status: number): string {
       const messages = detail
         .map((item: unknown) => {
           if (typeof item !== "object" || item === null) return null;
-          const msg = (item as { msg?: unknown }).msg;
-          if (typeof msg !== "string") return null;
+          const rawMsg = (item as { msg?: unknown }).msg;
+          if (typeof rawMsg !== "string") return null;
           // Pydantic prefixes user errors with "Value error, " - strip it
-          return msg.replace(/^Value error,\s*/, "");
+          const msg = rawMsg.replace(/^Value error,\s*/, "");
+          // Extract the target field from `loc`: ["body", "from_city"] → "from_city"
+          const loc = (item as { loc?: unknown }).loc;
+          const fieldKey =
+            Array.isArray(loc)
+              ? loc.filter((l) => typeof l === "string" && l !== "body").pop()
+              : null;
+          const fieldLabel =
+            typeof fieldKey === "string" ? (FIELD_LABELS_RU[fieldKey] ?? null) : null;
+          return translatePydanticMsg(msg, fieldLabel);
         })
         .filter((m): m is string => !!m);
       if (messages.length > 0) return messages.join(". ");

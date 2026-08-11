@@ -57,7 +57,7 @@ function IconArrowLeft() {
   );
 }
 
-const card = { background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, padding: "20px 24px" };
+const card = { background: "#ffffff", border: "1px solid #E2E8EE", borderRadius: 16, padding: "20px 24px" };
 
 export default function OrderDetailPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -175,7 +175,7 @@ export default function OrderDetailPage() {
       </div>
 
       {pendingDelete && (
-        <div style={{ marginBottom: 20, padding: "12px 20px", background: "#1e293b", borderRadius: 12, fontSize: 14, color: "#f1f5f9", display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ marginBottom: 20, padding: "12px 20px", background: "#163558", borderRadius: 12, fontSize: 14, color: "#f1f5f9", display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ flex: 1 }}>Черновик #{draftId} будет удалён через 5 секунд…</span>
           <button onClick={handleUndoDelete} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #475569", background: "transparent", color: "#f1f5f9", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
             Отменить
@@ -190,7 +190,7 @@ export default function OrderDetailPage() {
       )}
 
       {info && (
-        <div style={{ marginBottom: 20, background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 12, padding: "14px 20px", color: "#1e40af", fontSize: 14, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+        <div style={{ marginBottom: 20, background: "#F1F5F9", border: "1px solid #CFDCEA", borderRadius: 12, padding: "14px 20px", color: "#1e40af", fontSize: 14, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
           <span style={{ flex: 1 }}>{info}</span>
           <button
             onClick={() => setInfo(null)}
@@ -205,7 +205,7 @@ export default function OrderDetailPage() {
           <style>{`@keyframes skeleton-pulse { 0%,100%{opacity:1} 50%{opacity:.4} }`}</style>
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {[120, 100, 180, 120].map((h, i) => (
-              <div key={i} style={{ height: h, borderRadius: 16, background: "#e5e7eb", animation: "skeleton-pulse 1.5s ease infinite", animationDelay: `${i * 0.15}s` }} />
+              <div key={i} style={{ height: h, borderRadius: 16, background: "#E2E8EE", animation: "skeleton-pulse 1.5s ease infinite", animationDelay: `${i * 0.15}s` }} />
             ))}
           </div>
         </>
@@ -215,7 +215,7 @@ export default function OrderDetailPage() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
-                <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 28, fontWeight: 800, color: "#111827" }}>Заказ #{order.draft_id}</h1>
+                <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 28, fontWeight: 800, color: "#0E1826" }}>Заказ #{order.draft_id}</h1>
                 <StatusBadge status={order.status} />
               </div>
               <div style={{ fontSize: 13, color: "#94a3b8" }}>Создан {formatDate(order.created_at)}</div>
@@ -223,12 +223,12 @@ export default function OrderDetailPage() {
 
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {CHECKOUT_STATUSES.has(order.status) && (
-                <Link href={`/checkout?draftId=${order.draft_id}`} style={{ padding: "10px 20px", borderRadius: 10, background: "#2563EB", color: "#fff", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
+                <Link href={`/checkout?draftId=${order.draft_id}`} style={{ padding: "10px 20px", borderRadius: 10, background: "#0B2545", color: "#fff", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
                   Оплатить
                 </Link>
               )}
               {PAYMENT_PENDING_STATUSES.has(order.status) && (
-                <Link href={`/checkout?draftId=${order.draft_id}`} style={{ padding: "10px 20px", borderRadius: 10, background: "#2563EB", color: "#fff", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
+                <Link href={`/checkout?draftId=${order.draft_id}`} style={{ padding: "10px 20px", borderRadius: 10, background: "#0B2545", color: "#fff", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
                   Оплатить
                 </Link>
               )}
@@ -241,7 +241,7 @@ export default function OrderDetailPage() {
                 <button
                   onClick={() => void handleDownloadLabel()}
                   disabled={isDownloading}
-                  style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", color: "#111827", fontSize: 14, fontWeight: 600, cursor: isDownloading ? "not-allowed" : "pointer", opacity: isDownloading ? 0.6 : 1, fontFamily: "inherit" }}
+                  style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid #E2E8EE", background: "#fff", color: "#0E1826", fontSize: 14, fontWeight: 600, cursor: isDownloading ? "not-allowed" : "pointer", opacity: isDownloading ? 0.6 : 1, fontFamily: "inherit" }}
                 >
                   {isDownloading ? "Скачиваем…" : "Скачать накладную"}
                 </button>
@@ -282,7 +282,7 @@ export default function OrderDetailPage() {
                 ? "#fde68a"
                 : order.cancellation_request.status === "rejected"
                   ? "#fecaca"
-                  : "#e5e7eb",
+                  : "#E2E8EE",
               background: order.cancellation_request.status === "pending"
                 ? "#fffbeb"
                 : order.cancellation_request.status === "rejected"
@@ -314,7 +314,7 @@ export default function OrderDetailPage() {
             <div style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Трекинг-номер</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: "#111827", fontFamily: "monospace", letterSpacing: "0.05em" }}>{order.tracking_number}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#0E1826", fontFamily: "monospace", letterSpacing: "0.05em" }}>{order.tracking_number}</div>
               </div>
               <button
                 onClick={() => {
@@ -322,7 +322,7 @@ export default function OrderDetailPage() {
                   setCopied(true);
                   setTimeout(() => setCopied(false), 2000);
                 }}
-                style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, border: "1px solid #e5e7eb", background: copied ? "#f0fdf4" : "#fff", color: copied ? "#16a34a" : "#374151", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s", whiteSpace: "nowrap" }}
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, border: "1px solid #E2E8EE", background: copied ? "#f0fdf4" : "#fff", color: copied ? "#16a34a" : "#374151", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s", whiteSpace: "nowrap" }}
               >
                 {copied ? (
                   <>
@@ -343,28 +343,28 @@ export default function OrderDetailPage() {
           <div style={{ ...card }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 14 }}>Маршрут и тариф</div>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
-              <span style={{ fontSize: 22, fontWeight: 800, color: "#111827" }}>{order.from_city_snapshot}</span>
+              <span style={{ fontSize: 22, fontWeight: 800, color: "#0E1826" }}>{order.from_city_snapshot}</span>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
               </svg>
-              <span style={{ fontSize: 22, fontWeight: 800, color: "#111827" }}>{order.to_city_snapshot}</span>
+              <span style={{ fontSize: 22, fontWeight: 800, color: "#0E1826" }}>{order.to_city_snapshot}</span>
             </div>
             <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
               <div>
                 <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Перевозчик</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>{order.carrier_name_snapshot}</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#0E1826" }}>{order.carrier_name_snapshot}</div>
               </div>
               <div>
                 <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Тариф</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>{order.tariff_name_snapshot}</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#0E1826" }}>{order.tariff_name_snapshot}</div>
               </div>
               <div>
                 <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Срок доставки</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>{order.eta_days_min_snapshot}-{order.eta_days_max_snapshot} дн.</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#0E1826" }}>{order.eta_days_min_snapshot}-{order.eta_days_max_snapshot} дн.</div>
               </div>
               <div>
                 <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Стоимость</div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: "#111827" }}>{formatPrice(order.price_snapshot, order.currency_snapshot)}</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: "#0E1826" }}>{formatPrice(order.price_snapshot, order.currency_snapshot)}</div>
               </div>
             </div>
           </div>
@@ -375,7 +375,7 @@ export default function OrderDetailPage() {
               {order.sender && (
                 <div style={{ ...card }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>Отправитель</div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", marginBottom: 4 }}>{order.sender.full_name}</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "#0E1826", marginBottom: 4 }}>{order.sender.full_name}</div>
                   {order.sender.company_name && <div style={{ fontSize: 13, color: "#64748b", marginBottom: 2 }}>{order.sender.company_name}</div>}
                   <div style={{ fontSize: 13, color: "#64748b", marginBottom: 2 }}>{order.sender.phone}</div>
                   {order.sender.email && <div style={{ fontSize: 13, color: "#64748b", marginBottom: 8 }}>{order.sender.email}</div>}
@@ -391,7 +391,7 @@ export default function OrderDetailPage() {
               {order.recipient && (
                 <div style={{ ...card }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>Получатель</div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", marginBottom: 4 }}>{order.recipient.full_name}</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "#0E1826", marginBottom: 4 }}>{order.recipient.full_name}</div>
                   {order.recipient.company_name && <div style={{ fontSize: 13, color: "#64748b", marginBottom: 2 }}>{order.recipient.company_name}</div>}
                   <div style={{ fontSize: 13, color: "#64748b", marginBottom: 2 }}>{order.recipient.phone}</div>
                   {order.recipient.email && <div style={{ fontSize: 13, color: "#64748b", marginBottom: 8 }}>{order.recipient.email}</div>}
@@ -417,7 +417,7 @@ export default function OrderDetailPage() {
                 {order.packages.map((pkg) => (
                   <div key={pkg.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "#f8fafc", borderRadius: 12 }}>
                     <div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: "#111827", marginBottom: 2 }}>{pkg.description}</div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: "#0E1826", marginBottom: 2 }}>{pkg.description}</div>
                       <div style={{ fontSize: 12, color: "#94a3b8" }}>
                         {pkg.quantity} шт. · {pkg.weight_kg} кг · {pkg.width_cm}×{pkg.height_cm}×{pkg.depth_cm} см
                       </div>
@@ -439,10 +439,10 @@ export default function OrderDetailPage() {
               <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>Дополнительные услуги</div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 {order.call_before_delivery && (
-                  <span style={{ fontSize: 13, fontWeight: 600, background: "#dbeafe", color: "#1e40af", borderRadius: 999, padding: "5px 14px" }}>Звонок перед доставкой</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, background: "#E6EEF7", color: "#1e40af", borderRadius: 999, padding: "5px 14px" }}>Звонок перед доставкой</span>
                 )}
                 {order.insurance && (
-                  <span style={{ fontSize: 13, fontWeight: 600, background: "#dbeafe", color: "#1e40af", borderRadius: 999, padding: "5px 14px" }}>Страховка</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, background: "#E6EEF7", color: "#1e40af", borderRadius: 999, padding: "5px 14px" }}>Страховка</span>
                 )}
                 {order.fragile && (
                   <span style={{ fontSize: 13, fontWeight: 600, background: "#fef3c7", color: "#92400e", borderRadius: 999, padding: "5px 14px" }}>Хрупкий груз</span>
@@ -462,7 +462,7 @@ export default function OrderDetailPage() {
             onClick={(e) => e.stopPropagation()}
             style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 480, padding: "24px 28px", boxShadow: "0 20px 40px rgba(15,23,42,0.25)" }}
           >
-            <h2 style={{ margin: "0 0 8px", fontSize: 20, fontWeight: 800, color: "#111827" }}>
+            <h2 style={{ margin: "0 0 8px", fontSize: 20, fontWeight: 800, color: "#0E1826" }}>
               Отменить заказ #{order.draft_id}?
             </h2>
             {order.status !== "sent_to_carrier" && (
@@ -480,7 +480,7 @@ export default function OrderDetailPage() {
               rows={4}
               maxLength={500}
               disabled={isCancelling}
-              style={{ width: "100%", padding: "10px 12px", border: "1px solid #e5e7eb", borderRadius: 10, fontSize: 14, fontFamily: "inherit", outline: "none", resize: "vertical", boxSizing: "border-box", color: "#111827", background: "#fff" }}
+              style={{ width: "100%", padding: "10px 12px", border: "1px solid #E2E8EE", borderRadius: 10, fontSize: 14, fontFamily: "inherit", outline: "none", resize: "vertical", boxSizing: "border-box", color: "#0E1826", background: "#fff" }}
             />
             <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4, textAlign: "right" }}>
               {cancelReason.length} / 500
@@ -496,7 +496,7 @@ export default function OrderDetailPage() {
               <button
                 onClick={() => { setShowCancelModal(false); setCancelReason(""); setCancelError(null); }}
                 disabled={isCancelling}
-                style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", color: "#374151", fontSize: 14, fontWeight: 600, cursor: isCancelling ? "not-allowed" : "pointer", fontFamily: "inherit" }}
+                style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid #E2E8EE", background: "#fff", color: "#374151", fontSize: 14, fontWeight: 600, cursor: isCancelling ? "not-allowed" : "pointer", fontFamily: "inherit" }}
               >
                 Не отменять
               </button>

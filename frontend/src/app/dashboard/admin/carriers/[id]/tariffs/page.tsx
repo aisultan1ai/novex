@@ -25,9 +25,9 @@ function downloadTemplate() {
 }
 
 const inp: React.CSSProperties = {
-  border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 12px",
+  border: "1px solid #E2E8EE", borderRadius: 8, padding: "8px 12px",
   fontSize: 13, width: "100%", boxSizing: "border-box",
-  fontFamily: "inherit", outline: "none", background: "#f8fafc", color: "#0f172a",
+  fontFamily: "inherit", outline: "none", background: "#f8fafc", color: "#0B2545",
 };
 
 export default function AdminCarrierTariffsPage() {
@@ -171,9 +171,9 @@ export default function AdminCarrierTariffsPage() {
     <div style={{ display: "grid", gridTemplateColumns: "240px 1fr", gap: 20 }}>
       {/* Services list */}
       <div>
-        <div style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, overflow: "hidden" }}>
-          <div style={{ padding: "14px 16px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>Услуги</span>
+        <div style={{ background: "#ffffff", border: "1px solid #E2E8EE", borderRadius: 16, overflow: "hidden" }}>
+          <div style={{ padding: "14px 16px", borderBottom: "1px solid #E2E8EE", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#0B2545" }}>Услуги</span>
             <button
               onClick={() => setShowServiceForm((v) => !v)}
               style={{ fontSize: 20, lineHeight: 1, background: "none", border: "none", cursor: "pointer", color: "#64748b", padding: 0, fontFamily: "inherit" }}
@@ -191,7 +191,7 @@ export default function AdminCarrierTariffsPage() {
                 <option value="document">Документ</option>
                 <option value="cargo">Груз</option>
               </select>
-              <button type="submit" disabled={savingSvc} style={{ width: "100%", padding: "8px", borderRadius: 8, border: "none", background: "#0f172a", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+              <button type="submit" disabled={savingSvc} style={{ width: "100%", padding: "8px", borderRadius: 8, border: "none", background: "#0B2545", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                 {savingSvc ? "..." : "Добавить"}
               </button>
             </form>
@@ -208,7 +208,7 @@ export default function AdminCarrierTariffsPage() {
                   onClick={() => setSelectedService(svc)}
                   style={{ display: "block", width: "100%", padding: "12px 16px", textAlign: "left", border: "none", background: active ? "#f1f5f9" : "transparent", cursor: "pointer", borderBottom: "1px solid #f1f5f9", fontFamily: "inherit" }}
                 >
-                  <div style={{ fontSize: 14, fontWeight: active ? 700 : 500, color: "#0f172a" }}>{svc.name}</div>
+                  <div style={{ fontSize: 14, fontWeight: active ? 700 : 500, color: "#0B2545" }}>{svc.name}</div>
                   <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>{svc.code} · {svc.shipment_type}</div>
                 </button>
               );
@@ -220,21 +220,21 @@ export default function AdminCarrierTariffsPage() {
       {/* Rates table */}
       <div>
         {!selectedService ? (
-          <div style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, padding: 48, textAlign: "center", color: "#94a3b8", fontSize: 14 }}>
+          <div style={{ background: "#ffffff", border: "1px solid #E2E8EE", borderRadius: 16, padding: 48, textAlign: "center", color: "#94a3b8", fontSize: 14 }}>
             Выберите услугу слева для просмотра/редактирования ставок
           </div>
         ) : (
-          <div style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, overflow: "hidden" }}>
-            <div style={{ padding: "16px 20px", borderBottom: "1px solid #e5e7eb", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+          <div style={{ background: "#ffffff", border: "1px solid #E2E8EE", borderRadius: 16, overflow: "hidden" }}>
+            <div style={{ padding: "16px 20px", borderBottom: "1px solid #E2E8EE", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
               <div>
-                <span style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>{selectedService.name}</span>
+                <span style={{ fontSize: 15, fontWeight: 700, color: "#0B2545" }}>{selectedService.name}</span>
                 <span style={{ fontSize: 12, color: "#94a3b8", marginLeft: 10 }}>{rates.length} строк</span>
               </div>
               <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={downloadTemplate} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", color: "#0f172a", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                <button onClick={downloadTemplate} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid #E2E8EE", background: "#fff", color: "#0B2545", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                   Шаблон JSON
                 </button>
-                <label style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: "#0f172a", color: "#ffffff", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <label style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: "#0B2545", color: "#ffffff", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
                   {uploading ? "Загружаем..." : "Загрузить JSON"}
                   <input ref={fileRef} type="file" accept=".json" style={{ display: "none" }} onChange={handleUpload} disabled={uploading} />
                 </label>
@@ -242,7 +242,7 @@ export default function AdminCarrierTariffsPage() {
             </div>
 
             {uploadMsg && (
-              <div style={{ padding: "10px 20px", fontSize: 13, background: uploadMsg.startsWith("✓") ? "#f0fdf4" : "#fef2f2", color: uploadMsg.startsWith("✓") ? "#166534" : "#b91c1c", borderBottom: "1px solid #e5e7eb" }}>
+              <div style={{ padding: "10px 20px", fontSize: 13, background: uploadMsg.startsWith("✓") ? "#f0fdf4" : "#fef2f2", color: uploadMsg.startsWith("✓") ? "#166534" : "#b91c1c", borderBottom: "1px solid #E2E8EE" }}>
                 {uploadMsg}
               </div>
             )}
@@ -255,7 +255,7 @@ export default function AdminCarrierTariffsPage() {
               </div>
             ) : (
               <>
-                <div style={{ display: "grid", gridTemplateColumns: "50px 70px 70px 90px 80px 70px 70px 70px 76px", gap: 8, padding: "10px 20px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "50px 70px 70px 90px 80px 70px 70px 70px 76px", gap: 8, padding: "10px 20px", background: "#f8fafc", borderBottom: "1px solid #E2E8EE", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                   <span>ID</span><span>Зона</span><span>От, кг</span><span>До, кг</span><span>Базовая</span><span>Доп/ед</span><span>Срок мин</span><span>Срок макс</span><span></span>
                 </div>
                 {rates.map((rate, idx) => {
@@ -275,15 +275,15 @@ export default function AdminCarrierTariffsPage() {
                           <input style={cellInp} value={editDraft.eta_days_max} onChange={(e) => setEditDraft((d) => ({ ...d, eta_days_max: e.target.value }))} placeholder="-" />
                           <div style={{ display: "flex", gap: 4 }}>
                             <button onClick={() => void handleSaveEdit()} disabled={saving} style={{ flex: 1, height: 28, borderRadius: 6, border: "1px solid #bbf7d0", background: "#f0fdf4", color: "#166534", cursor: "pointer", fontSize: 13, padding: 0 }}>✓</button>
-                            <button onClick={cancelEdit} style={{ flex: 1, height: 28, borderRadius: 6, border: "1px solid #e5e7eb", background: "#fff", color: "#64748b", cursor: "pointer", fontSize: 13, padding: 0 }}>✕</button>
+                            <button onClick={cancelEdit} style={{ flex: 1, height: 28, borderRadius: 6, border: "1px solid #E2E8EE", background: "#fff", color: "#64748b", cursor: "pointer", fontSize: 13, padding: 0 }}>✕</button>
                           </div>
                         </>
                       ) : (
                         <>
-                          <span style={{ fontWeight: 700, color: "#0f172a" }}>Зона {rate.zone}</span>
+                          <span style={{ fontWeight: 700, color: "#0B2545" }}>Зона {rate.zone}</span>
                           <span style={{ color: "#475569" }}>{rate.weight_from_kg}</span>
                           <span style={{ color: "#475569" }}>{rate.weight_to_kg ?? "∞"}</span>
-                          <span style={{ fontWeight: 600, color: "#0f172a" }}>{Number(rate.base_price).toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          <span style={{ fontWeight: 600, color: "#0B2545" }}>{Number(rate.base_price).toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                           <span style={{ color: "#64748b" }}>{rate.per_unit_price ? Number(rate.per_unit_price).toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "-"}</span>
                           <span style={{ color: "#64748b" }}>{rate.eta_days_min ?? "-"}</span>
                           <span style={{ color: "#64748b" }}>{rate.eta_days_max ?? "-"}</span>

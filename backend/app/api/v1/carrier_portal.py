@@ -4,12 +4,14 @@ import math
 import secrets
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.db import get_db
 from app.core.dependencies import get_current_carrier_id, require_carrier
+from app.core.excel import MAX_EXPORT_ROWS, build_xlsx_response, fmt_dt
+from app.core.limiter import limiter
 from app.core.storage import MAX_FILE_SIZE, get_storage
 from app.modules.carriers.models import (
     Carrier,
@@ -21,6 +23,8 @@ from app.modules.carriers.webhook_config import (
     CarrierWebhookConfig,
     CarrierWebhookRepository,
 )
+from app.modules.commissions.models import Commission
+from app.modules.commissions.repository import CommissionsRepository
 from app.modules.commissions.schemas import CommissionSummary
 from app.modules.commissions.service import CommissionsService
 from app.modules.dispatch.models import OrderStatusHistory
@@ -57,8 +61,37 @@ _notif_repo = NotificationsRepository()
 _webhook_repo = CarrierWebhookRepository()
 
 _commissions_service = CommissionsService()
+_commissions_repo = CommissionsRepository()
 
 _reviews_repo = ReviewsRepository()
+
+
+# Русские статусы заказа для колонки в экспорте перевозчика — те же лейблы,
+# что и в админ-экспорте (см. admin_orders._STATUS_LABELS_RU), продублированы
+# здесь чтобы не тянуть импорт из соседнего модуля API-роутера.
+_CARRIER_STATUS_LABELS_RU: dict[str, str] = {
+    "sent_to_carrier": "Передан перевозчику",
+    "pending_manual": "Ручная обработка",
+    "pending_manual_dispatch": "Ручная отправка",
+    "dispatch_failed": "Ошибка отправки",
+    "picked_up": "Забран курьером",
+    "in_transit": "В пути",
+    "out_for_delivery": "Передан курьеру доставки",
+    "arrived": "Прибыл",
+    "delivered": "Доставлен",
+    "delivery_failed": "Не удалось доставить",
+    "customs_hold": "На таможне",
+    "return_requested": "Запрошен возврат",
+    "return_in_progress": "Возврат в процессе",
+    "returned": "Возвращён",
+    "cancelled": "Отменён",
+}
+
+_COMMISSION_STATUS_RU_CARRIER: dict[str, str] = {
+    "active": "начисление",
+    "reversal": "возврат",
+    "reversed": "отменено (заменено сторно)",
+}
 
 
 def _mask_secret(secret: str | None) -> str | None:
@@ -349,6 +382,166 @@ def _order_to_dict(
             for pkg in packages
         ],
     }
+
+
+_CARRIER_ORDER_EXPORT_HEADERS = [
+    "ID заказа",
+    "Дата создания",
+    "Статус",
+    "Откуда (город)",
+    "Куда (город)",
+    "Тип отправления",
+    "Тариф",
+    "Срок (мин, дн.)",
+    "Срок (макс, дн.)",
+    "Выплата перевозчику",
+    "Валюта",
+    "Трек Novex",
+    "Трек перевозчика",
+    "Штрих-код",
+    "Отправитель ФИО",
+    "Отправитель телефон",
+    "Отправитель адрес",
+    "Получатель ФИО",
+    "Получатель телефон",
+    "Получатель адрес",
+    "Мест",
+    "Вес, кг",
+    "Габариты (Ш×В×Г см)",
+    "Хрупкий",
+    "Страховка",
+    "Вызов курьера",
+    "Дата вывоза",
+]
+
+
+def _carrier_order_row(order: OrderDraft, shipment: Shipment | None) -> list:
+    parties = list(order.parties)
+    packages = list(order.packages)
+    sender = next((p for p in parties if p.role == "sender"), None)
+    recipient = next((p for p in parties if p.role == "recipient"), None)
+
+    def _addr(p) -> str:
+        if not p:
+            return ""
+        chunks = [p.city, p.address_line1]
+        if p.address_line2:
+            chunks.append(p.address_line2)
+        if p.postal_code:
+            chunks.append(p.postal_code)
+        return ", ".join(c for c in chunks if c)
+
+    total_qty = sum(int(p.quantity or 0) for p in packages)
+    total_weight = sum(float(p.weight_kg or 0) for p in packages)
+    dims = "; ".join(
+        f"{p.width_cm:g}×{p.height_cm:g}×{p.depth_cm:g}" for p in packages
+    ) if packages else ""
+
+    return [
+        order.id,
+        fmt_dt(order.created_at),
+        _CARRIER_STATUS_LABELS_RU.get(order.status, order.status),
+        order.from_city_snapshot,
+        order.to_city_snapshot,
+        "Посылка" if order.shipment_type_snapshot == "parcel" else "Документ",
+        order.tariff_name_snapshot,
+        order.eta_days_min_snapshot,
+        order.eta_days_max_snapshot,
+        # Перевозчик видит именно свою выплату, а НЕ цену клиента — цена
+        # клиента включает наценку Novex, разглашать её не нужно.
+        float(order.carrier_price_snapshot) if order.carrier_price_snapshot is not None
+        else (float(order.price_snapshot) if order.price_snapshot else None),
+        order.currency_snapshot,
+        shipment.tracking_number if shipment else None,
+        shipment.carrier_tracking_number if shipment else None,
+        shipment.carrier_barcode if shipment else None,
+        sender.full_name if sender else None,
+        sender.phone if sender else None,
+        _addr(sender),
+        recipient.full_name if recipient else None,
+        recipient.phone if recipient else None,
+        _addr(recipient),
+        total_qty,
+        round(total_weight, 3) if total_weight else 0,
+        dims,
+        "да" if order.fragile else "нет",
+        "да" if order.insurance else "нет",
+        "да" if order.pickup_requested else "нет",
+        order.pickup_date,
+    ]
+
+
+@router.get("/orders/export", summary="Экспорт заказов перевозчика в Excel")
+@limiter.limit("10/hour")
+def export_carrier_orders(
+    request: Request,
+    status: str | None = Query(default=None),
+    date_from: datetime | None = Query(default=None),
+    date_to: datetime | None = Query(default=None),
+    db: Session = Depends(get_db),
+    carrier_id: int = Depends(get_current_carrier_id),
+):
+    """XLSX-выгрузка заказов, доступных перевозчику. Скоуп совпадает со
+    списком: только carrier.code и статусы _CARRIER_VISIBLE_STATUSES."""
+    carrier = _get_carrier_or_404(db, carrier_id)
+
+    where = [
+        OrderDraft.carrier_code_snapshot == carrier.code,
+        OrderDraft.status.in_(_CARRIER_VISIBLE_STATUSES),
+    ]
+    if status:
+        where.append(OrderDraft.status == status)
+    if date_from:
+        where.append(OrderDraft.created_at >= date_from)
+    if date_to:
+        where.append(OrderDraft.created_at <= date_to)
+
+    orders = db.scalars(
+        select(OrderDraft)
+        .options(
+            selectinload(OrderDraft.parties),
+            selectinload(OrderDraft.packages),
+        )
+        .where(*where)
+        .order_by(OrderDraft.created_at.desc())
+    ).all()
+
+    if not orders:
+        raise HTTPException(422, "По этим фильтрам нет заказов для экспорта")
+    if len(orders) > MAX_EXPORT_ROWS:
+        raise HTTPException(
+            422,
+            f"Слишком много данных для экспорта (>{MAX_EXPORT_ROWS} строк). Сузьте период.",
+        )
+
+    order_ids = [o.id for o in orders]
+    shipments_map: dict[int, Shipment] = {}
+    if order_ids:
+        shps = db.scalars(
+            select(Shipment).where(Shipment.order_draft_id.in_(order_ids))
+        ).all()
+        shipments_map = {s.order_draft_id: s for s in shps}
+
+    total_payout = sum(
+        float(o.carrier_price_snapshot) if o.carrier_price_snapshot is not None
+        else float(o.price_snapshot or 0)
+        for o in orders
+    )
+    total_row: list = [None] * len(_CARRIER_ORDER_EXPORT_HEADERS)
+    total_row[0] = f"Итого: {len(orders)} строк"
+    total_row[9] = total_payout
+
+    rows = (_carrier_order_row(o, shipments_map.get(o.id)) for o in orders)
+    return build_xlsx_response(
+        filename_base=f"orders_{carrier.code}",
+        sheet_name="Заказы",
+        headers=_CARRIER_ORDER_EXPORT_HEADERS,
+        rows=rows,
+        money_cols=[10],
+        datetime_cols=[2],
+        date_cols=[27],
+        total_row=total_row,
+    )
 
 
 @router.get("/orders", summary="Список заказов перевозчика")
@@ -678,6 +871,106 @@ async def upload_pod(
 # just forces carrier_code = current carrier's code — perevozchik cannot spy
 # on other carriers' financials. Config endpoint returns the rate admin has
 # set for them; no PATCH/PUT here on purpose (только чтение).
+
+
+_CARRIER_COMMISSION_EXPORT_HEADERS = [
+    "Дата операции",
+    "ID заказа",
+    "Трек Novex",
+    "Трек перевозчика",
+    "Тип операции",
+    "Статус заказа",
+    "Сумма заказа",
+    "Ваша выплата",
+    "Валюта",
+    "Причина возврата",
+]
+
+
+def _carrier_commission_row(
+    c: Commission,
+    order: OrderDraft | None,
+    shipment: Shipment | None,
+) -> list:
+    return [
+        fmt_dt(c.created_at),
+        c.order_draft_id,
+        shipment.tracking_number if shipment else None,
+        shipment.carrier_tracking_number if shipment else None,
+        _COMMISSION_STATUS_RU_CARRIER.get(c.status, c.status),
+        _CARRIER_STATUS_LABELS_RU.get(order.status, order.status) if order else None,
+        float(c.gross_amount) if c.gross_amount is not None else None,
+        float(c.carrier_payout) if c.carrier_payout is not None else None,
+        c.currency,
+        c.reversal_reason,
+    ]
+
+
+@router.get("/commissions/export", summary="Экспорт комиссий перевозчика в Excel")
+@limiter.limit("10/hour")
+def export_carrier_commissions(
+    request: Request,
+    date_from: datetime | None = Query(default=None),
+    date_to: datetime | None = Query(default=None),
+    db: Session = Depends(get_db),
+    carrier_id: int = Depends(get_current_carrier_id),
+):
+    """XLSX-выгрузка комиссий перевозчика. Скрываем сумму комиссии Novex,
+    показываем только выплату перевозчику + сумму заказа."""
+    carrier = _get_carrier_or_404(db, carrier_id)
+
+    items, _ = _commissions_repo.list_all(
+        db,
+        offset=0,
+        limit=MAX_EXPORT_ROWS + 1,
+        date_from=date_from,
+        date_to=date_to,
+        carrier_code=carrier.code,
+    )
+    if not items:
+        raise HTTPException(422, "По этим фильтрам нет комиссий для экспорта")
+    if len(items) > MAX_EXPORT_ROWS:
+        raise HTTPException(
+            422,
+            f"Слишком много данных для экспорта (>{MAX_EXPORT_ROWS} строк). Сузьте период.",
+        )
+
+    order_ids = [c.order_draft_id for c in items]
+    orders_map: dict[int, OrderDraft] = {}
+    shipments_map: dict[int, Shipment] = {}
+    if order_ids:
+        orders = db.scalars(
+            select(OrderDraft).where(OrderDraft.id.in_(order_ids))
+        ).all()
+        orders_map = {o.id: o for o in orders}
+        shipments = db.scalars(
+            select(Shipment).where(Shipment.order_draft_id.in_(order_ids))
+        ).all()
+        shipments_map = {s.order_draft_id: s for s in shipments}
+
+    total_gross = sum(float(c.gross_amount) for c in items if c.gross_amount is not None)
+    total_payout = sum(
+        float(c.carrier_payout) for c in items if c.carrier_payout is not None
+    )
+    total_row: list = [None] * len(_CARRIER_COMMISSION_EXPORT_HEADERS)
+    total_row[0] = f"Итого: {len(items)}"
+    total_row[6] = total_gross
+    total_row[7] = total_payout
+
+    rows = (
+        _carrier_commission_row(c, orders_map.get(c.order_draft_id),
+                                shipments_map.get(c.order_draft_id))
+        for c in items
+    )
+    return build_xlsx_response(
+        filename_base=f"commissions_{carrier.code}",
+        sheet_name="Комиссии",
+        headers=_CARRIER_COMMISSION_EXPORT_HEADERS,
+        rows=rows,
+        money_cols=[7, 8],
+        datetime_cols=[1],
+        total_row=total_row,
+    )
 
 
 @router.get("/commissions", summary="Список комиссий по своим заказам")

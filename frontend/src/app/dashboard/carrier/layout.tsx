@@ -39,12 +39,12 @@ export default function CarrierLayout({ children }: { children: ReactNode }) {
             </svg>
           </div>
           <div>
-            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#111827" }}>Кабинет перевозчика</h1>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0E1826" }}>Кабинет перевозчика</h1>
             <p style={{ margin: 0, fontSize: 13, color: "#64748b" }}>Управление интеграцией с Novex</p>
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 6, background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 4, width: "fit-content" }}>
+        <div style={{ display: "flex", gap: 6, background: "#ffffff", border: "1px solid #E2E8EE", borderRadius: 12, padding: 4, width: "fit-content" }}>
           {TABS.map(({ label, href }) => {
             const active = href === "/dashboard/carrier"
               ? pathname === "/dashboard/carrier"

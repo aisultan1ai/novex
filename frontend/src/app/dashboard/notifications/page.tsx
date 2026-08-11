@@ -93,7 +93,7 @@ export default function NotificationsPage() {
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: isMobile ? 22 : 28, fontWeight: 800, color: "#111827" }}>
+          <h1 style={{ margin: 0, fontSize: isMobile ? 22 : 28, fontWeight: 800, color: "#0E1826" }}>
             Уведомления
           </h1>
           {unread > 0 && (
@@ -109,7 +109,7 @@ export default function NotificationsPage() {
             style={{
               padding: isMobile ? "8px 14px" : "9px 18px",
               borderRadius: 10,
-              border: "1px solid #e5e7eb",
+              border: "1px solid #E2E8EE",
               background: "#ffffff",
               color: "#475569",
               fontSize: isMobile ? 12 : 13,
@@ -131,13 +131,13 @@ export default function NotificationsPage() {
       )}
 
       {isLoading ? (
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: 48, textAlign: "center", color: "#64748b", fontSize: 14 }}>
+        <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 16, padding: 48, textAlign: "center", color: "#64748b", fontSize: 14 }}>
           Загружаем уведомления…
         </div>
       ) : items.length === 0 ? (
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: "64px 24px", textAlign: "center" }}>
+        <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 16, padding: "64px 24px", textAlign: "center" }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>🔔</div>
-          <p style={{ fontSize: 16, fontWeight: 700, margin: "0 0 6px", color: "#111827" }}>
+          <p style={{ fontSize: 16, fontWeight: 700, margin: "0 0 6px", color: "#0E1826" }}>
             Уведомлений пока нет
           </p>
           <p style={{ margin: 0, fontSize: 14, color: "#64748b" }}>
@@ -145,7 +145,7 @@ export default function NotificationsPage() {
           </p>
         </div>
       ) : (
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, overflow: "hidden" }}>
+        <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 16, overflow: "hidden" }}>
           {items.map((n, idx) => {
             const isLast = idx === items.length - 1;
             const icon = TYPE_ICONS[n.type] ?? "🔔";
@@ -172,7 +172,7 @@ export default function NotificationsPage() {
 
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 4 }}>
-                    <div style={{ fontSize: 14, fontWeight: n.is_read ? 500 : 700, color: "#111827" }}>
+                    <div style={{ fontSize: 14, fontWeight: n.is_read ? 500 : 700, color: "#0E1826" }}>
                       {n.title}
                     </div>
                     <div style={{ fontSize: 12, color: "#94a3b8", whiteSpace: "nowrap", flexShrink: 0 }}>

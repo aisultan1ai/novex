@@ -150,7 +150,7 @@ function QuoteResultsPageInner() {
                 font: `500 ${isMobile ? 11 : 13}px/1 Inter Variable, sans-serif`,
                 textTransform: "uppercase",
                 letterSpacing: "0.05em",
-                color: "#2563EB",
+                color: "#0B2545",
                 marginBottom: 8,
               }}
             >
@@ -158,9 +158,9 @@ function QuoteResultsPageInner() {
             </div>
             <h1
               style={{
-                font: `700 ${isMobile ? 22 : 28}px/1.2 Inter Variable, sans-serif`,
+                font: `700 ${isMobile ? 22 : 28}px/1.2 'Space Grotesk Variable', 'Inter Variable', sans-serif`,
                 letterSpacing: "-0.02em",
-                color: "#111827",
+                color: "#0E1826",
                 margin: 0,
               }}
             >
@@ -170,9 +170,9 @@ function QuoteResultsPageInner() {
           <button
             onClick={() => router.push("/")}
             style={{
-              border: "1.5px solid #E5E7EB",
+              border: "1.5px solid #E2E8EE",
               background: "#ffffff",
-              color: "#111827",
+              color: "#0E1826",
               borderRadius: 10,
               padding: isMobile ? "8px 14px" : "10px 18px",
               font: `600 ${isMobile ? 13 : 14}px/1 Inter Variable, sans-serif`,
@@ -217,7 +217,7 @@ function QuoteResultsPageInner() {
             <div
               style={{
                 background: "#ffffff",
-                border: "1px solid #E5E7EB",
+                border: "1px solid #E2E8EE",
                 borderRadius: 12,
                 padding: "14px 20px",
                 display: "flex",
@@ -229,9 +229,9 @@ function QuoteResultsPageInner() {
                 boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
               }}
             >
-              <span style={{ font: "500 14px/1 Inter Variable, sans-serif", color: "#6B7280" }}>
+              <span style={{ font: "500 14px/1 Inter Variable, sans-serif", color: "#5F6E7E" }}>
                 Найдено тарифов:{" "}
-                <b style={{ color: "#111827" }}>{data.quotes.length}</b>
+                <b style={{ color: "#0E1826" }}>{data.quotes.length}</b>
               </span>
               {selectedQuote && (
                 <span
@@ -252,8 +252,8 @@ function QuoteResultsPageInner() {
             {!selectedQuote && (
               <div
                 style={{
-                  background: "#EFF6FF",
-                  border: "1px solid #BFDBFE",
+                  background: "#F1F5F9",
+                  border: "1px solid #CFDCEA",
                   borderRadius: 10,
                   padding: "12px 16px",
                   font: "400 14px/1.4 Inter Variable, sans-serif",
@@ -282,9 +282,9 @@ function QuoteResultsPageInner() {
                       }
                     }}
                     style={{
-                      background: isSelected ? "#EFF6FF" : "#ffffff",
+                      background: isSelected ? "#F1F5F9" : "#ffffff",
                       borderRadius: 16,
-                      border: `1.5px solid ${isSelected ? "#2563EB" : isBest ? "#2563EB" : "#E5E7EB"}`,
+                      border: `1.5px solid ${isSelected ? "#0B2545" : isBest ? "#0B2545" : "#E2E8EE"}`,
                       padding: isMobile ? "16px" : "20px 24px",
                       display: "flex",
                       flexDirection: isMobile ? "column" : "row",
@@ -293,24 +293,24 @@ function QuoteResultsPageInner() {
                       gap: isMobile ? 14 : 16,
                       cursor: isSelected ? "default" : "pointer",
                       boxShadow: isBest || isSelected
-                        ? "0 4px 16px rgba(37,99,235,0.10)"
+                        ? "0 4px 16px rgba(11,37,69,0.10)"
                         : "0 1px 3px rgba(0,0,0,0.06)",
                       transition: "all 0.15s ease",
                     }}
                     onMouseEnter={(e) => {
                       if (!isSelected && !isMobile) {
-                        e.currentTarget.style.boxShadow = "0 4px 16px rgba(37,99,235,0.10)";
+                        e.currentTarget.style.boxShadow = "0 4px 16px rgba(11,37,69,0.10)";
                         e.currentTarget.style.transform = "translateY(-2px)";
-                        e.currentTarget.style.borderColor = "#2563EB";
+                        e.currentTarget.style.borderColor = "#0B2545";
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (!isSelected && !isMobile) {
                         e.currentTarget.style.boxShadow = isBest
-                          ? "0 4px 16px rgba(37,99,235,0.10)"
+                          ? "0 4px 16px rgba(11,37,69,0.10)"
                           : "0 1px 3px rgba(0,0,0,0.06)";
                         e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.borderColor = isBest ? "#2563EB" : "#E5E7EB";
+                        e.currentTarget.style.borderColor = isBest ? "#0B2545" : "#E2E8EE";
                       }
                     }}
                   >
@@ -327,12 +327,12 @@ function QuoteResultsPageInner() {
                             width: isMobile ? 40 : 48,
                             height: isMobile ? 40 : 48,
                             borderRadius: 10,
-                            background: "#EFF6FF",
+                            background: "#F1F5F9",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
                             font: `700 ${isMobile ? 16 : 20}px/1 Inter Variable, sans-serif`,
-                            color: "#2563EB",
+                            color: "#0B2545",
                             flexShrink: 0,
                           }}
                         >
@@ -341,7 +341,7 @@ function QuoteResultsPageInner() {
                         <div style={{ minWidth: 0, flex: 1, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
                           <span style={{
                             font: `600 ${isMobile ? 15 : 16}px/1.2 Inter Variable, sans-serif`,
-                            color: "#111827",
+                            color: "#0E1826",
                           }}>
                             {rate.carrier_name}
                           </span>
@@ -349,8 +349,8 @@ function QuoteResultsPageInner() {
                           {badgeLabel && (
                             <span
                               style={{
-                                background: "#EFF6FF",
-                                color: "#1D4ED8",
+                                background: "#F1F5F9",
+                                color: "#0E2E5C",
                                 padding: "3px 10px",
                                 borderRadius: 999,
                                 font: "600 11px/1 Inter Variable, sans-serif",
@@ -376,7 +376,7 @@ function QuoteResultsPageInner() {
                       </div>
                       <div style={{
                         font: "400 13px/1.3 Inter Variable, sans-serif",
-                        color: "#6B7280",
+                        color: "#5F6E7E",
                         display: "flex",
                         gap: 16,
                         flexWrap: "wrap",
@@ -402,8 +402,8 @@ function QuoteResultsPageInner() {
                     }}>
                       <div style={{ minWidth: 0 }}>
                         <div style={{
-                          font: `700 ${isMobile ? 22 : 24}px/1 Inter Variable, sans-serif`,
-                          color: "#111827",
+                          font: `700 ${isMobile ? 22 : 24}px/1 'Space Grotesk Variable', 'Inter Variable', sans-serif`,
+                          color: "#0E1826",
                           textAlign: isMobile ? "left" : "right",
                           whiteSpace: "nowrap",
                         }}>
@@ -422,9 +422,9 @@ function QuoteResultsPageInner() {
                         onClick={(e) => { e.stopPropagation(); void handleSelectQuote(e, rate); }}
                         disabled={rate.id == null || selectingId === rate.id || isSelected}
                         style={{
-                          border: isSelected ? "none" : "1.5px solid #E5E7EB",
-                          background: isSelected ? "#2563EB" : "#ffffff",
-                          color: isSelected ? "#ffffff" : "#111827",
+                          border: isSelected ? "none" : "1.5px solid #E2E8EE",
+                          background: isSelected ? "#0B2545" : "#ffffff",
+                          color: isSelected ? "#ffffff" : "#0E1826",
                           borderRadius: 10,
                           padding: isMobile ? "10px 20px" : "8px 18px",
                           font: "600 14px/1 Inter Variable, sans-serif",
@@ -437,16 +437,16 @@ function QuoteResultsPageInner() {
                         }}
                         onMouseEnter={(e) => {
                           if (!isSelected && selectingId !== rate.id && !isMobile) {
-                            e.currentTarget.style.background = "#2563EB";
+                            e.currentTarget.style.background = "#0B2545";
                             e.currentTarget.style.color = "#ffffff";
-                            e.currentTarget.style.borderColor = "#2563EB";
+                            e.currentTarget.style.borderColor = "#0B2545";
                           }
                         }}
                         onMouseLeave={(e) => {
                           if (!isSelected && selectingId !== rate.id && !isMobile) {
                             e.currentTarget.style.background = "#ffffff";
-                            e.currentTarget.style.color = "#111827";
-                            e.currentTarget.style.borderColor = "#E5E7EB";
+                            e.currentTarget.style.color = "#0E1826";
+                            e.currentTarget.style.borderColor = "#E2E8EE";
                           }
                         }}
                       >
@@ -473,7 +473,7 @@ function QuoteResultsPageInner() {
                 onClick={handleContinue}
                 disabled={!selectedQuote}
                 style={{
-                  background: selectedQuote ? "#2563EB" : "#E5E7EB",
+                  background: selectedQuote ? "#0B2545" : "#E2E8EE",
                   color: selectedQuote ? "#ffffff" : "#9CA3AF",
                   border: "none",
                   borderRadius: 10,
@@ -485,10 +485,10 @@ function QuoteResultsPageInner() {
                   width: isMobile ? "100%" : "auto",
                 }}
                 onMouseEnter={(e) => {
-                  if (selectedQuote) e.currentTarget.style.background = "#1D4ED8";
+                  if (selectedQuote) e.currentTarget.style.background = "#0E2E5C";
                 }}
                 onMouseLeave={(e) => {
-                  if (selectedQuote) e.currentTarget.style.background = "#2563EB";
+                  if (selectedQuote) e.currentTarget.style.background = "#0B2545";
                 }}
               >
                 Продолжить оформление →

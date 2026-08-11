@@ -21,7 +21,7 @@ const ROLE_LABELS: Record<string, string> = {
 const ROLE_STYLES: Record<string, { bg: string; color: string }> = {
   admin:    { bg: "#fef3c7", color: "#92400e" },
   operator: { bg: "#ede9fe", color: "#5b21b6" },
-  carrier:  { bg: "#dbeafe", color: "#1e40af" },
+  carrier:  { bg: "#E6EEF7", color: "#1e40af" },
   customer: { bg: "#f1f5f9", color: "#475569" },
 };
 
@@ -110,13 +110,13 @@ export default function AdminUsersPage() {
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0f172a" }}>Пользователи</h2>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0B2545" }}>Пользователи</h2>
           <p style={{ margin: "4px 0 0", fontSize: 14, color: "#64748b" }}>Все аккаунты · {total} всего</p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <button
             onClick={openCreate}
-            style={{ padding: "10px 18px", borderRadius: 10, border: "none", background: "#0f172a", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}
+            style={{ padding: "10px 18px", borderRadius: 10, border: "none", background: "#0B2545", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}
           >
             + Добавить
           </button>
@@ -125,9 +125,9 @@ export default function AdminUsersPage() {
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Поиск по email / имени..."
-              style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid #e5e7eb", fontSize: 14, width: 240, fontFamily: "inherit", outline: "none", background: "#ffffff", color: "#0f172a" }}
+              style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid #E2E8EE", fontSize: 14, width: 240, fontFamily: "inherit", outline: "none", background: "#ffffff", color: "#0B2545" }}
             />
-            <button type="submit" style={{ padding: "10px 18px", borderRadius: 10, border: "none", background: "#f1f5f9", color: "#0f172a", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+            <button type="submit" style={{ padding: "10px 18px", borderRadius: 10, border: "none", background: "#f1f5f9", color: "#0B2545", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
               Найти
             </button>
           </form>
@@ -140,8 +140,8 @@ export default function AdminUsersPage() {
         </div>
       )}
 
-      <div style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "60px 1fr 140px 100px 80px 100px 80px", gap: 12, padding: "12px 20px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+      <div style={{ background: "#ffffff", border: "1px solid #E2E8EE", borderRadius: 16, overflow: "hidden" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "60px 1fr 140px 100px 80px 100px 80px", gap: 12, padding: "12px 20px", background: "#f8fafc", borderBottom: "1px solid #E2E8EE", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
           <span>ID</span>
           <span>Пользователь</span>
           <span>Тип</span>
@@ -168,7 +168,7 @@ export default function AdminUsersPage() {
                 <span style={{ fontFamily: "monospace", fontSize: 13, color: "#94a3b8", fontWeight: 600 }}>#{user.id}</span>
 
                 <div style={{ minWidth: 0 }}>
-                  <Link href={`/dashboard/admin/users/${user.id}`} style={{ fontSize: 14, fontWeight: 600, color: "#0f172a", textDecoration: "none" }}>
+                  <Link href={`/dashboard/admin/users/${user.id}`} style={{ fontSize: 14, fontWeight: 600, color: "#0B2545", textDecoration: "none" }}>
                     {user.full_name || user.email}
                   </Link>
                   {user.full_name && (
@@ -186,7 +186,7 @@ export default function AdminUsersPage() {
                   {ROLE_LABELS[user.role ?? "customer"] ?? user.role}
                 </span>
 
-                <span style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>{user.order_count}</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#0B2545" }}>{user.order_count}</span>
 
                 <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600, background: user.is_active ? "#dcfce7" : "#f1f5f9", color: user.is_active ? "#166534" : "#94a3b8" }}>
                   {user.is_active ? "Активен" : "Заблок."}
@@ -195,7 +195,7 @@ export default function AdminUsersPage() {
                 <button
                   onClick={() => void toggleActive(user)}
                   disabled={togglingId === user.id}
-                  style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#ffffff", color: user.is_active ? "#b91c1c" : "#16a34a", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: togglingId === user.id ? 0.5 : 1 }}
+                  style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #E2E8EE", background: "#ffffff", color: user.is_active ? "#b91c1c" : "#16a34a", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: togglingId === user.id ? 0.5 : 1 }}
                 >
                   {user.is_active ? "Блок." : "Разблок."}
                 </button>
@@ -210,7 +210,7 @@ export default function AdminUsersPage() {
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
             <button
               key={p} onClick={() => setPage(p)}
-              style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid #e5e7eb", background: p === page ? "#0f172a" : "#ffffff", color: p === page ? "#ffffff" : "#0f172a", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+              style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid #E2E8EE", background: p === page ? "#0B2545" : "#ffffff", color: p === page ? "#ffffff" : "#0B2545", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
             >
               {p}
             </button>
@@ -227,12 +227,12 @@ export default function AdminUsersPage() {
           <div style={{ background: "#fff", borderRadius: 20, padding: "36px 40px", width: 440, boxShadow: "0 24px 64px rgba(0,0,0,0.16)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 26 }}>
               <div>
-                <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#0f172a" }}>Новый пользователь</h2>
+                <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#0B2545" }}>Новый пользователь</h2>
                 <p style={{ margin: "4px 0 0", fontSize: 13, color: "#94a3b8" }}>Создать аккаунт вручную</p>
               </div>
               <button
                 onClick={() => setShowCreate(false)}
-                style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", fontSize: 18, fontFamily: "inherit" }}
+                style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #E2E8EE", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", fontSize: 18, fontFamily: "inherit" }}
               >×</button>
             </div>
 
@@ -257,7 +257,7 @@ export default function AdminUsersPage() {
                         flex: 1,
                         padding: "9px 0",
                         borderRadius: 10,
-                        border: active ? `2px solid ${s.color}` : "2px solid #e5e7eb",
+                        border: active ? `2px solid ${s.color}` : "2px solid #E2E8EE",
                         background: active ? s.bg : "#fff",
                         color: active ? s.color : "#94a3b8",
                         fontSize: 13,
@@ -292,7 +292,7 @@ export default function AdminUsersPage() {
                 value={form.full_name ?? ""}
                 onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))}
                 placeholder="Иван Иванов"
-                style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #e5e7eb", fontSize: 14, boxSizing: "border-box", fontFamily: "inherit", outline: "none" }}
+                style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #E2E8EE", fontSize: 14, boxSizing: "border-box", fontFamily: "inherit", outline: "none" }}
               />
             </div>
 
@@ -306,7 +306,7 @@ export default function AdminUsersPage() {
                 value={form.email}
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                 placeholder="user@example.com"
-                style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #e5e7eb", fontSize: 14, boxSizing: "border-box", fontFamily: "inherit", outline: "none" }}
+                style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #E2E8EE", fontSize: 14, boxSizing: "border-box", fontFamily: "inherit", outline: "none" }}
               />
             </div>
 
@@ -320,7 +320,7 @@ export default function AdminUsersPage() {
                 value={form.phone ?? ""}
                 onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
                 placeholder="+7 700 000 00 00"
-                style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #e5e7eb", fontSize: 14, boxSizing: "border-box", fontFamily: "inherit", outline: "none" }}
+                style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #E2E8EE", fontSize: 14, boxSizing: "border-box", fontFamily: "inherit", outline: "none" }}
               />
             </div>
 
@@ -329,7 +329,7 @@ export default function AdminUsersPage() {
               <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
                 Пароль <span style={{ color: "#dc2626" }}>*</span>
               </label>
-              <div style={{ display: "flex", alignItems: "center", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", background: "#fff" }}>
+              <div style={{ display: "flex", alignItems: "center", border: "1px solid #E2E8EE", borderRadius: 10, overflow: "hidden", background: "#fff" }}>
                 <input
                   type={showPassword ? "text" : "password"}
                   value={form.password}
@@ -357,13 +357,13 @@ export default function AdminUsersPage() {
               <button
                 onClick={() => void handleCreate()}
                 disabled={creating}
-                style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", background: "#0f172a", color: "#fff", fontSize: 14, fontWeight: 600, cursor: creating ? "not-allowed" : "pointer", opacity: creating ? 0.6 : 1, fontFamily: "inherit" }}
+                style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", background: "#0B2545", color: "#fff", fontSize: 14, fontWeight: 600, cursor: creating ? "not-allowed" : "pointer", opacity: creating ? 0.6 : 1, fontFamily: "inherit" }}
               >
                 {creating ? "Создаём..." : "Создать пользователя"}
               </button>
               <button
                 onClick={() => setShowCreate(false)}
-                style={{ padding: "12px 20px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", color: "#475569", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+                style={{ padding: "12px 20px", borderRadius: 10, border: "1px solid #E2E8EE", background: "#fff", color: "#475569", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
               >
                 Отмена
               </button>

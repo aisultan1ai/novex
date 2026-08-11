@@ -14,9 +14,9 @@ import {
 } from "@/lib/api/admin";
 
 const inp: React.CSSProperties = {
-  border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 12px",
+  border: "1px solid #E2E8EE", borderRadius: 8, padding: "8px 12px",
   fontSize: 13, width: "100%", boxSizing: "border-box",
-  fontFamily: "inherit", outline: "none", background: "#f8fafc", color: "#0f172a",
+  fontFamily: "inherit", outline: "none", background: "#f8fafc", color: "#0B2545",
 };
 const lbl: React.CSSProperties = {
   display: "block", fontSize: 12, fontWeight: 600, color: "#64748b",
@@ -170,8 +170,8 @@ export default function CarrierIntegrationPage() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 16, alignItems: "start" }}>
         {/* Main form */}
         <div>
-          <form onSubmit={handleSave} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 14, padding: "22px 24px", marginBottom: 16 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 18 }}>Настройки диспетчеризации</div>
+          <form onSubmit={handleSave} style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 14, padding: "22px 24px", marginBottom: 16 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#0B2545", marginBottom: 18 }}>Настройки диспетчеризации</div>
 
             {/* dispatch_mode */}
             <div style={{ marginBottom: 16 }}>
@@ -215,7 +215,7 @@ export default function CarrierIntegrationPage() {
                   type="button"
                   onClick={handleRegenSecret}
                   disabled={regenLoading}
-                  style={{ whiteSpace: "nowrap", padding: "8px 14px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#f8fafc", color: "#0f172a", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                  style={{ whiteSpace: "nowrap", padding: "8px 14px", borderRadius: 8, border: "1px solid #E2E8EE", background: "#f8fafc", color: "#0B2545", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
                 >
                   {regenLoading ? "…" : "Перегенерировать"}
                 </button>
@@ -223,7 +223,7 @@ export default function CarrierIntegrationPage() {
               {regenSecret && (
                 <div style={{ marginTop: 8, background: "#fefce8", border: "1px solid #fde68a", borderRadius: 8, padding: "10px 12px", fontSize: 12 }}>
                   <strong>Новый секрет (сохраните - показывается один раз):</strong>
-                  <div style={{ fontFamily: "monospace", marginTop: 4, wordBreak: "break-all", color: "#0f172a" }}>{regenSecret}</div>
+                  <div style={{ fontFamily: "monospace", marginTop: 4, wordBreak: "break-all", color: "#0B2545" }}>{regenSecret}</div>
                 </div>
               )}
             </div>
@@ -252,15 +252,15 @@ export default function CarrierIntegrationPage() {
               </div>
             )}
 
-            <button type="submit" disabled={saving} style={{ padding: "10px 24px", borderRadius: 10, border: "none", background: "#0f172a", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+            <button type="submit" disabled={saving} style={{ padding: "10px 24px", borderRadius: 10, border: "none", background: "#0B2545", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
               {saving ? "Сохраняем…" : "Сохранить"}
             </button>
           </form>
 
           {/* Integration Logs */}
-          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 14, padding: "20px 24px" }}>
+          <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 14, padding: "20px 24px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Журнал событий</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#0B2545" }}>Журнал событий</div>
               <button onClick={loadLogs} disabled={logsLoading} style={{ fontSize: 12, color: "#4338ca", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
                 {logsLoading ? "…" : "Обновить"}
               </button>
@@ -270,7 +270,7 @@ export default function CarrierIntegrationPage() {
             ) : (
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                 <thead>
-                  <tr style={{ borderBottom: "2px solid #e5e7eb" }}>
+                  <tr style={{ borderBottom: "2px solid #E2E8EE" }}>
                     {["Время", "Направление", "Тип", "Заказ", "HTTP", "Время мс", "Статус"].map(h => (
                       <th key={h} style={{ textAlign: "left", padding: "6px 10px", fontWeight: 600, color: "#374151", whiteSpace: "nowrap" }}>{h}</th>
                     ))}
@@ -279,16 +279,16 @@ export default function CarrierIntegrationPage() {
                 <tbody>
                   {logs.map(log => (
                     <tr key={log.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                      <td style={{ padding: "7px 10px", whiteSpace: "nowrap", color: "#6b7280" }}>{new Date(log.created_at).toLocaleString("ru-KZ")}</td>
+                      <td style={{ padding: "7px 10px", whiteSpace: "nowrap", color: "#5F6E7E" }}>{new Date(log.created_at).toLocaleString("ru-KZ")}</td>
                       <td style={{ padding: "7px 10px" }}>
-                        <span style={{ padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 600, background: log.direction === "outbound" ? "#dbeafe" : "#dcfce7", color: log.direction === "outbound" ? "#1e40af" : "#166534" }}>
+                        <span style={{ padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 600, background: log.direction === "outbound" ? "#E6EEF7" : "#dcfce7", color: log.direction === "outbound" ? "#1e40af" : "#166534" }}>
                           {log.direction === "outbound" ? "→ OUT" : "← IN"}
                         </span>
                       </td>
                       <td style={{ padding: "7px 10px", color: "#374151" }}>{log.event_type}</td>
-                      <td style={{ padding: "7px 10px", color: "#6b7280" }}>{log.order_id ? `#${log.order_id}` : "-"}</td>
-                      <td style={{ padding: "7px 10px", color: "#6b7280" }}>{log.http_status ?? "-"}</td>
-                      <td style={{ padding: "7px 10px", color: "#6b7280" }}>{log.duration_ms ?? "-"}</td>
+                      <td style={{ padding: "7px 10px", color: "#5F6E7E" }}>{log.order_id ? `#${log.order_id}` : "-"}</td>
+                      <td style={{ padding: "7px 10px", color: "#5F6E7E" }}>{log.http_status ?? "-"}</td>
+                      <td style={{ padding: "7px 10px", color: "#5F6E7E" }}>{log.duration_ms ?? "-"}</td>
                       <td style={{ padding: "7px 10px" }}>
                         <span style={{ padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 600, background: log.status === "success" ? "#dcfce7" : "#fee2e2", color: log.status === "success" ? "#166534" : "#991b1b" }}>
                           {log.status}
@@ -306,15 +306,15 @@ export default function CarrierIntegrationPage() {
         {/* Right panel */}
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {/* Test webhook */}
-          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 14, padding: "18px 20px" }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>Тест Generic Webhook</div>
+          <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 14, padding: "18px 20px" }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#0B2545", marginBottom: 10 }}>Тест Generic Webhook</div>
             <p style={{ fontSize: 12, color: "#64748b", marginBottom: 12, marginTop: 0 }}>
               Отправит тестовый заказ на push_url с HMAC подписью (X-Novex-Signature, X-Novex-Timestamp, X-Novex-Event-Id).
             </p>
             <button
               onClick={handleTestWebhook}
               disabled={testing || !form.push_url}
-              style={{ width: "100%", padding: "10px", borderRadius: 10, border: "1px solid #e5e7eb", background: form.push_url ? "#f8fafc" : "#f1f5f9", color: form.push_url ? "#0f172a" : "#94a3b8", fontSize: 13, fontWeight: 600, cursor: form.push_url ? "pointer" : "not-allowed", fontFamily: "inherit" }}
+              style={{ width: "100%", padding: "10px", borderRadius: 10, border: "1px solid #E2E8EE", background: form.push_url ? "#f8fafc" : "#f1f5f9", color: form.push_url ? "#0B2545" : "#94a3b8", fontSize: 13, fontWeight: 600, cursor: form.push_url ? "pointer" : "not-allowed", fontFamily: "inherit" }}
             >
               {testing ? "Отправляем…" : "Отправить тестовый заказ"}
             </button>
@@ -330,8 +330,8 @@ export default function CarrierIntegrationPage() {
           </div>
 
           {/* How it works */}
-          <div style={{ background: "#f8fafc", border: "1px solid #e5e7eb", borderRadius: 14, padding: "16px 18px" }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>Как работает диспетчеризация</div>
+          <div style={{ background: "#f8fafc", border: "1px solid #E2E8EE", borderRadius: 14, padding: "16px 18px" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#0B2545", marginBottom: 10 }}>Как работает диспетчеризация</div>
             <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.7 }}>
               <div style={{ marginBottom: 8 }}>
                 <span style={{ fontWeight: 600 }}>Model A (API Adapter)</span><br />
@@ -345,8 +345,8 @@ export default function CarrierIntegrationPage() {
           </div>
 
           {/* Webhook endpoints */}
-          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 14, padding: "16px 18px" }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>Endpoint для трекинга</div>
+          <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 14, padding: "16px 18px" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#0B2545", marginBottom: 10 }}>Endpoint для трекинга</div>
             <div style={{ fontFamily: "monospace", fontSize: 11, background: "#f1f5f9", padding: "8px 10px", borderRadius: 6, wordBreak: "break-all", color: "#334155" }}>
               POST /api/v1/carriers/{cfg?.carrier_code}/tracking-webhook
             </div>

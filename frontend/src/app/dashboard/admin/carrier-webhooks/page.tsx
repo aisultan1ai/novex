@@ -95,7 +95,7 @@ export default function CarrierWebhooksPage() {
         <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>Конфиги перевозчиков</h2>
         <button
           onClick={() => { setShowForm(true); setEditCode(null); setForm(EMPTY_FORM); }}
-          style={{ padding: "8px 18px", background: "#0f172a", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600 }}
+          style={{ padding: "8px 18px", background: "#0B2545", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600 }}
         >
           + Добавить перевозчика
         </button>
@@ -142,7 +142,7 @@ export default function CarrierWebhooksPage() {
           </div>
           <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
             <button onClick={handleSubmit}
-              style={{ padding: "8px 20px", background: "#0f172a", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600 }}>
+              style={{ padding: "8px 20px", background: "#0B2545", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600 }}>
               Сохранить
             </button>
             <button onClick={() => { setShowForm(false); setEditCode(null); }}
@@ -213,4 +213,4 @@ export default function CarrierWebhooksPage() {
 }
 
 const th: React.CSSProperties = { padding: "10px 12px", textAlign: "left", fontWeight: 600, color: "#475569", fontSize: 12 };
-const td: React.CSSProperties = { padding: "10px 12px", color: "#1e293b" };
+const td: React.CSSProperties = { padding: "10px 12px", color: "#163558" };

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { listCarrierOrders, type CarrierOrderItem } from "@/lib/api/carrier";
 import { ORDER_STATUS_LABELS, orderStatusColors, orderStatusLabel } from "@/lib/status-labels";
 import { useIsMobile } from "@/hooks/use-is-mobile";
+import ExportXlsxButton from "@/components/ui/ExportXlsxButton";
 
 const badge: React.CSSProperties = {
   padding: "2px 10px",
@@ -35,7 +36,7 @@ function OrderMobileCard({ order }: { order: CarrierOrderItem }) {
       style={{
         display: "block",
         background: "#ffffff",
-        border: "1px solid #e5e7eb",
+        border: "1px solid #E2E8EE",
         borderRadius: 12,
         padding: "14px 16px",
         textDecoration: "none",
@@ -43,21 +44,21 @@ function OrderMobileCard({ order }: { order: CarrierOrderItem }) {
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 6 }}>
-        <span style={{ fontWeight: 700, color: "#111827" }}>#{order.id}</span>
+        <span style={{ fontWeight: 700, color: "#0E1826" }}>#{order.id}</span>
         <StatusBadge status={order.status} />
       </div>
-      <div style={{ fontSize: 14, fontWeight: 600, color: "#111827", marginBottom: 4 }}>
+      <div style={{ fontSize: 14, fontWeight: 600, color: "#0E1826", marginBottom: 4 }}>
         {order.from_city} → {order.to_city}
       </div>
-      <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 8 }}>
+      <div style={{ fontSize: 12, color: "#5F6E7E", marginBottom: 8 }}>
         {order.tariff_name}
         {pkg ? ` · ${pkg.weight_kg} кг` : ""}
       </div>
-      {sender && <div style={{ fontSize: 12, color: "#6b7280" }}>От: {sender.full_name}</div>}
-      {recipient && <div style={{ fontSize: 12, color: "#6b7280" }}>Кому: {recipient.full_name}</div>}
+      {sender && <div style={{ fontSize: 12, color: "#5F6E7E" }}>От: {sender.full_name}</div>}
+      {recipient && <div style={{ fontSize: 12, color: "#5F6E7E" }}>Кому: {recipient.full_name}</div>}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10, paddingTop: 10, borderTop: "1px solid #f1f5f9" }}>
         <span style={{ fontSize: 11, color: "#94a3b8" }}>{new Date(order.created_at).toLocaleDateString("ru-KZ")}</span>
-        <span style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: "#0E1826" }}>
           {order.price.toLocaleString()} {order.currency}
         </span>
       </div>
@@ -103,19 +104,27 @@ export default function CarrierOrdersPage() {
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0f172a" }}>Заказы</h2>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0B2545" }}>Заказы</h2>
           <p style={{ margin: "4px 0 0", fontSize: 14, color: "#64748b" }}>Все заказы · {total} всего</p>
         </div>
-        <select
-          value={statusFilter}
-          onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#ffffff", fontSize: 14, cursor: "pointer", fontFamily: "inherit", color: "#0f172a" }}
-        >
-          <option value="">Все статусы</option>
-          {Object.entries(ORDER_STATUS_LABELS).map(([v, l]) => (
-            <option key={v} value={v}>{l}</option>
-          ))}
-        </select>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <select
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+            style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid #E2E8EE", background: "#ffffff", fontSize: 14, cursor: "pointer", fontFamily: "inherit", color: "#0B2545" }}
+          >
+            <option value="">Все статусы</option>
+            {Object.entries(ORDER_STATUS_LABELS).map(([v, l]) => (
+              <option key={v} value={v}>{l}</option>
+            ))}
+          </select>
+          <ExportXlsxButton
+            endpoint="/carrier/orders/export"
+            query={new URLSearchParams(
+              statusFilter ? { status: statusFilter } : {},
+            ).toString()}
+          />
+        </div>
       </div>
 
       {error && <div style={{ padding: "12px 16px", borderRadius: 10, background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c", fontSize: 14, marginBottom: 20 }}>{error}</div>}
@@ -124,7 +133,7 @@ export default function CarrierOrdersPage() {
         loading ? (
           <p style={{ color: "#64748b" }}>Загружаем…</p>
         ) : orders.length === 0 ? (
-          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: "48px 24px", textAlign: "center", color: "#94a3b8", fontSize: 14 }}>
+          <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 16, padding: "48px 24px", textAlign: "center", color: "#94a3b8", fontSize: 14 }}>
             Заказы не найдены
           </div>
         ) : (
@@ -133,8 +142,8 @@ export default function CarrierOrdersPage() {
           </div>
         )
       ) : (
-        <div style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, overflow: "hidden" }}>
-          <div style={{ display: "grid", gridTemplateColumns: GRID, gap: 12, padding: "12px 20px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+        <div style={{ background: "#ffffff", border: "1px solid #E2E8EE", borderRadius: 16, overflow: "hidden" }}>
+          <div style={{ display: "grid", gridTemplateColumns: GRID, gap: 12, padding: "12px 20px", background: "#f8fafc", borderBottom: "1px solid #E2E8EE", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
             <span>№</span>
             <span>Маршрут</span>
             <span>Тариф / вес</span>
@@ -162,15 +171,15 @@ export default function CarrierOrdersPage() {
                 >
                   <span style={{ fontFamily: "monospace", fontSize: 13, color: "#475569", fontWeight: 600 }}>#{o.id}</span>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{o.from_city} → {o.to_city}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#0B2545" }}>{o.from_city} → {o.to_city}</div>
                     {sender && <div style={{ fontSize: 11, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>От: {sender.full_name}</div>}
                     {recipient && <div style={{ fontSize: 11, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Кому: {recipient.full_name}</div>}
                   </div>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: "#0f172a" }}>{o.tariff_name}</div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: "#0B2545" }}>{o.tariff_name}</div>
                     <div style={{ fontSize: 11, color: "#94a3b8" }}>{pkg ? `${pkg.weight_kg} кг` : "—"}</div>
                   </div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#0B2545" }}>
                     {o.price.toLocaleString()} {o.currency}
                   </div>
                   <div>
@@ -181,7 +190,7 @@ export default function CarrierOrdersPage() {
                   </span>
                   <Link
                     href={`/dashboard/carrier/orders/${o.id}`}
-                    style={{ padding: "6px 12px", borderRadius: 8, border: "none", fontSize: 12, fontWeight: 600, background: "#0f172a", color: "#ffffff", textDecoration: "none", textAlign: "center", fontFamily: "inherit" }}
+                    style={{ padding: "6px 12px", borderRadius: 8, border: "none", fontSize: 12, fontWeight: 600, background: "#0B2545", color: "#ffffff", textDecoration: "none", textAlign: "center", fontFamily: "inherit" }}
                   >
                     Открыть
                   </Link>
@@ -198,7 +207,7 @@ export default function CarrierOrdersPage() {
             <button
               key={p}
               onClick={() => setPage(p)}
-              style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid #e5e7eb", background: p === page ? "#0f172a" : "#ffffff", color: p === page ? "#ffffff" : "#0f172a", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+              style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid #E2E8EE", background: p === page ? "#0B2545" : "#ffffff", color: p === page ? "#ffffff" : "#0B2545", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
             >
               {p}
             </button>
@@ -210,12 +219,12 @@ export default function CarrierOrdersPage() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  select: { border: "1px solid #e5e7eb", borderRadius: 6, padding: "6px 12px", fontSize: 13, outline: "none" },
+  select: { border: "1px solid #E2E8EE", borderRadius: 6, padding: "6px 12px", fontSize: 13, outline: "none" },
   table: { width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 720 },
-  th: { textAlign: "left", padding: "8px 12px", borderBottom: "2px solid #e5e7eb", fontWeight: 600, color: "#374151", whiteSpace: "nowrap" },
+  th: { textAlign: "left", padding: "8px 12px", borderBottom: "2px solid #E2E8EE", fontWeight: 600, color: "#374151", whiteSpace: "nowrap" },
   tr: { borderBottom: "1px solid #f3f4f6" },
   td: { padding: "10px 12px", verticalAlign: "top" },
   btn: { background: "#4338ca", color: "#fff", borderRadius: 6, padding: "4px 12px", fontSize: 12, fontWeight: 600, textDecoration: "none", display: "inline-block" },
-  pageBtn: { border: "1px solid #e5e7eb", borderRadius: 6, padding: "6px 12px", fontSize: 12, cursor: "pointer", background: "#fff" },
+  pageBtn: { border: "1px solid #E2E8EE", borderRadius: 6, padding: "6px 12px", fontSize: 12, cursor: "pointer", background: "#fff" },
   error: { background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 8, padding: "8px 14px", fontSize: 13, color: "#991b1b", marginBottom: 12 },
 };

@@ -68,8 +68,8 @@ function ReviewForm({
   }
 
   return (
-    <div style={{ background: "#fff", border: "1px solid #E5E7EB", borderRadius: 16, padding: "28px 32px", maxWidth: 640, marginTop: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
-      <h3 style={{ margin: "0 0 16px", fontSize: 18, fontWeight: 700, color: "#111827" }}>
+    <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 16, padding: "28px 32px", maxWidth: 640, marginTop: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+      <h3 style={{ margin: "0 0 16px", fontSize: 18, fontWeight: 700, color: "#0E1826" }}>
         Оцените доставку
       </h3>
       <div style={{ marginBottom: 14 }}>
@@ -85,14 +85,14 @@ function ReviewForm({
           minHeight: 90,
           padding: "12px 14px",
           borderRadius: 10,
-          border: "1.5px solid #E5E7EB",
+          border: "1.5px solid #E2E8EE",
           font: "400 14px/1.5 Inter Variable, sans-serif",
           resize: "vertical",
           boxSizing: "border-box",
           marginBottom: 12,
           fontFamily: "inherit",
           outline: "none",
-          color: "#111827",
+          color: "#0E1826",
         }}
       />
       {error && (
@@ -102,7 +102,7 @@ function ReviewForm({
         onClick={handleSubmit}
         disabled={submitting || rating === 0}
         style={{
-          background: submitting || rating === 0 ? "#E5E7EB" : "#2563EB",
+          background: submitting || rating === 0 ? "#E2E8EE" : "#0B2545",
           color: submitting || rating === 0 ? "#9CA3AF" : "#fff",
           border: "none",
           borderRadius: 10,
@@ -187,10 +187,10 @@ export default function OrderTrackingPage() {
       </div>
 
       <div style={{ marginBottom: 28 }}>
-        <h1 style={{ margin: 0, font: "700 28px/1.2 Inter Variable, sans-serif", color: "#111827", letterSpacing: "-0.02em" }}>
+        <h1 style={{ margin: 0, font: "700 28px/1.2 'Space Grotesk Variable', 'Inter Variable', sans-serif", color: "#0E1826", letterSpacing: "-0.02em" }}>
           Отслеживание заказа
         </h1>
-        <p style={{ margin: "4px 0 0", font: "400 14px/1 Inter Variable, sans-serif", color: "#6B7280" }}>
+        <p style={{ margin: "4px 0 0", font: "400 14px/1 Inter Variable, sans-serif", color: "#5F6E7E" }}>
           Заказ #{draftId}
         </p>
       </div>
@@ -202,13 +202,13 @@ export default function OrderTrackingPage() {
       )}
 
       {isLoading ? (
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: 48, textAlign: "center", color: "#64748b", fontSize: 14 }}>
+        <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 16, padding: 48, textAlign: "center", color: "#64748b", fontSize: 14 }}>
           Загружаем историю…
         </div>
       ) : events.length === 0 ? (
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: "64px 24px", textAlign: "center" }}>
+        <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 16, padding: "64px 24px", textAlign: "center" }}>
           <div style={{ marginBottom: 12 }}><IconPackage /></div>
-          <p style={{ fontSize: 16, fontWeight: 700, margin: "0 0 8px", color: "#111827" }}>
+          <p style={{ fontSize: 16, fontWeight: 700, margin: "0 0 8px", color: "#0E1826" }}>
             История отслеживания пуста
           </p>
           <p style={{ margin: 0, fontSize: 14, color: "#64748b" }}>
@@ -216,7 +216,7 @@ export default function OrderTrackingPage() {
           </p>
         </div>
       ) : (
-        <div style={{ background: "#fff", border: "1px solid #E5E7EB", borderRadius: 16, padding: "32px 40px", maxWidth: 640, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+        <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 16, padding: "32px 40px", maxWidth: 640, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
           <TrackingTimeline events={events} carrierCode={carrierCode} />
         </div>
       )}
@@ -226,16 +226,16 @@ export default function OrderTrackingPage() {
       )}
 
       {review && (
-        <div style={{ background: "#fff", border: "1px solid #E5E7EB", borderRadius: 16, padding: "24px 32px", maxWidth: 640, marginTop: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+        <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 16, padding: "24px 32px", maxWidth: 640, marginTop: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-            <h3 style={{ margin: 0, font: "700 16px/1 Inter Variable, sans-serif", color: "#111827" }}>Ваш отзыв</h3>
+            <h3 style={{ margin: 0, font: "700 16px/1 Inter Variable, sans-serif", color: "#0E1826" }}>Ваш отзыв</h3>
             <span style={{ font: "600 11px/1 Inter Variable, sans-serif", color: "#065F46", background: "#D1FAE5", border: "1px solid #A7F3D0", borderRadius: 999, padding: "3px 10px" }}>
               Отправлен
             </span>
           </div>
           <div style={{ display: "flex", gap: 4, marginBottom: review.comment ? 12 : 0 }}>
             {[1,2,3,4,5].map((s) => (
-              <span key={s} style={{ fontSize: 26, color: s <= review.rating ? "#f59e0b" : "#e5e7eb" }}>★</span>
+              <span key={s} style={{ fontSize: 26, color: s <= review.rating ? "#f59e0b" : "#E2E8EE" }}>★</span>
             ))}
           </div>
           {review.comment && (

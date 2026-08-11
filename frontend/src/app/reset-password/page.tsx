@@ -7,8 +7,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { resetPassword, ApiError } from "@/lib/api/auth";
 
 const inp: React.CSSProperties = {
-  width: "100%", padding: "12px 14px", borderRadius: 10, border: "1px solid #e5e7eb",
-  fontSize: 15, outline: "none", boxSizing: "border-box", color: "#0f172a",
+  width: "100%", padding: "12px 14px", borderRadius: 10, border: "1px solid #E2E8EE",
+  fontSize: 15, outline: "none", boxSizing: "border-box", color: "#0B2545",
   background: "#f8fafc", fontFamily: "inherit", transition: "border-color 0.15s, background 0.15s",
 };
 
@@ -59,7 +59,7 @@ function ResetPasswordPageInner() {
         <Link
           href="/"
           style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13, color: "#64748b", textDecoration: "none", fontWeight: 500, marginBottom: 24 }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = "#0f172a"; }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "#0B2545"; }}
           onMouseLeave={(e) => { e.currentTarget.style.color = "#64748b"; }}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -70,27 +70,27 @@ function ResetPasswordPageInner() {
 
         {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: 28 }}>
-          <Link href="/" style={{ fontSize: 26, fontWeight: 800, color: "#0f172a", textDecoration: "none", letterSpacing: "-0.5px" }}>Novex</Link>
+          <Link href="/" style={{ fontSize: 26, fontWeight: 800, color: "#0B2545", textDecoration: "none", letterSpacing: "-0.5px" }}>Novex</Link>
         </div>
 
-        <div style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, padding: 40, boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04)" }}>
+        <div style={{ background: "#ffffff", border: "1px solid #E2E8EE", borderRadius: 16, padding: 40, boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04)" }}>
           {done ? (
             <div style={{ textAlign: "center" }}>
               <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#f0fdf4", border: "2px solid #bbf7d0", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: 24 }}>
                 ✓
               </div>
-              <h1 style={{ margin: "0 0 10px", fontSize: 20, fontWeight: 700, color: "#0f172a" }}>Пароль изменён</h1>
+              <h1 style={{ margin: "0 0 10px", fontSize: 20, fontWeight: 700, color: "#0B2545" }}>Пароль изменён</h1>
               <p style={{ margin: "0 0 20px", fontSize: 14, color: "#64748b" }}>Вы будете перенаправлены на страницу входа…</p>
               <button
                 onClick={() => router.push("/login")}
-                style={{ padding: "10px 24px", borderRadius: 10, border: "none", background: "#0f172a", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                style={{ padding: "10px 24px", borderRadius: 10, border: "none", background: "#0B2545", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
               >
                 Войти сейчас →
               </button>
             </div>
           ) : (
             <>
-              <h1 style={{ margin: "0 0 6px", fontSize: 20, fontWeight: 700, color: "#0f172a" }}>Новый пароль</h1>
+              <h1 style={{ margin: "0 0 6px", fontSize: 20, fontWeight: 700, color: "#0B2545" }}>Новый пароль</h1>
               <p style={{ margin: "0 0 24px", fontSize: 14, color: "#64748b" }}>Придумайте надёжный пароль от 8 символов.</p>
 
               <form onSubmit={handleSubmit} style={{ display: "grid", gap: 16 }}>
@@ -105,8 +105,8 @@ function ResetPasswordPageInner() {
                     minLength={8}
                     required
                     disabled={!token}
-                    onFocus={(e) => { e.currentTarget.style.borderColor = "#0f172a"; e.currentTarget.style.background = "#ffffff"; }}
-                    onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
+                    onFocus={(e) => { e.currentTarget.style.borderColor = "#0B2545"; e.currentTarget.style.background = "#ffffff"; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = "#E2E8EE"; e.currentTarget.style.background = "#f8fafc"; }}
                   />
                 </div>
 
@@ -121,8 +121,8 @@ function ResetPasswordPageInner() {
                     minLength={8}
                     required
                     disabled={!token}
-                    onFocus={(e) => { e.currentTarget.style.borderColor = "#0f172a"; e.currentTarget.style.background = "#ffffff"; }}
-                    onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
+                    onFocus={(e) => { e.currentTarget.style.borderColor = "#0B2545"; e.currentTarget.style.background = "#ffffff"; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = "#E2E8EE"; e.currentTarget.style.background = "#f8fafc"; }}
                   />
                 </div>
 
@@ -135,16 +135,16 @@ function ResetPasswordPageInner() {
                 <button
                   type="submit"
                   disabled={loading || !token}
-                  style={{ width: "100%", height: 52, borderRadius: 12, border: "none", background: "#0f172a", color: "#ffffff", fontSize: 16, fontWeight: 600, cursor: (loading || !token) ? "not-allowed" : "pointer", opacity: (loading || !token) ? 0.7 : 1, fontFamily: "inherit", transition: "background 0.15s" }}
-                  onMouseEnter={(e) => { if (!loading && token) e.currentTarget.style.background = "#1e293b"; }}
-                  onMouseLeave={(e) => { if (!loading && token) e.currentTarget.style.background = "#0f172a"; }}
+                  style={{ width: "100%", height: 52, borderRadius: 12, border: "none", background: "#0B2545", color: "#ffffff", fontSize: 16, fontWeight: 600, cursor: (loading || !token) ? "not-allowed" : "pointer", opacity: (loading || !token) ? 0.7 : 1, fontFamily: "inherit", transition: "background 0.15s" }}
+                  onMouseEnter={(e) => { if (!loading && token) e.currentTarget.style.background = "#163558"; }}
+                  onMouseLeave={(e) => { if (!loading && token) e.currentTarget.style.background = "#0B2545"; }}
                 >
                   {loading ? "Сохраняем..." : "Сохранить пароль"}
                 </button>
               </form>
 
               <p style={{ margin: "20px 0 0", fontSize: 14, color: "#64748b", textAlign: "center" }}>
-                <Link href="/login" style={{ color: "#0f172a", fontWeight: 600, textDecoration: "none" }}>← Назад ко входу</Link>
+                <Link href="/login" style={{ color: "#0B2545", fontWeight: 600, textDecoration: "none" }}>← Назад ко входу</Link>
               </p>
             </>
           )}

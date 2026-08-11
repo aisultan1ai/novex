@@ -180,11 +180,11 @@ def verify_novex_signature(body: bytes, timestamp: str, signature: str, secret: 
 function EndpointCard({ ep }: { ep: Endpoint }) {
   const [open, setOpen] = useState(false);
   return (
-    <div style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 14, overflow: "hidden", marginBottom: 12 }}>
+    <div style={{ background: "#ffffff", border: "1px solid #E2E8EE", borderRadius: 14, overflow: "hidden", marginBottom: 12 }}>
       <div style={{ padding: "16px 20px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12, userSelect: "none" }} onClick={() => setOpen((v) => !v)}>
         <span style={{ fontFamily: "monospace", fontWeight: 700, fontSize: 12, padding: "3px 10px", borderRadius: 6, background: "#dcfce7", color: "#166534", flexShrink: 0 }}>{ep.method}</span>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>{ep.title}</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#0B2545" }}>{ep.title}</div>
           <code style={{ fontSize: 12, fontFamily: "monospace", color: "#64748b" }}>{ep.path}</code>
         </div>
         <span style={{ color: "#94a3b8", fontSize: 12 }}>{open ? "▲" : "▼"}</span>
@@ -199,7 +199,7 @@ function EndpointCard({ ep }: { ep: Endpoint }) {
           {ep.requestBody && (
             <div>
               <p style={{ margin: "0 0 8px", fontSize: 12, fontWeight: 600, color: "#64748b" }}>Request body:</p>
-              <pre style={{ margin: 0, padding: "14px 16px", background: "#0f172a", borderRadius: 10, color: "#e2e8f0", fontSize: 12, overflow: "auto", lineHeight: 1.6 }}>{ep.requestBody}</pre>
+              <pre style={{ margin: 0, padding: "14px 16px", background: "#0B2545", borderRadius: 10, color: "#e2e8f0", fontSize: 12, overflow: "auto", lineHeight: 1.6 }}>{ep.requestBody}</pre>
             </div>
           )}
           {ep.responseBody && (
@@ -225,23 +225,23 @@ export default function CarrierDocsPage() {
   return (
     <>
       <div style={{ marginBottom: 24 }}>
-        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0f172a" }}>API Документация</h2>
+        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0B2545" }}>API Документация</h2>
         <p style={{ margin: "4px 0 0", fontSize: 14, color: "#64748b" }}>Руководство по интеграции с платформой Novex</p>
       </div>
 
       {/* Endpoints */}
       <section style={{ marginBottom: 28 }}>
-        <h3 style={{ margin: "0 0 12px", fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Endpoints</h3>
+        <h3 style={{ margin: "0 0 12px", fontSize: 15, fontWeight: 700, color: "#0B2545" }}>Endpoints</h3>
         {ENDPOINTS.map((ep) => <EndpointCard key={ep.path} ep={ep} />)}
       </section>
 
       {/* Status table */}
       <section style={{ marginBottom: 28 }}>
-        <h3 style={{ margin: "0 0 12px", fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Статусы трекинга</h3>
-        <div style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 14, overflow: "hidden" }}>
+        <h3 style={{ margin: "0 0 12px", fontSize: 15, fontWeight: 700, color: "#0B2545" }}>Статусы трекинга</h3>
+        <div style={{ background: "#ffffff", border: "1px solid #E2E8EE", borderRadius: 14, overflow: "hidden" }}>
           {STATUSES.map((s, i) => (
             <div key={s.code} style={{ display: "flex", alignItems: "center", gap: 16, padding: "12px 20px", borderBottom: i < STATUSES.length - 1 ? "1px solid #f1f5f9" : "none" }}>
-              <code style={{ fontFamily: "monospace", fontSize: 13, background: "#f1f5f9", padding: "3px 10px", borderRadius: 6, color: "#0f172a", minWidth: 180, flexShrink: 0 }}>{s.code}</code>
+              <code style={{ fontFamily: "monospace", fontSize: 13, background: "#f1f5f9", padding: "3px 10px", borderRadius: 6, color: "#0B2545", minWidth: 180, flexShrink: 0 }}>{s.code}</code>
               <span style={{ fontSize: 13, color: "#475569" }}>{s.desc}</span>
             </div>
           ))}
@@ -250,20 +250,20 @@ export default function CarrierDocsPage() {
 
       {/* Code examples */}
       <section>
-        <h3 style={{ margin: "0 0 12px", fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Примеры кода</h3>
-        <div style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 14, overflow: "hidden" }}>
-          <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #e5e7eb" }}>
+        <h3 style={{ margin: "0 0 12px", fontSize: 15, fontWeight: 700, color: "#0B2545" }}>Примеры кода</h3>
+        <div style={{ background: "#ffffff", border: "1px solid #E2E8EE", borderRadius: 14, overflow: "hidden" }}>
+          <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #E2E8EE" }}>
             {(["python", "nodejs", "verify"] as const).map((l) => (
               <button
                 key={l}
                 onClick={() => setLang(l)}
-                style={{ padding: "10px 20px", background: lang === l ? "#0f172a" : "transparent", color: lang === l ? "#ffffff" : "#64748b", border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                style={{ padding: "10px 20px", background: lang === l ? "#0B2545" : "transparent", color: lang === l ? "#ffffff" : "#64748b", border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
               >
                 {l === "python" ? "Python" : l === "nodejs" ? "Node.js" : "Проверка подписи"}
               </button>
             ))}
           </div>
-          <pre style={{ margin: 0, padding: "20px 24px", background: "#0f172a", color: "#e2e8f0", fontSize: 13, overflow: "auto", lineHeight: 1.7 }}>
+          <pre style={{ margin: 0, padding: "20px 24px", background: "#0B2545", color: "#e2e8f0", fontSize: 13, overflow: "auto", lineHeight: 1.7 }}>
             {CODE_EXAMPLES[lang]}
           </pre>
         </div>

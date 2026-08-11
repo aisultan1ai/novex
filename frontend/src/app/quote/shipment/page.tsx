@@ -230,14 +230,14 @@ function Stepper({ current }: { current: number }) {
                   width: isMobile ? 32 : 40,
                   height: isMobile ? 32 : 40,
                   borderRadius: "50%",
-                  border: done ? "none" : active ? "none" : "2px solid #E5E7EB",
-                  background: done ? "#10B981" : active ? "#2563EB" : "#ffffff",
+                  border: done ? "none" : active ? "none" : "2px solid #E2E8EE",
+                  background: done ? "#10B981" : active ? "#0B2545" : "#ffffff",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   font: `700 ${isMobile ? "13px" : "15px"}/1 Inter Variable, sans-serif`,
                   color: done || active ? "#ffffff" : "#9CA3AF",
-                  boxShadow: active ? "0 0 0 4px rgba(37,99,235,0.15)" : "none",
+                  boxShadow: active ? "0 0 0 4px rgba(11,37,69,0.15)" : "none",
                   flexShrink: 0,
                   transition: "all 0.2s",
                 }}
@@ -248,7 +248,7 @@ function Stepper({ current }: { current: number }) {
                 <span
                   style={{
                     font: "500 12px/1 Inter Variable, sans-serif",
-                    color: active ? "#111827" : done ? "#10B981" : "#9CA3AF",
+                    color: active ? "#0E1826" : done ? "#10B981" : "#9CA3AF",
                     whiteSpace: "nowrap",
                   }}
                 >
@@ -261,7 +261,7 @@ function Stepper({ current }: { current: number }) {
                 style={{
                   flex: 1,
                   height: 2,
-                  background: done ? "#10B981" : active ? "#2563EB" : "#E5E7EB",
+                  background: done ? "#10B981" : active ? "#0B2545" : "#E2E8EE",
                   margin: "0 6px",
                   marginBottom: isMobile ? 0 : 18,
                   transition: "background 0.2s",
@@ -311,10 +311,10 @@ function FormField({
           width: "100%",
           padding: "11px 14px",
           borderRadius: 10,
-          border: focused ? "1.5px solid #2563EB" : "1.5px solid #E5E7EB",
-          boxShadow: focused ? "0 0 0 3px rgba(37,99,235,0.15)" : "none",
+          border: focused ? "1.5px solid #0B2545" : "1.5px solid #E2E8EE",
+          boxShadow: focused ? "0 0 0 3px rgba(11,37,69,0.15)" : "none",
           font: "400 14px/1 Inter Variable, sans-serif",
-          color: "#111827",
+          color: "#0E1826",
           background: "#fff",
           outline: "none",
           boxSizing: "border-box",
@@ -334,7 +334,7 @@ function SectionCard({ title, children, action }: { title: string; children: Rea
     <div
       style={{
         background: "#ffffff",
-        border: "1px solid #E5E7EB",
+        border: "1px solid #E2E8EE",
         borderRadius: 16,
         padding: isMobile ? "18px" : "24px",
         boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
@@ -350,7 +350,7 @@ function SectionCard({ title, children, action }: { title: string; children: Rea
       }}>
         <h2 style={{
           font: `600 ${isMobile ? 16 : 18}px/1.2 Inter Variable, sans-serif`,
-          color: "#111827",
+          color: "#0E1826",
           margin: 0,
         }}>
           {title}
@@ -377,11 +377,11 @@ function PvzPickerSection({
   const selectStyle: React.CSSProperties = {
     width: "100%",
     padding: "12px 14px",
-    border: "1px solid #E5E7EB",
+    border: "1px solid #E2E8EE",
     borderRadius: 10,
     background: "#ffffff",
     font: "400 14px/1.2 Inter Variable, sans-serif",
-    color: "#111827",
+    color: "#0E1826",
     cursor: "pointer",
   };
   const hint = !city.trim()
@@ -408,7 +408,7 @@ function PvzPickerSection({
           ))}
         </select>
         {hint && (
-          <div style={{ font: "400 12px/1.4 Inter Variable, sans-serif", color: "#6B7280" }}>
+          <div style={{ font: "400 12px/1.4 Inter Variable, sans-serif", color: "#5F6E7E" }}>
             {hint}
           </div>
         )}
@@ -438,8 +438,8 @@ function TariffSummary({
   return (
     <div
       style={{
-        background: "#EFF6FF",
-        border: "1.5px solid #2563EB",
+        background: "#F1F5F9",
+        border: "1.5px solid #0B2545",
         borderRadius: 16,
         padding: isMobile ? "16px" : "20px 24px",
         display: "flex",
@@ -448,20 +448,20 @@ function TariffSummary({
         alignItems: isMobile ? "stretch" : "center",
         gap: isMobile ? 14 : 16,
         marginBottom: isMobile ? 20 : 28,
-        boxShadow: "0 4px 16px rgba(37,99,235,0.10)",
+        boxShadow: "0 4px 16px rgba(11,37,69,0.10)",
       }}
     >
       <div style={{ minWidth: 0 }}>
-        <div style={{ font: "500 11px/1 Inter Variable, sans-serif", textTransform: "uppercase", letterSpacing: "0.08em", color: "#2563EB", marginBottom: 6 }}>
+        <div style={{ font: "500 11px/1 Inter Variable, sans-serif", textTransform: "uppercase", letterSpacing: "0.08em", color: "#0B2545", marginBottom: 6 }}>
           Выбранный тариф
         </div>
         <div style={{
           font: `700 ${isMobile ? 16 : 18}px/1.2 Inter Variable, sans-serif`,
-          color: "#111827", marginBottom: 4,
+          color: "#0E1826", marginBottom: 4,
         }}>
           {draft.carrier_name_snapshot} · {draft.tariff_name_snapshot}
         </div>
-        <div style={{ font: `400 ${isMobile ? 13 : 14}px/1.3 Inter Variable, sans-serif`, color: "#6B7280" }}>
+        <div style={{ font: `400 ${isMobile ? 13 : 14}px/1.3 Inter Variable, sans-serif`, color: "#5F6E7E" }}>
           {draft.from_city_snapshot} → {draft.to_city_snapshot} · {draft.shipment_type_snapshot}
         </div>
       </div>
@@ -472,12 +472,12 @@ function TariffSummary({
         justifyContent: isMobile ? "space-between" : "flex-start",
         gap: isMobile ? 12 : 4,
         paddingTop: isMobile ? 12 : 0,
-        borderTop: isMobile ? "1px solid rgba(37,99,235,0.2)" : "none",
+        borderTop: isMobile ? "1px solid rgba(11,37,69,0.2)" : "none",
       }}>
         <div>
           <div style={{
-            font: `700 ${isMobile ? 22 : 26}px/1 Inter Variable, sans-serif`,
-            color: "#111827", marginBottom: 4,
+            font: `700 ${isMobile ? 22 : 26}px/1 'Space Grotesk Variable', 'Inter Variable', sans-serif`,
+            color: "#0E1826", marginBottom: 4,
             whiteSpace: "nowrap",
             opacity: isRecalculating ? 0.5 : 1,
             transition: "opacity 0.2s",
@@ -495,7 +495,7 @@ function TariffSummary({
           )}
           <div style={{
             font: `600 ${isMobile ? 12 : 13}px/1 Inter Variable, sans-serif`,
-            color: "#2563EB",
+            color: "#0B2545",
             marginBottom: isMobile ? 0 : 12,
           }}>
             {draft.eta_days_min_snapshot}-{draft.eta_days_max_snapshot} дн.
@@ -504,9 +504,9 @@ function TariffSummary({
         <button
           onClick={onChangeTariff}
           style={{
-            border: "1.5px solid #2563EB",
+            border: "1.5px solid #0B2545",
             background: "#ffffff",
-            color: "#2563EB",
+            color: "#0B2545",
             borderRadius: 8,
             padding: isMobile ? "8px 14px" : "7px 14px",
             font: "600 13px/1 Inter Variable, sans-serif",
@@ -516,7 +516,7 @@ function TariffSummary({
             whiteSpace: "nowrap",
             flexShrink: 0,
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = "#EFF6FF"; }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = "#F1F5F9"; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = "#ffffff"; }}
         >
           Изменить
@@ -570,7 +570,7 @@ function AddressBookPicker({ entries, onPick }: {
         maxHeight: 320,
         overflowY: "auto",
         background: "#ffffff",
-        border: "1px solid #E5E7EB",
+        border: "1px solid #E2E8EE",
         borderRadius: 12,
         boxShadow: "0 10px 30px rgba(0,0,0,0.10)",
         padding: 6,
@@ -585,7 +585,7 @@ function AddressBookPicker({ entries, onPick }: {
         maxHeight: 320,
         overflowY: "auto",
         background: "#ffffff",
-        border: "1px solid #E5E7EB",
+        border: "1px solid #E2E8EE",
         borderRadius: 12,
         boxShadow: "0 10px 30px rgba(0,0,0,0.10)",
         padding: 6,
@@ -605,7 +605,7 @@ function AddressBookPicker({ entries, onPick }: {
           gap: 6,
           padding: "8px 14px",
           background: "#F3F4F6",
-          border: "1px solid #E5E7EB",
+          border: "1px solid #E2E8EE",
           borderRadius: 8,
           font: "500 13px/1 Inter Variable, sans-serif",
           color: "#374151",
@@ -640,7 +640,7 @@ function AddressBookPicker({ entries, onPick }: {
                 onMouseEnter={(e) => { e.currentTarget.style.background = "#F9FAFB"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
               >
-                <div style={{ font: "600 14px/1.3 Inter Variable, sans-serif", color: "#111827", display: "flex", alignItems: "center", gap: 6 }}>
+                <div style={{ font: "600 14px/1.3 Inter Variable, sans-serif", color: "#0E1826", display: "flex", alignItems: "center", gap: 6 }}>
                   {line1}
                   {entry.is_default && (
                     <span style={{ font: "600 10px/1 Inter Variable, sans-serif", color: "#065F46", background: "#D1FAE5", padding: "2px 6px", borderRadius: 999 }}>
@@ -649,7 +649,7 @@ function AddressBookPicker({ entries, onPick }: {
                   )}
                 </div>
                 {line2 && (
-                  <div style={{ font: "400 12px/1.4 Inter Variable, sans-serif", color: "#6B7280", marginTop: 2 }}>
+                  <div style={{ font: "400 12px/1.4 Inter Variable, sans-serif", color: "#5F6E7E", marginTop: 2 }}>
                     {line2}
                   </div>
                 )}
@@ -719,7 +719,7 @@ function PartySection({ title, values, onChange, onToggleSave, addressBook, onAp
           type="checkbox"
           checked={values.save_to_address_book}
           onChange={(e) => onToggleSave(e.target.checked)}
-          style={{ width: 16, height: 16, cursor: "pointer", accentColor: "#2563EB" }}
+          style={{ width: 16, height: 16, cursor: "pointer", accentColor: "#0B2545" }}
         />
         Сохранить в адресную книгу
       </label>
@@ -1306,7 +1306,7 @@ function ShipmentPageInner() {
 
   const cardBase = {
     background: "#ffffff",
-    border: "1px solid #E5E7EB",
+    border: "1px solid #E2E8EE",
     borderRadius: 16,
     padding: "20px 24px",
     boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
@@ -1318,7 +1318,7 @@ function ShipmentPageInner() {
         <Navbar />
         <main style={{ maxWidth: 860, margin: "0 auto", padding: "60px 20px" }}>
           <div style={cardBase}>
-            <span style={{ font: "400 15px/1 Inter Variable, sans-serif", color: "#6B7280" }}>
+            <span style={{ font: "400 15px/1 Inter Variable, sans-serif", color: "#5F6E7E" }}>
               Проверяем доступ к оформлению...
             </span>
           </div>
@@ -1344,8 +1344,8 @@ function ShipmentPageInner() {
             marginBottom: isMobile ? 20 : 32,
           }}>
             <h1 style={{
-              font: `700 ${isMobile ? 20 : 28}px/1.2 Inter Variable, sans-serif`,
-              letterSpacing: "-0.02em", color: "#111827", margin: 0,
+              font: `700 ${isMobile ? 20 : 28}px/1.2 'Space Grotesk Variable', 'Inter Variable', sans-serif`,
+              letterSpacing: "-0.02em", color: "#0E1826", margin: 0,
               flex: 1, minWidth: 0,
             }}>
               Оформление отправления
@@ -1356,9 +1356,9 @@ function ShipmentPageInner() {
                 router.push(`/quote/results?quoteSessionId=${quoteSessionId}${quoteToken ? `&token=${quoteToken}` : ""}`);
               }}
               style={{
-                border: "1.5px solid #E5E7EB",
+                border: "1.5px solid #E2E8EE",
                 background: "#ffffff",
-                color: "#111827",
+                color: "#0E1826",
                 borderRadius: 10,
                 padding: isMobile ? "8px 14px" : "10px 18px",
                 font: `600 ${isMobile ? 13 : 14}px/1 Inter Variable, sans-serif`,
@@ -1398,7 +1398,7 @@ function ShipmentPageInner() {
         {/* Bootstrapping */}
         {isBootstrapping ? (
           <div style={cardBase}>
-            <span style={{ font: "400 15px/1 Inter Variable, sans-serif", color: "#6B7280" }}>
+            <span style={{ font: "400 15px/1 Inter Variable, sans-serif", color: "#5F6E7E" }}>
               Подготавливаем черновик заказа...
             </span>
           </div>
@@ -1453,11 +1453,11 @@ function ShipmentPageInner() {
                                 checked={form.delivery_type === opt.value}
                                 disabled={!available}
                                 onChange={() => available && updateForm((prev) => ({ ...prev, delivery_type: opt.value }))}
-                                style={{ marginTop: 3, width: 16, height: 16, cursor: available ? "pointer" : "not-allowed", accentColor: "#2563EB" }}
+                                style={{ marginTop: 3, width: 16, height: 16, cursor: available ? "pointer" : "not-allowed", accentColor: "#0B2545" }}
                               />
                               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                                <span style={{ font: "500 14px/1.3 Inter Variable, sans-serif", color: "#111827" }}>{opt.label}</span>
-                                <span style={{ font: "400 12px/1.4 Inter Variable, sans-serif", color: "#6B7280" }}>
+                                <span style={{ font: "500 14px/1.3 Inter Variable, sans-serif", color: "#0E1826" }}>{opt.label}</span>
+                                <span style={{ font: "400 12px/1.4 Inter Variable, sans-serif", color: "#5F6E7E" }}>
                                   {available ? opt.hint : disabledReason}
                                 </span>
                               </div>
@@ -1465,7 +1465,7 @@ function ShipmentPageInner() {
                           );
                         })}
                         {(senderLegWh || recipientLegWh) && (
-                          <div style={{ marginTop: 4, padding: 10, background: "#F3F4F6", borderRadius: 8, font: "400 12px/1.4 Inter Variable, sans-serif", color: "#6B7280" }}>
+                          <div style={{ marginTop: 4, padding: 10, background: "#F3F4F6", borderRadius: 8, font: "400 12px/1.4 Inter Variable, sans-serif", color: "#5F6E7E" }}>
                             ПВЗ выбирается на следующих шагах, после заполнения города{senderLegWh && recipientLegWh ? " отправителя и получателя" : senderLegWh ? " отправителя" : " получателя"}.
                           </div>
                         )}
@@ -1482,12 +1482,12 @@ function ShipmentPageInner() {
                         ] as { key: "call_before_delivery" | "insurance" | "fragile"; label: string }[]
                       ).map(({ key, label }) => (
                         <label key={key} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", font: "500 14px/1 Inter Variable, sans-serif", color: "#374151" }}>
-                          <input type="checkbox" checked={form[key]} onChange={(e) => toggleService(key, e.target.checked)} style={{ width: 16, height: 16, cursor: "pointer", accentColor: "#2563EB" }} />
+                          <input type="checkbox" checked={form[key]} onChange={(e) => toggleService(key, e.target.checked)} style={{ width: 16, height: 16, cursor: "pointer", accentColor: "#0B2545" }} />
                           {label}
                         </label>
                       ))}
                       {form.insurance && (
-                        <div style={{ marginTop: 4, paddingTop: 12, borderTop: "1px dashed #E5E7EB" }}>
+                        <div style={{ marginTop: 4, paddingTop: 12, borderTop: "1px dashed #E2E8EE" }}>
                           <FormField
                             label="Объявленная ценность, ₸"
                             value={form.declared_value}
@@ -1495,7 +1495,7 @@ function ShipmentPageInner() {
                             required
                             inputMode="decimal"
                           />
-                          <div style={{ marginTop: 6, font: "400 12px/1.4 Inter Variable, sans-serif", color: "#6B7280" }}>
+                          <div style={{ marginTop: 6, font: "400 12px/1.4 Inter Variable, sans-serif", color: "#5F6E7E" }}>
                             Сумма, на которую будет застрахован груз. Передаётся перевозчику при отправке.
                           </div>
                         </div>
@@ -1526,14 +1526,14 @@ function ShipmentPageInner() {
                             pickup_date: e.target.checked ? prev.pickup_date : "",
                             pickup_time_slot: e.target.checked ? prev.pickup_time_slot : "",
                           }))}
-                          style={{ width: 16, height: 16, cursor: "pointer", accentColor: "#2563EB" }}
+                          style={{ width: 16, height: 16, cursor: "pointer", accentColor: "#0B2545" }}
                         />
                         Вызвать курьера Azimuth для забора груза
                       </label>
                       <div style={{
                         marginTop: 8,
                         font: "400 12px/1.4 Inter Variable, sans-serif",
-                        color: "#6B7280",
+                        color: "#5F6E7E",
                       }}>
                         Курьер приедет по адресу отправителя после подтверждения оплаты.
                       </div>
@@ -1542,7 +1542,7 @@ function ShipmentPageInner() {
                         <div style={{
                           marginTop: 14,
                           paddingTop: 14,
-                          borderTop: "1px dashed #E5E7EB",
+                          borderTop: "1px dashed #E2E8EE",
                           display: "grid",
                           gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))",
                           gap: 14,
@@ -1567,9 +1567,9 @@ function ShipmentPageInner() {
                                 width: "100%",
                                 padding: "11px 14px",
                                 borderRadius: 10,
-                                border: "1.5px solid #E5E7EB",
+                                border: "1.5px solid #E2E8EE",
                                 font: "400 14px/1 Inter Variable, sans-serif",
-                                color: "#111827",
+                                color: "#0E1826",
                                 background: "#fff",
                                 outline: "none",
                                 boxSizing: "border-box",
@@ -1595,9 +1595,9 @@ function ShipmentPageInner() {
                                 width: "100%",
                                 padding: "11px 14px",
                                 borderRadius: 10,
-                                border: "1.5px solid #E5E7EB",
+                                border: "1.5px solid #E2E8EE",
                                 font: "400 14px/1 Inter Variable, sans-serif",
-                                color: "#111827",
+                                color: "#0E1826",
                                 background: "#fff",
                                 outline: "none",
                                 boxSizing: "border-box",
@@ -1680,9 +1680,9 @@ function ShipmentPageInner() {
                   onClick={currentStep === 0 ? () => router.push("/") : handlePrevStep}
                   style={{
                     background: isMobile ? "#ffffff" : "none",
-                    border: isMobile ? "1px solid #E5E7EB" : "none",
+                    border: isMobile ? "1px solid #E2E8EE" : "none",
                     borderRadius: isMobile ? 10 : 0,
-                    color: "#6B7280",
+                    color: "#5F6E7E",
                     font: "500 14px/1 Inter Variable, sans-serif",
                     cursor: "pointer",
                     fontFamily: "inherit",
@@ -1698,7 +1698,7 @@ function ShipmentPageInner() {
                     type="button"
                     onClick={handleNextStep}
                     style={{
-                      background: "#2563EB",
+                      background: "#0B2545",
                       color: "#ffffff",
                       border: "none",
                       borderRadius: 10,
@@ -1709,8 +1709,8 @@ function ShipmentPageInner() {
                       transition: "background 0.15s",
                       width: isMobile ? "100%" : "auto",
                     }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = "#1D4ED8"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = "#2563EB"; }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "#0E2E5C"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "#0B2545"; }}
                   >
                     Далее →
                   </button>
@@ -1719,7 +1719,7 @@ function ShipmentPageInner() {
                     type="submit"
                     disabled={isSubmitting}
                     style={{
-                      background: isSubmitting ? "#93C5FD" : "#2563EB",
+                      background: isSubmitting ? "#94A6C0" : "#0B2545",
                       color: "#ffffff",
                       border: "none",
                       borderRadius: 10,
@@ -1730,8 +1730,8 @@ function ShipmentPageInner() {
                       transition: "background 0.15s",
                       width: isMobile ? "100%" : "auto",
                     }}
-                    onMouseEnter={(e) => { if (!isSubmitting) e.currentTarget.style.background = "#1D4ED8"; }}
-                    onMouseLeave={(e) => { if (!isSubmitting) e.currentTarget.style.background = "#2563EB"; }}
+                    onMouseEnter={(e) => { if (!isSubmitting) e.currentTarget.style.background = "#0E2E5C"; }}
+                    onMouseLeave={(e) => { if (!isSubmitting) e.currentTarget.style.background = "#0B2545"; }}
                   >
                     {isSubmitting ? "Сохраняем..." : "Далее → Оплата"}
                   </button>

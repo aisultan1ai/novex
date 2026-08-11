@@ -15,8 +15,8 @@ export interface TrackingEvent {
 // там bg/color для badge-пилюль, тут другая семантика.
 const TIMELINE_COLORS: Record<string, { dot: string; line: string }> = {
   paid:             { dot: "#16a34a", line: "#bbf7d0" },
-  sent_to_carrier:  { dot: "#2563eb", line: "#bfdbfe" },
-  picked_up:        { dot: "#2563eb", line: "#bfdbfe" },
+  sent_to_carrier:  { dot: "#0B2545", line: "#CFDCEA" },
+  picked_up:        { dot: "#0B2545", line: "#CFDCEA" },
   in_transit:       { dot: "#7c3aed", line: "#ddd6fe" },
   out_for_delivery: { dot: "#7c3aed", line: "#ddd6fe" },
   arrived:          { dot: "#7c3aed", line: "#ddd6fe" },
@@ -57,7 +57,7 @@ export function TrackingTimeline({
   return (
     <>
       {events.map((event, idx) => {
-        const colors = TIMELINE_COLORS[event.status] ?? { dot: "#94a3b8", line: "#e5e7eb" };
+        const colors = TIMELINE_COLORS[event.status] ?? { dot: "#94a3b8", line: "#E2E8EE" };
         const isLast = idx === events.length - 1;
         const label = eventLabel(event, carrierCode);
         // subtitle показываем только если description != label — так не
@@ -71,16 +71,16 @@ export function TrackingTimeline({
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
               <div style={{ width: 14, height: 14, borderRadius: "50%", background: colors.dot, boxShadow: `0 0 0 4px ${colors.line}`, flexShrink: 0, marginTop: 3 }} />
               {!isLast && (
-                <div style={{ width: 2, flex: 1, background: "#e5e7eb", marginTop: 6, marginBottom: 6, minHeight: 24 }} />
+                <div style={{ width: 2, flex: 1, background: "#E2E8EE", marginTop: 6, marginBottom: 6, minHeight: 24 }} />
               )}
             </div>
             {/* content */}
             <div style={{ flex: 1, paddingBottom: isLast ? 0 : 4 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#111827", marginBottom: 2, lineHeight: 1.3 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#0E1826", marginBottom: 2, lineHeight: 1.3 }}>
                 {label}
               </div>
               {subtitle && (
-                <div style={{ fontSize: 13, color: "#6B7280", marginBottom: 2, lineHeight: 1.4 }}>{subtitle}</div>
+                <div style={{ fontSize: 13, color: "#5F6E7E", marginBottom: 2, lineHeight: 1.4 }}>{subtitle}</div>
               )}
               {event.location && (
                 <div style={{ fontSize: 12, color: "#9CA3AF", marginBottom: 2 }}>{event.location}</div>

@@ -32,7 +32,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
   awaiting_payment:     { bg: "#FEF3C7", color: "#92400E" },
-  payment_under_review: { bg: "#DBEAFE", color: "#1E40AF" },
+  payment_under_review: { bg: "#E6EEF7", color: "#1E40AF" },
   paid:                 { bg: "#DCFCE7", color: "#166534" },
   dispatch_queued:      { bg: "#DCFCE7", color: "#166534" },
   payment_rejected:     { bg: "#FEE2E2", color: "#991B1B" },
@@ -50,8 +50,8 @@ function InfoRow({ lbl, val }: { lbl: string; val: string | null | undefined }) 
   if (!val) return null;
   return (
     <div style={{ marginBottom: 10 }}>
-      <div style={{ fontSize: 12, color: "#6B7280", marginBottom: 3 }}>{lbl}</div>
-      <div style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>{val}</div>
+      <div style={{ fontSize: 12, color: "#5F6E7E", marginBottom: 3 }}>{lbl}</div>
+      <div style={{ fontSize: 14, fontWeight: 600, color: "#0E1826" }}>{val}</div>
     </div>
   );
 }
@@ -68,24 +68,24 @@ function Stepper({ current }: { current: number }) {
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
               <div style={{
                 width: isMobile ? 32 : 40, height: isMobile ? 32 : 40, borderRadius: "50%",
-                border: done || active ? "none" : "2px solid #E5E7EB",
-                background: done ? "#10B981" : active ? "#2563EB" : "#ffffff",
+                border: done || active ? "none" : "2px solid #E2E8EE",
+                background: done ? "#10B981" : active ? "#0B2545" : "#ffffff",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 font: `700 ${isMobile ? "13px" : "15px"}/1 Inter Variable, sans-serif`,
                 color: done || active ? "#ffffff" : "#9CA3AF",
-                boxShadow: active ? "0 0 0 4px rgba(37,99,235,0.15)" : "none",
+                boxShadow: active ? "0 0 0 4px rgba(11,37,69,0.15)" : "none",
                 flexShrink: 0, transition: "all 0.2s",
               }}>
                 {done ? <Check size={isMobile ? 13 : 16} strokeWidth={3} /> : i + 1}
               </div>
               {!isMobile && (
-                <span style={{ font: "500 12px/1 Inter Variable, sans-serif", color: active ? "#111827" : done ? "#10B981" : "#9CA3AF", whiteSpace: "nowrap" }}>
+                <span style={{ font: "500 12px/1 Inter Variable, sans-serif", color: active ? "#0E1826" : done ? "#10B981" : "#9CA3AF", whiteSpace: "nowrap" }}>
                   {label}
                 </span>
               )}
             </div>
             {i < STEPS.length - 1 && (
-              <div style={{ flex: 1, height: 2, background: done ? "#10B981" : "#E5E7EB", margin: "0 6px", marginBottom: isMobile ? 0 : 18, transition: "background 0.2s" }} />
+              <div style={{ flex: 1, height: 2, background: done ? "#10B981" : "#E2E8EE", margin: "0 6px", marginBottom: isMobile ? 0 : 18, transition: "background 0.2s" }} />
             )}
           </div>
         );
@@ -103,13 +103,13 @@ function ReqRow({ label, value, copy: copyable }: { label: string; value: string
   };
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid #F1F5F9", gap: 12 }}>
-      <span style={{ font: "400 13px/1 Inter Variable, sans-serif", color: "#6B7280", minWidth: 160, flexShrink: 0 }}>{label}</span>
-      <span style={{ font: "500 14px/1.4 Inter Variable, sans-serif", color: "#111827", display: "flex", gap: 10, alignItems: "center", textAlign: "right" }}>
+      <span style={{ font: "400 13px/1 Inter Variable, sans-serif", color: "#5F6E7E", minWidth: 160, flexShrink: 0 }}>{label}</span>
+      <span style={{ font: "500 14px/1.4 Inter Variable, sans-serif", color: "#0E1826", display: "flex", gap: 10, alignItems: "center", textAlign: "right" }}>
         {value}
         {copyable && (
           <button
             onClick={handleCopy}
-            style={{ background: "none", border: "1px solid #E5E7EB", borderRadius: 6, padding: "3px 8px", cursor: "pointer", color: copied ? "#166534" : "#6B7280", display: "flex", alignItems: "center", gap: 4, transition: "all 0.15s", flexShrink: 0 }}
+            style={{ background: "none", border: "1px solid #E2E8EE", borderRadius: 6, padding: "3px 8px", cursor: "pointer", color: copied ? "#166534" : "#5F6E7E", display: "flex", alignItems: "center", gap: 4, transition: "all 0.15s", flexShrink: 0 }}
           >
             {copied ? <Check size={12} /> : <Copy size={12} />}
             <span style={{ font: "500 11px/1 Inter Variable, sans-serif" }}>{copied ? "Скопировано" : "Копировать"}</span>
@@ -256,7 +256,7 @@ function CheckoutPageInner() {
 
   const card = {
     background: "#ffffff",
-    border: "1px solid #E5E7EB",
+    border: "1px solid #E2E8EE",
     borderRadius: 16,
     boxShadow: "0 2px 8px rgba(17,24,39,0.04)",
   };
@@ -269,13 +269,22 @@ function CheckoutPageInner() {
     <div style={{ minHeight: "100vh", background: "#FAFAFA", fontFamily: "Inter Variable, sans-serif" }}>
 
       {/* Header */}
-      <header style={{ height: 64, background: "#ffffff", borderBottom: "1px solid #E5E7EB", padding: "0 24px", display: "flex", alignItems: "center", position: "sticky", top: 0, zIndex: 50 }}>
+      <header style={{ height: 64, background: "#ffffff", borderBottom: "1px solid #E2E8EE", padding: "0 24px", display: "flex", alignItems: "center", position: "sticky", top: 0, zIndex: 50 }}>
         <Link
           href="/"
-          style={{ display: "inline-flex", alignItems: "center", gap: 8, textDecoration: "none", font: "700 20px/1 Inter Variable, sans-serif", letterSpacing: "-0.02em", color: "#111827" }}
+          aria-label="Novex — на главную"
+          style={{ display: "inline-flex", alignItems: "center", gap: 8, textDecoration: "none", font: "700 20px/1 'Space Grotesk Variable', 'Inter Variable', sans-serif", letterSpacing: "-0.02em", color: "#0E1826" }}
         >
-          <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#2563EB", flexShrink: 0 }} />
-          novex
+          <svg width="30" height="27" viewBox="10 11 38 34" fill="none" aria-hidden="true" style={{ flexShrink: 0, display: "block" }}>
+            <circle cx="17" cy="28" r="5" fill="#22C9E0" />
+            <line x1="20" y1="25.5" x2="37" y2="17" stroke="#3E6E8A" strokeWidth="2.2" strokeLinecap="round" />
+            <line x1="21" y1="28" x2="38" y2="28" stroke="#22C9E0" strokeWidth="2.4" strokeLinecap="round" />
+            <line x1="20" y1="30.5" x2="37" y2="39" stroke="#3E6E8A" strokeWidth="2.2" strokeLinecap="round" />
+            <circle cx="40" cy="16" r="3.4" fill="#3E6E8A" />
+            <circle cx="41" cy="28" r="4.6" fill="#22C9E0" />
+            <circle cx="40" cy="40" r="3.4" fill="#3E6E8A" />
+          </svg>
+          <span>n<span style={{ color: "#22C9E0" }}>o</span>vex</span>
         </Link>
       </header>
 
@@ -288,15 +297,15 @@ function CheckoutPageInner() {
                 <polyline points="20 6 9 17 4 12" />
               </svg>
             </div>
-            <div style={{ font: "700 18px/1.3 Inter Variable, sans-serif", color: "#111827", marginBottom: 12 }}>
+            <div style={{ font: "700 18px/1.3 Inter Variable, sans-serif", color: "#0E1826", marginBottom: 12 }}>
               Чек успешно загружен
             </div>
-            <p style={{ font: "400 14px/1.6 Inter Variable, sans-serif", color: "#6B7280", margin: "0 0 28px" }}>
+            <p style={{ font: "400 14px/1.6 Inter Variable, sans-serif", color: "#5F6E7E", margin: "0 0 28px" }}>
               Оплата отправлена на проверку оператором.
             </p>
             <button
               onClick={() => router.push("/dashboard/orders")}
-              style={{ width: "100%", padding: "13px 0", borderRadius: 12, border: "none", background: "#2563EB", color: "#fff", font: "600 15px/1 Inter Variable, sans-serif", cursor: "pointer" }}
+              style={{ width: "100%", padding: "13px 0", borderRadius: 12, border: "none", background: "#0B2545", color: "#fff", font: "600 15px/1 Inter Variable, sans-serif", cursor: "pointer" }}
             >
               OK
             </button>
@@ -310,15 +319,15 @@ function CheckoutPageInner() {
         <div style={{ marginBottom: 32 }}>
           <Link
             href="/dashboard/orders"
-            style={{ display: "inline-flex", alignItems: "center", gap: 6, font: "500 13px/1 Inter Variable, sans-serif", color: "#6B7280", textDecoration: "none", marginBottom: 20 }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = "#111827")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = "#6B7280")}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, font: "500 13px/1 Inter Variable, sans-serif", color: "#5F6E7E", textDecoration: "none", marginBottom: 20 }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "#0E1826")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "#5F6E7E")}
           >
             <ArrowLeft size={14} />
             Мои заказы
           </Link>
           <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-            <h1 style={{ margin: 0, font: "700 28px/1.2 Inter Variable, sans-serif", color: "#111827", letterSpacing: "-0.01em" }}>
+            <h1 style={{ margin: 0, font: "700 28px/1.2 'Space Grotesk Variable', 'Inter Variable', sans-serif", color: "#0E1826", letterSpacing: "-0.01em" }}>
               Оформление оплаты
             </h1>
             {view === "payment" && status && (
@@ -327,7 +336,7 @@ function CheckoutPageInner() {
               </span>
             )}
           </div>
-          <p style={{ margin: "6px 0 0", font: "400 15px/1 Inter Variable, sans-serif", color: "#6B7280" }}>
+          <p style={{ margin: "6px 0 0", font: "400 15px/1 Inter Variable, sans-serif", color: "#5F6E7E" }}>
             {view === "summary"
               ? "Проверьте данные и подтвердите заказ"
               : (paymentData?.order_reference ?? "Переведите оплату по реквизитам ниже")}
@@ -338,7 +347,7 @@ function CheckoutPageInner() {
         <Stepper current={3} />
 
         {isLoading ? (
-          <div style={{ ...card, padding: 48, textAlign: "center", color: "#6B7280", font: "400 14px/1 Inter Variable, sans-serif" }}>
+          <div style={{ ...card, padding: 48, textAlign: "center", color: "#5F6E7E", font: "400 14px/1 Inter Variable, sans-serif" }}>
             Загружаем заказ…
           </div>
         ) : error && !draft ? (
@@ -348,7 +357,7 @@ function CheckoutPageInner() {
             </div>
             <Link
               href="/"
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 20px", borderRadius: 10, border: "1px solid #E5E7EB", background: "#ffffff", font: "600 14px/1 Inter Variable, sans-serif", color: "#374151", textDecoration: "none" }}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 20px", borderRadius: 10, border: "1px solid #E2E8EE", background: "#ffffff", font: "600 14px/1 Inter Variable, sans-serif", color: "#374151", textDecoration: "none" }}
             >
               ← Новый расчёт тарифа
             </Link>
@@ -358,26 +367,26 @@ function CheckoutPageInner() {
 
             {/* Route & carrier */}
             <div style={{ ...card, padding: "24px 28px" }}>
-              <div style={{ font: "700 11px/1 Inter Variable, sans-serif", color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>
+              <div style={{ font: "700 11px/1 Inter Variable, sans-serif", color: "#5F6E7E", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>
                 Маршрут и тариф
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
                 <div>
-                  <div style={{ font: "700 22px/1.2 Inter Variable, sans-serif", color: "#111827", marginBottom: 8 }}>
+                  <div style={{ font: "700 22px/1.2 Inter Variable, sans-serif", color: "#0E1826", marginBottom: 8 }}>
                     {draft.from_city_snapshot} → {draft.to_city_snapshot}
                   </div>
-                  <div style={{ font: "400 13px/1.6 Inter Variable, sans-serif", color: "#6B7280" }}>
+                  <div style={{ font: "400 13px/1.6 Inter Variable, sans-serif", color: "#5F6E7E" }}>
                     {draft.shipment_type_snapshot} · {draft.eta_days_min_snapshot}-{draft.eta_days_max_snapshot} дн.
                   </div>
-                  <div style={{ font: "400 13px/1 Inter Variable, sans-serif", color: "#6B7280", marginTop: 4 }}>
+                  <div style={{ font: "400 13px/1 Inter Variable, sans-serif", color: "#5F6E7E", marginTop: 4 }}>
                     {draft.carrier_name_snapshot} - {draft.tariff_name_snapshot}
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ font: "800 30px/1 Inter Variable, sans-serif", color: "#111827" }}>
+                  <div style={{ font: "800 30px/1 'Space Grotesk Variable', 'Inter Variable', sans-serif", color: "#0E1826" }}>
                     {formatPrice(Number(draft.price_snapshot), draft.currency_snapshot)}
                   </div>
-                  <div style={{ font: "400 12px/1 Inter Variable, sans-serif", color: "#6B7280", marginTop: 6 }}>
+                  <div style={{ font: "400 12px/1 Inter Variable, sans-serif", color: "#5F6E7E", marginTop: 6 }}>
                     стоимость доставки
                   </div>
                 </div>
@@ -387,7 +396,7 @@ function CheckoutPageInner() {
             {/* Sender + Recipient */}
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
               <div style={{ ...card, padding: "24px 28px" }}>
-                <div style={{ font: "700 11px/1 Inter Variable, sans-serif", color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>
+                <div style={{ font: "700 11px/1 Inter Variable, sans-serif", color: "#5F6E7E", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>
                   Отправитель
                 </div>
                 <InfoRow lbl="ФИО" val={sender?.full_name} />
@@ -399,7 +408,7 @@ function CheckoutPageInner() {
                 <InfoRow lbl="Комментарий" val={sender?.comment} />
               </div>
               <div style={{ ...card, padding: "24px 28px" }}>
-                <div style={{ font: "700 11px/1 Inter Variable, sans-serif", color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>
+                <div style={{ font: "700 11px/1 Inter Variable, sans-serif", color: "#5F6E7E", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>
                   Получатель
                 </div>
                 <InfoRow lbl="ФИО" val={recipient?.full_name} />
@@ -414,7 +423,7 @@ function CheckoutPageInner() {
 
             {/* Packages */}
             <div style={{ ...card, padding: "24px 28px" }}>
-              <div style={{ font: "700 11px/1 Inter Variable, sans-serif", color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>
+              <div style={{ font: "700 11px/1 Inter Variable, sans-serif", color: "#5F6E7E", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>
                 Грузовые места ({draft.packages.length})
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -423,10 +432,10 @@ function CheckoutPageInner() {
                     key={pkg.id}
                     style={{ display: "flex", justifyContent: "space-between", padding: "12px 16px", background: "#F8FAFC", borderRadius: 12, font: "400 14px/1 Inter Variable, sans-serif", flexWrap: "wrap", gap: 8 }}
                   >
-                    <span style={{ fontWeight: 600, color: "#111827" }}>
+                    <span style={{ fontWeight: 600, color: "#0E1826" }}>
                       {i + 1}. {pkg.description}
                     </span>
-                    <span style={{ color: "#6B7280" }}>
+                    <span style={{ color: "#5F6E7E" }}>
                       {pkg.quantity} шт · {Number(pkg.weight_kg)} кг · {Number(pkg.width_cm)}×{Number(pkg.height_cm)}×{Number(pkg.depth_cm)} см
                     </span>
                   </div>
@@ -436,10 +445,10 @@ function CheckoutPageInner() {
 
             {/* Payment CTA */}
             <div style={{ ...card, padding: "24px 28px" }}>
-              <div style={{ font: "700 11px/1 Inter Variable, sans-serif", color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>
+              <div style={{ font: "700 11px/1 Inter Variable, sans-serif", color: "#5F6E7E", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>
                 Способ оплаты
               </div>
-              <div style={{ padding: "14px 18px", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 12, font: "400 13px/1.5 Inter Variable, sans-serif", color: "#1E40AF", marginBottom: 24 }}>
+              <div style={{ padding: "14px 18px", background: "#F1F5F9", border: "1px solid #CFDCEA", borderRadius: 12, font: "400 13px/1.5 Inter Variable, sans-serif", color: "#1E40AF", marginBottom: 24 }}>
                 <strong>Банковский перевод.</strong> После нажатия кнопки вы получите реквизиты и сможете загрузить подтверждение оплаты.
               </div>
               {error && (
@@ -449,8 +458,8 @@ function CheckoutPageInner() {
               )}
               <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", alignItems: isMobile ? "stretch" : "center", gap: 16 }}>
                 <div>
-                  <div style={{ font: "400 13px/1 Inter Variable, sans-serif", color: "#6B7280", marginBottom: 6 }}>Итого к оплате</div>
-                  <div style={{ font: "800 28px/1 Inter Variable, sans-serif", color: "#111827" }}>
+                  <div style={{ font: "400 13px/1 Inter Variable, sans-serif", color: "#5F6E7E", marginBottom: 6 }}>Итого к оплате</div>
+                  <div style={{ font: "800 28px/1 'Space Grotesk Variable', 'Inter Variable', sans-serif", color: "#0E1826" }}>
                     {formatPrice(Number(draft.price_snapshot), draft.currency_snapshot)}
                   </div>
                 </div>
@@ -458,7 +467,7 @@ function CheckoutPageInner() {
                   onClick={() => void handlePay()}
                   disabled={isPaying}
                   style={{
-                    background: isPaying ? "#93C5FD" : "#2563EB",
+                    background: isPaying ? "#94A6C0" : "#0B2545",
                     color: "#fff",
                     border: "none",
                     borderRadius: 12,
@@ -470,8 +479,8 @@ function CheckoutPageInner() {
                     minWidth: isMobile ? "auto" : 220,
                     transition: "background 0.15s",
                   }}
-                  onMouseEnter={(e) => { if (!isPaying) e.currentTarget.style.background = "#1D4ED8"; }}
-                  onMouseLeave={(e) => { if (!isPaying) e.currentTarget.style.background = "#2563EB"; }}
+                  onMouseEnter={(e) => { if (!isPaying) e.currentTarget.style.background = "#0E2E5C"; }}
+                  onMouseLeave={(e) => { if (!isPaying) e.currentTarget.style.background = "#0B2545"; }}
                 >
                   {isPaying ? "Обрабатываем…" : `Оплатить ${formatPrice(Number(draft.price_snapshot), draft.currency_snapshot)}`}
                 </button>
@@ -484,7 +493,7 @@ function CheckoutPageInner() {
 
             {/* Bank details */}
             <div style={{ ...card, padding: "24px 28px" }}>
-              <div style={{ font: "700 11px/1 Inter Variable, sans-serif", color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 20 }}>
+              <div style={{ font: "700 11px/1 Inter Variable, sans-serif", color: "#5F6E7E", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 20 }}>
                 Реквизиты для оплаты
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
@@ -496,8 +505,8 @@ function CheckoutPageInner() {
                 <ReqRow label="Назначение платежа" value={paymentData.bank_details.purpose} copy />
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16, paddingTop: 16, borderTop: "1px solid #F1F5F9" }}>
-                <span style={{ font: "400 13px/1 Inter Variable, sans-serif", color: "#6B7280" }}>Итого к оплате</span>
-                <span style={{ font: "800 24px/1 Inter Variable, sans-serif", color: "#111827" }}>
+                <span style={{ font: "400 13px/1 Inter Variable, sans-serif", color: "#5F6E7E" }}>Итого к оплате</span>
+                <span style={{ font: "800 24px/1 'Space Grotesk Variable', 'Inter Variable', sans-serif", color: "#0E1826" }}>
                   {paymentData.bank_details.amount} {paymentData.bank_details.currency}
                 </span>
               </div>
@@ -506,10 +515,10 @@ function CheckoutPageInner() {
             {/* Upload proof */}
             {status !== "paid" && status !== "dispatch_queued" && (
               <div style={{ ...card, padding: "24px 28px" }}>
-                <div style={{ font: "700 11px/1 Inter Variable, sans-serif", color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 20 }}>
+                <div style={{ font: "700 11px/1 Inter Variable, sans-serif", color: "#5F6E7E", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 20 }}>
                   Подтверждение оплаты
                 </div>
-                <ol style={{ font: "400 13px/1.8 Inter Variable, sans-serif", color: "#6B7280", paddingLeft: 18, margin: "0 0 16px" }}>
+                <ol style={{ font: "400 13px/1.8 Inter Variable, sans-serif", color: "#5F6E7E", paddingLeft: 18, margin: "0 0 16px" }}>
                   <li>Переведите точную сумму по реквизитам выше.</li>
                   <li>В назначении платежа укажите номер заказа.</li>
                   <li>Сохраните скриншот или PDF-квитанцию из банка.</li>
@@ -611,7 +620,7 @@ function CheckoutPageInner() {
                     type="submit"
                     disabled={uploading || !selectedFile}
                     style={{
-                      background: uploading ? "#93C5FD" : !selectedFile ? "#E5E7EB" : "#2563EB",
+                      background: uploading ? "#94A6C0" : !selectedFile ? "#E2E8EE" : "#0B2545",
                       color: !selectedFile && !uploading ? "#9CA3AF" : "#fff",
                       padding: "13px 24px",
                       border: "none",
@@ -622,8 +631,8 @@ function CheckoutPageInner() {
                       transition: "background 0.15s",
                       marginTop: 4,
                     }}
-                    onMouseEnter={(e) => { if (!uploading && selectedFile) e.currentTarget.style.background = "#1D4ED8"; }}
-                    onMouseLeave={(e) => { if (!uploading && selectedFile) e.currentTarget.style.background = "#2563EB"; }}
+                    onMouseEnter={(e) => { if (!uploading && selectedFile) e.currentTarget.style.background = "#0E2E5C"; }}
+                    onMouseLeave={(e) => { if (!uploading && selectedFile) e.currentTarget.style.background = "#0B2545"; }}
                   >
                     {uploading ? "Загрузка..." : "Я оплатил - загрузить чек"}
                   </button>

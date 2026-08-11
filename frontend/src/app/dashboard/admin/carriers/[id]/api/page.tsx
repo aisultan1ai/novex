@@ -44,7 +44,7 @@ function getCarrierDefaults(code: string) {
 }
 
 const inp: React.CSSProperties = {
-  border: "1px solid #e5e7eb",
+  border: "1px solid #E2E8EE",
   borderRadius: 8,
   padding: "8px 12px",
   fontSize: 13,
@@ -53,7 +53,7 @@ const inp: React.CSSProperties = {
   fontFamily: "inherit",
   outline: "none",
   background: "#f8fafc",
-  color: "#0f172a",
+  color: "#0B2545",
 };
 
 const label: React.CSSProperties = {
@@ -201,8 +201,8 @@ export default function CarrierAPIPage() {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 20, alignItems: "start" }}>
         {/* Main form */}
-        <form onSubmit={handleSave} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: "24px 28px" }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 20 }}>
+        <form onSubmit={handleSave} style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 16, padding: "24px 28px" }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#0B2545", marginBottom: 20 }}>
             {creds ? "Обновить учётные данные" : "Настроить API-интеграцию"}
           </div>
 
@@ -258,7 +258,7 @@ export default function CarrierAPIPage() {
               onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))}
               style={{ width: 16, height: 16, cursor: "pointer" }}
             />
-            <label htmlFor="is_active" style={{ fontSize: 13, color: "#0f172a", cursor: "pointer", fontWeight: 500 }}>
+            <label htmlFor="is_active" style={{ fontSize: 13, color: "#0B2545", cursor: "pointer", fontWeight: 500 }}>
               API-интеграция активна (если выключено - используется webhook)
             </label>
           </div>
@@ -273,7 +273,7 @@ export default function CarrierAPIPage() {
             <button
               type="submit"
               disabled={saving}
-              style={{ padding: "10px 24px", borderRadius: 10, border: "none", background: "#0f172a", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+              style={{ padding: "10px 24px", borderRadius: 10, border: "none", background: "#0B2545", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
             >
               {saving ? "Сохраняем…" : creds ? "Обновить" : "Сохранить"}
             </button>
@@ -293,15 +293,15 @@ export default function CarrierAPIPage() {
         {/* Right panel: test + info */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {/* Test connection */}
-          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: "20px 22px" }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 12 }}>Проверка подключения</div>
+          <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 16, padding: "20px 22px" }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#0B2545", marginBottom: 12 }}>Проверка подключения</div>
             <p style={{ fontSize: 13, color: "#64748b", marginTop: 0, marginBottom: 14 }}>
               Отправит тестовый запрос к API перевозчика с сохранёнными учётными данными.
             </p>
             <button
               onClick={() => void handleTest()}
               disabled={testing || !creds}
-              style={{ width: "100%", padding: "10px", borderRadius: 10, border: "1px solid #e5e7eb", background: creds ? "#f8fafc" : "#f1f5f9", color: creds ? "#0f172a" : "#94a3b8", fontSize: 13, fontWeight: 600, cursor: creds ? "pointer" : "not-allowed", fontFamily: "inherit" }}
+              style={{ width: "100%", padding: "10px", borderRadius: 10, border: "1px solid #E2E8EE", background: creds ? "#f8fafc" : "#f1f5f9", color: creds ? "#0B2545" : "#94a3b8", fontSize: 13, fontWeight: 600, cursor: creds ? "pointer" : "not-allowed", fontFamily: "inherit" }}
             >
               {testing ? "Проверяем…" : "Проверить подключение"}
             </button>
@@ -313,8 +313,8 @@ export default function CarrierAPIPage() {
           </div>
 
           {/* How it works */}
-          <div style={{ background: "#f8fafc", border: "1px solid #e5e7eb", borderRadius: 16, padding: "18px 20px" }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>Как работает диспетчеризация</div>
+          <div style={{ background: "#f8fafc", border: "1px solid #E2E8EE", borderRadius: 16, padding: "18px 20px" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#0B2545", marginBottom: 10 }}>Как работает диспетчеризация</div>
             <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "#475569", lineHeight: 1.7 }}>
               <li>При оплате заказа создаётся DispatchJob</li>
               <li>Если для перевозчика настроен и активен API - вызывается API напрямую</li>
@@ -326,11 +326,11 @@ export default function CarrierAPIPage() {
 
           {/* Current status */}
           {creds && (
-            <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: "18px 20px" }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>Текущая конфигурация</div>
+            <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 16, padding: "18px 20px" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#0B2545", marginBottom: 10 }}>Текущая конфигурация</div>
               <div style={{ fontSize: 12, color: "#64748b", display: "grid", gap: 6 }}>
-                <div><span style={{ color: "#94a3b8" }}>URL:</span> <span style={{ fontFamily: "monospace", color: "#0f172a" }}>{creds.api_url}</span></div>
-                <div><span style={{ color: "#94a3b8" }}>Токен:</span> <span style={{ fontFamily: "monospace", color: "#0f172a" }}>{creds.api_token_masked}</span></div>
+                <div><span style={{ color: "#94a3b8" }}>URL:</span> <span style={{ fontFamily: "monospace", color: "#0B2545" }}>{creds.api_url}</span></div>
+                <div><span style={{ color: "#94a3b8" }}>Токен:</span> <span style={{ fontFamily: "monospace", color: "#0B2545" }}>{creds.api_token_masked}</span></div>
                 <div><span style={{ color: "#94a3b8" }}>Обновлён:</span> {new Date(creds.updated_at).toLocaleString("ru-RU")}</div>
               </div>
             </div>

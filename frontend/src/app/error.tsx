@@ -30,7 +30,7 @@ export default function GlobalError({
         maxWidth: 480,
         width: "100%",
         background: "#FFFFFF",
-        border: "1px solid #E5E7EB",
+        border: "1px solid #E2E8EE",
         borderRadius: 16,
         padding: "32px 32px 28px",
         boxShadow: "0 4px 12px rgba(15,23,42,0.06)",
@@ -50,14 +50,14 @@ export default function GlobalError({
         <h1 style={{
           margin: "0 0 8px",
           fontSize: 20, fontWeight: 700,
-          color: "#111827",
+          color: "#0E1826",
         }}>
           Что-то пошло не так
         </h1>
         <p style={{
           margin: "0 0 24px",
           fontSize: 14, lineHeight: 1.55,
-          color: "#6B7280",
+          color: "#5F6E7E",
         }}>
           Произошла непредвиденная ошибка на странице. Попробуйте обновить или вернуться на главную.
           Если ошибка повторяется, напишите в поддержку.
@@ -67,11 +67,11 @@ export default function GlobalError({
             margin: "0 0 20px",
             padding: "8px 12px",
             background: "#F9FAFB",
-            border: "1px solid #E5E7EB",
+            border: "1px solid #E2E8EE",
             borderRadius: 8,
             fontSize: 11,
             fontFamily: "monospace",
-            color: "#6B7280",
+            color: "#5F6E7E",
             wordBreak: "break-all",
           }}>
             ID: {error.digest}
@@ -82,7 +82,7 @@ export default function GlobalError({
             onClick={reset}
             style={{
               padding: "10px 20px", borderRadius: 10,
-              border: "none", background: "#2563EB", color: "#FFFFFF",
+              border: "none", background: "#0B2545", color: "#FFFFFF",
               fontSize: 14, fontWeight: 600, cursor: "pointer",
               fontFamily: "inherit",
             }}
@@ -93,7 +93,7 @@ export default function GlobalError({
             href="/"
             style={{
               padding: "10px 20px", borderRadius: 10,
-              border: "1px solid #E5E7EB", background: "#FFFFFF", color: "#374151",
+              border: "1px solid #E2E8EE", background: "#FFFFFF", color: "#374151",
               fontSize: 14, fontWeight: 600, textDecoration: "none",
               display: "inline-flex", alignItems: "center",
             }}

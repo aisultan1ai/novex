@@ -42,12 +42,12 @@ export default function AdminSubLayout({ children }: { children: ReactNode }) {
   if (isMobile) {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh", padding: "40px 24px", textAlign: "center" }}>
-        <div style={{ width: 56, height: 56, borderRadius: 14, background: "#0f172a", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
+        <div style={{ width: 56, height: 56, borderRadius: 14, background: "#0B2545", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" />
           </svg>
         </div>
-        <h2 style={{ margin: "0 0 10px", font: "700 20px/1.3 Inter Variable, sans-serif", color: "#0f172a" }}>
+        <h2 style={{ margin: "0 0 10px", font: "700 20px/1.3 Inter Variable, sans-serif", color: "#0B2545" }}>
           Только для компьютера
         </h2>
         <p style={{ margin: 0, font: "400 14px/1.6 Inter Variable, sans-serif", color: "#64748b", maxWidth: 280 }}>
@@ -62,13 +62,13 @@ export default function AdminSubLayout({ children }: { children: ReactNode }) {
       {/* Admin header */}
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: "#0f172a", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: "#0B2545", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
             </svg>
           </div>
           <div>
-            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0f172a" }}>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0B2545" }}>
               {isAdmin ? "Администрирование" : "Панель оператора"}
             </h1>
             <p style={{ margin: 0, fontSize: 13, color: "#64748b" }}>
@@ -78,7 +78,7 @@ export default function AdminSubLayout({ children }: { children: ReactNode }) {
         </div>
 
         {/* Sub-nav pills */}
-        <div style={{ display: "flex", gap: 6, background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 4, width: "fit-content", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 6, background: "#ffffff", border: "1px solid #E2E8EE", borderRadius: 12, padding: 4, width: "fit-content", flexWrap: "wrap" }}>
           {tabs.map(({ label, href }) => {
             const active = href === "/dashboard/admin"
               ? pathname === "/dashboard/admin"
@@ -93,7 +93,7 @@ export default function AdminSubLayout({ children }: { children: ReactNode }) {
                   fontSize: 13,
                   fontWeight: active ? 600 : 500,
                   textDecoration: "none",
-                  background: active ? "#0f172a" : "transparent",
+                  background: active ? "#0B2545" : "transparent",
                   color: active ? "#ffffff" : "#64748b",
                   transition: "all 0.15s",
                   whiteSpace: "nowrap",

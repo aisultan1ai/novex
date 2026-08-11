@@ -13,6 +13,7 @@ import {
   type CommissionType,
 } from "@/lib/api/commission_configs";
 import type { AdminCommission, CommissionSummary, PlatformSettings } from "@/types/admin";
+import ExportXlsxButton from "@/components/ui/ExportXlsxButton";
 
 const TYPE_LABELS: Record<CommissionType, string> = {
   percentage: "Процент",
@@ -59,11 +60,11 @@ function InfoDot({ tooltip, color = "#94a3b8" }: { tooltip: string; color?: stri
 
 function SummaryCard({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) {
   return (
-    <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 14, padding: "20px 24px", flex: 1 }}>
+    <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 14, padding: "20px 24px", flex: 1 }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
         {label}
       </div>
-      <div style={{ fontSize: 28, fontWeight: 800, color: color ?? "#0f172a", lineHeight: 1 }}>{value}</div>
+      <div style={{ fontSize: 28, fontWeight: 800, color: color ?? "#0B2545", lineHeight: 1 }}>{value}</div>
       {sub && <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 6 }}>{sub}</div>}
     </div>
   );
@@ -228,21 +229,22 @@ export default function AdminCommissionsPage() {
         ) : (
           <>
             {[0,1,2].map(i => (
-              <div key={i} style={{ flex: 1, background: "#f8fafc", border: "1px solid #e5e7eb", borderRadius: 14, padding: "20px 24px", minHeight: 80, minWidth: 220 }} />
+              <div key={i} style={{ flex: 1, background: "#f8fafc", border: "1px solid #E2E8EE", borderRadius: 14, padding: "20px 24px", minHeight: 80, minWidth: 220 }} />
             ))}
           </>
         )}
       </div>
 
-      {/* ── Settings button (below cards) ────────────────────── */}
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 28 }}>
+      {/* ── Export + Settings buttons (below cards) ─────────── */}
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginBottom: 28 }}>
+        <ExportXlsxButton endpoint="/admin/commissions/export" />
         <button
           onClick={openSettings}
           style={{
             display: "flex", alignItems: "center", gap: 8,
             padding: "9px 18px",
             borderRadius: 10,
-            border: "1px solid #e5e7eb",
+            border: "1px solid #E2E8EE",
             background: "#fff",
             color: "#475569",
             fontSize: 13,
@@ -267,8 +269,8 @@ export default function AdminCommissionsPage() {
       )}
 
       {/* ── History table ─────────────────────────────────────── */}
-      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "80px 100px 140px 160px 160px 120px", gap: 12, padding: "12px 24px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+      <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 16, overflow: "hidden" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "80px 100px 140px 160px 160px 120px", gap: 12, padding: "12px 24px", background: "#f8fafc", borderBottom: "1px solid #E2E8EE", fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
           <span>ID</span><span>Заказ</span><span>Перевозчик</span><span>Сумма заказа</span><span>Комиссия</span><span>Дата</span>
         </div>
 
@@ -304,7 +306,7 @@ export default function AdminCommissionsPage() {
                     <InfoDot color={isReversal ? "#dc2626" : "#94a3b8"} tooltip={iconTooltip} />
                   )}
                 </span>
-                <span style={{ fontSize: 13, color: "#0f172a", fontWeight: 500, textDecoration: isReversed ? "line-through" : "none", opacity: isReversed ? 0.6 : 1 }}>{c.carrier_code}</span>
+                <span style={{ fontSize: 13, color: "#0B2545", fontWeight: 500, textDecoration: isReversed ? "line-through" : "none", opacity: isReversed ? 0.6 : 1 }}>{c.carrier_code}</span>
                 <span style={{ fontSize: 13, color: grossColor, fontWeight: isReversal ? 600 : 400, textDecoration: isReversed ? "line-through" : "none", opacity: isReversed ? 0.6 : 1 }}>
                   {formatPrice(c.gross_amount, c.currency)}
                 </span>
@@ -325,12 +327,12 @@ export default function AdminCommissionsPage() {
         <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 20 }}>
           <button
             onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
-            style={{ padding: "7px 16px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", color: "#475569", fontSize: 13, fontWeight: 500, cursor: page === 1 ? "not-allowed" : "pointer", opacity: page === 1 ? 0.4 : 1, fontFamily: "inherit" }}
+            style={{ padding: "7px 16px", borderRadius: 8, border: "1px solid #E2E8EE", background: "#fff", color: "#475569", fontSize: 13, fontWeight: 500, cursor: page === 1 ? "not-allowed" : "pointer", opacity: page === 1 ? 0.4 : 1, fontFamily: "inherit" }}
           >← Назад</button>
           <span style={{ padding: "7px 16px", fontSize: 13, color: "#64748b" }}>{page} / {historyPages}</span>
           <button
             onClick={() => setPage((p) => Math.min(historyPages, p + 1))} disabled={page === historyPages}
-            style={{ padding: "7px 16px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", color: "#475569", fontSize: 13, fontWeight: 500, cursor: page === historyPages ? "not-allowed" : "pointer", opacity: page === historyPages ? 0.4 : 1, fontFamily: "inherit" }}
+            style={{ padding: "7px 16px", borderRadius: 8, border: "1px solid #E2E8EE", background: "#fff", color: "#475569", fontSize: 13, fontWeight: 500, cursor: page === historyPages ? "not-allowed" : "pointer", opacity: page === historyPages ? 0.4 : 1, fontFamily: "inherit" }}
           >Вперёд →</button>
         </div>
       )}
@@ -345,24 +347,24 @@ export default function AdminCommissionsPage() {
             {/* Drawer header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "24px 28px", borderBottom: "1px solid #f1f5f9", flexShrink: 0 }}>
               <div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: "#0f172a" }}>Настройки комиссий</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: "#0B2545" }}>Настройки комиссий</div>
                 <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>Ставки и конфигурации перевозчиков</div>
               </div>
               <button
                 onClick={() => setShowSettings(false)}
-                style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", fontSize: 18, fontFamily: "inherit" }}
+                style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #E2E8EE", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", fontSize: 18, fontFamily: "inherit" }}
               >×</button>
             </div>
 
             <div style={{ padding: "24px 28px", flex: 1 }}>
               {/* Global rate accordion */}
-              <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, marginBottom: 16, overflow: "hidden" }}>
+              <div style={{ border: "1px solid #E2E8EE", borderRadius: 12, marginBottom: 16, overflow: "hidden" }}>
                 <button
                   onClick={() => setGlobalOpen((v) => !v)}
                   style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", background: globalOpen ? "#f8fafc" : "#fff", border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
                 >
                   <div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>Глобальная ставка</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#0B2545" }}>Глобальная ставка</div>
                     {!globalOpen && settings && (
                       <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>
                         Текущая: {(Number(settings.commission_rate) * 100).toFixed(2)}%
@@ -384,12 +386,12 @@ export default function AdminCommissionsPage() {
                     </div>
                     <form onSubmit={(e) => void handleSaveRate(e)} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
                       <div style={{ flex: 1 }}>
-                        <div style={{ display: "flex", alignItems: "center", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", background: "#f8fafc" }}>
+                        <div style={{ display: "flex", alignItems: "center", border: "1px solid #E2E8EE", borderRadius: 10, overflow: "hidden", background: "#f8fafc" }}>
                           <input
                             type="number" min="0" max="100" step="0.01"
                             value={rateInput}
                             onChange={(e) => { setRateInput(e.target.value); setRateError(null); setRateSaved(false); }}
-                            style={{ flex: 1, border: "none", background: "transparent", padding: "10px 12px", fontSize: 16, fontWeight: 700, color: "#0f172a", outline: "none", fontFamily: "inherit" }}
+                            style={{ flex: 1, border: "none", background: "transparent", padding: "10px 12px", fontSize: 16, fontWeight: 700, color: "#0B2545", outline: "none", fontFamily: "inherit" }}
                           />
                           <span style={{ padding: "10px 14px 10px 0", fontSize: 16, fontWeight: 700, color: "#64748b" }}>%</span>
                         </div>
@@ -398,7 +400,7 @@ export default function AdminCommissionsPage() {
                       </div>
                       <button
                         type="submit" disabled={savingRate}
-                        style={{ padding: "10px 18px", borderRadius: 10, border: "none", background: "#0f172a", color: "#fff", fontSize: 13, fontWeight: 600, cursor: savingRate ? "not-allowed" : "pointer", opacity: savingRate ? 0.6 : 1, fontFamily: "inherit" }}
+                        style={{ padding: "10px 18px", borderRadius: 10, border: "none", background: "#0B2545", color: "#fff", fontSize: 13, fontWeight: 600, cursor: savingRate ? "not-allowed" : "pointer", opacity: savingRate ? 0.6 : 1, fontFamily: "inherit" }}
                       >{savingRate ? "…" : "Сохранить"}</button>
                     </form>
                   </div>
@@ -408,12 +410,12 @@ export default function AdminCommissionsPage() {
               {/* Per-carrier configs */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>Индивидуальные ставки</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#0B2545" }}>Индивидуальные ставки</div>
                   <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>Переопределяют глобальную по перевозчику</div>
                 </div>
                 <button
                   onClick={openNew}
-                  style={{ padding: "7px 14px", borderRadius: 9, border: "none", background: "#0f172a", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                  style={{ padding: "7px 14px", borderRadius: 9, border: "none", background: "#0B2545", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
                 >+ Добавить</button>
               </div>
 
@@ -434,10 +436,10 @@ export default function AdminCommissionsPage() {
                   {configs.map((cfg) => (
                     <div
                       key={cfg.id}
-                      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "#f8fafc", borderRadius: 12, border: "1px solid #e5e7eb" }}
+                      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "#f8fafc", borderRadius: 12, border: "1px solid #E2E8EE" }}
                     >
                       <div>
-                        <span style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", fontFamily: "monospace" }}>{cfg.carrier_code}</span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: "#0B2545", fontFamily: "monospace" }}>{cfg.carrier_code}</span>
                         <span style={{ fontSize: 12, color: "#64748b", marginLeft: 10 }}>{TYPE_LABELS[cfg.commission_type]}</span>
                         <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 3 }}>
                           {cfg.commission_rate != null && `${(Number(cfg.commission_rate) * 100).toFixed(2)}%`}
@@ -448,7 +450,7 @@ export default function AdminCommissionsPage() {
                       <div style={{ display: "flex", gap: 6 }}>
                         <button
                           onClick={() => openEdit(cfg)}
-                          style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", color: "#0f172a", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                          style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid #E2E8EE", background: "#fff", color: "#0B2545", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
                         >Изм.</button>
                         <button
                           onClick={() => void handleDeleteConfig(cfg.carrier_code)}
@@ -469,7 +471,7 @@ export default function AdminCommissionsPage() {
       {editingCode !== null && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div style={{ background: "#fff", borderRadius: 18, padding: "32px 36px", width: 400, boxShadow: "0 20px 60px rgba(0,0,0,0.18)" }}>
-            <h2 style={{ margin: "0 0 22px", fontSize: 18, fontWeight: 800, color: "#0f172a" }}>
+            <h2 style={{ margin: "0 0 22px", fontSize: 18, fontWeight: 800, color: "#0B2545" }}>
               {isNew ? "Новая ставка" : `Редактировать: ${editingCode}`}
             </h2>
 
@@ -512,7 +514,7 @@ export default function AdminCommissionsPage() {
                     type="number" min="0" max="100" step="0.01"
                     value={form.commission_rate ?? ""}
                     onChange={(e) => setForm((f) => ({ ...f, commission_rate: e.target.value === "" ? null : parseFloat(e.target.value) }))}
-                    style={{ flex: 1, border: "none", background: "transparent", padding: "10px 14px", fontSize: 14, fontWeight: 700, color: "#0f172a", outline: "none", fontFamily: "inherit" }}
+                    style={{ flex: 1, border: "none", background: "transparent", padding: "10px 14px", fontSize: 14, fontWeight: 700, color: "#0B2545", outline: "none", fontFamily: "inherit" }}
                   />
                   <span style={{ padding: "10px 14px 10px 0", fontSize: 14, fontWeight: 700, color: "#64748b" }}>%</span>
                 </div>
@@ -529,7 +531,7 @@ export default function AdminCommissionsPage() {
                     type="number" min="0" step="0.01"
                     value={form.fixed_amount ?? ""}
                     onChange={(e) => setForm((f) => ({ ...f, fixed_amount: e.target.value === "" ? null : parseFloat(e.target.value) }))}
-                    style={{ flex: 1, border: "none", background: "transparent", padding: "10px 14px", fontSize: 14, fontWeight: 700, color: "#0f172a", outline: "none", fontFamily: "inherit" }}
+                    style={{ flex: 1, border: "none", background: "transparent", padding: "10px 14px", fontSize: 14, fontWeight: 700, color: "#0B2545", outline: "none", fontFamily: "inherit" }}
                   />
                   <span style={{ padding: "10px 14px 10px 0", fontSize: 14, fontWeight: 600, color: "#64748b" }}>{form.currency}</span>
                 </div>
@@ -553,11 +555,11 @@ export default function AdminCommissionsPage() {
             <div style={{ display: "flex", gap: 10 }}>
               <button
                 onClick={() => void handleSaveConfig()} disabled={saving}
-                style={{ flex: 1, padding: 11, borderRadius: 10, border: "none", background: "#0f172a", color: "#fff", fontSize: 14, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1, fontFamily: "inherit" }}
+                style={{ flex: 1, padding: 11, borderRadius: 10, border: "none", background: "#0B2545", color: "#fff", fontSize: 14, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1, fontFamily: "inherit" }}
               >{saving ? "Сохраняем..." : "Сохранить"}</button>
               <button
                 onClick={() => setEditingCode(null)}
-                style={{ padding: "11px 20px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", color: "#475569", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+                style={{ padding: "11px 20px", borderRadius: 10, border: "1px solid #E2E8EE", background: "#fff", color: "#475569", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
               >Отмена</button>
             </div>
           </div>

@@ -36,7 +36,7 @@ function getInitials(fullName: string | null, email: string): string {
 }
 
 const inp: React.CSSProperties = {
-  border: "1px solid #e5e7eb",
+  border: "1px solid #E2E8EE",
   borderRadius: 10,
   padding: "11px 14px",
   fontSize: 14,
@@ -45,7 +45,7 @@ const inp: React.CSSProperties = {
   boxSizing: "border-box",
   outline: "none",
   fontFamily: "inherit",
-  color: "#111827",
+  color: "#0E1826",
   transition: "border-color 0.15s, background 0.15s",
 };
 
@@ -181,14 +181,14 @@ export default function ProfilePage() {
   return (
     <>
       <div style={{ marginBottom: isMobile ? 20 : 28 }}>
-        <h1 style={{ margin: 0, fontSize: isMobile ? 22 : 28, fontWeight: 800, color: "#111827" }}>Профиль</h1>
+        <h1 style={{ margin: 0, fontSize: isMobile ? 22 : 28, fontWeight: 800, color: "#0E1826" }}>Профиль</h1>
         <p style={{ margin: "4px 0 0", fontSize: isMobile ? 13 : 14, color: "#64748b" }}>
           Ваши данные и настройки аккаунта
         </p>
       </div>
 
       {isFetching && !dp ? (
-        <div style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, padding: 32, textAlign: "center", color: "#64748b", fontSize: 14 }}>
+        <div style={{ background: "#ffffff", border: "1px solid #E2E8EE", borderRadius: 16, padding: 32, textAlign: "center", color: "#64748b", fontSize: 14 }}>
           Загружаем профиль…
         </div>
       ) : (
@@ -201,14 +201,14 @@ export default function ProfilePage() {
         }}>
 
           {/* ── Main profile card ──────────────────────────────── */}
-          <div style={{ flex: 1, minWidth: 0, background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, padding: isMobile ? 20 : 32 }}>
+          <div style={{ flex: 1, minWidth: 0, background: "#ffffff", border: "1px solid #E2E8EE", borderRadius: 16, padding: isMobile ? 20 : 32 }}>
             {/* Avatar + name */}
             <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 14 : 20, marginBottom: isMobile ? 20 : 32 }}>
               <div style={{
                 width: isMobile ? 56 : 72,
                 height: isMobile ? 56 : 72,
                 borderRadius: "50%",
-                background: "#111827",
+                background: "#0E1826",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: isMobile ? 22 : 28, fontWeight: 800, color: "#ffffff",
                 flexShrink: 0,
@@ -217,7 +217,7 @@ export default function ProfilePage() {
               </div>
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{
-                  fontSize: isMobile ? 17 : 22, fontWeight: 700, color: "#111827",
+                  fontSize: isMobile ? 17 : 22, fontWeight: 700, color: "#0E1826",
                   marginBottom: 4,
                   overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                 }}>
@@ -227,7 +227,7 @@ export default function ProfilePage() {
                   <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 11, fontWeight: 600, background: "#ede9fe", color: "#5b21b6" }}>
                     {ROLE_LABELS[dp?.role ?? ""] ?? dp?.role}
                   </span>
-                  <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 11, fontWeight: 600, background: "#dbeafe", color: "#1e40af" }}>
+                  <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 11, fontWeight: 600, background: "#E6EEF7", color: "#1e40af" }}>
                     {CUSTOMER_TYPE_LABELS[dp?.customer_type ?? ""] ?? dp?.customer_type}
                   </span>
                   <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 11, fontWeight: 600, background: dp?.is_active ? "#dcfce7" : "#fee2e2", color: dp?.is_active ? "#166534" : "#991b1b" }}>
@@ -244,7 +244,7 @@ export default function ProfilePage() {
 
             <hr style={{ border: "none", borderTop: "1px solid #f1f5f9", margin: "0 0 20px" }} />
 
-            <h2 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#111827" }}>
+            <h2 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#0E1826" }}>
               Редактировать данные
             </h2>
 
@@ -265,8 +265,8 @@ export default function ProfilePage() {
                     style={inp} value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="+7 700 000 0000" inputMode="tel"
-                    onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.background = "#ffffff"; }}
-                    onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
+                    onFocus={(e) => { e.currentTarget.style.borderColor = "#0E1826"; e.currentTarget.style.background = "#ffffff"; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = "#E2E8EE"; e.currentTarget.style.background = "#f8fafc"; }}
                   />
                 </div>
                 <div>
@@ -275,8 +275,8 @@ export default function ProfilePage() {
                     style={inp} value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="Иван Иванов"
-                    onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.background = "#ffffff"; }}
-                    onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
+                    onFocus={(e) => { e.currentTarget.style.borderColor = "#0E1826"; e.currentTarget.style.background = "#ffffff"; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = "#E2E8EE"; e.currentTarget.style.background = "#f8fafc"; }}
                   />
                 </div>
                 <div>
@@ -285,8 +285,8 @@ export default function ProfilePage() {
                     style={inp} value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
                     placeholder="ТОО «Компания»"
-                    onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.background = "#ffffff"; }}
-                    onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
+                    onFocus={(e) => { e.currentTarget.style.borderColor = "#0E1826"; e.currentTarget.style.background = "#ffffff"; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = "#E2E8EE"; e.currentTarget.style.background = "#f8fafc"; }}
                   />
                 </div>
                 <div>
@@ -296,8 +296,8 @@ export default function ProfilePage() {
                     onChange={(e) => setTaxId(e.target.value.replace(/\D/g, "").slice(0, 12))}
                     placeholder="12 цифр"
                     inputMode="numeric"
-                    onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.background = "#ffffff"; }}
-                    onBlur={(e) => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f8fafc"; }}
+                    onFocus={(e) => { e.currentTarget.style.borderColor = "#0E1826"; e.currentTarget.style.background = "#ffffff"; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = "#E2E8EE"; e.currentTarget.style.background = "#f8fafc"; }}
                   />
                 </div>
               </div>
@@ -305,7 +305,7 @@ export default function ProfilePage() {
               <button
                 type="submit" disabled={isSaving}
                 style={{
-                  background: "#111827", color: "#ffffff", border: "none",
+                  background: "#0E1826", color: "#ffffff", border: "none",
                   borderRadius: 10,
                   padding: isMobile ? "12px 24px" : "12px 32px",
                   fontWeight: 600, fontSize: 15,
@@ -334,7 +334,7 @@ export default function ProfilePage() {
           <div style={{
             width: isMobile ? "100%" : 240,
             flexShrink: 0,
-            background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16,
+            background: "#ffffff", border: "1px solid #E2E8EE", borderRadius: 16,
             padding: isMobile ? 20 : 24,
             display: "flex",
             flexDirection: isMobile ? "row" : "column",
@@ -350,7 +350,7 @@ export default function ProfilePage() {
               </svg>
             </div>
             <div style={{ flex: isMobile ? 1 : "none", minWidth: 0 }}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", marginBottom: 4 }}>Сменить пароль</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#0E1826", marginBottom: 4 }}>Сменить пароль</div>
               <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.5 }}>
                 Рекомендуем использовать надёжный пароль
               </div>
@@ -360,8 +360,8 @@ export default function ProfilePage() {
               style={{
                 width: isMobile ? "auto" : "100%",
                 padding: isMobile ? "10px 16px" : "11px 0",
-                borderRadius: 10, border: "1px solid #e5e7eb",
-                background: "#fff", color: "#111827", fontSize: 14, fontWeight: 600,
+                borderRadius: 10, border: "1px solid #E2E8EE",
+                background: "#fff", color: "#0E1826", fontSize: 14, fontWeight: 600,
                 cursor: "pointer", fontFamily: "inherit", transition: "background 0.15s",
                 whiteSpace: "nowrap", flexShrink: 0,
               }}
@@ -399,12 +399,12 @@ export default function ProfilePage() {
           }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 26 }}>
               <div>
-                <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#111827" }}>Сменить пароль</h2>
+                <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#0E1826" }}>Сменить пароль</h2>
                 <p style={{ margin: "4px 0 0", fontSize: 13, color: "#94a3b8" }}>Минимум 8 символов</p>
               </div>
               <button
                 onClick={() => setShowPwModal(false)}
-                style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", fontSize: 18, fontFamily: "inherit" }}
+                style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #E2E8EE", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", fontSize: 18, fontFamily: "inherit" }}
               >×</button>
             </div>
 
@@ -415,20 +415,20 @@ export default function ProfilePage() {
                     <polyline points="20 6 9 17 4 12"/>
                   </svg>
                 </div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: "#111827" }}>Пароль изменён</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#0E1826" }}>Пароль изменён</div>
               </div>
             ) : (
               <form onSubmit={(e) => void handleChangePassword(e)}>
                 {/* Current password */}
                 <div style={{ marginBottom: 16 }}>
                   <label style={lbl}>Текущий пароль</label>
-                  <div style={{ display: "flex", alignItems: "center", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", background: "#f8fafc" }}>
+                  <div style={{ display: "flex", alignItems: "center", border: "1px solid #E2E8EE", borderRadius: 10, overflow: "hidden", background: "#f8fafc" }}>
                     <input
                       type={showCurrent ? "text" : "password"}
                       value={currentPassword}
                       onChange={(e) => setCurrentPassword(e.target.value)}
                       placeholder="••••••••" required
-                      style={{ flex: 1, border: "none", background: "transparent", padding: "11px 14px", fontSize: 14, outline: "none", fontFamily: "inherit", color: "#111827" }}
+                      style={{ flex: 1, border: "none", background: "transparent", padding: "11px 14px", fontSize: 14, outline: "none", fontFamily: "inherit", color: "#0E1826" }}
                     />
                     <button type="button" onClick={() => setShowCurrent(v => !v)}
                       style={{ padding: "0 14px", background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 12, fontFamily: "inherit" }}>
@@ -440,13 +440,13 @@ export default function ProfilePage() {
                 {/* New password */}
                 <div style={{ marginBottom: 16 }}>
                   <label style={lbl}>Новый пароль</label>
-                  <div style={{ display: "flex", alignItems: "center", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", background: "#f8fafc" }}>
+                  <div style={{ display: "flex", alignItems: "center", border: "1px solid #E2E8EE", borderRadius: 10, overflow: "hidden", background: "#f8fafc" }}>
                     <input
                       type={showNew ? "text" : "password"}
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="Минимум 8 символов" required
-                      style={{ flex: 1, border: "none", background: "transparent", padding: "11px 14px", fontSize: 14, outline: "none", fontFamily: "inherit", color: "#111827" }}
+                      style={{ flex: 1, border: "none", background: "transparent", padding: "11px 14px", fontSize: 14, outline: "none", fontFamily: "inherit", color: "#0E1826" }}
                     />
                     <button type="button" onClick={() => setShowNew(v => !v)}
                       style={{ padding: "0 14px", background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 12, fontFamily: "inherit" }}>
@@ -463,7 +463,7 @@ export default function ProfilePage() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="••••••••" required
-                    style={{ ...inp, background: confirmPassword && confirmPassword !== newPassword ? "#fef2f2" : "#f8fafc", borderColor: confirmPassword && confirmPassword !== newPassword ? "#fecaca" : "#e5e7eb" }}
+                    style={{ ...inp, background: confirmPassword && confirmPassword !== newPassword ? "#fef2f2" : "#f8fafc", borderColor: confirmPassword && confirmPassword !== newPassword ? "#fecaca" : "#E2E8EE" }}
                   />
                   {confirmPassword && confirmPassword !== newPassword && (
                     <div style={{ fontSize: 12, color: "#dc2626", marginTop: 4 }}>Пароли не совпадают</div>
@@ -479,13 +479,13 @@ export default function ProfilePage() {
                 <div style={{ display: "flex", gap: 10 }}>
                   <button
                     type="submit" disabled={pwSaving}
-                    style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", background: "#111827", color: "#fff", fontSize: 14, fontWeight: 600, cursor: pwSaving ? "not-allowed" : "pointer", opacity: pwSaving ? 0.6 : 1, fontFamily: "inherit" }}
+                    style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", background: "#0E1826", color: "#fff", fontSize: 14, fontWeight: 600, cursor: pwSaving ? "not-allowed" : "pointer", opacity: pwSaving ? 0.6 : 1, fontFamily: "inherit" }}
                   >
                     {pwSaving ? "Сохраняем…" : "Изменить пароль"}
                   </button>
                   <button
                     type="button" onClick={() => setShowPwModal(false)}
-                    style={{ padding: "12px 20px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", color: "#475569", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+                    style={{ padding: "12px 20px", borderRadius: 10, border: "1px solid #E2E8EE", background: "#fff", color: "#475569", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
                   >
                     Отмена
                   </button>

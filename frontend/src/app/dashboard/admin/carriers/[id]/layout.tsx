@@ -35,15 +35,15 @@ export default function CarrierDetailLayout({ children }: { children: ReactNode 
       </Link>
 
       {/* Carrier header */}
-      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 14, padding: "16px 22px", display: "flex", alignItems: "center", gap: 14, minHeight: 72, marginBottom: 0 }}>
+      <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 14, padding: "16px 22px", display: "flex", alignItems: "center", gap: 14, minHeight: 72, marginBottom: 0 }}>
         {carrier ? (
           <>
-            <div style={{ width: 40, height: 40, borderRadius: 10, background: "#0f172a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 800, color: "#fff", flexShrink: 0 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: "#0B2545", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 800, color: "#fff", flexShrink: 0 }}>
               {carrier.name[0]}
             </div>
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 17, fontWeight: 800, color: "#0f172a" }}>{carrier.name}</span>
+                <span style={{ fontSize: 17, fontWeight: 800, color: "#0B2545" }}>{carrier.name}</span>
                 <span style={{ fontFamily: "monospace", fontSize: 12, color: "#94a3b8", background: "#f1f5f9", padding: "2px 8px", borderRadius: 6 }}>{carrier.code}</span>
                 <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600, background: carrier.is_active ? "#dcfce7" : "#f1f5f9", color: carrier.is_active ? "#166534" : "#94a3b8" }}>
                   {carrier.is_active ? "Активен" : "Неактивен"}
@@ -72,8 +72,8 @@ export default function CarrierDetailLayout({ children }: { children: ReactNode 
                 fontSize: 14,
                 fontWeight: active ? 700 : 500,
                 textDecoration: "none",
-                color: active ? "#0f172a" : "#64748b",
-                borderBottom: `2px solid ${active ? "#0f172a" : "transparent"}`,
+                color: active ? "#0B2545" : "#64748b",
+                borderBottom: `2px solid ${active ? "#0B2545" : "transparent"}`,
                 marginBottom: -2,
                 whiteSpace: "nowrap",
                 transition: "color 0.15s",

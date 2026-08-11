@@ -50,9 +50,9 @@ export default function CarrierTariffsPage() {
     <div style={{ display: "grid", gridTemplateColumns: "240px 1fr", gap: 20 }}>
       {/* Services list */}
       <div>
-        <div style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, overflow: "hidden" }}>
-          <div style={{ padding: "14px 16px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>Услуги</span>
+        <div style={{ background: "#ffffff", border: "1px solid #E2E8EE", borderRadius: 16, overflow: "hidden" }}>
+          <div style={{ padding: "14px 16px", borderBottom: "1px solid #E2E8EE", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#0B2545" }}>Услуги</span>
             <span style={{ fontSize: 11, color: "#94a3b8", padding: "2px 8px", borderRadius: 999, background: "#f1f5f9", fontWeight: 600 }}>
               Только чтение
             </span>
@@ -71,7 +71,7 @@ export default function CarrierTariffsPage() {
                   onClick={() => setSelectedService(svc)}
                   style={{ display: "block", width: "100%", padding: "12px 16px", textAlign: "left", border: "none", background: active ? "#f1f5f9" : "transparent", cursor: "pointer", borderBottom: "1px solid #f1f5f9", fontFamily: "inherit" }}
                 >
-                  <div style={{ fontSize: 14, fontWeight: active ? 700 : 500, color: "#0f172a" }}>{svc.name}</div>
+                  <div style={{ fontSize: 14, fontWeight: active ? 700 : 500, color: "#0B2545" }}>{svc.name}</div>
                   <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
                     {svc.code}
                     {svc.shipment_type ? ` · ${svc.shipment_type}` : ""}
@@ -91,14 +91,14 @@ export default function CarrierTariffsPage() {
       {/* Rates table */}
       <div>
         {!selectedService ? (
-          <div style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, padding: 48, textAlign: "center", color: "#94a3b8", fontSize: 14 }}>
+          <div style={{ background: "#ffffff", border: "1px solid #E2E8EE", borderRadius: 16, padding: 48, textAlign: "center", color: "#94a3b8", fontSize: 14 }}>
             Выберите услугу слева для просмотра тарифной сетки
           </div>
         ) : (
-          <div style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, overflow: "hidden" }}>
-            <div style={{ padding: "16px 20px", borderBottom: "1px solid #e5e7eb", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+          <div style={{ background: "#ffffff", border: "1px solid #E2E8EE", borderRadius: 16, overflow: "hidden" }}>
+            <div style={{ padding: "16px 20px", borderBottom: "1px solid #E2E8EE", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
               <div>
-                <span style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>{selectedService.name}</span>
+                <span style={{ fontSize: 15, fontWeight: 700, color: "#0B2545" }}>{selectedService.name}</span>
                 <span style={{ fontSize: 12, color: "#94a3b8", marginLeft: 10 }}>{rates.length} строк</span>
               </div>
               <span style={{ fontFamily: "monospace", fontSize: 12, color: "#64748b", background: "#f1f5f9", padding: "4px 10px", borderRadius: 6 }}>
@@ -114,16 +114,16 @@ export default function CarrierTariffsPage() {
               </div>
             ) : (
               <>
-                <div style={{ display: "grid", gridTemplateColumns: "60px 90px 90px 100px 110px 100px 90px 90px 90px", gap: 8, padding: "10px 20px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "60px 90px 90px 100px 110px 100px 90px 90px 90px", gap: 8, padding: "10px 20px", background: "#f8fafc", borderBottom: "1px solid #E2E8EE", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                   <span>ID</span><span>Зона</span><span>От, кг</span><span>До, кг</span><span>Базовая</span><span>Доп/ед</span><span>Ед. веса</span><span>Срок мин</span><span>Срок макс</span>
                 </div>
                 {rates.map((rate, idx) => (
                   <div key={rate.id} style={{ display: "grid", gridTemplateColumns: "60px 90px 90px 100px 110px 100px 90px 90px 90px", gap: 8, padding: "11px 20px", borderBottom: idx < rates.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center", fontSize: 13 }}>
                     <span style={{ fontFamily: "monospace", color: "#94a3b8" }}>#{rate.id}</span>
-                    <span style={{ fontWeight: 700, color: "#0f172a" }}>Зона {rate.zone}</span>
+                    <span style={{ fontWeight: 700, color: "#0B2545" }}>Зона {rate.zone}</span>
                     <span style={{ color: "#475569" }}>{rate.weight_from_kg}</span>
                     <span style={{ color: "#475569" }}>{rate.weight_to_kg ?? "∞"}</span>
-                    <span style={{ fontWeight: 600, color: "#0f172a" }}>
+                    <span style={{ fontWeight: 600, color: "#0B2545" }}>
                       {Number(rate.base_price).toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {rate.currency}
                     </span>
                     <span style={{ color: "#64748b" }}>

@@ -1,38 +1,59 @@
 @import "tailwindcss";
 @import "@fontsource-variable/inter";
+@import "@fontsource-variable/space-grotesk";
 
 /* ─── Design Tokens ──────────────────────────────────────────────────────── */
 @theme {
-  /* Font */
+  /* Fonts */
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system,
     BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: "Space Grotesk Variable", "Inter Variable", ui-sans-serif,
+    system-ui, sans-serif;
 
-  /* Brand colours */
-  --color-primary:       #2563EB;
-  --color-primary-hover: #1D4ED8;
-  --color-primary-light: #EFF6FF;
+  /* ── Brand palette (Novex) ── */
+  --color-navy:  #0B2545;   /* основной: фон, текст, заголовки, CTA */
+  --color-cyan:  #22C9E0;   /* акцент: выбор, активные элементы */
+  --color-steel: #3E6E8A;   /* второстепенный: варианты, иконки */
+  --color-cloud: #F1F5F9;   /* фон-подложка секций */
+
+  /* ── Neutrals ── */
+  --color-ink:   #0E1826;   /* основной текст */
+  --color-muted: #5F6E7E;   /* вторичный текст */
+  --color-line:  #E2E8EE;   /* границы, разделители */
+  --color-white: #FFFFFF;
+
+  /* ── Status colours ── */
+  --color-status-new:       #8FA3B2;
+  --color-status-transit:   #F5A623;
+  --color-status-delivered: #12B886;
+  --color-status-delayed:   #E24B4A;
+
+  /* ── Legacy aliases (обратная совместимость с прежними именами) ── */
+  --color-primary:       var(--color-navy);
+  --color-primary-hover: #0E2E5C;
+  --color-primary-light: var(--color-cloud);
 
   /* Surfaces */
   --color-background: #FAFAFA;
-  --color-surface:    #FFFFFF;
+  --color-surface:    var(--color-white);
 
-  /* Text */
-  --color-text:           #111827;
-  --color-text-secondary: #6B7280;
+  /* Text (алиасы) */
+  --color-text:           var(--color-ink);
+  --color-text-secondary: var(--color-muted);
   --color-text-label:     #374151;
   --color-placeholder:    #9CA3AF;
 
   /* Borders / dividers */
-  --color-border: #E5E7EB;
+  --color-border: var(--color-line);
 
-  /* Semantic */
-  --color-success:  #10B981;
-  --color-warning:  #F59E0B;
-  --color-error:    #EF4444;
+  /* Semantic (алиасы к статусным) */
+  --color-success: var(--color-status-delivered);
+  --color-warning: var(--color-status-transit);
+  --color-error:   var(--color-status-delayed);
 
-  /* Dark surface (footer, tracking board) */
-  --color-dark:            #0F172A;
-  --color-dark-border:     #1E293B;
+  /* Dark surface (footer, tracking board) — единый navy */
+  --color-dark:            var(--color-navy);
+  --color-dark-border:     #163558;
   --color-dark-secondary:  #94A3B8;
   --color-dark-muted:      #64748B;
 
@@ -55,10 +76,11 @@
 
   /* Shadows */
   --shadow-card:      0 1px 3px rgba(0,0,0,0.08);
-  --shadow-card-hover:0 4px 16px rgba(37,99,235,0.10);
-  --shadow-form:      0 10px 40px rgba(17,24,39,0.08);
-  --shadow-accent:    0 12px 40px rgba(37,99,235,0.16);
-  --shadow-auth:      0 12px 40px rgba(17,24,39,0.08);
+  --shadow-card-hover:0 4px 16px rgba(11,37,69,0.10);
+  --shadow-form:      0 10px 40px rgba(11,37,69,0.08);
+  --shadow-accent:    0 12px 40px rgba(11,37,69,0.16);
+  --shadow-auth:      0 12px 40px rgba(11,37,69,0.08);
+  --shadow-cyan-ring: 0 0 0 4px rgba(34,201,224,0.18);
 }
 
 /* ─── Base ───────────────────────────────────────────────────────────────── */
@@ -74,8 +96,16 @@ html {
 body {
   margin: 0;
   background: var(--color-background);
-  color: var(--color-text);
+  color: var(--color-ink);
   font-family: var(--font-sans);
+}
+
+/* Заголовки и брендовые/дисплейные акценты — Space Grotesk */
+h1, h2, h3,
+.font-display,
+.brand {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
 }
 
 /* ─── Animations ─────────────────────────────────────────────────────────── */
@@ -123,4 +153,14 @@ body {
   background-size: 200% 100%;
   animation: shimmer 1.4s infinite;
   border-radius: var(--radius-sm);
+}
+
+/* Уважаем системную настройку — тихо, без анимаций */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

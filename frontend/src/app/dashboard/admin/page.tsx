@@ -11,7 +11,7 @@ function StatCard({ label, value, sub, href, color }: { label: string; value: nu
     <div
       style={{
         background: "#ffffff",
-        border: "1px solid #e5e7eb",
+        border: "1px solid #E2E8EE",
         borderRadius: 16,
         padding: "24px 28px",
         cursor: href ? "pointer" : "default",
@@ -26,7 +26,7 @@ function StatCard({ label, value, sub, href, color }: { label: string; value: nu
       <div style={{ fontSize: 13, fontWeight: 600, color: "#64748b", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.04em" }}>
         {label}
       </div>
-      <div style={{ fontSize: 36, fontWeight: 800, color: color ?? "#0f172a", lineHeight: 1 }}>{value}</div>
+      <div style={{ fontSize: 36, fontWeight: 800, color: color ?? "#0B2545", lineHeight: 1 }}>{value}</div>
       {sub && <div style={{ fontSize: 13, color: "#94a3b8", marginTop: 8 }}>{sub}</div>}
     </div>
   );
@@ -38,13 +38,13 @@ function QuickLink({ href, title, desc, icon }: { href: string; title: string; d
   return (
     <Link href={href} style={{ textDecoration: "none" }}>
       <div
-        style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 14, padding: "20px 24px", display: "flex", gap: 16, alignItems: "flex-start", cursor: "pointer", transition: "box-shadow 0.15s" }}
+        style={{ background: "#ffffff", border: "1px solid #E2E8EE", borderRadius: 14, padding: "20px 24px", display: "flex", gap: 16, alignItems: "flex-start", cursor: "pointer", transition: "box-shadow 0.15s" }}
         onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 4px 20px rgba(0,0,0,0.08)"; }}
         onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; }}
       >
         <span style={{ fontSize: 28 }}>{icon}</span>
         <div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>{title}</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#0B2545" }}>{title}</div>
           <div style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>{desc}</div>
         </div>
       </div>

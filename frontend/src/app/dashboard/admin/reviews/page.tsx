@@ -74,7 +74,7 @@ export default function AdminReviewsPage() {
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28, flexWrap: "wrap", gap: 16 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "#0f172a" }}>Отзывы</h1>
+          <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "#0B2545" }}>Отзывы</h1>
           <p style={{ margin: "4px 0 0", fontSize: 14, color: "#64748b" }}>
             Оценки клиентов по перевозчикам · {total} отзывов
           </p>
@@ -83,7 +83,7 @@ export default function AdminReviewsPage() {
           value={filterCarrier}
           onChange={(e) => handleFilterChange(e.target.value.toUpperCase())}
           placeholder="Фильтр по перевозчику..."
-          style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid #e5e7eb", fontSize: 14, width: 220, fontFamily: "inherit" }}
+          style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid #E2E8EE", fontSize: 14, width: 220, fontFamily: "inherit" }}
         />
       </div>
 
@@ -95,13 +95,13 @@ export default function AdminReviewsPage() {
 
       {/* Ratings summary (only on page 1, no filter) */}
       {ratings.length > 0 && page === 1 && !filterCarrier && (
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: "24px 28px", marginBottom: 24 }}>
-          <h2 style={{ margin: "0 0 18px", fontSize: 16, fontWeight: 700, color: "#0f172a" }}>Средние оценки</h2>
+        <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 16, padding: "24px 28px", marginBottom: 24 }}>
+          <h2 style={{ margin: "0 0 18px", fontSize: 16, fontWeight: 700, color: "#0B2545" }}>Средние оценки</h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
             {ratings.map((r) => (
               <div key={r.carrier_code} style={{ border: "1px solid #f1f5f9", borderRadius: 12, padding: "14px 18px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", fontFamily: "monospace" }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "#0B2545", fontFamily: "monospace" }}>
                     {r.carrier_code}
                   </span>
                   <span style={{ fontSize: 13, color: "#f59e0b" }}>
@@ -116,8 +116,8 @@ export default function AdminReviewsPage() {
       )}
 
       {/* Reviews table */}
-      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "80px 100px 120px 80px 1fr 110px", gap: 12, padding: "12px 24px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+      <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 16, overflow: "hidden" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "80px 100px 120px 80px 1fr 110px", gap: 12, padding: "12px 24px", background: "#f8fafc", borderBottom: "1px solid #E2E8EE", fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
           <span>ID</span>
           <span>Заказ</span>
           <span>Перевозчик</span>
@@ -140,7 +140,7 @@ export default function AdminReviewsPage() {
             >
               <span style={{ fontFamily: "monospace", fontSize: 12, color: "#94a3b8" }}>#{review.id}</span>
               <span style={{ fontFamily: "monospace", fontSize: 13, color: "#475569", fontWeight: 600 }}>#{review.order_draft_id}</span>
-              <span style={{ fontSize: 13, color: "#0f172a", fontWeight: 500 }}>{review.carrier_code}</span>
+              <span style={{ fontSize: 13, color: "#0B2545", fontWeight: 500 }}>{review.carrier_code}</span>
               <span style={{ fontSize: 14, color: "#f59e0b" }}>
                 <Stars rating={review.rating} />
               </span>
@@ -159,7 +159,7 @@ export default function AdminReviewsPage() {
           <button
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page === 1}
-            style={{ padding: "7px 16px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", color: "#475569", fontSize: 13, fontWeight: 500, cursor: page === 1 ? "not-allowed" : "pointer", opacity: page === 1 ? 0.4 : 1, fontFamily: "inherit" }}
+            style={{ padding: "7px 16px", borderRadius: 8, border: "1px solid #E2E8EE", background: "#fff", color: "#475569", fontSize: 13, fontWeight: 500, cursor: page === 1 ? "not-allowed" : "pointer", opacity: page === 1 ? 0.4 : 1, fontFamily: "inherit" }}
           >
             ← Назад
           </button>
@@ -167,7 +167,7 @@ export default function AdminReviewsPage() {
           <button
             onClick={() => setPage((p) => Math.min(pages, p + 1))}
             disabled={page === pages}
-            style={{ padding: "7px 16px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", color: "#475569", fontSize: 13, fontWeight: 500, cursor: page === pages ? "not-allowed" : "pointer", opacity: page === pages ? 0.4 : 1, fontFamily: "inherit" }}
+            style={{ padding: "7px 16px", borderRadius: 8, border: "1px solid #E2E8EE", background: "#fff", color: "#475569", fontSize: 13, fontWeight: 500, cursor: page === pages ? "not-allowed" : "pointer", opacity: page === pages ? 0.4 : 1, fontFamily: "inherit" }}
           >
             Вперёд →
           </button>

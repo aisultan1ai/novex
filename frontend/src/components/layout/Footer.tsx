@@ -37,7 +37,7 @@ export default function Footer() {
   return (
     <footer
       style={{
-        background: "#0F172A",
+        background: "#0B2545",
         color: "#94A3B8",
         padding: isMobile ? "40px 20px 24px" : "64px 48px 32px",
       }}
@@ -56,27 +56,36 @@ export default function Footer() {
           <div style={isMobile ? { gridColumn: "1 / -1" } : {}}>
             <Link
               href="/"
+              aria-label="Novex — на главную"
               style={{
                 display: "inline-flex",
                 alignItems: "center",
-                gap: 9,
+                gap: 10,
                 textDecoration: "none",
-                font: "700 22px/1 Inter Variable, sans-serif",
+                font: "700 22px/1 'Space Grotesk Variable', 'Inter Variable', sans-serif",
                 letterSpacing: "-0.02em",
                 color: "#ffffff",
                 marginBottom: 16,
               }}
             >
-              <span
-                style={{
-                  width: 11,
-                  height: 11,
-                  borderRadius: "50%",
-                  background: "#2563EB",
-                  flexShrink: 0,
-                }}
-              />
-              novex
+              <svg
+                width="34"
+                height="30"
+                viewBox="10 11 38 34"
+                fill="none"
+                role="img"
+                aria-hidden="true"
+                style={{ flexShrink: 0, display: "block" }}
+              >
+                <circle cx="17" cy="28" r="5" fill="#22C9E0" />
+                <line x1="20" y1="25.5" x2="37" y2="17" stroke="#94A3B8" strokeWidth="2.2" strokeLinecap="round" />
+                <line x1="21" y1="28" x2="38" y2="28" stroke="#22C9E0" strokeWidth="2.4" strokeLinecap="round" />
+                <line x1="20" y1="30.5" x2="37" y2="39" stroke="#94A3B8" strokeWidth="2.2" strokeLinecap="round" />
+                <circle cx="40" cy="16" r="3.4" fill="#94A3B8" />
+                <circle cx="41" cy="28" r="4.6" fill="#22C9E0" />
+                <circle cx="40" cy="40" r="3.4" fill="#94A3B8" />
+              </svg>
+              <span>n<span style={{ color: "#22C9E0" }}>o</span>vex</span>
             </Link>
             <p
               style={{
@@ -142,7 +151,7 @@ export default function Footer() {
         </div>
 
         {/* Divider */}
-        <div style={{ height: 1, background: "#1E293B", margin: "0 0 24px" }} />
+        <div style={{ height: 1, background: "#163558", margin: "0 0 24px" }} />
 
         {/* Bottom row */}
         <div

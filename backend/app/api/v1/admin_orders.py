@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import math
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
@@ -11,6 +12,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.common.status_machine import can_transition
 from app.core.db import get_db
 from app.core.dependencies import require_admin, require_admin_or_operator
+from app.core.excel import build_xlsx_response, fmt_dt
 from app.core.limiter import limiter
 from app.modules.audit.service import AuditService
 from app.modules.cancellations.repository import CancellationRequestsRepository
@@ -212,6 +214,246 @@ def list_all_orders(
     pages = math.ceil(total / size) if total > 0 else 1
     logger.debug("admin list_all_orders: page=%d size=%d total=%d", page, size, total)
     return {"items": items, "total": total, "page": page, "size": size, "pages": pages}
+
+
+_STATUS_LABELS_RU: dict[str, str] = {
+    "draft": "Черновик",
+    "shipment_details_completed": "Данные заполнены",
+    "ready_for_checkout": "Готов к оплате",
+    "awaiting_payment": "Ожидает оплату",
+    "payment_under_review": "Оплата на проверке",
+    "payment_rejected": "Оплата отклонена",
+    "paid": "Оплачен",
+    "dispatch_queued": "В очереди на отправку",
+    "dispatch_failed": "Ошибка отправки",
+    "pending_manual": "Ручная обработка",
+    "pending_manual_dispatch": "Ручная отправка",
+    "sent_to_carrier": "Передан перевозчику",
+    "picked_up": "Забран курьером",
+    "in_transit": "В пути",
+    "out_for_delivery": "Передан курьеру доставки",
+    "arrived": "Прибыл",
+    "delivered": "Доставлен",
+    "delivery_failed": "Не удалось доставить",
+    "customs_hold": "На таможне",
+    "return_requested": "Запрошен возврат",
+    "return_in_progress": "Возврат в процессе",
+    "returned": "Возвращён",
+    "cancelled": "Отменён",
+}
+
+
+def _party_by_role(parties: list, role: str) -> object | None:
+    for p in parties:
+        if p.role == role:
+            return p
+    return None
+
+
+def _party_address(p) -> str:
+    if not p:
+        return ""
+    parts = [p.city, p.address_line1]
+    if p.address_line2:
+        parts.append(p.address_line2)
+    if p.postal_code:
+        parts.append(p.postal_code)
+    return ", ".join(x for x in parts if x)
+
+
+_ORDER_EXPORT_HEADERS = [
+    "ID заказа",
+    "Дата создания",
+    "Дата обновления",
+    "Статус",
+    "Клиент (email)",
+    "Клиент (имя)",
+    "Откуда (город)",
+    "Куда (город)",
+    "Тип отправления",
+    "Перевозчик",
+    "Код перевозчика",
+    "Тариф",
+    "Срок (мин, дн.)",
+    "Срок (макс, дн.)",
+    "Цена клиенту",
+    "Стоимость перевозки",
+    "Наценка Novex",
+    "Валюта",
+    "Трек Novex",
+    "Трек перевозчика",
+    "Штрих-код",
+    "Отправитель ФИО",
+    "Отправитель телефон",
+    "Отправитель компания",
+    "Отправитель ИИН/БИН",
+    "Отправитель адрес",
+    "Получатель ФИО",
+    "Получатель телефон",
+    "Получатель компания",
+    "Получатель ИИН/БИН",
+    "Получатель адрес",
+    "Мест",
+    "Вес суммарный, кг",
+    "Габариты (Ш×В×Г см)",
+    "Страхование",
+    "Хрупкий груз",
+    "Звонок перед доставкой",
+    "Вызов курьера",
+    "Дата вывоза",
+    "Слот вывоза",
+    "Ошибка отправки",
+]
+
+
+def _order_to_export_row(order: OrderDraft, user: User | None, shipment) -> list:
+    parties = list(order.parties)
+    packages = list(order.packages)
+    sender = _party_by_role(parties, "sender")
+    recipient = _party_by_role(parties, "recipient")
+
+    total_qty = sum(int(p.quantity or 0) for p in packages)
+    total_weight = sum(float(p.weight_kg or 0) for p in packages)
+    dims = "; ".join(
+        f"{p.width_cm:g}×{p.height_cm:g}×{p.depth_cm:g}" for p in packages
+    ) if packages else ""
+
+    return [
+        order.id,
+        fmt_dt(order.created_at),
+        fmt_dt(order.updated_at),
+        _STATUS_LABELS_RU.get(order.status, order.status),
+        user.email if user else None,
+        user.full_name if user else None,
+        order.from_city_snapshot,
+        order.to_city_snapshot,
+        "Посылка" if order.shipment_type_snapshot == "parcel" else "Документ",
+        order.carrier_name_snapshot,
+        order.carrier_code_snapshot,
+        order.tariff_name_snapshot,
+        order.eta_days_min_snapshot,
+        order.eta_days_max_snapshot,
+        float(order.price_snapshot) if order.price_snapshot is not None else None,
+        float(order.carrier_price_snapshot) if order.carrier_price_snapshot is not None else None,
+        float(order.markup_amount_snapshot) if order.markup_amount_snapshot is not None else None,
+        order.currency_snapshot,
+        shipment.tracking_number if shipment else None,
+        shipment.carrier_tracking_number if shipment else None,
+        shipment.carrier_barcode if shipment else None,
+        sender.full_name if sender else None,
+        sender.phone if sender else None,
+        sender.company_name if sender else None,
+        sender.tax_id if sender else None,
+        _party_address(sender),
+        recipient.full_name if recipient else None,
+        recipient.phone if recipient else None,
+        recipient.company_name if recipient else None,
+        recipient.tax_id if recipient else None,
+        _party_address(recipient),
+        total_qty,
+        round(total_weight, 3) if total_weight else 0,
+        dims,
+        "да" if order.insurance else "нет",
+        "да" if order.fragile else "нет",
+        "да" if order.call_before_delivery else "нет",
+        "да" if order.pickup_requested else "нет",
+        order.pickup_date,
+        order.pickup_time_slot,
+        order.dispatch_error,
+    ]
+
+
+@router.get("/export", summary="Экспорт заказов в Excel")
+@limiter.limit("10/hour")
+def export_orders(
+    request: Request,
+    status: str | None = Query(default=None),
+    carrier_code: str | None = Query(default=None),
+    date_from: datetime | None = Query(default=None),
+    date_to: datetime | None = Query(default=None),
+    barcode: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    _=Depends(require_admin_or_operator),
+):
+    """XLSX-выгрузка заказов с теми же фильтрами, что и список.
+
+    Rate-limit: 10 экспортов в час на IP. Хард-кап MAX_EXPORT_ROWS (50k)
+    защищает от «выгрузить всё за 3 года».
+    """
+    from app.modules.shipments.models import Shipment as _Shipment
+
+    stmt = (
+        select(OrderDraft)
+        .options(
+            selectinload(OrderDraft.parties),
+            selectinload(OrderDraft.packages),
+        )
+        .order_by(OrderDraft.created_at.desc())
+    )
+    if status:
+        stmt = stmt.where(OrderDraft.status == status)
+    if carrier_code:
+        stmt = stmt.where(OrderDraft.carrier_code_snapshot == carrier_code)
+    if date_from:
+        stmt = stmt.where(OrderDraft.created_at >= date_from)
+    if date_to:
+        stmt = stmt.where(OrderDraft.created_at <= date_to)
+    if barcode:
+        needle = f"%{barcode.strip()}%"
+        stmt = stmt.join(_Shipment, _Shipment.order_draft_id == OrderDraft.id).where(
+            (_Shipment.tracking_number.ilike(needle))
+            | (_Shipment.carrier_tracking_number.ilike(needle))
+            | (_Shipment.carrier_barcode.ilike(needle))
+        )
+
+    orders = db.scalars(stmt).all()
+    if not orders:
+        raise HTTPException(422, "По этим фильтрам нет заказов для экспорта")
+
+    user_ids = {o.user_id for o in orders}
+    users_map: dict[int, User] = {}
+    if user_ids:
+        users = db.scalars(select(User).where(User.id.in_(user_ids))).all()
+        users_map = {u.id: u for u in users}
+
+    order_ids = [o.id for o in orders]
+    shipments_map: dict[int, _Shipment] = {}
+    if order_ids:
+        shps = db.scalars(select(_Shipment).where(_Shipment.order_draft_id.in_(order_ids))).all()
+        shipments_map = {s.order_draft_id: s for s in shps}
+
+    rows = (
+        _order_to_export_row(o, users_map.get(o.user_id), shipments_map.get(o.id))
+        for o in orders
+    )
+    # Итоги: сумма по трём денежным колонкам (15, 16, 17).
+    total_price = sum(
+        float(o.price_snapshot) for o in orders if o.price_snapshot is not None
+    )
+    total_carrier = sum(
+        float(o.carrier_price_snapshot) for o in orders
+        if o.carrier_price_snapshot is not None
+    )
+    total_markup = sum(
+        float(o.markup_amount_snapshot) for o in orders
+        if o.markup_amount_snapshot is not None
+    )
+    total_row: list = [None] * len(_ORDER_EXPORT_HEADERS)
+    total_row[0] = f"Итого: {len(orders)} строк"
+    total_row[14] = total_price
+    total_row[15] = total_carrier
+    total_row[16] = total_markup
+
+    return build_xlsx_response(
+        filename_base="orders_admin",
+        sheet_name="Заказы",
+        headers=_ORDER_EXPORT_HEADERS,
+        rows=rows,
+        money_cols=[15, 16, 17],
+        datetime_cols=[2, 3],
+        date_cols=[39],
+        total_row=total_row,
+    )
 
 
 @router.get("/{order_id}")

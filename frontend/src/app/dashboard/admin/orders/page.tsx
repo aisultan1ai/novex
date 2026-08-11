@@ -14,6 +14,7 @@ import {
   type AdminTrackingResponse,
 } from "@/lib/api/admin";
 import { TrackingTimeline } from "@/components/orders/tracking-timeline";
+import ExportXlsxButton from "@/components/ui/ExportXlsxButton";
 import {
   adminApproveCancellation,
   adminRejectCancellation,
@@ -155,7 +156,7 @@ function PaymentPanel({ orderId, onAction }: PaymentPanelProps) {
                       <img
                         src={fileUrl}
                         alt={proof.file_name}
-                        style={{ width: 140, height: 100, objectFit: "cover", borderRadius: 6, display: "block", border: "1px solid #e5e7eb" }}
+                        style={{ width: 140, height: 100, objectFit: "cover", borderRadius: 6, display: "block", border: "1px solid #E2E8EE" }}
                       />
                     </a>
                   ) : (
@@ -362,7 +363,7 @@ function OrderDetailPanel({ orderId, onCancellationResolved }: { orderId: number
                 onChange={(e) => setRejectReason(e.target.value)}
                 placeholder="Причина отклонения (клиент увидит этот текст) — минимум 3 символа"
                 rows={2}
-                style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #E5E7EB", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "vertical" }}
+                style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #E2E8EE", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "vertical" }}
               />
               <div style={{ display: "flex", gap: 8 }}>
                 <button
@@ -375,7 +376,7 @@ function OrderDetailPanel({ orderId, onCancellationResolved }: { orderId: number
                 <button
                   onClick={() => { setRejectOpen(false); setRejectReason(""); setCancelMsg(null); }}
                   disabled={cancelBusy !== null}
-                  style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #E5E7EB", background: "#fff", color: "#64748B", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+                  style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #E2E8EE", background: "#fff", color: "#64748B", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
                 >
                   Отмена
                 </button>
@@ -497,7 +498,7 @@ function OrderDetailPanel({ orderId, onCancellationResolved }: { orderId: number
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {detail.packages.map((pkg, i) => (
               <div key={i} style={dp.packageRow}>
-                <span style={{ fontSize: 13, color: "#0f172a", fontWeight: 500, flex: 1 }}>{pkg.description}</span>
+                <span style={{ fontSize: 13, color: "#0B2545", fontWeight: 500, flex: 1 }}>{pkg.description}</span>
                 <span style={dp.pkgBadge}>{pkg.quantity} шт</span>
                 <span style={dp.pkgBadge}>{pkg.weight_kg} кг</span>
               </div>
@@ -520,14 +521,14 @@ function OrderDetailPanel({ orderId, onCancellationResolved }: { orderId: number
               gap: 8,
               padding: "10px 14px",
               background: "#ffffff",
-              border: "1px solid #e5e7eb",
+              border: "1px solid #E2E8EE",
               borderRadius: 10,
               cursor: "pointer",
               fontFamily: "inherit",
               textAlign: "left",
             }}
           >
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#0B2545" }}>
               История статусов ({tracking.events.length})
             </span>
             <span style={{ fontSize: 14, color: "#94a3b8", transform: trackingOpen ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.15s" }}>
@@ -547,36 +548,36 @@ function OrderDetailPanel({ orderId, onCancellationResolved }: { orderId: number
 
 // ── Helpers inside OrderDetailPanel namespace ──────────────────────────────
 const dp = {
-  wrap:        { padding: "16px 20px 4px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb" } as React.CSSProperties,
+  wrap:        { padding: "16px 20px 4px", background: "#f8fafc", borderBottom: "1px solid #E2E8EE" } as React.CSSProperties,
   section:     { borderBottom: "1px solid #f1f5f9", paddingBottom: 16, marginBottom: 16 } as React.CSSProperties,
   sectionTitle:{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" as const, letterSpacing: "0.05em", marginBottom: 10 },
   grid3:       { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px 24px" } as React.CSSProperties,
-  partyCard:   { background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "12px 14px" } as React.CSSProperties,
+  partyCard:   { background: "#ffffff", border: "1px solid #E2E8EE", borderRadius: 10, padding: "12px 14px" } as React.CSSProperties,
   partyRole:   { fontSize: 10, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 6 },
-  partyName:   { fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 4 },
+  partyName:   { fontSize: 14, fontWeight: 700, color: "#0B2545", marginBottom: 4 },
   partyLine:   { fontSize: 13, color: "#475569" },
-  packageRow:  { display: "flex", alignItems: "center", gap: 10, background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 14px" } as React.CSSProperties,
-  pkgBadge:   { fontSize: 12, fontWeight: 600, color: "#1e40af", background: "#dbeafe", padding: "2px 9px", borderRadius: 999 },
+  packageRow:  { display: "flex", alignItems: "center", gap: 10, background: "#ffffff", border: "1px solid #E2E8EE", borderRadius: 8, padding: "10px 14px" } as React.CSSProperties,
+  pkgBadge:   { fontSize: 12, fontWeight: 600, color: "#1e40af", background: "#E6EEF7", padding: "2px 9px", borderRadius: 999 },
   Field: function({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
     return (
       <div>
         <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, marginBottom: 2 }}>{label}</div>
-        <div style={{ fontSize: 13, color: "#0f172a", fontWeight: 600, fontFamily: mono ? "monospace" : "inherit" }}>{value}</div>
+        <div style={{ fontSize: 13, color: "#0B2545", fontWeight: 600, fontFamily: mono ? "monospace" : "inherit" }}>{value}</div>
       </div>
     );
   },
 };
 
 const ps: Record<string, React.CSSProperties> = {
-  wrap: { padding: "14px 20px 16px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb" },
+  wrap: { padding: "14px 20px 16px", background: "#f8fafc", borderBottom: "1px solid #E2E8EE" },
   row:  { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" },
   label: { fontSize: 12, color: "#94a3b8", fontWeight: 600 },
-  val:   { fontSize: 13, color: "#0f172a", fontWeight: 600 },
+  val:   { fontSize: 13, color: "#0B2545", fontWeight: 600 },
   proofCard: { display: "flex", flexDirection: "column" },
-  fileLink: { fontSize: 13, color: "#1d4ed8", textDecoration: "underline" },
+  fileLink: { fontSize: 13, color: "#0E2E5C", textDecoration: "underline" },
   btnApprove: { padding: "7px 14px", borderRadius: 8, border: "none", background: "#166534", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" },
   btnReject:  { padding: "7px 14px", borderRadius: 8, border: "none", background: "#991b1b", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" },
-  input: { border: "1px solid #e5e7eb", borderRadius: 8, padding: "6px 10px", fontSize: 13, outline: "none", minWidth: 220, fontFamily: "inherit" },
+  input: { border: "1px solid #E2E8EE", borderRadius: 8, padding: "6px 10px", fontSize: 13, outline: "none", minWidth: 220, fontFamily: "inherit" },
 };
 
 const PAYMENT_STATUSES = new Set(["payment_under_review", "payment_rejected", "awaiting_payment", "paid"]);
@@ -634,7 +635,7 @@ const OrderRow = memo(function OrderRow({
         <span style={{ fontFamily: "monospace", fontSize: 13, color: "#475569", fontWeight: 600 }}>#{order.id}</span>
 
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#0B2545", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {order.user_name || order.user_email || "-"}
           </div>
           <div style={{ fontSize: 11, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -643,10 +644,10 @@ const OrderRow = memo(function OrderRow({
         </div>
 
         <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{order.from_city} → {order.to_city}</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#0B2545" }}>{order.from_city} → {order.to_city}</div>
           <div style={{ fontSize: 11, color: "#94a3b8" }}>{new Date(order.created_at).toLocaleDateString("ru-RU")}</div>
           {order.tracking_number && (
-            <div style={{ fontSize: 11, color: "#1d4ed8", fontFamily: "monospace", marginTop: 2 }}>{order.tracking_number}</div>
+            <div style={{ fontSize: 11, color: "#0E2E5C", fontFamily: "monospace", marginTop: 2 }}>{order.tracking_number}</div>
           )}
           {order.carrier_barcode && order.carrier_barcode !== order.carrier_tracking_number && (
             <div style={{ fontSize: 11, color: "#94a3b8", fontFamily: "monospace" }} title="Штрих-код перевозчика">ШК: {order.carrier_barcode}</div>
@@ -656,7 +657,7 @@ const OrderRow = memo(function OrderRow({
         <div style={{ fontSize: 13, color: "#475569" }}>{order.carrier_name}</div>
 
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }} title="Оплатил клиент">{formatPrice(order.price, order.currency)}</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#0B2545" }} title="Оплатил клиент">{formatPrice(order.price, order.currency)}</div>
           {order.markup_amount > 0 && (
             <div style={{ fontSize: 11, color: "#94a3b8" }} title={`Перевозчику ${formatPrice(order.carrier_price, order.currency)} · Наценка ${formatPrice(order.markup_amount, order.currency)}`}>
               {formatPrice(order.carrier_price, order.currency)} + {formatPrice(order.markup_amount, order.currency)}
@@ -690,7 +691,7 @@ const OrderRow = memo(function OrderRow({
               onClick={() => onOpenPayment(order.id)}
               style={{
                 padding: "6px 10px", borderRadius: 8, border: "none", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
-                background: isPaymentOpen ? "#1d4ed8" : "#dbeafe",
+                background: isPaymentOpen ? "#0E2E5C" : "#E6EEF7",
                 color: isPaymentOpen ? "#ffffff" : "#1e40af",
               }}
             >
@@ -701,15 +702,15 @@ const OrderRow = memo(function OrderRow({
             onClick={() => onOpenDetail(order.id)}
             style={{
               padding: "6px 10px", borderRadius: 8, border: "none", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
-              background: isDetailOpen ? "#0f172a" : "#f1f5f9",
-              color: isDetailOpen ? "#ffffff" : "#0f172a",
+              background: isDetailOpen ? "#0B2545" : "#f1f5f9",
+              color: isDetailOpen ? "#ffffff" : "#0B2545",
             }}
           >
             {isDetailOpen ? "Скрыть" : "Детали"}
           </button>
           <button
             onClick={() => onStartEdit(order.id, order.status)}
-            style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#ffffff", color: "#0f172a", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+            style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #E2E8EE", background: "#ffffff", color: "#0B2545", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
           >
             Статус
           </button>
@@ -723,12 +724,12 @@ const OrderRow = memo(function OrderRow({
       {isDetailOpen && <OrderDetailPanel orderId={order.id} onCancellationResolved={onPaymentAction} />}
 
       {isEditing && (
-        <div style={{ padding: "12px 20px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ padding: "12px 20px", background: "#f8fafc", borderBottom: "1px solid #E2E8EE", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <span style={{ fontSize: 13, color: "#64748b", fontWeight: 500 }}>Новый статус:</span>
           <select
             value={editStatus ?? order.status}
             onChange={(e) => onChangeEditStatus?.(e.target.value)}
-            style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 13, fontFamily: "inherit", background: "#ffffff", color: "#0f172a" }}
+            style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #E2E8EE", fontSize: 13, fontFamily: "inherit", background: "#ffffff", color: "#0B2545" }}
           >
             {ALL_STATUSES.map((s) => (
               <option key={s} value={s}>{STATUS_LABELS[s]}</option>
@@ -737,13 +738,13 @@ const OrderRow = memo(function OrderRow({
           <button
             onClick={() => onSaveStatus?.(order.id)}
             disabled={saving}
-            style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#0f172a", color: "#ffffff", fontSize: 13, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1, fontFamily: "inherit" }}
+            style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#0B2545", color: "#ffffff", fontSize: 13, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1, fontFamily: "inherit" }}
           >
             {saving ? "Сохраняем..." : "Сохранить"}
           </button>
           <button
             onClick={onCancelEdit}
-            style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#ffffff", color: "#64748b", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
+            style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #E2E8EE", background: "#ffffff", color: "#64748b", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
           >
             Отмена
           </button>
@@ -826,7 +827,7 @@ export default function AdminOrdersPage() {
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0f172a" }}>Заказы</h2>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0B2545" }}>Заказы</h2>
           <p style={{ margin: "4px 0 0", fontSize: 14, color: "#64748b" }}>Все заказы платформы · {total} всего</p>
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -839,13 +840,13 @@ export default function AdminOrdersPage() {
               placeholder="Поиск по ШК / трек-номеру"
               value={barcodeInput}
               onChange={(e) => setBarcodeInput(e.target.value)}
-              style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#ffffff", fontSize: 14, fontFamily: "inherit", color: "#0f172a", minWidth: 240, outline: "none" }}
+              style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid #E2E8EE", background: "#ffffff", fontSize: 14, fontFamily: "inherit", color: "#0B2545", minWidth: 240, outline: "none" }}
             />
             {barcodeQuery && (
               <button
                 type="button"
                 onClick={() => { setBarcodeInput(""); setBarcodeQuery(""); setPage(1); }}
-                style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#ffffff", fontSize: 14, cursor: "pointer", fontFamily: "inherit", color: "#64748b" }}
+                style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid #E2E8EE", background: "#ffffff", fontSize: 14, cursor: "pointer", fontFamily: "inherit", color: "#64748b" }}
                 title="Сбросить поиск"
               >
                 ×
@@ -855,20 +856,27 @@ export default function AdminOrdersPage() {
           <select
             value={statusFilter}
             onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-            style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#ffffff", fontSize: 14, cursor: "pointer", fontFamily: "inherit", color: "#0f172a" }}
+            style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid #E2E8EE", background: "#ffffff", fontSize: 14, cursor: "pointer", fontFamily: "inherit", color: "#0B2545" }}
           >
             <option value="">Все статусы</option>
             {ALL_STATUSES.map((s) => (
               <option key={s} value={s}>{STATUS_LABELS[s]}</option>
             ))}
           </select>
+          <ExportXlsxButton
+            endpoint="/admin/orders/export"
+            query={new URLSearchParams({
+              ...(statusFilter ? { status: statusFilter } : {}),
+              ...(barcodeQuery.trim() ? { barcode: barcodeQuery.trim() } : {}),
+            }).toString()}
+          />
         </div>
       </div>
 
       {error && <div style={{ padding: "12px 16px", borderRadius: 10, background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c", fontSize: 14, marginBottom: 20 }}>{error}</div>}
 
-      <div style={{ background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "70px 160px 1fr 150px 110px 150px 160px", gap: 12, padding: "12px 20px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+      <div style={{ background: "#ffffff", border: "1px solid #E2E8EE", borderRadius: 16, overflow: "hidden" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "70px 160px 1fr 150px 110px 150px 160px", gap: 12, padding: "12px 20px", background: "#f8fafc", borderBottom: "1px solid #E2E8EE", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
           <span>№</span>
           <span>Клиент</span>
           <span>Маршрут</span>
@@ -915,7 +923,7 @@ export default function AdminOrdersPage() {
             <button
               key={p}
               onClick={() => setPage(p)}
-              style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid #e5e7eb", background: p === page ? "#0f172a" : "#ffffff", color: p === page ? "#ffffff" : "#0f172a", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+              style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid #E2E8EE", background: p === page ? "#0B2545" : "#ffffff", color: p === page ? "#ffffff" : "#0B2545", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
             >
               {p}
             </button>

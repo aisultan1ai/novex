@@ -115,7 +115,7 @@ export default function AdminCommissionConfigsPage() {
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "#0f172a" }}>
+          <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "#0B2545" }}>
             Комиссии перевозчиков
           </h1>
           <p style={{ margin: "4px 0 0", fontSize: 14, color: "#64748b" }}>
@@ -124,7 +124,7 @@ export default function AdminCommissionConfigsPage() {
         </div>
         <button
           onClick={openNew}
-          style={{ padding: "10px 20px", borderRadius: 10, border: "none", background: "#0f172a", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+          style={{ padding: "10px 20px", borderRadius: 10, border: "none", background: "#0B2545", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
         >
           + Добавить
         </button>
@@ -140,7 +140,7 @@ export default function AdminCommissionConfigsPage() {
       {editingCode !== null && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div style={{ background: "#fff", borderRadius: 18, padding: "32px 36px", width: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }}>
-            <h2 style={{ margin: "0 0 22px", fontSize: 20, fontWeight: 800, color: "#0f172a" }}>
+            <h2 style={{ margin: "0 0 22px", fontSize: 20, fontWeight: 800, color: "#0B2545" }}>
               {isNew ? "Новая конфигурация" : `Редактировать: ${editingCode}`}
             </h2>
 
@@ -189,7 +189,7 @@ export default function AdminCommissionConfigsPage() {
                     step="0.01"
                     value={form.commission_rate ?? ""}
                     onChange={(e) => setForm((f) => ({ ...f, commission_rate: e.target.value === "" ? null : parseFloat(e.target.value) }))}
-                    style={{ flex: 1, border: "none", background: "transparent", padding: "10px 14px", fontSize: 14, fontWeight: 700, color: "#0f172a", outline: "none", fontFamily: "inherit" }}
+                    style={{ flex: 1, border: "none", background: "transparent", padding: "10px 14px", fontSize: 14, fontWeight: 700, color: "#0B2545", outline: "none", fontFamily: "inherit" }}
                   />
                   <span style={{ padding: "10px 14px 10px 0", fontSize: 14, fontWeight: 700, color: "#64748b" }}>%</span>
                 </div>
@@ -209,7 +209,7 @@ export default function AdminCommissionConfigsPage() {
                     step="0.01"
                     value={form.fixed_amount ?? ""}
                     onChange={(e) => setForm((f) => ({ ...f, fixed_amount: e.target.value === "" ? null : parseFloat(e.target.value) }))}
-                    style={{ flex: 1, border: "none", background: "transparent", padding: "10px 14px", fontSize: 14, fontWeight: 700, color: "#0f172a", outline: "none", fontFamily: "inherit" }}
+                    style={{ flex: 1, border: "none", background: "transparent", padding: "10px 14px", fontSize: 14, fontWeight: 700, color: "#0B2545", outline: "none", fontFamily: "inherit" }}
                   />
                   <span style={{ padding: "10px 14px 10px 0", fontSize: 14, fontWeight: 600, color: "#64748b" }}>{form.currency}</span>
                 </div>
@@ -237,13 +237,13 @@ export default function AdminCommissionConfigsPage() {
               <button
                 onClick={() => void handleSave()}
                 disabled={saving}
-                style={{ flex: 1, padding: "11px", borderRadius: 10, border: "none", background: "#0f172a", color: "#fff", fontSize: 14, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1, fontFamily: "inherit" }}
+                style={{ flex: 1, padding: "11px", borderRadius: 10, border: "none", background: "#0B2545", color: "#fff", fontSize: 14, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1, fontFamily: "inherit" }}
               >
                 {saving ? "Сохраняем..." : "Сохранить"}
               </button>
               <button
                 onClick={() => setEditingCode(null)}
-                style={{ padding: "11px 20px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", color: "#475569", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+                style={{ padding: "11px 20px", borderRadius: 10, border: "1px solid #E2E8EE", background: "#fff", color: "#475569", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
               >
                 Отмена
               </button>
@@ -253,8 +253,8 @@ export default function AdminCommissionConfigsPage() {
       )}
 
       {/* Table */}
-      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "160px 160px 130px 130px 90px 100px", gap: 12, padding: "12px 24px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+      <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 16, overflow: "hidden" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "160px 160px 130px 130px 90px 100px", gap: 12, padding: "12px 24px", background: "#f8fafc", borderBottom: "1px solid #E2E8EE", fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
           <span>Перевозчик</span>
           <span>Тип</span>
           <span>Ставка</span>
@@ -275,18 +275,18 @@ export default function AdminCommissionConfigsPage() {
               key={cfg.id}
               style={{ display: "grid", gridTemplateColumns: "160px 160px 130px 130px 90px 100px", gap: 12, padding: "14px 24px", borderBottom: idx === configs.length - 1 ? "none" : "1px solid #f1f5f9", alignItems: "center" }}
             >
-              <span style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", fontFamily: "monospace" }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "#0B2545", fontFamily: "monospace" }}>
                 {cfg.carrier_code}
               </span>
               <span style={{ fontSize: 13, color: "#475569" }}>
                 {TYPE_LABELS[cfg.commission_type]}
               </span>
-              <span style={{ fontSize: 13, color: "#0f172a", fontWeight: 600 }}>
+              <span style={{ fontSize: 13, color: "#0B2545", fontWeight: 600 }}>
                 {cfg.commission_rate != null
                   ? `${(Number(cfg.commission_rate) * 100).toFixed(2)}%`
                   : "-"}
               </span>
-              <span style={{ fontSize: 13, color: "#0f172a", fontWeight: 600 }}>
+              <span style={{ fontSize: 13, color: "#0B2545", fontWeight: 600 }}>
                 {cfg.fixed_amount != null
                   ? `${Number(cfg.fixed_amount).toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${cfg.currency}`
                   : "-"}
@@ -295,7 +295,7 @@ export default function AdminCommissionConfigsPage() {
               <div style={{ display: "flex", gap: 8 }}>
                 <button
                   onClick={() => openEdit(cfg)}
-                  style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", color: "#0f172a", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                  style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid #E2E8EE", background: "#fff", color: "#0B2545", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
                 >
                   Изм.
                 </button>
@@ -313,7 +313,7 @@ export default function AdminCommissionConfigsPage() {
       </div>
 
       {/* Info note */}
-      <div style={{ marginTop: 20, padding: "14px 18px", background: "#f8fafc", border: "1px solid #e5e7eb", borderRadius: 12, fontSize: 13, color: "#64748b" }}>
+      <div style={{ marginTop: 20, padding: "14px 18px", background: "#f8fafc", border: "1px solid #E2E8EE", borderRadius: 12, fontSize: 13, color: "#64748b" }}>
         <strong style={{ color: "#475569" }}>Как работает:</strong>{" "}
         Если для перевозчика задана конфигурация, она используется при расчёте комиссии вместо глобальной ставки. Ставка задаётся в процентах от суммы заказа, фиксированная - в абсолютной сумме.
       </div>

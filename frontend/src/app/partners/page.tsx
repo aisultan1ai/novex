@@ -110,18 +110,26 @@ export default function PartnersPage() {
       <Navbar />
       <main style={{ minHeight: "calc(100vh - 64px)", background: "#FAFAFA" }}>
         {/* Hero */}
-        <section style={{ padding: isMobile ? "48px 20px" : "72px 48px", background: "#FFFFFF", borderBottom: "1px solid #E5E7EB" }}>
+        <section style={{ padding: isMobile ? "48px 20px" : "72px 48px", background: "#FFFFFF", borderBottom: "1px solid #E2E8EE" }}>
           <div style={{ maxWidth: 900, margin: "0 auto", textAlign: "center" }}>
-            <span style={{ display: "inline-block", padding: "6px 14px", borderRadius: 999, background: "#EFF6FF", color: "#1D4ED8", fontSize: 13, fontWeight: 600, marginBottom: 16 }}>
+            <div
+              style={{
+                font: "500 13px/1 Inter Variable, sans-serif",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                color: "#0B2545",
+                marginBottom: 16,
+              }}
+            >
               Для курьерских служб
-            </span>
-            <h1 style={{ font: `800 ${isMobile ? 32 : 44}px/1.15 Inter Variable, sans-serif`, letterSpacing: "-0.02em", margin: "0 0 16px", color: "#111827" }}>
+            </div>
+            <h1 style={{ font: `800 ${isMobile ? 32 : 44}px/1.15 'Space Grotesk Variable', 'Inter Variable', sans-serif`, letterSpacing: "-0.02em", margin: "0 0 16px", color: "#0E1826" }}>
               Станьте партнёром Novex
             </h1>
-            <p style={{ font: "400 17px/1.55 Inter Variable, sans-serif", color: "#6B7280", margin: "0 0 8px" }}>
+            <p style={{ font: "400 17px/1.55 Inter Variable, sans-serif", color: "#5F6E7E", margin: "0 0 8px" }}>
               Мы агрегируем спрос на доставку по Казахстану и передаём заказы курьерским службам.
             </p>
-            <p style={{ font: "400 17px/1.55 Inter Variable, sans-serif", color: "#6B7280", margin: 0 }}>
+            <p style={{ font: "400 17px/1.55 Inter Variable, sans-serif", color: "#5F6E7E", margin: 0 }}>
               Подключитесь - и получайте поток заказов без затрат на маркетинг.
             </p>
           </div>
@@ -130,14 +138,14 @@ export default function PartnersPage() {
         {/* Benefits */}
         <section style={{ padding: isMobile ? "48px 20px" : "64px 48px" }}>
           <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-            <h2 style={{ font: `700 ${isMobile ? 24 : 30}px/1.2 Inter Variable, sans-serif`, letterSpacing: "-0.01em", margin: "0 0 32px", color: "#111827", textAlign: "center" }}>
+            <h2 style={{ font: `700 ${isMobile ? 24 : 30}px/1.2 'Space Grotesk Variable', 'Inter Variable', sans-serif`, letterSpacing: "-0.01em", margin: "0 0 32px", color: "#0E1826", textAlign: "center" }}>
               Что мы даём
             </h2>
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))", gap: 16 }}>
               {BENEFITS.map((b) => (
-                <div key={b.title} style={{ background: "#FFFFFF", border: "1px solid #E5E7EB", borderRadius: 16, padding: "20px 22px" }}>
-                  <div style={{ font: "700 16px/1.3 Inter Variable, sans-serif", color: "#111827", marginBottom: 8 }}>{b.title}</div>
-                  <p style={{ font: "400 14px/1.55 Inter Variable, sans-serif", color: "#6B7280", margin: 0 }}>{b.body}</p>
+                <div key={b.title} style={{ background: "#FFFFFF", border: "1px solid #E2E8EE", borderRadius: 16, padding: "20px 22px" }}>
+                  <div style={{ font: "700 16px/1.3 Inter Variable, sans-serif", color: "#0E1826", marginBottom: 8 }}>{b.title}</div>
+                  <p style={{ font: "400 14px/1.55 Inter Variable, sans-serif", color: "#5F6E7E", margin: 0 }}>{b.body}</p>
                 </div>
               ))}
             </div>
@@ -145,19 +153,19 @@ export default function PartnersPage() {
         </section>
 
         {/* How it works */}
-        <section style={{ padding: isMobile ? "48px 20px" : "64px 48px", background: "#FFFFFF", borderTop: "1px solid #E5E7EB", borderBottom: "1px solid #E5E7EB" }}>
+        <section style={{ padding: isMobile ? "48px 20px" : "64px 48px", background: "#FFFFFF", borderTop: "1px solid #E2E8EE", borderBottom: "1px solid #E2E8EE" }}>
           <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-            <h2 style={{ font: `700 ${isMobile ? 24 : 30}px/1.2 Inter Variable, sans-serif`, letterSpacing: "-0.01em", margin: "0 0 32px", color: "#111827", textAlign: "center" }}>
+            <h2 style={{ font: `700 ${isMobile ? 24 : 30}px/1.2 'Space Grotesk Variable', 'Inter Variable', sans-serif`, letterSpacing: "-0.01em", margin: "0 0 32px", color: "#0E1826", textAlign: "center" }}>
               Как это работает
             </h2>
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(5, minmax(0, 1fr))", gap: 12 }}>
               {STEPS.map((s) => (
-                <div key={s.n} style={{ background: "#FAFAFA", border: "1px solid #E5E7EB", borderRadius: 14, padding: "18px 18px" }}>
-                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#2563EB", color: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", font: "700 14px/1 Inter Variable, sans-serif", marginBottom: 10 }}>
+                <div key={s.n} style={{ background: "#FAFAFA", border: "1px solid #E2E8EE", borderRadius: 14, padding: "18px 18px" }}>
+                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#0B2545", color: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", font: "700 14px/1 Inter Variable, sans-serif", marginBottom: 10 }}>
                     {s.n}
                   </div>
-                  <div style={{ font: "700 14px/1.3 Inter Variable, sans-serif", color: "#111827", marginBottom: 6 }}>{s.title}</div>
-                  <p style={{ font: "400 13px/1.5 Inter Variable, sans-serif", color: "#6B7280", margin: 0 }}>{s.body}</p>
+                  <div style={{ font: "700 14px/1.3 Inter Variable, sans-serif", color: "#0E1826", marginBottom: 6 }}>{s.title}</div>
+                  <p style={{ font: "400 13px/1.5 Inter Variable, sans-serif", color: "#5F6E7E", margin: 0 }}>{s.body}</p>
                 </div>
               ))}
             </div>
@@ -165,12 +173,12 @@ export default function PartnersPage() {
         </section>
 
         {/* Form */}
-        <section id="apply" style={{ padding: isMobile ? "48px 20px" : "64px 48px", background: "#FFFFFF", borderTop: "1px solid #E5E7EB" }}>
+        <section id="apply" style={{ padding: isMobile ? "48px 20px" : "64px 48px", background: "#FFFFFF", borderTop: "1px solid #E2E8EE" }}>
           <div style={{ maxWidth: 640, margin: "0 auto" }}>
-            <h2 style={{ font: `700 ${isMobile ? 24 : 30}px/1.2 Inter Variable, sans-serif`, letterSpacing: "-0.01em", margin: "0 0 8px", color: "#111827", textAlign: "center" }}>
+            <h2 style={{ font: `700 ${isMobile ? 24 : 30}px/1.2 'Space Grotesk Variable', 'Inter Variable', sans-serif`, letterSpacing: "-0.01em", margin: "0 0 8px", color: "#0E1826", textAlign: "center" }}>
               Оставить заявку
             </h2>
-            <p style={{ font: "400 15px/1.55 Inter Variable, sans-serif", color: "#6B7280", margin: "0 0 28px", textAlign: "center" }}>
+            <p style={{ font: "400 15px/1.55 Inter Variable, sans-serif", color: "#5F6E7E", margin: "0 0 28px", textAlign: "center" }}>
               Оставьте заявку - наш менеджер свяжется с вами.
             </p>
 
@@ -197,7 +205,7 @@ export default function PartnersPage() {
                 <Field label="Города / регионы работы" value={form.cities} onChange={(v) => upd("cities", v)} disabled={submitting} />
 
                 <div>
-                  <label style={{ display: "block", font: "600 13px/1 Inter Variable, sans-serif", color: "#111827", marginBottom: 8 }}>
+                  <label style={{ display: "block", font: "600 13px/1 Inter Variable, sans-serif", color: "#0E1826", marginBottom: 8 }}>
                     Тип интеграции
                   </label>
                   <div style={{ display: "grid", gap: 8 }}>
@@ -205,7 +213,7 @@ export default function PartnersPage() {
                       { key: "api", label: "Готовы к автоматической интеграции" },
                       { key: "unsure", label: "Нужна консультация" },
                     ].map((opt) => (
-                      <label key={opt.key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", border: form.integration_type === opt.key ? "1px solid #2563EB" : "1px solid #E5E7EB", borderRadius: 10, background: form.integration_type === opt.key ? "#EFF6FF" : "#FFFFFF", cursor: submitting ? "not-allowed" : "pointer", transition: "all 0.15s" }}>
+                      <label key={opt.key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", border: form.integration_type === opt.key ? "1px solid #0B2545" : "1px solid #E2E8EE", borderRadius: 10, background: form.integration_type === opt.key ? "#F1F5F9" : "#FFFFFF", cursor: submitting ? "not-allowed" : "pointer", transition: "all 0.15s" }}>
                         <input
                           type="radio"
                           name="integration_type"
@@ -213,16 +221,16 @@ export default function PartnersPage() {
                           checked={form.integration_type === opt.key}
                           onChange={() => upd("integration_type", opt.key as PartnerIntegrationType)}
                           disabled={submitting}
-                          style={{ accentColor: "#2563EB" }}
+                          style={{ accentColor: "#0B2545" }}
                         />
-                        <span style={{ font: "400 14px/1.4 Inter Variable, sans-serif", color: "#111827" }}>{opt.label}</span>
+                        <span style={{ font: "400 14px/1.4 Inter Variable, sans-serif", color: "#0E1826" }}>{opt.label}</span>
                       </label>
                     ))}
                   </div>
                 </div>
 
                 <div>
-                  <label style={{ display: "block", font: "600 13px/1 Inter Variable, sans-serif", color: "#111827", marginBottom: 6 }}>
+                  <label style={{ display: "block", font: "600 13px/1 Inter Variable, sans-serif", color: "#0E1826", marginBottom: 6 }}>
                     Комментарий
                   </label>
                   <textarea
@@ -232,7 +240,7 @@ export default function PartnersPage() {
                     maxLength={2000}
                     placeholder="Кратко расскажите о компании"
                     disabled={submitting}
-                    style={{ width: "100%", padding: "10px 12px", border: "1px solid #E5E7EB", borderRadius: 10, font: "400 14px/1.5 Inter Variable, sans-serif", color: "#111827", background: "#FFFFFF", outline: "none", resize: "vertical", boxSizing: "border-box" }}
+                    style={{ width: "100%", padding: "10px 12px", border: "1px solid #E2E8EE", borderRadius: 10, font: "400 14px/1.5 Inter Variable, sans-serif", color: "#0E1826", background: "#FFFFFF", outline: "none", resize: "vertical", boxSizing: "border-box" }}
                   />
                 </div>
 
@@ -242,9 +250,9 @@ export default function PartnersPage() {
                     checked={form.consent}
                     onChange={(e) => upd("consent", e.target.checked)}
                     disabled={submitting}
-                    style={{ marginTop: 3, accentColor: "#2563EB" }}
+                    style={{ marginTop: 3, accentColor: "#0B2545" }}
                   />
-                  <span style={{ font: "400 13px/1.5 Inter Variable, sans-serif", color: "#6B7280" }}>
+                  <span style={{ font: "400 13px/1.5 Inter Variable, sans-serif", color: "#5F6E7E" }}>
                     Согласен на обработку персональных данных для связи по вопросу партнёрства.
                   </span>
                 </label>
@@ -258,7 +266,7 @@ export default function PartnersPage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  style={{ marginTop: 4, padding: "12px 24px", background: "#2563EB", color: "#FFFFFF", border: "none", borderRadius: 10, font: "600 15px/1 Inter Variable, sans-serif", cursor: submitting ? "not-allowed" : "pointer", opacity: submitting ? 0.7 : 1, transition: "background 0.15s" }}
+                  style={{ marginTop: 4, padding: "12px 24px", background: "#0B2545", color: "#FFFFFF", border: "none", borderRadius: 10, font: "600 15px/1 Inter Variable, sans-serif", cursor: submitting ? "not-allowed" : "pointer", opacity: submitting ? 0.7 : 1, transition: "background 0.15s" }}
                 >
                   {submitting ? "Отправляем…" : "Отправить заявку"}
                 </button>
@@ -285,7 +293,7 @@ function Field({
 }) {
   return (
     <div>
-      <label style={{ display: "block", font: "600 13px/1 Inter Variable, sans-serif", color: "#111827", marginBottom: 6 }}>
+      <label style={{ display: "block", font: "600 13px/1 Inter Variable, sans-serif", color: "#0E1826", marginBottom: 6 }}>
         {label}
       </label>
       <input
@@ -295,7 +303,7 @@ function Field({
         placeholder={placeholder}
         required={required}
         disabled={disabled}
-        style={{ width: "100%", padding: "10px 12px", border: "1px solid #E5E7EB", borderRadius: 10, font: "400 14px/1 Inter Variable, sans-serif", color: "#111827", background: "#FFFFFF", outline: "none", boxSizing: "border-box" }}
+        style={{ width: "100%", padding: "10px 12px", border: "1px solid #E2E8EE", borderRadius: 10, font: "400 14px/1 Inter Variable, sans-serif", color: "#0E1826", background: "#FFFFFF", outline: "none", boxSizing: "border-box" }}
       />
     </div>
   );

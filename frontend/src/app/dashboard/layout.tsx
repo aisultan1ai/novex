@@ -30,13 +30,13 @@ function BellButton({ unread, onClick }: { unread: number; onClick: () => void }
         width: 36,
         height: 36,
         borderRadius: "50%",
-        border: "1px solid #e5e7eb",
+        border: "1px solid #E2E8EE",
         background: "#ffffff",
         cursor: "pointer",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        color: unread > 0 ? "#2563EB" : "#94a3b8",
+        color: unread > 0 ? "#0B2545" : "#94a3b8",
         flexShrink: 0,
       }}
     >
@@ -194,7 +194,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         style={{
           height: 64,
           background: "#ffffff",
-          borderBottom: "1px solid #e5e7eb",
+          borderBottom: "1px solid #E2E8EE",
           padding: hPad,
           display: "flex",
           alignItems: "center",
@@ -208,24 +208,33 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, overflow: "hidden" }}>
           <Link
             href="/"
+            aria-label="Novex — на главную"
             style={{
               display: "inline-flex",
               alignItems: "center",
               gap: 8,
               textDecoration: "none",
-              font: "700 20px/1 Inter Variable, sans-serif",
+              font: "700 20px/1 'Space Grotesk Variable', 'Inter Variable', sans-serif",
               letterSpacing: "-0.02em",
-              color: "#111827",
+              color: "#0E1826",
               flexShrink: 0,
             }}
           >
-            <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#2563EB", flexShrink: 0 }} />
-            novex
+            <svg width="30" height="27" viewBox="10 11 38 34" fill="none" aria-hidden="true" style={{ flexShrink: 0, display: "block" }}>
+              <circle cx="17" cy="28" r="5" fill="#22C9E0" />
+              <line x1="20" y1="25.5" x2="37" y2="17" stroke="#3E6E8A" strokeWidth="2.2" strokeLinecap="round" />
+              <line x1="21" y1="28" x2="38" y2="28" stroke="#22C9E0" strokeWidth="2.4" strokeLinecap="round" />
+              <line x1="20" y1="30.5" x2="37" y2="39" stroke="#3E6E8A" strokeWidth="2.2" strokeLinecap="round" />
+              <circle cx="40" cy="16" r="3.4" fill="#3E6E8A" />
+              <circle cx="41" cy="28" r="4.6" fill="#22C9E0" />
+              <circle cx="40" cy="40" r="3.4" fill="#3E6E8A" />
+            </svg>
+            <span>n<span style={{ color: "#22C9E0" }}>o</span>vex</span>
           </Link>
           {!isMobile && (
             <>
-              <span style={{ color: "#e5e7eb", fontSize: 18 }}>|</span>
-              <span style={{ fontSize: 14, color: "#6B7280", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span style={{ color: "#E2E8EE", fontSize: 18 }}>|</span>
+              <span style={{ fontSize: 14, color: "#5F6E7E", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {displayName}
               </span>
             </>
@@ -245,7 +254,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               gap: isMobile ? 0 : 6,
               padding: isMobile ? "8px 10px" : "8px 14px",
               borderRadius: 10,
-              border: "1px solid #e5e7eb",
+              border: "1px solid #E2E8EE",
               background: "#ffffff",
               color: "#64748b",
               fontSize: 13,
@@ -264,7 +273,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       <nav
         style={{
           background: "#ffffff",
-          borderBottom: "1px solid #e5e7eb",
+          borderBottom: "1px solid #E2E8EE",
           padding: hPad,
           display: "flex",
           gap: 0,
@@ -278,12 +287,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           const activeColor =
             variant === "admin" ? "#d97706" :
             variant === "carrier" ? "#4338ca" :
-            "#2563EB";
+            "#0B2545";
           const activeBorder = activeColor;
           const idleColor =
             variant === "admin" ? "#b45309" :
             variant === "carrier" ? "#4f46e5" :
-            "#6B7280";
+            "#5F6E7E";
           const showDot = href === "/dashboard/notifications" && unreadCount > 0 && !active;
           return (
             <Link

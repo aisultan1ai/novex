@@ -43,7 +43,7 @@ export const ORDER_STATUS_LABELS: Record<string, string> = {
 export const ORDER_STATUS_COLORS: Record<string, { bg: string; color: string }> = {
   draft:                      { bg: "#f1f5f9", color: "#475569" },
   shipment_details_completed: { bg: "#e0f2fe", color: "#0369a1" },
-  ready_for_checkout:         { bg: "#dbeafe", color: "#1d4ed8" },
+  ready_for_checkout:         { bg: "#E6EEF7", color: "#0E2E5C" },
   awaiting_payment:           { bg: "#fef3c7", color: "#92400e" },
   payment_under_review:       { bg: "#fef3c7", color: "#92400e" },
   payment_rejected:           { bg: "#fee2e2", color: "#991b1b" },
@@ -54,7 +54,7 @@ export const ORDER_STATUS_COLORS: Record<string, { bg: string; color: string }> 
   pending_manual_dispatch:    { bg: "#e0e7ff", color: "#3730a3" },
   sent_to_carrier:            { bg: "#e0f2fe", color: "#0369a1" },
   picked_up:                  { bg: "#c7d2fe", color: "#3730a3" },
-  in_transit:                 { bg: "#dbeafe", color: "#1e40af" },
+  in_transit:                 { bg: "#E6EEF7", color: "#1e40af" },
   out_for_delivery:           { bg: "#ede9fe", color: "#5b21b6" },
   arrived:                    { bg: "#d1fae5", color: "#065f46" },
   delivery_failed:            { bg: "#fed7aa", color: "#9a3412" },

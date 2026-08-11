@@ -44,7 +44,7 @@ function PaymentRedirect() {
     }}>
       <div style={{
         background: "#fff",
-        border: "1px solid #E5E7EB",
+        border: "1px solid #E2E8EE",
         borderRadius: 16,
         padding: "28px 32px",
         maxWidth: 440, width: "100%",
@@ -58,7 +58,7 @@ function PaymentRedirect() {
         <h1 style={{
           margin: "0 0 8px",
           font: "700 18px/1.3 Inter Variable, sans-serif",
-          color: "#111827",
+          color: "#0E1826",
         }}>
           {draftId
             ? (redirected ? "Открываем страницу оплаты…" : "Готовим страницу оплаты…")
@@ -68,7 +68,7 @@ function PaymentRedirect() {
         <p style={{
           margin: "0 0 20px",
           font: "400 14px/1.55 Inter Variable, sans-serif",
-          color: "#6B7280",
+          color: "#5F6E7E",
         }}>
           {draftId
             ? "Если страница не открылась автоматически - нажмите кнопку ниже."
@@ -79,7 +79,7 @@ function PaymentRedirect() {
           href={target}
           style={{
             display: "inline-block",
-            background: "#2563EB",
+            background: "#0B2545",
             color: "#fff",
             padding: "12px 24px",
             borderRadius: 10,

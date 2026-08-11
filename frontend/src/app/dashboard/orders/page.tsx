@@ -79,7 +79,7 @@ function IconTruck() {
 }
 
 const cardStyle: CSSProperties = {
-  border: "1px solid #e5e7eb",
+  border: "1px solid #E2E8EE",
   borderRadius: 16,
   background: "#ffffff",
   overflow: "hidden",
@@ -98,7 +98,7 @@ const MobileOrderCard = memo(function MobileOrderCard({ order, onOpen }: OrderRo
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#111827", marginBottom: 2 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#0E1826", marginBottom: 2 }}>
             {order.from_city_snapshot} → {order.to_city_snapshot}
           </div>
           <div style={{ fontSize: 12, color: "#94a3b8" }}>
@@ -115,7 +115,7 @@ const MobileOrderCard = memo(function MobileOrderCard({ order, onOpen }: OrderRo
           <StatusBadge status={order.status} />
           {order.cancellation_request?.status === "pending" && <CancelPendingBadge />}
         </div>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#0E1826" }}>
           {formatPrice(order.price_snapshot, order.currency_snapshot)}
         </div>
       </div>
@@ -140,7 +140,7 @@ const DesktopOrderRow = memo(function DesktopOrderRow({ order, isLast, onOpen }:
       </span>
 
       <div>
-        <div style={{ fontSize: 14, fontWeight: 600, color: "#111827", marginBottom: 3 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: "#0E1826", marginBottom: 3 }}>
           {order.to_city_snapshot || "-"}
         </div>
         <div style={{ fontSize: 12, color: "#94a3b8" }}>
@@ -149,7 +149,7 @@ const DesktopOrderRow = memo(function DesktopOrderRow({ order, isLast, onOpen }:
       </div>
 
       <div>
-        <div style={{ fontSize: 13, fontWeight: 500, color: "#111827", marginBottom: 3 }}>
+        <div style={{ fontSize: 13, fontWeight: 500, color: "#0E1826", marginBottom: 3 }}>
           {order.carrier_name_snapshot}
         </div>
         <div style={{ fontSize: 12, color: "#94a3b8" }}>
@@ -162,7 +162,7 @@ const DesktopOrderRow = memo(function DesktopOrderRow({ order, isLast, onOpen }:
         {order.cancellation_request?.status === "pending" && <CancelPendingBadge />}
       </div>
 
-      <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: "#0E1826" }}>
         {formatPrice(order.price_snapshot, order.currency_snapshot)}
       </div>
 
@@ -247,10 +247,10 @@ function MyOrdersPageInner() {
       )}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
-        <h1 style={{ margin: 0, fontSize: isMobile ? 22 : 28, fontWeight: 800, color: "#111827" }}>Мои заказы</h1>
+        <h1 style={{ margin: 0, fontSize: isMobile ? 22 : 28, fontWeight: 800, color: "#0E1826" }}>Мои заказы</h1>
         <Link
           href="/"
-          style={{ background: "#2563EB", color: "#ffffff", borderRadius: 10, padding: "10px 20px", fontSize: 14, fontWeight: 600, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}
+          style={{ background: "#0B2545", color: "#ffffff", borderRadius: 10, padding: "10px 20px", fontSize: 14, fontWeight: 600, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}
         >
           + Новая доставка
         </Link>
@@ -263,7 +263,7 @@ function MyOrdersPageInner() {
             <button
               key={key}
               onClick={() => setActiveFilter(key)}
-              style={{ padding: "6px 16px", borderRadius: 999, border: active ? "none" : "1px solid #e5e7eb", background: active ? "#2563EB" : "#ffffff", color: active ? "#ffffff" : "#6B7280", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+              style={{ padding: "6px 16px", borderRadius: 999, border: active ? "none" : "1px solid #E2E8EE", background: active ? "#0B2545" : "#ffffff", color: active ? "#ffffff" : "#5F6E7E", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
             >
               {label}
             </button>
@@ -277,9 +277,9 @@ function MyOrdersPageInner() {
           {[1, 2, 3].map((i) => (
             <div key={i} style={{ ...cardStyle, padding: "20px 24px", animation: "skeleton-pulse 1.5s ease infinite", animationDelay: `${i * 0.15}s` }}>
               <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                <div style={{ width: 80, height: 16, borderRadius: 6, background: "#e5e7eb", flexShrink: 0 }} />
-                <div style={{ flex: 1, height: 16, borderRadius: 6, background: "#e5e7eb" }} />
-                <div style={{ width: 90, height: 24, borderRadius: 999, background: "#e5e7eb", flexShrink: 0 }} />
+                <div style={{ width: 80, height: 16, borderRadius: 6, background: "#E2E8EE", flexShrink: 0 }} />
+                <div style={{ flex: 1, height: 16, borderRadius: 6, background: "#E2E8EE" }} />
+                <div style={{ width: 90, height: 24, borderRadius: 999, background: "#E2E8EE", flexShrink: 0 }} />
               </div>
             </div>
           ))}
@@ -291,11 +291,11 @@ function MyOrdersPageInner() {
       ) : filteredOrders.length === 0 ? (
         <div style={{ ...cardStyle, padding: "64px 24px", textAlign: "center" }}>
           <IconTruck />
-          <p style={{ fontSize: 16, fontWeight: 700, margin: "0 0 8px", color: "#111827" }}>
+          <p style={{ fontSize: 16, fontWeight: 700, margin: "0 0 8px", color: "#0E1826" }}>
             {activeFilter === "all" ? "Заказов пока нет" : "Заказов в этой категории нет"}
           </p>
           <p style={{ margin: "0 0 24px", fontSize: 14, color: "#64748b" }}>Оформите первую доставку прямо сейчас</p>
-          <Link href="/" style={{ background: "#2563EB", color: "#ffffff", borderRadius: 10, padding: "10px 20px", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
+          <Link href="/" style={{ background: "#0B2545", color: "#ffffff", borderRadius: 10, padding: "10px 20px", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
             Рассчитать тариф
           </Link>
         </div>
@@ -314,7 +314,7 @@ function MyOrdersPageInner() {
       ) : (
         /* ── Desktop: table ── */
         <div style={cardStyle}>
-          <div style={{ display: "grid", gridTemplateColumns: "100px 1fr 170px 180px 130px 32px", gap: 12, padding: "12px 24px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", alignItems: "center" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "100px 1fr 170px 180px 130px 32px", gap: 12, padding: "12px 24px", background: "#f8fafc", borderBottom: "1px solid #E2E8EE", fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", alignItems: "center" }}>
             <span>Реф. №</span>
             <span>Адрес получателя</span>
             <span>Служба / Тариф</span>
@@ -340,7 +340,7 @@ function MyOrdersPageInner() {
             <button
               key={p}
               onClick={() => setPage(p)}
-              style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid #e5e7eb", background: p === page ? "#0f172a" : "#ffffff", color: p === page ? "#ffffff" : "#0f172a", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+              style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid #E2E8EE", background: p === page ? "#0B2545" : "#ffffff", color: p === page ? "#ffffff" : "#0B2545", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
             >
               {p}
             </button>

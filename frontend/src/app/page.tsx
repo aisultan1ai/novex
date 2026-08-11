@@ -40,6 +40,9 @@ const initialForm: FormState = {
 };
 
 function validateQuoteForm(form: FormState): string | null {
+  if (!form.fromCity.trim()) return "Укажите город отправления.";
+  if (!form.toCity.trim()) return "Укажите город доставки.";
+
   const weight = Number(form.weightKg);
   const qty = Number(form.quantity);
 
@@ -127,8 +130,8 @@ function TariffBadge({ name }: { name: string }) {
 function DetailRow({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-      <span style={{ fontSize: 13, color: "#6B7280" }}>{label}</span>
-      <span style={{ fontSize: 14, fontWeight: 600, color: muted ? "#9CA3AF" : "#111827" }}>{value}</span>
+      <span style={{ fontSize: 13, color: "#5F6E7E" }}>{label}</span>
+      <span style={{ fontSize: 14, fontWeight: 600, color: muted ? "#9CA3AF" : "#0E1826" }}>{value}</span>
     </div>
   );
 }
@@ -162,14 +165,14 @@ function InputField({
         onBlur={() => setFocused(false)}
         style={{
           width: "100%",
-          border: focused ? "1.5px solid #2563EB" : "1.5px solid #E5E7EB",
+          border: focused ? "1.5px solid #0B2545" : "1.5px solid #E2E8EE",
           borderRadius: 10,
           padding: "12px 14px",
           font: "400 15px/1 Inter Variable, sans-serif",
-          color: "#111827",
+          color: "#0E1826",
           background: "#fff",
           outline: "none",
-          boxShadow: focused ? "0 0 0 3px rgba(37,99,235,0.15)" : "none",
+          boxShadow: focused ? "0 0 0 3px rgba(11,37,69,0.15)" : "none",
           transition: "border-color 0.15s, box-shadow 0.15s",
           boxSizing: "border-box",
         }}
@@ -205,17 +208,17 @@ const HOW_IT_WORKS = [
 
 const WHY_NOVEX = [
   {
-    icon: <Star size={24} color="#2563EB" />,
+    icon: <Star size={24} color="#0B2545" />,
     title: "Выгодные цены",
     desc: "Сравниваем тарифы ведущих курьерских служб и показываем лучшие предложения",
   },
   {
-    icon: <Clock size={24} color="#2563EB" />,
+    icon: <Clock size={24} color="#0B2545" />,
     title: "Быстрое оформление",
     desc: "От расчёта до оформления - 2 минуты. Без лишних звонков и визитов",
   },
   {
-    icon: <MapPin size={24} color="#2563EB" />,
+    icon: <MapPin size={24} color="#0B2545" />,
     title: "Надёжное отслеживание",
     desc: "Актуальный статус посылки в одном окне, уведомления о каждом этапе",
   },
@@ -384,7 +387,7 @@ export default function HomePage() {
         {/* ── HERO ──────────────────────────────────────────────────────── */}
         <section
           style={{
-            background: "linear-gradient(160deg, #EFF6FF 0%, #F8FAFF 45%, #F0FDF4 100%)",
+            background: "linear-gradient(160deg, #F1F5F9 0%, #F8FAFF 45%, #F0FDF4 100%)",
             padding: isMobile ? "56px 20px 64px" : "88px 48px 96px",
             textAlign: "center",
             position: "relative",
@@ -392,14 +395,14 @@ export default function HomePage() {
           }}
         >
           {/* Decorative background blobs */}
-          <div style={{ position: "absolute", top: -60, left: -80, width: 320, height: 320, borderRadius: "50%", background: "rgba(37,99,235,0.06)", pointerEvents: "none" }} />
+          <div style={{ position: "absolute", top: -60, left: -80, width: 320, height: 320, borderRadius: "50%", background: "rgba(11,37,69,0.06)", pointerEvents: "none" }} />
           <div style={{ position: "absolute", bottom: -80, right: -60, width: 280, height: 280, borderRadius: "50%", background: "rgba(16,185,129,0.05)", pointerEvents: "none" }} />
           <div
             style={{
               font: "500 13px/1 Inter Variable, sans-serif",
               textTransform: "uppercase",
               letterSpacing: "0.05em",
-              color: "#2563EB",
+              color: "#0B2545",
               marginBottom: 16,
             }}
           >
@@ -407,9 +410,9 @@ export default function HomePage() {
           </div>
           <h1
             style={{
-              font: `700 ${isMobile ? "32px" : "48px"}/1.12 Inter Variable, sans-serif`,
+              font: `700 ${isMobile ? "32px" : "48px"}/1.12 'Space Grotesk Variable', 'Inter Variable', sans-serif`,
               letterSpacing: "-0.02em",
-              color: "#111827",
+              color: "#0E1826",
               margin: "0 auto 16px",
               maxWidth: 640,
             }}
@@ -419,7 +422,7 @@ export default function HomePage() {
           <p
             style={{
               font: "400 18px/1.6 Inter Variable, sans-serif",
-              color: "#6B7280",
+              color: "#5F6E7E",
               margin: "0 auto 40px",
               maxWidth: 520,
             }}
@@ -431,9 +434,9 @@ export default function HomePage() {
           <div
             style={{
               background: "#ffffff",
-              border: "1px solid #E5E7EB",
+              border: "1px solid #E2E8EE",
               borderRadius: 24,
-              boxShadow: "0 20px 60px rgba(37,99,235,0.10), 0 4px 16px rgba(0,0,0,0.06)",
+              boxShadow: "0 20px 60px rgba(11,37,69,0.10), 0 4px 16px rgba(0,0,0,0.06)",
               padding: isMobile ? "24px 20px" : "36px 36px",
               maxWidth: 940,
               margin: "0 auto",
@@ -487,9 +490,9 @@ export default function HomePage() {
                           onClick={() => setField("shipmentType", t)}
                           style={{
                             flex: 1,
-                            border: active ? "1.5px solid #2563EB" : "1.5px solid #E5E7EB",
-                            background: active ? "#EFF6FF" : "#ffffff",
-                            color: active ? "#2563EB" : "#6B7280",
+                            border: active ? "1.5px solid #0B2545" : "1.5px solid #E2E8EE",
+                            background: active ? "#F1F5F9" : "#ffffff",
+                            color: active ? "#0B2545" : "#5F6E7E",
                             borderRadius: 10,
                             padding: "12px 0",
                             font: "600 14px/1 Inter Variable, sans-serif",
@@ -537,7 +540,7 @@ export default function HomePage() {
                   type="submit"
                   disabled={isLoading}
                   style={{
-                    background: isLoading ? "#93C5FD" : "#2563EB",
+                    background: isLoading ? "#94A6C0" : "#0B2545",
                     color: "#ffffff",
                     border: "none",
                     borderRadius: 10,
@@ -549,10 +552,10 @@ export default function HomePage() {
                     ...(isMobile ? { gridColumn: "1 / -1", padding: "14px" } : {}),
                   }}
                   onMouseEnter={(e) => {
-                    if (!isLoading) e.currentTarget.style.background = "#1D4ED8";
+                    if (!isLoading) e.currentTarget.style.background = "#0E2E5C";
                   }}
                   onMouseLeave={(e) => {
-                    if (!isLoading) e.currentTarget.style.background = "#2563EB";
+                    if (!isLoading) e.currentTarget.style.background = "#0B2545";
                   }}
                 >
                   {isLoading ? "Рассчитываем..." : "Рассчитать"}
@@ -594,14 +597,14 @@ export default function HomePage() {
                   flexWrap: "wrap",
                   marginTop: 24,
                   font: "500 13px/1 Inter Variable, sans-serif",
-                  color: "#6B7280",
+                  color: "#5F6E7E",
                 }}
               >
-                <span><b style={{ color: "#111827" }}>{carriersLabel}</b> служб доставки</span>
+                <span><b style={{ color: "#0E1826" }}>{carriersLabel}</b> служб доставки</span>
                 {LANDING_STATS.shipmentsLabel && (
                   <>
                     <span style={{ color: "#D1D5DB" }}>|</span>
-                    <span><b style={{ color: "#111827" }}>{LANDING_STATS.shipmentsLabel}</b> отправлений</span>
+                    <span><b style={{ color: "#0E1826" }}>{LANDING_STATS.shipmentsLabel}</b> отправлений</span>
                   </>
                 )}
                 {LANDING_STATS.ratingLabel && (
@@ -639,7 +642,7 @@ export default function HomePage() {
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span style={{ font: "600 18px/1 Inter Variable, sans-serif", color: "#111827" }}>
+                <span style={{ font: "600 18px/1 Inter Variable, sans-serif", color: "#0E1826" }}>
                   {form.fromCity} → {form.toCity}
                 </span>
                 <span
@@ -659,7 +662,7 @@ export default function HomePage() {
                 style={{
                   background: "none",
                   border: "none",
-                  color: "#2563EB",
+                  color: "#0B2545",
                   font: "500 14px/1 Inter Variable, sans-serif",
                   cursor: "pointer",
                   textDecoration: "underline",
@@ -682,10 +685,10 @@ export default function HomePage() {
                   const isSelected = selectedRate === rate;
                   const showBestBadge =
                     isBest && !rate.badge
-                      ? { label: "Лучшая цена", bg: "#EFF6FF", color: "#1D4ED8" }
+                      ? { label: "Лучшая цена", bg: "#F1F5F9", color: "#0E2E5C" }
                       : null;
                   const badgeInfo = rate.badge
-                    ? { label: BADGE_LABELS[rate.badge] ?? rate.badge, bg: "#EFF6FF", color: "#1D4ED8" }
+                    ? { label: BADGE_LABELS[rate.badge] ?? rate.badge, bg: "#F1F5F9", color: "#0E2E5C" }
                     : showBestBadge;
 
                   return (
@@ -694,31 +697,35 @@ export default function HomePage() {
                       className="result-card"
                       onClick={() => handleSelectRate(rate)}
                       style={{
-                        background: isSelected ? "#EFF6FF" : "#ffffff",
+                        background: isSelected ? "#F1F5F9" : "#ffffff",
                         borderRadius: 16,
-                        border: `1.5px solid ${isSelected ? "#2563EB" : isBest ? "#2563EB" : "#E5E7EB"}`,
+                        border: `1.5px solid ${isSelected ? "#22C9E0" : isBest ? "#0B2545" : "#E2E8EE"}`,
                         padding: "20px 24px",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "space-between",
                         gap: 16,
                         cursor: "pointer",
-                        boxShadow: isBest ? "0 4px 16px rgba(37,99,235,0.10)" : "0 1px 3px rgba(0,0,0,0.08)",
+                        boxShadow: isSelected
+                          ? "0 0 0 4px rgba(34,201,224,0.18)"
+                          : isBest
+                            ? "0 4px 16px rgba(11,37,69,0.10)"
+                            : "0 1px 3px rgba(0,0,0,0.08)",
                         transition: "all 0.15s ease",
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.boxShadow = "0 4px 16px rgba(37,99,235,0.10)";
+                        if (isSelected) return;
+                        e.currentTarget.style.boxShadow = "0 4px 16px rgba(11,37,69,0.10)";
                         e.currentTarget.style.transform = "translateY(-2px)";
-                        e.currentTarget.style.borderColor = "#2563EB";
+                        e.currentTarget.style.borderColor = "#0B2545";
                       }}
                       onMouseLeave={(e) => {
+                        if (isSelected) return;
                         e.currentTarget.style.boxShadow = isBest
-                          ? "0 4px 16px rgba(37,99,235,0.10)"
+                          ? "0 4px 16px rgba(11,37,69,0.10)"
                           : "0 1px 3px rgba(0,0,0,0.08)";
                         e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.borderColor = isSelected || isBest
-                          ? "#2563EB"
-                          : "#E5E7EB";
+                        e.currentTarget.style.borderColor = isBest ? "#0B2545" : "#E2E8EE";
                       }}
                     >
                       {/* Carrier info */}
@@ -729,12 +736,12 @@ export default function HomePage() {
                               width: 48,
                               height: 48,
                               borderRadius: 10,
-                              background: "#EFF6FF",
+                              background: "#F1F5F9",
                               display: "flex",
                               alignItems: "center",
                               justifyContent: "center",
                               font: "700 20px/1 Inter Variable, sans-serif",
-                              color: "#2563EB",
+                              color: "#0B2545",
                               flexShrink: 0,
                               overflow: "hidden",
                             }}
@@ -747,7 +754,7 @@ export default function HomePage() {
                             )}
                           </div>
                           <div>
-                            <span style={{ font: "600 16px/1 Inter Variable, sans-serif", color: "#111827", marginRight: 8 }}>
+                            <span style={{ font: "600 16px/1 Inter Variable, sans-serif", color: "#0E1826", marginRight: 8 }}>
                               {rate.carrier_name}
                             </span>
                             <TariffBadge name={rate.tariff_name} />
@@ -770,7 +777,7 @@ export default function HomePage() {
                         <div
                           style={{
                             font: "400 13px/1 Inter Variable, sans-serif",
-                            color: "#6B7280",
+                            color: "#5F6E7E",
                             display: "flex",
                             gap: 16,
                             alignItems: "center",
@@ -785,7 +792,7 @@ export default function HomePage() {
                       {/* Price + CTA */}
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0 }}>
                         <div>
-                          <div style={{ font: "700 24px/1 Inter Variable, sans-serif", color: "#111827", textAlign: "right" }}>
+                          <div style={{ font: "700 24px/1 'Space Grotesk Variable', 'Inter Variable', sans-serif", color: "#0E1826", textAlign: "right" }}>
                             {formatPrice(rate.price, rate.currency)}
                           </div>
                           <div style={{ font: "400 12px/1 Inter Variable, sans-serif", color: "#9CA3AF", textAlign: "right", marginTop: 4 }}>
@@ -795,9 +802,9 @@ export default function HomePage() {
                         <button
                           onClick={(e) => { e.stopPropagation(); void handleSelectRate(rate); }}
                           style={{
-                            border: isSelected ? "none" : "1.5px solid #E5E7EB",
-                            background: isSelected ? "#2563EB" : "#ffffff",
-                            color: isSelected ? "#ffffff" : "#111827",
+                            border: isSelected ? "none" : "1.5px solid #E2E8EE",
+                            background: isSelected ? "#0B2545" : "#ffffff",
+                            color: isSelected ? "#ffffff" : "#0E1826",
                             borderRadius: 10,
                             padding: "8px 20px",
                             font: "600 14px/1 Inter Variable, sans-serif",
@@ -807,16 +814,16 @@ export default function HomePage() {
                           }}
                           onMouseEnter={(e) => {
                             if (!isSelected) {
-                              e.currentTarget.style.background = "#2563EB";
+                              e.currentTarget.style.background = "#0B2545";
                               e.currentTarget.style.color = "#ffffff";
-                              e.currentTarget.style.borderColor = "#2563EB";
+                              e.currentTarget.style.borderColor = "#0B2545";
                             }
                           }}
                           onMouseLeave={(e) => {
                             if (!isSelected) {
                               e.currentTarget.style.background = "#ffffff";
-                              e.currentTarget.style.color = "#111827";
-                              e.currentTarget.style.borderColor = "#E5E7EB";
+                              e.currentTarget.style.color = "#0E1826";
+                              e.currentTarget.style.borderColor = "#E2E8EE";
                             }
                           }}
                         >
@@ -844,8 +851,8 @@ export default function HomePage() {
               <div style={{ maxWidth: 1200, margin: "0 auto" }}>
                 <h2
                   style={{
-                    font: "600 32px/1.25 Inter Variable, sans-serif",
-                    color: "#111827",
+                    font: "600 32px/1.25 'Space Grotesk Variable', 'Inter Variable', sans-serif",
+                    color: "#0E1826",
                     textAlign: "center",
                     margin: "0 0 48px",
                   }}
@@ -866,8 +873,8 @@ export default function HomePage() {
                           width: 48,
                           height: 48,
                           borderRadius: 12,
-                          background: "#EFF6FF",
-                          color: "#2563EB",
+                          background: "#F1F5F9",
+                          color: "#0B2545",
                           font: "700 20px/1 Inter Variable, sans-serif",
                           display: "flex",
                           alignItems: "center",
@@ -877,10 +884,10 @@ export default function HomePage() {
                       >
                         {step}
                       </div>
-                      <div style={{ font: "600 18px/1.3 Inter Variable, sans-serif", color: "#111827", marginBottom: 8 }}>
+                      <div style={{ font: "600 18px/1.3 Inter Variable, sans-serif", color: "#0E1826", marginBottom: 8 }}>
                         {title}
                       </div>
-                      <div style={{ font: "400 15px/1.5 Inter Variable, sans-serif", color: "#6B7280" }}>
+                      <div style={{ font: "400 15px/1.5 Inter Variable, sans-serif", color: "#5F6E7E" }}>
                         {desc}
                       </div>
                     </div>
@@ -892,8 +899,8 @@ export default function HomePage() {
             {/* Partners / carriers. Rendered from SUPPORTED_CARRIERS so the strip
                 always matches the "N+ служб доставки" claim in the hero - one
                 source of truth. */}
-            <section style={{ background: "#FAFAFA", borderTop: "1px solid #E5E7EB", padding: isMobile ? "48px 20px" : "56px 48px", textAlign: "center" }}>
-              <p style={{ font: "400 15px/1 Inter Variable, sans-serif", color: "#6B7280", margin: "0 0 28px" }}>
+            <section style={{ background: "#FAFAFA", borderTop: "1px solid #E2E8EE", padding: isMobile ? "48px 20px" : "56px 48px", textAlign: "center" }}>
+              <p style={{ font: "400 15px/1 Inter Variable, sans-serif", color: "#5F6E7E", margin: "0 0 28px" }}>
                 Сравниваем цены ведущих служб в реальном времени
               </p>
               <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", alignItems: "center" }}>
@@ -902,7 +909,7 @@ export default function HomePage() {
                     key={c.code}
                     style={{
                       background: "#ffffff",
-                      border: "1px solid #E5E7EB",
+                      border: "1px solid #E2E8EE",
                       borderRadius: 10,
                       padding: "12px 28px",
                       font: "700 16px/1 Inter Variable, sans-serif",
@@ -917,12 +924,12 @@ export default function HomePage() {
             </section>
 
             {/* Why Novex */}
-            <section style={{ background: "#FAFAFA", borderTop: "1px solid #E5E7EB", padding: isMobile ? "56px 20px" : "80px 48px" }}>
+            <section style={{ background: "#FAFAFA", borderTop: "1px solid #E2E8EE", padding: isMobile ? "56px 20px" : "80px 48px" }}>
               <div style={{ maxWidth: 1200, margin: "0 auto" }}>
                 <h2
                   style={{
-                    font: "600 32px/1.25 Inter Variable, sans-serif",
-                    color: "#111827",
+                    font: "600 32px/1.25 'Space Grotesk Variable', 'Inter Variable', sans-serif",
+                    color: "#0E1826",
                     textAlign: "center",
                     margin: "0 0 48px",
                   }}
@@ -936,7 +943,7 @@ export default function HomePage() {
                       style={{
                         background: "#ffffff",
                         borderRadius: 16,
-                        border: "1px solid #E5E7EB",
+                        border: "1px solid #E2E8EE",
                         padding: "28px 24px",
                         boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
                       }}
@@ -946,7 +953,7 @@ export default function HomePage() {
                           width: 44,
                           height: 44,
                           borderRadius: 10,
-                          background: "#EFF6FF",
+                          background: "#F1F5F9",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
@@ -955,10 +962,10 @@ export default function HomePage() {
                       >
                         {icon}
                       </div>
-                      <div style={{ font: "600 20px/1.3 Inter Variable, sans-serif", color: "#111827", marginBottom: 8 }}>
+                      <div style={{ font: "600 20px/1.3 Inter Variable, sans-serif", color: "#0E1826", marginBottom: 8 }}>
                         {title}
                       </div>
-                      <div style={{ font: "400 15px/1.6 Inter Variable, sans-serif", color: "#6B7280" }}>
+                      <div style={{ font: "400 15px/1.6 Inter Variable, sans-serif", color: "#5F6E7E" }}>
                         {desc}
                       </div>
                     </div>
@@ -971,19 +978,19 @@ export default function HomePage() {
             <section id="help" style={{ background: "#ffffff", padding: isMobile ? "56px 20px" : "80px 48px" }}>
               <div style={{ maxWidth: 1200, margin: "0 auto", display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1.5fr", gap: 64 }}>
                 <div>
-                  <h2 style={{ font: "600 32px/1.25 Inter Variable, sans-serif", color: "#111827", margin: "0 0 16px" }}>
+                  <h2 style={{ font: "600 32px/1.25 'Space Grotesk Variable', 'Inter Variable', sans-serif", color: "#0E1826", margin: "0 0 16px" }}>
                     Часто задаваемые вопросы
                   </h2>
-                  <p style={{ font: "400 16px/1.6 Inter Variable, sans-serif", color: "#6B7280", margin: "0 0 28px" }}>
+                  <p style={{ font: "400 16px/1.6 Inter Variable, sans-serif", color: "#5F6E7E", margin: "0 0 28px" }}>
                     Не нашли ответ? Напишите нам.
                   </p>
                   <a
                     href={`mailto:${CONTACTS.supportEmail}`}
                     style={{
                       display: "inline-block",
-                      border: "1.5px solid #E5E7EB",
+                      border: "1.5px solid #E2E8EE",
                       background: "#ffffff",
-                      color: "#111827",
+                      color: "#0E1826",
                       borderRadius: 10,
                       padding: "12px 24px",
                       font: "600 15px/1 Inter Variable, sans-serif",
@@ -1002,7 +1009,7 @@ export default function HomePage() {
                     return (
                       <div
                         key={i}
-                        style={{ borderBottom: "1px solid #E5E7EB" }}
+                        style={{ borderBottom: "1px solid #E2E8EE" }}
                       >
                         <button
                           onClick={() => setOpenFaq(isOpen ? null : i)}
@@ -1016,7 +1023,7 @@ export default function HomePage() {
                             alignItems: "center",
                             cursor: "pointer",
                             font: "500 16px/1.4 Inter Variable, sans-serif",
-                            color: "#111827",
+                            color: "#0E1826",
                             textAlign: "left",
                             gap: 16,
                             fontFamily: "inherit",
@@ -1024,7 +1031,7 @@ export default function HomePage() {
                         >
                           {item.q}
                           {isOpen
-                            ? <ChevronUp size={18} color="#2563EB" style={{ flexShrink: 0 }} />
+                            ? <ChevronUp size={18} color="#0B2545" style={{ flexShrink: 0 }} />
                             : <ChevronDown size={18} color="#9CA3AF" style={{ flexShrink: 0 }} />
                           }
                         </button>
@@ -1033,7 +1040,7 @@ export default function HomePage() {
                             style={{
                               padding: "0 0 20px",
                               font: "400 15px/1.6 Inter Variable, sans-serif",
-                              color: "#6B7280",
+                              color: "#5F6E7E",
                             }}
                           >
                             {item.a}
@@ -1082,14 +1089,14 @@ export default function HomePage() {
                 width: 36,
                 height: 36,
                 borderRadius: "50%",
-                border: "1px solid #E5E7EB",
+                border: "1px solid #E2E8EE",
                 background: "#ffffff",
                 cursor: "pointer",
                 fontSize: 18,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "#6B7280",
+                color: "#5F6E7E",
                 fontFamily: "inherit",
               }}
             >
@@ -1102,12 +1109,12 @@ export default function HomePage() {
                   width: 56,
                   height: 56,
                   borderRadius: 12,
-                  background: "#EFF6FF",
+                  background: "#F1F5F9",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  font: "700 24px/1 Inter Variable, sans-serif",
-                  color: "#2563EB",
+                  font: "700 24px/1 'Space Grotesk Variable', 'Inter Variable', sans-serif",
+                  color: "#0B2545",
                   overflow: "hidden",
                 }}
               >
@@ -1119,7 +1126,7 @@ export default function HomePage() {
                 )}
               </div>
               <div>
-                <div style={{ font: "700 18px/1 Inter Variable, sans-serif", color: "#111827" }}>
+                <div style={{ font: "700 18px/1 Inter Variable, sans-serif", color: "#0E1826" }}>
                   {selectedRate.carrier_name}
                 </div>
                 <span style={{ background: "#D1FAE5", color: "#065F46", padding: "3px 10px", borderRadius: 999, font: "600 12px/1 Inter Variable, sans-serif" }}>
@@ -1128,7 +1135,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            <hr style={{ border: "none", borderTop: "1px solid #E5E7EB", margin: "0 0 20px" }} />
+            <hr style={{ border: "none", borderTop: "1px solid #E2E8EE", margin: "0 0 20px" }} />
 
             <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
               <DetailRow label="Тариф" value={selectedRate.tariff_name} />
@@ -1141,7 +1148,7 @@ export default function HomePage() {
               <DetailRow label="Доп. услуги" value="Страхование, хрупкий груз - на след. шаге" muted />
             </div>
 
-            <hr style={{ border: "none", borderTop: "1px solid #E5E7EB", margin: "0 0 20px" }} />
+            <hr style={{ border: "none", borderTop: "1px solid #E2E8EE", margin: "0 0 20px" }} />
 
             <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
               <DetailRow label="Маршрут" value={`${form.fromCity} → ${form.toCity}`} />
@@ -1150,7 +1157,7 @@ export default function HomePage() {
             </div>
 
             <div style={{ textAlign: "center", marginBottom: 24 }}>
-              <div style={{ font: "700 32px/1 Inter Variable, sans-serif", color: "#111827" }}>
+              <div style={{ font: "700 32px/1 'Space Grotesk Variable', 'Inter Variable', sans-serif", color: "#0E1826" }}>
                 {formatPrice(selectedRate.price, selectedRate.currency)}
               </div>
               <div style={{ font: "400 13px/1 Inter Variable, sans-serif", color: "#9CA3AF", marginTop: 4 }}>
@@ -1164,7 +1171,7 @@ export default function HomePage() {
               style={{
                 width: "100%",
                 height: 52,
-                background: isSelectingRate ? "#93C5FD" : "#2563EB",
+                background: isSelectingRate ? "#94A6C0" : "#0B2545",
                 color: "#ffffff",
                 borderRadius: 10,
                 font: "600 16px/1 Inter Variable, sans-serif",
@@ -1174,10 +1181,10 @@ export default function HomePage() {
                 transition: "background 0.15s",
               }}
               onMouseEnter={(e) => {
-                if (!isSelectingRate) e.currentTarget.style.background = "#1D4ED8";
+                if (!isSelectingRate) e.currentTarget.style.background = "#0E2E5C";
               }}
               onMouseLeave={(e) => {
-                if (!isSelectingRate) e.currentTarget.style.background = "#2563EB";
+                if (!isSelectingRate) e.currentTarget.style.background = "#0B2545";
               }}
             >
               {isSelectingRate ? "Оформляем..." : "Оформить доставку →"}

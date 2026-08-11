@@ -13,9 +13,9 @@ import {
 import type { AdminCarrierDetail } from "@/types/admin";
 
 const inp: React.CSSProperties = {
-  border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 12px",
+  border: "1px solid #E2E8EE", borderRadius: 8, padding: "8px 12px",
   fontSize: 13, width: "100%", boxSizing: "border-box",
-  fontFamily: "inherit", outline: "none", background: "#f8fafc", color: "#0f172a",
+  fontFamily: "inherit", outline: "none", background: "#f8fafc", color: "#0B2545",
 };
 const lbl: React.CSSProperties = {
   display: "block", fontSize: 12, fontWeight: 600, color: "#64748b",
@@ -116,8 +116,8 @@ export default function AdminCarrierOverviewPage() {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 20, alignItems: "start" }}>
       {/* Edit form */}
-      <form onSubmit={handleSave} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 14, padding: "24px" }}>
-        <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 18 }}>Основные данные</div>
+      <form onSubmit={handleSave} style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 14, padding: "24px" }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: "#0B2545", marginBottom: 18 }}>Основные данные</div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
           <div>
@@ -155,7 +155,7 @@ export default function AdminCarrierOverviewPage() {
             onChange={(e) => setForm(f => ({ ...f, is_active: e.target.checked }))}
             style={{ width: 16, height: 16, cursor: "pointer" }}
           />
-          <label htmlFor="is_active" style={{ fontSize: 13, cursor: "pointer", color: "#0f172a" }}>
+          <label htmlFor="is_active" style={{ fontSize: 13, cursor: "pointer", color: "#0B2545" }}>
             Перевозчик активен (доступен для котировок)
           </label>
         </div>
@@ -166,14 +166,14 @@ export default function AdminCarrierOverviewPage() {
           </div>
         )}
 
-        <button type="submit" disabled={saving} style={{ padding: "10px 24px", borderRadius: 10, border: "none", background: "#0f172a", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+        <button type="submit" disabled={saving} style={{ padding: "10px 24px", borderRadius: 10, border: "none", background: "#0B2545", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
           {saving ? "Сохраняем…" : "Сохранить"}
         </button>
       </form>
 
       {/* Account section */}
-      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 14, padding: "22px 24px" }}>
-        <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 6 }}>Аккаунт перевозчика</div>
+      <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 14, padding: "22px 24px" }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: "#0B2545", marginBottom: 6 }}>Аккаунт перевозчика</div>
         <p style={{ fontSize: 13, color: "#64748b", marginTop: 0, marginBottom: 16 }}>
           {accounts && accounts.length > 0
             ? "Сотрудники этого перевозчика, у которых есть доступ в личный кабинет."
@@ -192,12 +192,12 @@ export default function AdminCarrierOverviewPage() {
               <Link
                 key={a.id}
                 href={`/dashboard/admin/users/${a.id}`}
-                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "10px 12px", background: "#f8fafc", border: "1px solid #e5e7eb", borderRadius: 10, textDecoration: "none", cursor: "pointer", transition: "background 0.15s" }}
+                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "10px 12px", background: "#f8fafc", border: "1px solid #E2E8EE", borderRadius: 10, textDecoration: "none", cursor: "pointer", transition: "background 0.15s" }}
                 onMouseEnter={(e) => { e.currentTarget.style.background = "#f1f5f9"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = "#f8fafc"; }}
               >
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#0B2545", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {a.full_name || a.email}
                   </div>
                   {a.full_name && (
@@ -243,10 +243,10 @@ export default function AdminCarrierOverviewPage() {
               <input style={inp} required minLength={8} value={accountForm.temp_password} onChange={(e) => setAccountForm(f => ({ ...f, temp_password: e.target.value }))} placeholder="Минимум 8 символов" />
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <button type="submit" disabled={savingAccount} style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: "#0f172a", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+              <button type="submit" disabled={savingAccount} style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: "#0B2545", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                 {savingAccount ? "…" : "Создать"}
               </button>
-              <button type="button" onClick={() => setShowAccountForm(false)} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", color: "#64748b", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+              <button type="button" onClick={() => setShowAccountForm(false)} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid #E2E8EE", background: "#fff", color: "#64748b", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
                 Отмена
               </button>
             </div>

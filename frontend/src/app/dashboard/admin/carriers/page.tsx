@@ -7,9 +7,9 @@ import { createAdminCarrier, createCarrierAccount, listAdminCarriers, updateAdmi
 import type { AdminCarrier } from "@/types/admin";
 
 const inp: React.CSSProperties = {
-  border: "1px solid #e5e7eb", borderRadius: 10, padding: "10px 14px",
+  border: "1px solid #E2E8EE", borderRadius: 10, padding: "10px 14px",
   fontSize: 14, width: "100%", boxSizing: "border-box",
-  fontFamily: "inherit", outline: "none", background: "#f8fafc", color: "#0f172a",
+  fontFamily: "inherit", outline: "none", background: "#f8fafc", color: "#0B2545",
 };
 
 const EMPTY_CARRIER = { code: "", name: "", description: "" };
@@ -90,13 +90,13 @@ export default function AdminCarriersPage() {
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0f172a" }}>Перевозчики</h2>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0B2545" }}>Перевозчики</h2>
           <p style={{ margin: "4px 0 0", fontSize: 14, color: "#64748b" }}>Управление перевозчиками и тарифными сетками</p>
         </div>
         {!showForm && (
           <button
             onClick={openForm}
-            style={{ padding: "10px 20px", borderRadius: 10, border: "none", background: "#0f172a", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+            style={{ padding: "10px 20px", borderRadius: 10, border: "none", background: "#0B2545", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
           >
             + Добавить перевозчика
           </button>
@@ -111,9 +111,9 @@ export default function AdminCarriersPage() {
 
       {/* Add carrier form */}
       {showForm && (
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: "28px 32px", marginBottom: 24 }}>
+        <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 16, padding: "28px 32px", marginBottom: 24 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
-            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0f172a" }}>Новый перевозчик</h3>
+            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0B2545" }}>Новый перевозчик</h3>
             <button onClick={() => setShowForm(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 22, lineHeight: 1, padding: 4 }}>×</button>
           </div>
 
@@ -137,20 +137,20 @@ export default function AdminCarriersPage() {
             {/* Account toggle */}
             <div
               onClick={() => setWithAccount((v) => !v)}
-              style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", padding: "14px 16px", borderRadius: 12, border: `1px solid ${withAccount ? "#c7d2fe" : "#e5e7eb"}`, background: withAccount ? "#eef2ff" : "#f8fafc", marginBottom: withAccount ? 16 : 24, userSelect: "none", transition: "all 0.15s" }}
+              style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", padding: "14px 16px", borderRadius: 12, border: `1px solid ${withAccount ? "#c7d2fe" : "#E2E8EE"}`, background: withAccount ? "#eef2ff" : "#f8fafc", marginBottom: withAccount ? 16 : 24, userSelect: "none", transition: "all 0.15s" }}
             >
               <div style={{ width: 20, height: 20, borderRadius: 6, border: `2px solid ${withAccount ? "#6366f1" : "#cbd5e1"}`, background: withAccount ? "#6366f1" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
                 {withAccount && <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><polyline points="2 6 5 9 10 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
               </div>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>Создать аккаунт для перевозчика</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#0B2545" }}>Создать аккаунт для перевозчика</div>
                 <div style={{ fontSize: 12, color: "#64748b" }}>Перевозчик сможет войти в личный кабинет и получать уведомления</div>
               </div>
             </div>
 
             {/* Account fields (conditional) */}
             {withAccount && (
-              <div style={{ background: "#f8fafc", border: "1px solid #e5e7eb", borderRadius: 12, padding: "18px 20px", marginBottom: 20 }}>
+              <div style={{ background: "#f8fafc", border: "1px solid #E2E8EE", borderRadius: 12, padding: "18px 20px", marginBottom: 20 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 14 }}>Данные аккаунта</div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                   <div>
@@ -174,10 +174,10 @@ export default function AdminCarriersPage() {
             )}
 
             <div style={{ display: "flex", gap: 10 }}>
-              <button type="submit" disabled={saving} style={{ padding: "10px 28px", borderRadius: 10, border: "none", background: "#0f172a", color: "#fff", fontSize: 14, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1, fontFamily: "inherit" }}>
+              <button type="submit" disabled={saving} style={{ padding: "10px 28px", borderRadius: 10, border: "none", background: "#0B2545", color: "#fff", fontSize: 14, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1, fontFamily: "inherit" }}>
                 {saving ? "Создаём..." : withAccount ? "Создать перевозчика и аккаунт" : "Создать перевозчика"}
               </button>
-              <button type="button" onClick={() => setShowForm(false)} style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", color: "#64748b", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+              <button type="button" onClick={() => setShowForm(false)} style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid #E2E8EE", background: "#fff", color: "#64748b", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                 Отмена
               </button>
             </div>
@@ -189,18 +189,18 @@ export default function AdminCarriersPage() {
       {isLoading ? (
         <div style={{ padding: 48, textAlign: "center", color: "#64748b" }}>Загружаем…</div>
       ) : carriers.length === 0 ? (
-        <div style={{ padding: 48, textAlign: "center", color: "#94a3b8", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16 }}>Перевозчиков нет</div>
+        <div style={{ padding: 48, textAlign: "center", color: "#94a3b8", background: "#fff", border: "1px solid #E2E8EE", borderRadius: 16 }}>Перевозчиков нет</div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {carriers.map((carrier) => (
-            <div key={carrier.id} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 14, padding: "20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+            <div key={carrier.id} style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 14, padding: "20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                <div style={{ width: 48, height: 48, borderRadius: 10, background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 800, color: "#0f172a", flexShrink: 0 }}>
+                <div style={{ width: 48, height: 48, borderRadius: 10, background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 800, color: "#0B2545", flexShrink: 0 }}>
                   {carrier.name[0]}
                 </div>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>{carrier.name}</span>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: "#0B2545" }}>{carrier.name}</span>
                     <span style={{ fontFamily: "monospace", fontSize: 12, color: "#94a3b8", background: "#f1f5f9", padding: "2px 8px", borderRadius: 6 }}>{carrier.code}</span>
                     <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600, background: carrier.is_active ? "#dcfce7" : "#f1f5f9", color: carrier.is_active ? "#166534" : "#94a3b8" }}>
                       {carrier.is_active ? "Активен" : "Неактивен"}
@@ -213,7 +213,7 @@ export default function AdminCarriersPage() {
               <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
                 <Link
                   href={`/dashboard/admin/carriers/${carrier.id}`}
-                  style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", color: "#0f172a", fontSize: 13, fontWeight: 600, textDecoration: "none" }}
+                  style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #E2E8EE", background: "#fff", color: "#0B2545", fontSize: 13, fontWeight: 600, textDecoration: "none" }}
                 >
                   Тарифы →
                 </Link>
