@@ -4,10 +4,27 @@ import "./globals.css";
 
 import { AuthProvider } from "@/components/providers/auth-provider";
 
+const SITE_URL = "https://novex.kz";
+
 export const metadata: Metadata = {
-  title: "Novex - Доставка по Казахстану",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Novex — Доставка по Казахстану",
+    template: "%s — Novex",
+  },
   description:
-    "Сравните тарифы курьерских служб и оформите доставку онлайн",
+    "Novex — агрегатор курьерских служб Казахстана. Сравните тарифы Azimuth Cargo, Exline, CSE и оформите доставку онлайн за 2 минуты.",
+  applicationName: "Novex",
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    locale: "ru_KZ",
+    url: SITE_URL,
+    siteName: "Novex",
+    title: "Novex — Доставка по Казахстану",
+    description:
+      "Сравните тарифы курьерских служб Казахстана и оформите отправление за 2 минуты.",
+  },
   icons: {
     icon: [
       { url: "/favicon.svg", type: "image/svg+xml" },
@@ -24,10 +41,40 @@ export const viewport: Viewport = {
   themeColor: "#0B2545",
 };
 
+const organizationJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "Novex",
+  url: SITE_URL,
+  logo: `${SITE_URL}/favicon-512.png`,
+  email: "support@novex.kz",
+  areaServed: "KZ",
+};
+
+const websiteJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "Novex",
+  url: SITE_URL,
+  potentialAction: {
+    "@type": "SearchAction",
+    target: `${SITE_URL}/tracking?query={search_term_string}`,
+    "query-input": "required name=search_term_string",
+  },
+};
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="ru">
       <body>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+        />
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
