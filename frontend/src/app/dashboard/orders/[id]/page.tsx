@@ -9,10 +9,12 @@ import { useIsMobile } from "@/hooks/use-is-mobile";
 import {
   ApiError,
   CANCELLABLE_STATUSES,
+  RESCHEDULE_PICKUP_STATUSES,
   cancelOrder,
   deleteOrderDraft,
   downloadOrderLabel,
   getOrderDraft,
+  reschedulePickup,
 } from "@/lib/api/orders";
 import { orderStatusColors, orderStatusLabel } from "@/lib/status-labels";
 import type { OrderDraftResponse } from "@/types/order";
@@ -81,6 +83,17 @@ export default function OrderDetailPage() {
   // заявки на отмену (не error, но заказ ещё не cancelled).
   const [info, setInfo] = useState<string | null>(null);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Reschedule pickup modal state ──────────────────────────────────────
+  // We show this only for orders whose carrier is CSE and whose status is
+  // in RESCHEDULE_PICKUP_STATUSES (i.e., waybill exists but courier hasn't
+  // taken the parcel yet). Beyond that a reschedule is impossible without
+  // manual carrier support.
+  const [showReschedModal, setShowReschedModal] = useState(false);
+  const [reschedDate, setReschedDate] = useState("");
+  const [reschedSlot, setReschedSlot] = useState("");
+  const [isRescheduling, setIsRescheduling] = useState(false);
+  const [reschedError, setReschedError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) router.push("/login");
@@ -161,6 +174,43 @@ export default function OrderDetailPage() {
       setCancelError(err instanceof ApiError ? err.detail : "Не удалось отменить заказ.");
     } finally {
       setIsCancelling(false);
+    }
+  }
+
+  function openReschedule() {
+    setReschedDate(order?.pickup_date ?? "");
+    setReschedSlot(order?.pickup_time_slot ?? "");
+    setReschedError(null);
+    setShowReschedModal(true);
+  }
+
+  async function handleConfirmReschedule() {
+    if (!reschedDate) {
+      setReschedError("Выберите новую дату забора");
+      return;
+    }
+    if (!reschedSlot.trim()) {
+      setReschedError("Выберите или введите интервал времени");
+      return;
+    }
+    setIsRescheduling(true);
+    setReschedError(null);
+    try {
+      const resp = await reschedulePickup(draftId, {
+        pickup_date: reschedDate,
+        pickup_time_slot: reschedSlot.trim(),
+      });
+      setOrder(resp.order);
+      setShowReschedModal(false);
+      setInfo(
+        resp.outcome === "rescheduled"
+          ? "Забор перенесён. Курьер подъедет в новое время."
+          : "Новая дата забора уже поставлена в очередь.",
+      );
+    } catch (err) {
+      setReschedError(err instanceof ApiError ? err.detail : "Не удалось перенести забор.");
+    } finally {
+      setIsRescheduling(false);
     }
   }
 
@@ -253,6 +303,15 @@ export default function OrderDetailPage() {
                   style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid #fecaca", background: "#fff", color: "#ef4444", fontSize: 14, fontWeight: 600, cursor: isDeleting ? "not-allowed" : "pointer", opacity: isDeleting ? 0.5 : 1, fontFamily: "inherit" }}
                 >
                   Удалить черновик
+                </button>
+              )}
+              {order.carrier_code_snapshot?.toLowerCase() === "cse" &&
+                RESCHEDULE_PICKUP_STATUSES.includes(order.status) && (
+                <button
+                  onClick={openReschedule}
+                  style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid #E2E8EE", background: "#fff", color: "#0E1826", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                >
+                  Перенести забор
                 </button>
               )}
               {CANCELLABLE_STATUSES.includes(order.status) && (
@@ -368,6 +427,42 @@ export default function OrderDetailPage() {
               </div>
             </div>
           </div>
+
+          {/* Pickup schedule (только для CSE-заказов с указанной датой забора).
+              До picked_up блок редактируем через кнопку «Перенести забор» выше;
+              после — только просмотр. */}
+          {order.carrier_code_snapshot?.toLowerCase() === "cse" && order.pickup_date && (
+            <div style={{ ...card }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 14 }}>Забор груза</div>
+              <div style={{ display: "flex", gap: 32, flexWrap: "wrap", alignItems: "flex-start" }}>
+                <div>
+                  <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Дата</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "#0E1826" }}>{formatDate(order.pickup_date)}</div>
+                </div>
+                {order.pickup_time_slot && (
+                  <div>
+                    <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Время</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: "#0E1826" }}>{order.pickup_time_slot}</div>
+                  </div>
+                )}
+                {order.pickup_contact_person && (
+                  <div>
+                    <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Контакт</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#0E1826" }}>{order.pickup_contact_person}</div>
+                    {order.pickup_contact_phone && (
+                      <div style={{ fontSize: 13, color: "#64748b" }}>{order.pickup_contact_phone}</div>
+                    )}
+                  </div>
+                )}
+              </div>
+              {RESCHEDULE_PICKUP_STATUSES.includes(order.status) && (
+                <div style={{ marginTop: 14, fontSize: 12, color: "#64748b" }}>
+                  Курьер приедет в указанное время. Если планы изменились, нажмите
+                  «Перенести забор» — старая накладная будет отменена и создана новая.
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Sender + Recipient */}
           {(order.sender ?? order.recipient) && (
@@ -506,6 +601,75 @@ export default function OrderDetailPage() {
                 style={{ padding: "10px 20px", borderRadius: 10, border: "none", background: "#ef4444", color: "#fff", fontSize: 14, fontWeight: 600, cursor: (isCancelling || cancelReason.trim().length < 3) ? "not-allowed" : "pointer", opacity: (isCancelling || cancelReason.trim().length < 3) ? 0.6 : 1, fontFamily: "inherit" }}
               >
                 {isCancelling ? "Отменяем…" : "Отменить заявку"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showReschedModal && order && (
+        <div
+          onClick={() => { if (!isRescheduling) setShowReschedModal(false); }}
+          style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 100 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 480, padding: "24px 28px", boxShadow: "0 20px 40px rgba(15,23,42,0.25)" }}
+          >
+            <h2 style={{ margin: "0 0 8px", fontSize: 20, fontWeight: 800, color: "#0E1826" }}>
+              Перенести забор груза
+            </h2>
+            <p style={{ margin: "0 0 16px", fontSize: 13, color: "#64748b", lineHeight: 1.5 }}>
+              Выберите удобное время. Старая накладная будет отменена, и мы создадим новую с новой датой забора.
+            </p>
+
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6 }}>
+              Новая дата <span style={{ color: "#ef4444" }}>*</span>
+            </label>
+            <input
+              type="date"
+              value={reschedDate}
+              min={new Date().toISOString().slice(0, 10)}
+              onChange={(e) => setReschedDate(e.target.value)}
+              disabled={isRescheduling}
+              style={{ width: "100%", padding: "10px 12px", border: "1px solid #E2E8EE", borderRadius: 10, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", color: "#0E1826", background: "#fff" }}
+            />
+
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", margin: "14px 0 6px" }}>
+              Интервал времени <span style={{ color: "#ef4444" }}>*</span>
+            </label>
+            <select
+              value={reschedSlot}
+              onChange={(e) => setReschedSlot(e.target.value)}
+              disabled={isRescheduling}
+              style={{ width: "100%", padding: "10px 12px", border: "1px solid #E2E8EE", borderRadius: 10, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", color: "#0E1826", background: "#fff" }}
+            >
+              <option value="">Выберите интервал…</option>
+              <option value="10:00-14:00">10:00 – 14:00</option>
+              <option value="14:00-18:00">14:00 – 18:00</option>
+              <option value="18:00-22:00">18:00 – 22:00</option>
+            </select>
+
+            {reschedError && (
+              <div style={{ marginTop: 12, padding: "10px 14px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, fontSize: 13, color: "#b91c1c" }}>
+                {reschedError}
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
+              <button
+                onClick={() => { setShowReschedModal(false); setReschedError(null); }}
+                disabled={isRescheduling}
+                style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid #E2E8EE", background: "#fff", color: "#374151", fontSize: 14, fontWeight: 600, cursor: isRescheduling ? "not-allowed" : "pointer", fontFamily: "inherit" }}
+              >
+                Отмена
+              </button>
+              <button
+                onClick={() => void handleConfirmReschedule()}
+                disabled={isRescheduling || !reschedDate || !reschedSlot.trim()}
+                style={{ padding: "10px 20px", borderRadius: 10, border: "none", background: "#0B2545", color: "#fff", fontSize: 14, fontWeight: 600, cursor: (isRescheduling || !reschedDate || !reschedSlot.trim()) ? "not-allowed" : "pointer", opacity: (isRescheduling || !reschedDate || !reschedSlot.trim()) ? 0.6 : 1, fontFamily: "inherit" }}
+              >
+                {isRescheduling ? "Переносим…" : "Перенести"}
               </button>
             </div>
           </div>

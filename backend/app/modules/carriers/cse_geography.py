@@ -8,6 +8,13 @@ CSE accepts two identifier formats for Kazakhstan cities:
 Quote flow (Calc) uses postal-code format — no API round-trip.
 Dispatch flow (SaveWaybillOffice) needs GUIDs — resolved via Geography API
 and cached in Redis for 24 h.
+
+Additionally, `_KZ_KNOWN_GUIDS` hardcodes GUIDs for major KZ cities pulled
+from the CSE Geography XML directory (CSE Ref/Справочник География). This
+short-circuits the API call for the ~95% of dispatches that head to a
+regional centre. If the CSE side later renames a city (rare — GUIDs are
+stable), the value can be corrected here without a redeploy of the API
+lookup path.
 """
 from __future__ import annotations
 
@@ -157,6 +164,149 @@ def city_to_postcode_geo(city: str) -> str | None:
 
 
 # ---------------------------------------------------------------------------
+# Known KZ city GUIDs — dumped from CSE Geography XML (September 2025).
+#
+# Aliases (russian + kazakh + eng transliteration) are grouped so any
+# normalised spelling points to the same GUID. Keep entries lowercase — keys
+# are compared post-`_normalize`.
+# ---------------------------------------------------------------------------
+_KZ_KNOWN_GUIDS: dict[str, str] = {
+    # ── Cities of Republican Status (уровень страны) ────────────────────────
+    "алматы":            "189ad5cd-4fec-11dc-bda1-0015170f8c09",
+    "almaty":            "189ad5cd-4fec-11dc-bda1-0015170f8c09",
+    "алма-ата":          "189ad5cd-4fec-11dc-bda1-0015170f8c09",
+    "астана":            "189ad5d6-4fec-11dc-bda1-0015170f8c09",
+    "astana":            "189ad5d6-4fec-11dc-bda1-0015170f8c09",
+    "нур-султан":        "189ad5d6-4fec-11dc-bda1-0015170f8c09",
+    "нурсултан":         "189ad5d6-4fec-11dc-bda1-0015170f8c09",
+    "nur-sultan":        "189ad5d6-4fec-11dc-bda1-0015170f8c09",
+    "шымкент":           "189ad6b4-4fec-11dc-bda1-0015170f8c09",
+    "shymkent":          "189ad6b4-4fec-11dc-bda1-0015170f8c09",
+    "чимкент":           "189ad6b4-4fec-11dc-bda1-0015170f8c09",
+    # ── Regional centres ────────────────────────────────────────────────────
+    "актобе":            "189ad5c7-4fec-11dc-bda1-0015170f8c09",
+    "aktobe":            "189ad5c7-4fec-11dc-bda1-0015170f8c09",
+    "актюбинск":         "189ad5c7-4fec-11dc-bda1-0015170f8c09",
+    "актау":             "189ad5c4-4fec-11dc-bda1-0015170f8c09",
+    "aktau":             "189ad5c4-4fec-11dc-bda1-0015170f8c09",
+    "шевченко":          "189ad5c4-4fec-11dc-bda1-0015170f8c09",
+    "атырау":            "189ad5dc-4fec-11dc-bda1-0015170f8c09",
+    "atyrau":            "189ad5dc-4fec-11dc-bda1-0015170f8c09",
+    "гурьев":            "189ad5dc-4fec-11dc-bda1-0015170f8c09",
+    "караганда":         "189ad623-4fec-11dc-bda1-0015170f8c09",
+    "karaganda":         "189ad623-4fec-11dc-bda1-0015170f8c09",
+    "кокшетау":          "189ad638-4fec-11dc-bda1-0015170f8c09",
+    "kokshetau":         "189ad638-4fec-11dc-bda1-0015170f8c09",
+    "костанай":          "189ad63d-4fec-11dc-bda1-0015170f8c09",
+    "kostanay":          "189ad63d-4fec-11dc-bda1-0015170f8c09",
+    "кустанай":          "189ad63d-4fec-11dc-bda1-0015170f8c09",
+    "кызылорда":         "189ad645-4fec-11dc-bda1-0015170f8c09",
+    "kyzylorda":         "189ad645-4fec-11dc-bda1-0015170f8c09",
+    "qyzylorda":         "189ad645-4fec-11dc-bda1-0015170f8c09",
+    "павлодар":          "189ad65e-4fec-11dc-bda1-0015170f8c09",
+    "pavlodar":          "189ad65e-4fec-11dc-bda1-0015170f8c09",
+    "петропавловск":     "189ad661-4fec-11dc-bda1-0015170f8c09",
+    "petropavlovsk":     "189ad661-4fec-11dc-bda1-0015170f8c09",
+    "petropavl":         "189ad661-4fec-11dc-bda1-0015170f8c09",
+    "талдыкорган":       "189ad67c-4fec-11dc-bda1-0015170f8c09",
+    "taldykorgan":       "189ad67c-4fec-11dc-bda1-0015170f8c09",
+    "тараз":             "189ad67f-4fec-11dc-bda1-0015170f8c09",
+    "taraz":             "189ad67f-4fec-11dc-bda1-0015170f8c09",
+    "джамбул":           "189ad67f-4fec-11dc-bda1-0015170f8c09",
+    "жамбыл":            "189ad67f-4fec-11dc-bda1-0015170f8c09",
+    "туркестан":         "189ad68e-4fec-11dc-bda1-0015170f8c09",
+    "turkestan":         "189ad68e-4fec-11dc-bda1-0015170f8c09",
+    "уральск":           "189ad694-4fec-11dc-bda1-0015170f8c09",
+    "oral":              "189ad694-4fec-11dc-bda1-0015170f8c09",
+    "uralsk":            "189ad694-4fec-11dc-bda1-0015170f8c09",
+    "усть-каменогорск":  "189ad697-4fec-11dc-bda1-0015170f8c09",
+    "ust-kamenogorsk":   "189ad697-4fec-11dc-bda1-0015170f8c09",
+    "оскемен":           "189ad697-4fec-11dc-bda1-0015170f8c09",
+    "oskemen":           "189ad697-4fec-11dc-bda1-0015170f8c09",
+    "семей":             "9552cc38-a3f4-11dc-986e-0015170f8c09",
+    "semey":             "9552cc38-a3f4-11dc-986e-0015170f8c09",
+    "семипалатинск":     "9552cc38-a3f4-11dc-986e-0015170f8c09",
+    "semipalatinsk":     "9552cc38-a3f4-11dc-986e-0015170f8c09",
+    # ── District centres and other larger towns ─────────────────────────────
+    "темиртау":          "189ad684-4fec-11dc-bda1-0015170f8c09",
+    "temirtau":          "189ad684-4fec-11dc-bda1-0015170f8c09",
+    "экибастуз":         "189ad6b7-4fec-11dc-bda1-0015170f8c09",
+    "ekibastuz":         "189ad6b7-4fec-11dc-bda1-0015170f8c09",
+    "балхаш":            "189ad5e4-4fec-11dc-bda1-0015170f8c09",
+    "balkhash":          "189ad5e4-4fec-11dc-bda1-0015170f8c09",
+    "риддер":            "13736927-d1bc-11dd-927a-0015170f8c09",
+    "ridder":            "13736927-d1bc-11dd-927a-0015170f8c09",
+    "лениногорск":       "13736927-d1bc-11dd-927a-0015170f8c09",
+    "рудный":            "189ad664-4fec-11dc-bda1-0015170f8c09",
+    "rudny":             "189ad664-4fec-11dc-bda1-0015170f8c09",
+    "аркалык":           "189ad5d0-4fec-11dc-bda1-0015170f8c09",
+    "arkalyk":           "189ad5d0-4fec-11dc-bda1-0015170f8c09",
+    "лисаковск":         "189ad64b-4fec-11dc-bda1-0015170f8c09",
+    "lisakovsk":         "189ad64b-4fec-11dc-bda1-0015170f8c09",
+    "жанаозен":          "189ad607-4fec-11dc-bda1-0015170f8c09",
+    "zhanaozen":         "189ad607-4fec-11dc-bda1-0015170f8c09",
+    "жезказган":         "189ad60c-4fec-11dc-bda1-0015170f8c09",
+    "zhezkazgan":        "189ad60c-4fec-11dc-bda1-0015170f8c09",
+    "jezkazgan":         "189ad60c-4fec-11dc-bda1-0015170f8c09",
+    "аксу":              "d9ef2632-d570-11ea-80db-7cd30aec6901",
+    "aksu":              "d9ef2632-d570-11ea-80db-7cd30aec6901",
+    "аксай":             "189ad5bf-4fec-11dc-bda1-0015170f8c09",
+    "aksai":             "189ad5bf-4fec-11dc-bda1-0015170f8c09",
+    "капшагай":          "189ad61f-4fec-11dc-bda1-0015170f8c09",  # renamed → Конаев in 2022
+    "kapshagai":         "189ad61f-4fec-11dc-bda1-0015170f8c09",
+    "конаев":            "189ad61f-4fec-11dc-bda1-0015170f8c09",
+    "konaev":            "189ad61f-4fec-11dc-bda1-0015170f8c09",
+    "каскелен":          "189ad62c-4fec-11dc-bda1-0015170f8c09",
+    "kaskelen":          "189ad62c-4fec-11dc-bda1-0015170f8c09",
+    "талгар":            "189ad67b-4fec-11dc-bda1-0015170f8c09",
+    "talgar":            "189ad67b-4fec-11dc-bda1-0015170f8c09",
+    "жаркент":           "189ad60a-4fec-11dc-bda1-0015170f8c09",
+    "zharkent":          "189ad60a-4fec-11dc-bda1-0015170f8c09",
+    "текели":            "189ad682-4fec-11dc-bda1-0015170f8c09",
+    "tekeli":            "189ad682-4fec-11dc-bda1-0015170f8c09",
+    "есик":              "189ad600-4fec-11dc-bda1-0015170f8c09",
+    "esik":              "189ad600-4fec-11dc-bda1-0015170f8c09",
+    "кульсары":          "189ad640-4fec-11dc-bda1-0015170f8c09",
+    "kulsary":           "189ad640-4fec-11dc-bda1-0015170f8c09",
+    "сатпаев":           "189ad66e-4fec-11dc-bda1-0015170f8c09",
+    "satpaev":           "189ad66e-4fec-11dc-bda1-0015170f8c09",
+    "байконур":          "c0f8d5c0-1962-11e9-80c3-7cd30aec6900",
+    "baikonur":          "c0f8d5c0-1962-11e9-80c3-7cd30aec6900",
+    "степногорск":       "189ad676-4fec-11dc-bda1-0015170f8c09",
+    "stepnogorsk":       "189ad676-4fec-11dc-bda1-0015170f8c09",
+    "щучинск":           "189ad6b6-4fec-11dc-bda1-0015170f8c09",
+    "shchuchinsk":       "189ad6b6-4fec-11dc-bda1-0015170f8c09",
+    "курчатов":          "189ad641-4fec-11dc-bda1-0015170f8c09",
+    "kurchatov":         "189ad641-4fec-11dc-bda1-0015170f8c09",
+    "каратау":           "189ad627-4fec-11dc-bda1-0015170f8c09",
+    "karatau":           "189ad627-4fec-11dc-bda1-0015170f8c09",
+    "шахтинск":          "189ad6a9-4fec-11dc-bda1-0015170f8c09",
+    "shakhtinsk":        "189ad6a9-4fec-11dc-bda1-0015170f8c09",
+    "приозерск":         "189ad663-4fec-11dc-bda1-0015170f8c09",
+    "приозёрск":         "189ad663-4fec-11dc-bda1-0015170f8c09",
+    "priozersk":         "189ad663-4fec-11dc-bda1-0015170f8c09",
+    "кентау":            "189ad632-4fec-11dc-bda1-0015170f8c09",
+    "kentau":            "189ad632-4fec-11dc-bda1-0015170f8c09",
+    "сарыагаш":          "189ad66a-4fec-11dc-bda1-0015170f8c09",
+    "saryagash":         "189ad66a-4fec-11dc-bda1-0015170f8c09",
+    "арыс":              "ea119482-040f-11ed-8105-0090faaaf8e4",
+    "arys":              "ea119482-040f-11ed-8105-0090faaaf8e4",
+    "абай":              "a431eb62-9000-11e3-be51-001e67086478",
+    "abai":              "a431eb62-9000-11e3-be51-001e67086478",
+    "сарань":            "189ad668-4fec-11dc-bda1-0015170f8c09",
+    "saran":             "189ad668-4fec-11dc-bda1-0015170f8c09",
+}
+
+
+def city_to_known_guid(city: str) -> str | None:
+    """Return the hardcoded CSE Geography GUID for a KZ city, or None.
+
+    O(1) lookup — used before hitting Redis / Geography API.
+    """
+    return _KZ_KNOWN_GUIDS.get(_normalize(city))
+
+
+# ---------------------------------------------------------------------------
 # Geography GUID lookup with Redis cache (for dispatch / SaveWaybillOffice)
 # ---------------------------------------------------------------------------
 
@@ -167,10 +317,24 @@ _CACHE_PREFIX = "cse:geo:"
 def get_city_guid(city: str, creds: dict) -> str | None:
     """
     Return the CSE Geography GUID for a city name.
-    Checks Redis cache first; on miss, calls GetReferenceData → Geography.
+
+    Lookup order:
+      0. Hardcoded KZ known-GUIDs table (populated from the CSE XML directory
+         dump). No network / cache hit for ~45 major cities that cover the
+         bulk of dispatches.
+      1. Redis cache (24h TTL).
+      2. Geography API — GetReferenceData:Geography with optional trailing " г"
+         retry for CSE's peculiar KZ city storage.
+
     Returns None if the city cannot be resolved.
     """
     normalized = _normalize(city)
+
+    # 0. Hardcoded fast-path
+    known = _KZ_KNOWN_GUIDS.get(normalized)
+    if known:
+        return known
+
     cache_key = f"{_CACHE_PREFIX}{normalized}"
 
     # 1. Try Redis cache

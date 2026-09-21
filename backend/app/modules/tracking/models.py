@@ -69,6 +69,12 @@ class TrackingEvent(Base):
         nullable=False,
         index=True,
     )
+    # CSE-specific: плановая дата доставки; обновляется на «Переадресации».
+    # Nullable — Exline / Azimuth не эмитят это поле.
+    planned_delivery_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=False),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=False),
         server_default=func.now(),

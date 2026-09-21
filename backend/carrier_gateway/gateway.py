@@ -77,6 +77,11 @@ class TrackingEventItem(BaseModel):
     location: str | None = None
     occurred_at: str          # ISO 8601 — datetime serialised as string for transport
     description: str | None = None
+    # CSE emits «плановая дата доставки» in tracking events; other carriers
+    # leave it null. Serialised as ISO 8601 string. Missing on the wire means
+    # the legacy adapter did not expose it.
+    planned_delivery_at: str | None = None
+    delivered_at: str | None = None
 
 
 class FetchTrackingResponse(BaseModel):
@@ -177,6 +182,8 @@ def fetch_tracking(req: FetchTrackingRequest) -> FetchTrackingResponse:
             location=ev.location,
             occurred_at=ev.occurred_at.isoformat(),
             description=ev.description,
+            planned_delivery_at=ev.planned_delivery_at.isoformat() if ev.planned_delivery_at else None,
+            delivered_at=ev.delivered_at.isoformat() if ev.delivered_at else None,
         )
         for ev in events
     ])

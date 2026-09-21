@@ -154,26 +154,59 @@ _STATUS_MAP: dict[str, str] = {
 _UNKNOWN_STATUS = "carrier_unknown"
 
 
-def _map_status(carrier_status: str) -> str:
+# ---------------------------------------------------------------------------
+# GUID → internal status
+# ---------------------------------------------------------------------------
+# CSE docs (Tracking method) recommend keying off status GUIDs, not names:
+# "используйте GUID статуса, а не его название. Название может измениться,
+# GUID остаётся постоянным". This map takes precedence over the substring
+# fallback below. Populate it with GUIDs verified from live CSE responses.
+# Anchor entries known from the CSE integration guide:
+_STATUS_GUID_MAP: dict[str, str] = {
+    # Финальный статус доставки — "Доставка успешно выполнена".
+    "8e5ded66-a8f5-4fa8-b863-03e1e0406df5": "delivered",
+}
+
+
+def _map_status(carrier_status: str, guid: str = "") -> str:
+    """Resolve a CSE status to an internal Novex status.
+
+    Priority:
+      1. GUID lookup (stable across CSE renames).
+      2. Substring lookup on the localised status name (legacy path — kept
+         as a fallback because most GUIDs are not yet populated in the map).
+      3. `carrier_unknown` — polling scheduler treats this as "do not change
+         internal order.status", but the raw event is still persisted so the
+         customer sees the timeline entry.
+
+    Unknown GUIDs and unknown names are logged separately (rate-limited) so
+    ops can populate `_STATUS_GUID_MAP` from prod traffic.
+    """
+    guid_norm = (guid or "").strip().lower()
+    if guid_norm and guid_norm in _STATUS_GUID_MAP:
+        return _STATUS_GUID_MAP[guid_norm]
+
     normalized = carrier_status.strip().lower()
     for key, mapped in _STATUS_MAP.items():
         if key in normalized:
+            if guid_norm:
+                # Name matched but GUID is not yet in the map — log so ops
+                # can extend _STATUS_GUID_MAP with the stable identifier.
+                log_once_per(
+                    logger,
+                    f"cse-guid-unknown:{guid_norm}",
+                    "CSEPollingAdapter: status GUID %s not in _STATUS_GUID_MAP "
+                    "but matched by name %r → mapped to %s",
+                    guid_norm, carrier_status, mapped,
+                )
             return mapped
-    # Unknown status — log so we can extend _STATUS_MAP when new phrasings
-    # appear in prod. Return `carrier_unknown` (not present in the internal
-    # state machine) so that `can_transition(order.status, "carrier_unknown")`
-    # in the polling scheduler always returns False and the order status stays
-    # untouched. The raw carrier_status is still persisted on TrackingEvent so
-    # the customer sees the timeline entry — we just refuse to lie about the
-    # internal status. Previously this fell back to "in_transit", which could
-    # silently move e.g. `picked_up → in_transit` for a "проблема" event.
-    # Rate-limited: high-volume polling would otherwise flood logs with the
-    # same unknown status for every event on every tick.
+
     log_once_per(
         logger,
-        f"cse-unmapped:{normalized!r}",
-        "CSEPollingAdapter: unmapped carrier status %r → keeping order status unchanged",
-        carrier_status,
+        f"cse-unmapped:{normalized!r}:{guid_norm}",
+        "CSEPollingAdapter: unmapped carrier status guid=%s name=%r "
+        "→ keeping order status unchanged",
+        guid_norm or "-", carrier_status,
     )
     return _UNKNOWN_STATUS
 
@@ -221,8 +254,18 @@ class CSEPollingAdapter(CarrierPollingAdapter):
         effective_creds = {"login": login, "password": password, "api_url": api_url}
         client = CSEAPIClient()
 
+        # client_number is our internal ClientNumber (NOVEX-XXXXXX) that CSE
+        # echoes back and uses to link the outbound waybill with its return
+        # (Возвратная накладная). When present, tracking() sends it as a
+        # second lookup key so we see both legs in one response. The scheduler
+        # stashes it into creds["client_number"] — leaving it out here keeps
+        # backwards compatibility (single-leg tracking still works).
+        client_number = creds.get("client_number") or None
+
         try:
-            raw_events = client.tracking(tracking_number, effective_creds)
+            raw_events = client.tracking(
+                tracking_number, effective_creds, client_number=client_number
+            )
         except Exception as exc:
             logger.warning(
                 "CSEPollingAdapter: tracking request failed (waybill=%s): %s",
@@ -234,13 +277,17 @@ class CSEPollingAdapter(CarrierPollingAdapter):
         for ev in raw_events:
             carrier_status = ev.get("status", "")
             occurred_at = _parse_datetime(ev.get("occurred_at", ""))
-            mapped = _map_status(carrier_status)
+            mapped = _map_status(carrier_status, ev.get("guid", ""))
+            planned_raw = ev.get("planned_delivery_at") or ""
+            delivered_raw = ev.get("delivered_at") or ""
             events.append(TrackingEventData(
                 status=mapped,
                 carrier_status=carrier_status,
                 location=ev.get("location") or None,
                 occurred_at=occurred_at,
                 description=ev.get("comment") or carrier_status or None,
+                planned_delivery_at=_parse_datetime(planned_raw) if planned_raw else None,
+                delivered_at=_parse_datetime(delivered_raw) if delivered_raw else None,
             ))
 
         logger.debug(

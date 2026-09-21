@@ -17,7 +17,7 @@ from app.api.v1.admin_settings import router as admin_settings_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.carrier_portal import router as carrier_portal_router
 from app.api.v1.carrier_tracking import router as carrier_tracking_router
-from app.api.v1.cse import router as cse_router
+from app.api.v1.cse import admin_router as cse_admin_router, router as cse_router
 from app.api.v1.documents import router as documents_router
 from app.api.v1.health import router as health_router
 from app.api.v1.notifications import router as notifications_router
@@ -57,5 +57,6 @@ api_router.include_router(admin_commission_configs_router)
 api_router.include_router(admin_carrier_api_router)
 api_router.include_router(admin_audit_router)
 api_router.include_router(cse_router)
+api_router.include_router(cse_admin_router)
 api_router.include_router(public_tracking_router)
 api_router.include_router(partners_router)

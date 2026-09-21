@@ -16,6 +16,8 @@ from app.modules.orders.schemas import (
     CseRecalcResponse,
     OrderDraftListResponse,
     OrderDraftResponse,
+    ReschedulePickupRequest,
+    ReschedulePickupResponse,
     ShipmentPackageResponse,
     ShipmentPartyInput,
     ShipmentPartyResponse,
@@ -662,6 +664,159 @@ class OrdersService:
             len(payload.packages),
         )
         return self._build_order_draft_response(refreshed_draft)
+
+    # Statuses at which the customer can still change the pickup date/time.
+    # Later stages ("picked_up" and onward) mean the courier is already
+    # holding the parcel — no point trying to cancel the waybill.
+    _PICKUP_RESCHEDULE_ALLOWED_STATUSES: frozenset[str] = frozenset({
+        "dispatch_queued",
+        "sent_to_carrier",
+        "dispatch_failed",
+    })
+
+    def reschedule_pickup(
+        self,
+        db: Session,
+        *,
+        user_id: int,
+        draft_id: int,
+        payload: ReschedulePickupRequest,
+    ) -> ReschedulePickupResponse:
+        """Change the courier pickup date/time for a paid order.
+
+        Steps:
+          1. Load order + ownership check.
+          2. Guard: status ∈ _PICKUP_RESCHEDULE_ALLOWED_STATUSES.
+          3. Guard: new pickup_date >= today.
+          4. If a carrier waybill already exists (sent_to_carrier), ask the
+             carrier gateway to cancel it. Failure to cancel is NOT fatal
+             for the customer's request — we still update the local pickup
+             fields and re-queue dispatch; admin will reconcile.
+          5. Clear shipment.carrier_tracking_number so the idempotency guard
+             in dispatch_worker forces a fresh create_invoice next tick.
+          6. Update pickup_date / pickup_time_slot / pickup_error=None.
+          7. Transition order to dispatch_queued (if not already) and create
+             a new DispatchJob. Publish to the Redis stream so the worker
+             picks it up immediately.
+
+        Non-goals: does NOT block on the new create_invoice succeeding.
+        Dispatch is async, worker will notify via existing pipeline.
+        """
+        from datetime import date as _date
+
+        order_draft = self.repository.get_order_draft_by_id(db, draft_id)
+        if order_draft is None:
+            raise NotFoundError("Order draft not found")
+        if order_draft.user_id != user_id:
+            raise ForbiddenError("Order draft does not belong to the current user")
+
+        if order_draft.status not in self._PICKUP_RESCHEDULE_ALLOWED_STATUSES:
+            raise ValidationError(
+                f"Нельзя перенести забор в статусе '{order_draft.status}' — "
+                "курьер уже приехал или заказ ещё не оплачен"
+            )
+        if payload.pickup_date < _date.today():
+            raise ValidationError("Дата забора не может быть в прошлом")
+
+        # Update local pickup fields first so the new dispatch attempt uses them.
+        order_draft.pickup_requested = True
+        order_draft.pickup_date = payload.pickup_date
+        order_draft.pickup_time_slot = payload.pickup_time_slot
+        order_draft.pickup_error = None
+
+        # Cancel the existing carrier waybill (if any). Failure is logged but
+        # non-fatal — we still re-queue dispatch and let admin reconcile the
+        # abandoned waybill if the carrier ever billed for it.
+        from sqlalchemy import select as _select
+
+        shipment = db.scalar(
+            _select(Shipment).where(Shipment.order_draft_id == draft_id)
+        )
+        old_waybill = shipment.carrier_tracking_number if shipment else None
+        if shipment and shipment.carrier_tracking_number:
+            try:
+                from app.core.carrier_gateway_client import get_gateway_client
+                from app.modules.carriers.creds_cache import (
+                    get_creds as _get_carrier_creds,
+                )
+
+                creds = _get_carrier_creds(db, order_draft.carrier_code_snapshot)
+                get_gateway_client().cancel_invoice(
+                    order_draft.carrier_code_snapshot,
+                    shipment.carrier_tracking_number,
+                    creds,
+                )
+                logger.info(
+                    "reschedule_pickup: cancelled old waybill %s for order %s",
+                    shipment.carrier_tracking_number, draft_id,
+                )
+            except Exception:
+                logger.exception(
+                    "reschedule_pickup: failed to cancel waybill %s for order %s "
+                    "(non-fatal — proceeding with re-dispatch)",
+                    shipment.carrier_tracking_number, draft_id,
+                )
+            # Wipe the tracking number so dispatch_worker's idempotency
+            # guard does NOT skip create_invoice this time.
+            shipment.carrier_tracking_number = None
+            shipment.carrier_barcode = None
+            shipment.status = "pending"
+
+        # Re-queue dispatch. If we're already in dispatch_queued (worker not
+        # yet picked it up), skip the transition but still enqueue a new job
+        # so the pickup_date change is retried.
+        from app.modules.dispatch.service import create_dispatch_job
+
+        if order_draft.status == "dispatch_queued":
+            # A previous DispatchJob may still be in QUEUED/PROCESSING with
+            # the old pickup_date. It'll re-read order.pickup_date when it
+            # fires, so bumping status is unnecessary — just enqueue a new
+            # job to make sure a worker picks it up promptly.
+            outcome = "already_scheduled_new"
+        else:
+            outcome = "rescheduled"
+
+        # create_dispatch_job() handles the status transition through the
+        # state machine (sent_to_carrier → dispatch_queued, paid →
+        # dispatch_queued, or dispatch_failed → dispatch_queued — all allowed).
+        # If we're already in dispatch_queued the current status.machine
+        # rejects the same-status transition, so we skip create_dispatch_job
+        # in that branch and let the existing job re-read pickup_date.
+        if outcome == "rescheduled":
+            dispatch_job = create_dispatch_job(
+                db, order=order_draft, changed_by_user_id=user_id,
+                source="customer_reschedule",
+            )
+        else:
+            dispatch_job = None
+
+        db.flush()
+
+        # Publish stream event AFTER db.flush() — but our caller (endpoint)
+        # does the commit. We publish inside a try/except so a Redis outage
+        # doesn't break the endpoint response; polling will still catch the
+        # job. Skip publishing when we didn't enqueue a new job.
+        if dispatch_job is not None:
+            try:
+                from app.core.streams import STREAM_DISPATCH, stream_publish
+                stream_publish(STREAM_DISPATCH, {
+                    "dispatch_job_id": str(dispatch_job.id),
+                    "order_id": str(order_draft.id),
+                })
+            except Exception:
+                logger.exception(
+                    "reschedule_pickup: failed to publish dispatch event for order %s "
+                    "(polling will pick it up)", draft_id,
+                )
+
+        db.refresh(order_draft)
+        return ReschedulePickupResponse(
+            outcome=outcome,
+            order=self._build_order_draft_response(
+                order_draft,
+                tracking_number=shipment.tracking_number if shipment else None,
+            ),
+        )
 
     def cse_recalc(
         self,

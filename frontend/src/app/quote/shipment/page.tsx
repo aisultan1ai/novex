@@ -9,7 +9,14 @@ import Navbar from "@/components/layout/Navbar";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { ApiError, createDraftFromQuote, cseRecalcDraft, updateOrderDraftShipment } from "@/lib/api/orders";
-import { fetchCsePvzByCity, type CsePvzItem } from "@/lib/api/cse";
+import {
+  fetchCseDeliveryInfo,
+  fetchCsePvzByCity,
+  fetchCseTakeDates,
+  type CseAvailableDate,
+  type CseDeliveryInfo,
+  type CsePvzItem,
+} from "@/lib/api/cse";
 import { listAddresses } from "@/lib/api/address_book";
 import type { AddressEntry } from "@/types/address_book";
 import type { ProfileResponse } from "@/types/auth";
@@ -125,6 +132,7 @@ function buildShipmentPayload(
   form: ShipmentFormState,
   isDocument: boolean,
   isAzimuth: boolean,
+  isCse: boolean = false,
 ): UpdateShipmentDetailsRequest {
   const parsedDeclared = form.insurance ? Number(form.declared_value) : NaN;
   const declaredValue = Number.isFinite(parsedDeclared) && parsedDeclared > 0
@@ -132,11 +140,10 @@ function buildShipmentPayload(
     : null;
   const senderWh = form.delivery_type === "warehouse_to_door" || form.delivery_type === "warehouse_to_warehouse";
   const recipientWh = form.delivery_type === "door_to_warehouse" || form.delivery_type === "warehouse_to_warehouse";
-  // Pickup fields are only meaningful for Azimuth. Silently drop them for
-  // other carriers so a customer who ticked "вызвать курьера" and then
-  // switched tariff does not send stale data to /order-courier for a
-  // non-Azimuth order.
-  const pickup = isAzimuth && form.pickup_requested;
+  // Pickup fields are meaningful for Azimuth (order-courier flow) and CSE
+  // (SaveWaybillOffice TakeDate). Silently drop for other carriers so stale
+  // data from a switched tariff doesn't reach the dispatcher.
+  const pickup = (isAzimuth || isCse) && form.pickup_requested;
   return {
     sender: mapPartyFormToPayload(form.sender),
     recipient: mapPartyFormToPayload(form.recipient),
@@ -420,12 +427,16 @@ function PvzPickerSection({
 /* ─── Tariff summary card ────────────────────────────────────────────────── */
 
 function TariffSummary({
-  draft, onChangeTariff, livePrice, isRecalculating,
+  draft, onChangeTariff, livePrice, isRecalculating, cseInfo,
 }: {
   draft: OrderDraftResponse;
   onChangeTariff: () => void;
   livePrice?: { price: number; currency: string } | null;
   isRecalculating?: boolean;
+  // CSE-only route hints (transit days, COD/card availability). Shown as
+  // a subtitle line under the tariff name; null when the delivery-info
+  // endpoint hasn't answered yet OR the carrier isn't CSE.
+  cseInfo?: CseDeliveryInfo | null;
 }) {
   const isMobile = useIsMobile();
   const displayPrice = livePrice?.price ?? draft.price_snapshot;
@@ -464,6 +475,26 @@ function TariffSummary({
         <div style={{ font: `400 ${isMobile ? 13 : 14}px/1.3 Inter Variable, sans-serif`, color: "#5F6E7E" }}>
           {draft.from_city_snapshot} → {draft.to_city_snapshot} · {draft.shipment_type_snapshot}
         </div>
+        {cseInfo && (
+          <div style={{
+            marginTop: 8,
+            font: `400 ${isMobile ? 12 : 13}px/1.3 Inter Variable, sans-serif`,
+            color: "#0B2545",
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 10,
+          }}>
+            {(cseInfo.min_days != null && cseInfo.max_days != null) && (
+              <span>Транзит по маршруту: {cseInfo.min_days}–{cseInfo.max_days} дн.</span>
+            )}
+            <span style={{ color: cseInfo.cod_available ? "#059669" : "#94a3b8" }}>
+              • COD {cseInfo.cod_available ? "доступен" : "недоступен"}
+            </span>
+            <span style={{ color: cseInfo.card_available ? "#059669" : "#94a3b8" }}>
+              • Оплата картой при получении {cseInfo.card_available ? "доступна" : "недоступна"}
+            </span>
+          </div>
+        )}
       </div>
       <div style={{
         display: "flex",
@@ -935,6 +966,13 @@ function ShipmentPageInner() {
   // Cached PVZ lists per side; keyed by (side, city) so switching city refreshes.
   const [senderPvzList, setSenderPvzList] = useState<CsePvzItem[]>([]);
   const [recipientPvzList, setRecipientPvzList] = useState<CsePvzItem[]>([]);
+  // CSE — available courier-pickup dates for the sender city. Populated on
+  // step 0 whenever pickup_requested is true. Empty list = we haven't queried
+  // yet OR CSE returned nothing (that's why the render checks length before
+  // switching to the whitelist).
+  const [cseTakeDates, setCseTakeDates] = useState<CseAvailableDate[]>([]);
+  const [cseTakeDatesLoading, setCseTakeDatesLoading] = useState(false);
+  const [cseDeliveryInfo, setCseDeliveryInfo] = useState<CseDeliveryInfo | null>(null);
   const [pvzLoading, setPvzLoading] = useState<{ sender: boolean; recipient: boolean }>({ sender: false, recipient: false });
   // "checked" = we've actually queried CSE for this city and know the result.
   // Distinguishes "не проверяли" from "проверили и пусто" - the latter must
@@ -1034,6 +1072,39 @@ function ShipmentPageInner() {
       .finally(() => setPvzLoading((p) => ({ ...p, recipient: false })));
     return () => ac.abort();
   }, [isCse, recipientCheckCity]);
+
+  // CSE take-dates: whitelisted courier pickup calendar for the sender city.
+  // We only fetch when the customer actually asked for a pickup (checkbox) to
+  // avoid an extra API round-trip for every draft. Failing to fetch is
+  // non-fatal — the UI falls back to a plain <input type="date"> so the form
+  // never blocks on a CSE outage.
+  useEffect(() => {
+    if (!isCse || !form.pickup_requested || !senderCheckCity) {
+      setCseTakeDates([]);
+      return;
+    }
+    const ac = new AbortController();
+    setCseTakeDatesLoading(true);
+    fetchCseTakeDates(senderCheckCity, ac.signal)
+      .then((list) => setCseTakeDates(list))
+      .catch(() => { /* leave list empty → free-form date input */ })
+      .finally(() => setCseTakeDatesLoading(false));
+    return () => ac.abort();
+  }, [isCse, form.pickup_requested, senderCheckCity]);
+
+  // CSE delivery-info: min/max days + COD availability for the route. Shown
+  // on step 0 next to the delivery type selector.
+  useEffect(() => {
+    if (!isCse || !senderCheckCity || !recipientCheckCity) {
+      setCseDeliveryInfo(null);
+      return;
+    }
+    const ac = new AbortController();
+    fetchCseDeliveryInfo(senderCheckCity, recipientCheckCity, ac.signal)
+      .then((info) => setCseDeliveryInfo(info))
+      .catch(() => setCseDeliveryInfo(null));
+    return () => ac.abort();
+  }, [isCse, senderCheckCity, recipientCheckCity]);
 
   // Auto-downgrade to door_to_door if the city check just revealed the
   // currently-selected option is impossible (e.g. user picked warehouse_to_*
@@ -1222,10 +1293,10 @@ function ShipmentPageInner() {
           return "Укажите объявленную ценность для страхования.";
         }
       }
-      // Azimuth-only: validate pickup fields when the customer opted in.
+      // Azimuth/CSE: validate pickup fields when the customer opted in.
       // For other carriers pickup_* are dropped in buildShipmentPayload so
       // there is nothing to validate.
-      if (isAzimuth && form.pickup_requested) {
+      if ((isAzimuth || isCse) && form.pickup_requested) {
         if (!form.pickup_date) return "Укажите дату забора груза курьером.";
         // Sanity: pickup date must be today or later.
         const today = new Date();
@@ -1287,7 +1358,7 @@ function ShipmentPageInner() {
     setIsSubmitting(true);
     try {
       const isDocument = (draft.shipment_type_snapshot ?? "").toLowerCase() === "document";
-      await updateOrderDraftShipment(draft.draft_id, buildShipmentPayload(form, isDocument, isAzimuth));
+      await updateOrderDraftShipment(draft.draft_id, buildShipmentPayload(form, isDocument, isAzimuth, isCse));
       clearSavedForm();
       router.push(`/checkout?draftId=${draft.draft_id}`);
     } catch (err) {
@@ -1412,6 +1483,7 @@ function ShipmentPageInner() {
               }
               livePrice={livePrice}
               isRecalculating={isRecalculating}
+              cseInfo={isCse ? cseDeliveryInfo : null}
             />
 
             {/* Shipment form */}
@@ -1503,14 +1575,15 @@ function ShipmentPageInner() {
                     </div>
                   </SectionCard>
 
-                  {/* ── Azimuth pickup opt-in ─────────────────────────── */}
+                  {/* ── Courier pickup opt-in (Azimuth + CSE) ────────── */}
                   {/* Ships to backend as pickup_requested + pickup_date +
-                      pickup_time_slot. After payment is approved by admin,
-                      the dispatch worker calls Azimuth /order-courier. For
-                      any other carrier this section is hidden and the
-                      payload silently drops these fields. */}
-                  {isAzimuth && (
-                    <SectionCard title="Вызов курьера Azimuth">
+                      pickup_time_slot. For Azimuth the dispatch worker
+                      then calls /order-courier; for CSE the values flow
+                      through TakeDate on SaveWaybillOffice. Any other
+                      carrier hides this section and the payload silently
+                      drops the fields. */}
+                  {(isAzimuth || isCse) && (
+                    <SectionCard title={isCse ? "Забор груза курьером" : "Вызов курьера Azimuth"}>
                       <label style={{
                         display: "flex", alignItems: "center", gap: 10, cursor: "pointer",
                         font: "500 14px/1 Inter Variable, sans-serif", color: "#374151",
@@ -1528,14 +1601,18 @@ function ShipmentPageInner() {
                           }))}
                           style={{ width: 16, height: 16, cursor: "pointer", accentColor: "#0B2545" }}
                         />
-                        Вызвать курьера Azimuth для забора груза
+                        {isCse
+                          ? "Указать удобное время забора груза"
+                          : "Вызвать курьера Azimuth для забора груза"}
                       </label>
                       <div style={{
                         marginTop: 8,
                         font: "400 12px/1.4 Inter Variable, sans-serif",
                         color: "#5F6E7E",
                       }}>
-                        Курьер приедет по адресу отправителя после подтверждения оплаты.
+                        {isCse
+                          ? "Курьер КСЭ подъедет по адресу отправителя в указанное время. Если оставить пустым — приедет сегодня утром."
+                          : "Курьер приедет по адресу отправителя после подтверждения оплаты."}
                       </div>
 
                       {form.pickup_requested && (
@@ -1556,26 +1633,69 @@ function ShipmentPageInner() {
                             }}>
                               Дата забора <span style={{ color: "#EF4444", marginLeft: 2 }}>*</span>
                             </label>
-                            <input
-                              type="date"
-                              value={form.pickup_date}
-                              min={new Date().toISOString().slice(0, 10)}
-                              onChange={(e) => updateForm((prev) => ({
-                                ...prev, pickup_date: e.target.value,
-                              }))}
-                              style={{
-                                width: "100%",
-                                padding: "11px 14px",
-                                borderRadius: 10,
-                                border: "1.5px solid #E2E8EE",
-                                font: "400 14px/1 Inter Variable, sans-serif",
-                                color: "#0E1826",
-                                background: "#fff",
-                                outline: "none",
-                                boxSizing: "border-box",
-                                fontFamily: "inherit",
-                              }}
-                            />
+                            {isCse && cseTakeDates.length > 0 ? (
+                              <select
+                                value={form.pickup_date}
+                                onChange={(e) => updateForm((prev) => ({
+                                  ...prev, pickup_date: e.target.value,
+                                }))}
+                                style={{
+                                  width: "100%",
+                                  padding: "11px 14px",
+                                  borderRadius: 10,
+                                  border: "1.5px solid #E2E8EE",
+                                  font: "400 14px/1 Inter Variable, sans-serif",
+                                  color: "#0E1826",
+                                  background: "#fff",
+                                  outline: "none",
+                                  boxSizing: "border-box",
+                                  fontFamily: "inherit",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                <option value="">- Выберите дату -</option>
+                                {cseTakeDates.map((d) => {
+                                  // Backend returns ISO datetime "2026-09-25T00:00:00"; trim to date.
+                                  const dateOnly = d.date.slice(0, 10);
+                                  const display = new Date(dateOnly).toLocaleDateString("ru-RU", {
+                                    weekday: "short", day: "2-digit", month: "long",
+                                  });
+                                  return (
+                                    <option key={dateOnly} value={dateOnly}>{display}</option>
+                                  );
+                                })}
+                              </select>
+                            ) : (
+                              <input
+                                type="date"
+                                value={form.pickup_date}
+                                min={new Date().toISOString().slice(0, 10)}
+                                onChange={(e) => updateForm((prev) => ({
+                                  ...prev, pickup_date: e.target.value,
+                                }))}
+                                style={{
+                                  width: "100%",
+                                  padding: "11px 14px",
+                                  borderRadius: 10,
+                                  border: "1.5px solid #E2E8EE",
+                                  font: "400 14px/1 Inter Variable, sans-serif",
+                                  color: "#0E1826",
+                                  background: "#fff",
+                                  outline: "none",
+                                  boxSizing: "border-box",
+                                  fontFamily: "inherit",
+                                }}
+                              />
+                            )}
+                            {isCse && cseTakeDatesLoading && (
+                              <div style={{
+                                marginTop: 6,
+                                font: "400 11px/1.4 Inter Variable, sans-serif",
+                                color: "#94a3b8",
+                              }}>
+                                Загружаем доступные даты забора…
+                              </div>
+                            )}
                           </div>
                           <div>
                             <label style={{
@@ -1606,9 +1726,23 @@ function ShipmentPageInner() {
                               }}
                             >
                               <option value="">- Выберите интервал -</option>
-                              {PICKUP_TIME_SLOTS.map((slot) => (
-                                <option key={slot} value={slot}>{slot}</option>
-                              ))}
+                              {(() => {
+                                // Prefer CSE's per-date slot list when available:
+                                // it lets us surface windows the courier actually
+                                // works. Falls back to the static PICKUP_TIME_SLOTS
+                                // when CSE didn't send slots for the picked date.
+                                const dateOnly = form.pickup_date;
+                                const csePick = isCse && dateOnly
+                                  ? cseTakeDates.find((d) => d.date.slice(0, 10) === dateOnly)
+                                  : undefined;
+                                const cseSlots = (csePick?.slots ?? [])
+                                  .map((s) => `${s.from}-${s.to}`)
+                                  .filter(Boolean);
+                                const slots = cseSlots.length > 0 ? cseSlots : PICKUP_TIME_SLOTS;
+                                return slots.map((slot) => (
+                                  <option key={slot} value={slot}>{slot}</option>
+                                ));
+                              })()}
                             </select>
                           </div>
                         </div>

@@ -13,6 +13,10 @@ ALLOWED_ORDER_TRANSITIONS: dict[str, list[str]] = {
         "arrived",
         "delivered", "return_requested", "delivery_failed", "customs_hold",
         "cancelled",
+        # Reschedule pickup: customer changed the courier date/time before
+        # the parcel was picked up. We cancel the old waybill and re-queue
+        # dispatch. Only allowed pre-`picked_up` — see reschedule_pickup.
+        "dispatch_queued",
     ],
     "picked_up": ["out_for_delivery", "in_transit", "delivered", "return_requested", "delivery_failed", "customs_hold"],
     "in_transit": ["arrived", "out_for_delivery", "delivered", "return_requested", "delivery_failed", "customs_hold"],

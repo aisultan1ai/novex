@@ -12,6 +12,13 @@ class TrackingEventData:
     location: str | None
     occurred_at: datetime
     description: str | None = field(default=None)
+    # CSE-specific: плановая дата доставки. Обновляется при документе
+    # «Переадресация» и должна попадать в клиентский timeline отдельно от
+    # occurred_at. Другие адаптеры (Exline, Azimuth) не эмитят её сегодня.
+    planned_delivery_at: datetime | None = field(default=None)
+    # Фактическое время доставки. Проставляется CSE только для финального
+    # статуса «Доставка успешно выполнена».
+    delivered_at: datetime | None = field(default=None)
 
 
 class CarrierPollingAdapter(ABC):

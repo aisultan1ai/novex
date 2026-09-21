@@ -155,6 +155,7 @@ class UpdateShipmentDetailsRequest(BaseModel):
     pickup_requested: bool = False
     pickup_date: date | None = None
     pickup_time_slot: str | None = Field(default=None, max_length=50)
+    # `ReschedulePickupRequest` reuses these two — see below.
     pickup_contact_person: str | None = Field(default=None, max_length=255)
     pickup_contact_phone: str | None = Field(default=None, max_length=50)
 
@@ -310,6 +311,28 @@ class OrderDraftListResponse(BaseModel):
     page: int
     size: int
     pages: int
+
+
+class ReschedulePickupRequest(BaseModel):
+    """Клиент выбрал новую дату/время забора груза. Разрешено пока курьер
+    ещё не приехал — конкретный список статусов проверяет сервис.
+
+    ``pickup_time_slot`` наследует формат из UpdateShipmentDetailsRequest —
+    свободная строка «10:00-14:00» / «morning». Валидатор карриера сам
+    приведёт её к формату CSE TakeTimeFrom/TakeTimeTo, если нужно.
+    """
+    pickup_date: date
+    pickup_time_slot: str = Field(..., min_length=1, max_length=50)
+
+
+class ReschedulePickupResponse(BaseModel):
+    """Ответ на POST /orders/{id}/reschedule-pickup.
+
+    ``outcome`` = "rescheduled" (успех, dispatch пересоздан) либо
+    "already_scheduled_new" (если dispatch уже стоял в очереди).
+    """
+    outcome: str
+    order: "OrderDraftResponse"
 
 
 class CancelOrderResponse(BaseModel):

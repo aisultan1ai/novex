@@ -15,6 +15,8 @@ from app.modules.orders.schemas import (
     CseRecalcResponse,
     OrderDraftListResponse,
     OrderDraftResponse,
+    ReschedulePickupRequest,
+    ReschedulePickupResponse,
     UpdateShipmentDetailsRequest,
 )
 from app.modules.orders.service import OrdersService
@@ -216,5 +218,29 @@ def cse_recalc_draft(
     unconditionally.
     """
     return orders_service.cse_recalc(
+        db, user_id=current_user_id, draft_id=draft_id, payload=payload,
+    )
+
+
+@router.post(
+    "/{draft_id}/reschedule-pickup",
+    response_model=ReschedulePickupResponse,
+    status_code=200,
+    summary="Перенести дату забора груза",
+)
+def reschedule_pickup(
+    draft_id: int,
+    payload: ReschedulePickupRequest,
+    current_user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> ReschedulePickupResponse:
+    """Клиент меняет дату и время забора груза. Разрешено пока курьер не
+    приехал (статусы dispatch_queued / sent_to_carrier / dispatch_failed).
+
+    Если у карриера уже была создана накладная — она отменяется через
+    cancel_invoice (для КСЭ = DeleteDocuments), затем ставится новая через
+    штатный dispatch worker с новой pickup_date.
+    """
+    return orders_service.reschedule_pickup(
         db, user_id=current_user_id, draft_id=draft_id, payload=payload,
     )

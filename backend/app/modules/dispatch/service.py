@@ -690,6 +690,41 @@ def _build_api_order_data(order: OrderDraft, creds: dict | None = None, urgency_
         except Exception as exc:
             logger.debug("CSE geography GUID lookup failed (non-fatal): %s", exc)
 
+    # CSE TakeDate + optional COD. Prior to this we let CSE default TakeDate
+    # to `today 09:00`, which meant every dispatch reserved a courier visit
+    # regardless of what the customer picked. Now the customer's chosen
+    # pickup_date + pickup_time_slot flow through as a proper ISO datetime.
+    #
+    # pickup_time_slot is free-form ("10:00-14:00" | "утро" | ""). We parse
+    # the first HH:MM out of it for TakeDate; the client can fall back to
+    # 09:00 when the slot doesn't have a numeric prefix.
+    cse_take_date: str | None = None
+    if order.carrier_code_snapshot and order.carrier_code_snapshot.lower() == "cse" and order.pickup_date:
+        import re as _re
+
+        slot = (order.pickup_time_slot or "").strip()
+        m = _re.match(r"(\d{1,2}):(\d{2})", slot)
+        if m:
+            hh = int(m.group(1))
+            mm = int(m.group(2))
+            time_part = f"{hh:02d}:{mm:02d}:00"
+        else:
+            time_part = "09:00:00"
+        cse_take_date = f"{order.pickup_date.isoformat()}T{time_part}"
+
+    cse_cod: dict | None = None
+    if order.carrier_code_snapshot and order.carrier_code_snapshot.lower() == "cse":
+        # Enable COD only when the customer opted in explicitly via a positive
+        # amount on order.cod_amount. Other carriers ignore this field; CSE
+        # picks it up in create_waybill (TypeOfPayer=1 + WayOfPayment mapping).
+        amount = float(getattr(order, "cod_amount", 0) or 0)
+        if amount > 0:
+            cse_cod = {
+                "amount": amount,
+                "currency": getattr(order, "cod_currency", None) or "KZT",
+                "payment_method": getattr(order, "cod_payment_method", None) or "cash",
+            }
+
     return {
         "order_id": order.id,
         "order_reference": f"NOVEX-{order.id:06d}",
@@ -741,6 +776,9 @@ def _build_api_order_data(order: OrderDraft, creds: dict | None = None, urgency_
         "fragile": order.fragile,
         "call_before_delivery": order.call_before_delivery,
         "insurance": order.insurance,
+        # CSE-only extras — other clients ignore unknown keys.
+        **({"take_date": cse_take_date} if cse_take_date else {}),
+        **({"cod": cse_cod} if cse_cod else {}),
     }
 
 

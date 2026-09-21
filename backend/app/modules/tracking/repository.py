@@ -21,6 +21,7 @@ class TrackingRepository:
         location: str | None = None,
         carrier_status: str | None = None,
         occurred_at: datetime | None = None,
+        planned_delivery_at: datetime | None = None,
     ) -> TrackingEvent:
         event = TrackingEvent(
             order_draft_id=order_draft_id,
@@ -28,6 +29,7 @@ class TrackingRepository:
             description=description,
             location=location,
             carrier_status=carrier_status,
+            planned_delivery_at=planned_delivery_at,
             **({"occurred_at": occurred_at} if occurred_at is not None else {}),
         )
         db.add(event)

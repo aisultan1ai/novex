@@ -117,10 +117,17 @@ def poll_all_active_shipments(db: Session) -> None:
     for shipment, order in rows:
         if not shipment.carrier_tracking_number:
             continue
+        creds = _get_creds(db, order.carrier_code_snapshot)
+        # ClientNumber = our own NOVEX-XXXXXX reference we sent in
+        # SaveWaybillOffice. CSE echoes it back and uses it as a lookup key
+        # that spans the outbound + return waybills — so passing it here
+        # lets the tracking() call see events from both legs in one response.
+        # Adapters that don't care about client_number simply ignore the key.
+        creds["client_number"] = f"NOVEX-{order.id:06d}"
         work_items.append(_PollWork(
             shipment=shipment,
             order=order,
-            creds=_get_creds(db, order.carrier_code_snapshot),
+            creds=creds,
             request_id=f"poll-{uuid.uuid4().hex[:12]}",
         ))
 
@@ -211,6 +218,7 @@ def _process_result(db: Session, result: _PollResult) -> None:
                     "location": ev.location,
                     "description": ev.description,
                     "occurred_at": ev.occurred_at,
+                    "planned_delivery_at": ev.planned_delivery_at,
                 }
                 for ev in new_events
             ],

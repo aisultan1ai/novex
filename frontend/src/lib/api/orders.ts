@@ -109,6 +109,34 @@ export const CANCELLABLE_STATUSES: readonly string[] = [
   "sent_to_carrier",
 ];
 
+// Statuses at which the customer can still change the courier pickup
+// date/time. Beyond `picked_up` the parcel is with the courier already.
+export const RESCHEDULE_PICKUP_STATUSES: readonly string[] = [
+  "dispatch_queued",
+  "sent_to_carrier",
+  "dispatch_failed",
+];
+
+export interface ReschedulePickupRequest {
+  pickup_date: string;      // YYYY-MM-DD
+  pickup_time_slot: string; // free-form label, e.g. "10:00-14:00"
+}
+
+export interface ReschedulePickupResponse {
+  outcome: "rescheduled" | "already_scheduled_new";
+  order: OrderDraftResponse;
+}
+
+export async function reschedulePickup(
+  orderId: number,
+  payload: ReschedulePickupRequest,
+): Promise<ReschedulePickupResponse> {
+  return apiRequest<ReschedulePickupResponse>(
+    `/orders/${orderId}/reschedule-pickup`,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+}
+
 export async function listOrders(
   page = 1,
   size = 20,

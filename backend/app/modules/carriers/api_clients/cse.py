@@ -23,6 +23,11 @@ from typing import Any
 import httpx
 
 from app.modules.carriers.api_clients.base import CarrierAPIClient, CarrierServiceOption, InvoiceResult
+from app.modules.carriers.cse_error_codes import (
+    CSEWaybillValidationError,
+    format_error as _format_cse_error,
+    parse_save_waybill_error as _parse_save_waybill_error,
+)
 from app.modules.carriers.pii_mask import mask_pii_text
 
 logger = logging.getLogger(__name__)
@@ -76,6 +81,20 @@ def _esc(s: str) -> str:
          .replace(">", "&gt;")
          .replace('"', "&quot;")
     )
+
+
+_LEADING_CODE_RE = __import__("re").compile(r"^\s*(\d{4,5})\b")
+
+
+def _extract_leading_code(text: str) -> str:
+    """CSE SaveWaybillOffice occasionally prefixes ErrorInfo with the numeric
+    code ("05042: Указан ..."). Pull it out so parse_save_waybill_error can
+    use the code path; return '' when the text has no leading code so we
+    fall back to describing the freeform message as-is."""
+    if not text:
+        return ""
+    m = _LEADING_CODE_RE.match(text)
+    return m.group(1) if m else ""
 
 
 def build_envelope(method: str, inner: str) -> bytes:
@@ -149,28 +168,36 @@ def extract_return(text: str, method: str) -> ET.Element:
     if return_el is None:
         raise ValueError(f"CSE: no <return> in {method}Response")
 
-    # Check for application-level error
+    # Check for application-level error. CSE encodes them as:
+    #   <Properties><Key>Error</Key><Value>true</Value>
+    #     <List><Key>Description</Key><Value>{CODE}</Value>...</List>
+    #     <List><Key>Info</Key><Value>{freeform hint}</Value>...</List>
+    #   </Properties>
+    # Description is the numeric code (e.g. "03010"); some methods also fill
+    # Info with a longer human hint (e.g. offending product row).
     for prop in return_el.findall(f"{_NM}Properties"):
         key_el = prop.find(f"{_NM}Key")
         val_el = prop.find(f"{_NM}Value")
-        if key_el is not None and (key_el.text or "") == "Error":
-            if val_el is not None and (val_el.text or "").lower() in ("true", "1"):
-                desc = ""
-                for list_el in prop.findall(f"{_NM}List"):
-                    lk = list_el.find(f"{_NM}Key")
-                    lv = list_el.find(f"{_NM}Value")
-                    if lk is not None and (lk.text or "") == "Description" and lv is not None:
-                        desc = (lv.text or "").strip()
-                # 02011 = auth error per CSE error code registry
-                code_map = {
-                    "02011": "Неверный логин или пароль (ошибка авторизации CSE)",
-                    "02053": "По указанным данным информация не найдена",
-                    "03010": "Пункт маршрута не найден (неверный geography GUID)",
-                    "05011": "Указан некорректный код срочности",
-                    "05042": "Указан некорректный код географии",
-                }
-                human = code_map.get(desc, f"код {desc}" if desc else "неизвестная ошибка")
-                raise RuntimeError(f"CSE {method} error: {human}")
+        if key_el is None or (key_el.text or "") != "Error":
+            continue
+        if val_el is None or (val_el.text or "").lower() not in ("true", "1"):
+            continue
+
+        desc = ""
+        info = ""
+        for list_el in prop.findall(f"{_NM}List"):
+            lk = list_el.find(f"{_NM}Key")
+            lv = list_el.find(f"{_NM}Value")
+            if lk is None or lv is None:
+                continue
+            key = (lk.text or "").strip()
+            value = (lv.text or "").strip()
+            if key == "Description":
+                desc = value
+            elif key == "Info":
+                info = value
+
+        raise RuntimeError(_format_cse_error(method, desc, info or None))
 
     return return_el
 
@@ -213,12 +240,29 @@ def props_of(el: ET.Element) -> list[ET.Element]:
     return el.findall(f"{_NM}Properties")
 
 
+_DELIVERED_STATUS_GUID = "8e5ded66-a8f5-4fa8-b863-03e1e0406df5"
+
+
 def _tracking_events_from(status_item: ET.Element) -> list[dict]:
     """Extract a single tracking event from an <m:List> node.
 
     Per CSE Tracking response format: the event's <m:Key> is the status name
     (Russian, e.g. "Заказ создан"), and its <m:Properties> children carry the
     metadata (GUID, Comment, RecorderGUID, RecorderName, DateTime, etc.).
+
+    Property keys are normalised to lower-case internally because CSE
+    occasionally emits `PlannedDeliveryDate` / `planneddeliverydate` /
+    `Planneddeliverydate` inconsistently between endpoints — this way we don't
+    need to guess the casing.
+
+    `planned_delivery_at` — плановая дата доставки. Обновляется CSE при
+    переадресации (документ «Переадресация»), поэтому появляется в timeline
+    независимо от прогресса статусов.
+
+    `delivered_at` — фактическое время доставки. Проставляется только для
+    финального статуса (GUID `_DELIVERED_STATUS_GUID`) из `DeliveryDateTime`;
+    для промежуточных статусов эта property часто продублирована из плановой
+    даты и её нельзя интерпретировать как факт доставки.
 
     Returns [] for nodes that look like metadata (no DateTime property) so that
     the caller can iterate every List child without filtering upfront.
@@ -233,20 +277,28 @@ def _tracking_events_from(status_item: ET.Element) -> list[dict]:
         key = (key_el.text or "").strip()
         value = (val_el.text or "").strip() if val_el is not None else ""
         if key:
-            props[key] = value
+            props[key.lower()] = value
 
-    occurred_at = props.get("DateTime") or props.get("DeliveryDateTime") or ""
+    occurred_at = props.get("datetime") or props.get("deliverydatetime") or ""
     if not occurred_at:
         return []
 
+    guid = props.get("guid", "")
+    planned_delivery_at = props.get("planneddeliverydate", "")
+    delivered_at = ""
+    if guid.lower() == _DELIVERED_STATUS_GUID:
+        delivered_at = props.get("deliverydatetime", "") or occurred_at
+
     return [{
-        "guid": props.get("GUID", ""),
+        "guid": guid,
         "status": status_name,
         "occurred_at": occurred_at,
-        "location": props.get("Location", ""),
-        "comment": props.get("Comment", ""),
-        "recipient": props.get("Recipient", ""),
-        "recorder": props.get("RecorderName", ""),
+        "location": props.get("location", ""),
+        "comment": props.get("comment", ""),
+        "recipient": props.get("recipient", ""),
+        "recorder": props.get("recordername", ""),
+        "planned_delivery_at": planned_delivery_at,
+        "delivered_at": delivered_at,
     }]
 
 
@@ -730,12 +782,172 @@ class CSEAPIClient(CarrierAPIClient):
             logger.warning("CSE delete_document failed (waybill=%s): %s", waybill_number, exc)
             return False
 
+    # ── SaveDocuments (pickup / вызов курьера) ───────────────────────────────
+
+    def create_pickup_request(self, pickup_data: dict, creds: dict) -> str:
+        """
+        Create a courier pickup request via SaveDocuments (Order document).
+
+        Semantics per CSE Web API docs («SaveDocuments», pages 92–104):
+          The Order document reserves a courier visit at a sender address for
+          a specific date/time window. Unlike SaveWaybillOffice — which is
+          both a courier call AND a shipment — SaveDocuments creates just the
+          pickup, and one or more waybills can be attached later.
+
+        ``pickup_data`` keys:
+            sender          — dict: full_name, phone, geography_guid, address
+            take_date       — YYYY-MM-DD or ISO datetime (defaults to today 09:00)
+            take_time_from  — HH:MM (optional)
+            take_time_to    — HH:MM (optional)
+            client_number   — our internal reference (max 20 chars); if omitted,
+                              CSE assigns its own client-side number.
+            comment         — free-form note printed on the visit slip
+            waybill_numbers — optional list of CSE waybill numbers to attach
+
+        Returns the CSE document number.
+        """
+        sender = pickup_data.get("sender") or {}
+
+        take_date = pickup_data.get("take_date") or date.today().isoformat()
+        if "T" not in take_date:
+            take_date += "T09:00:00"
+
+        client_number = _esc((pickup_data.get("client_number") or "")[:20])
+        comment = _esc(pickup_data.get("comment") or "")
+
+        sender_geo = _esc(sender.get("geography_guid") or sender.get("city", ""))
+        sender_addr = _esc(sender.get("address") or sender.get("address_line1", ""))
+        sender_phone = _esc(sender.get("phone", ""))
+        sender_client, sender_official = "", ""
+        company = (sender.get("company") or "").strip()
+        full = (sender.get("full_name") or "").strip()
+        if company:
+            sender_client, sender_official = company, full
+        else:
+            sender_client = full
+
+        sender_official_xml = (
+            f"<m:Official>{_esc(sender_official)}</m:Official>"
+            if sender_official else ""
+        )
+
+        take_time_from = pickup_data.get("take_time_from") or ""
+        take_time_to = pickup_data.get("take_time_to") or ""
+        time_xml = ""
+        if take_time_from:
+            time_xml += f"<m:TakeTimeFrom>{_esc(take_time_from)}</m:TakeTimeFrom>"
+        if take_time_to:
+            time_xml += f"<m:TakeTimeTo>{_esc(take_time_to)}</m:TakeTimeTo>"
+
+        # Attach existing waybill numbers (for grouped pickup of multiple
+        # shipments in one courier visit). CSE names the element <Waybills>
+        # with repeating <Items> children.
+        waybill_numbers = pickup_data.get("waybill_numbers") or []
+        waybills_xml = ""
+        if waybill_numbers:
+            items = "".join(
+                f"<m:Items>{_esc(str(n))}</m:Items>" for n in waybill_numbers if n
+            )
+            waybills_xml = f"<m:Waybills>{items}</m:Waybills>"
+
+        inner = (
+            self._auth(creds)
+            + f"<m:ClientNumber>{client_number}</m:ClientNumber>"
+            + "<m:OrderData>"
+            + "<m:Sender>"
+            + f"<m:Client>{_esc(sender_client)}</m:Client>"
+            + sender_official_xml
+            + "<m:Address>"
+            + f"<m:Geography>{sender_geo}</m:Geography>"
+            + f"<m:Info>{sender_addr}</m:Info>"
+            + "<m:FreeForm>true</m:FreeForm>"
+            + "</m:Address>"
+            + f"<m:Phone>{sender_phone}</m:Phone>"
+            + "</m:Sender>"
+            + f"<m:TakeDate>{_esc(take_date)}</m:TakeDate>"
+            + time_xml
+            + (f"<m:Comment>{comment}</m:Comment>" if comment else "")
+            + waybills_xml
+            + "</m:OrderData>"
+        )
+
+        resp = httpx.post(
+            self._url(creds),
+            content=build_envelope("SaveDocuments", inner),
+            headers={"Content-Type": "text/xml; charset=utf-8"},
+            timeout=_TIMEOUT,
+        )
+        if resp.status_code >= 400:
+            body_snippet = mask_pii_text(resp.text or "")[:2000]
+            logger.error(
+                "CSE SaveDocuments HTTP %s at %s; body=%s",
+                resp.status_code, self._url(creds), body_snippet,
+            )
+            raise RuntimeError(
+                f"CSE SaveDocuments HTTP {resp.status_code}: {body_snippet}"
+            )
+
+        try:
+            root = ET.fromstring(resp.text)
+        except ET.ParseError as exc:
+            raise RuntimeError(f"CSE SaveDocuments: invalid XML response: {exc}") from exc
+
+        body = root.find(f"{{{_NS_SOAP}}}Body")
+        if body is None:
+            raise RuntimeError("CSE SaveDocuments: no SOAP Body in response")
+
+        fault = body.find(f"{{{_NS_SOAP}}}Fault")
+        if fault is not None:
+            msg = (fault.findtext("faultstring") or "").strip()
+            raise RuntimeError(f"CSE SaveDocuments SOAP Fault: {msg}")
+
+        # Reuse SaveWaybillOffice response shape — SaveDocuments returns the
+        # same <return><Items><Value>NUMBER</Value>...</Items></return> structure.
+        ret_el = None
+        for resp_el in body:
+            ret_el = resp_el.find(f"{_NM}return")
+            if ret_el is not None:
+                break
+        if ret_el is None:
+            raise RuntimeError("CSE SaveDocuments: no <return> in response")
+
+        top_error = ret_el.find(f"{_NM}Error")
+        if top_error is not None and (top_error.text or "").strip().lower() == "true":
+            error_info = (ret_el.findtext(f"{_NM}ErrorInfo") or "").strip()
+            raise _parse_save_waybill_error(
+                _extract_leading_code(error_info),
+                error_info,
+            )
+
+        for items_el in ret_el.findall(f"{_NM}Items"):
+            item_error = items_el.find(f"{_NM}Error")
+            if item_error is not None and (item_error.text or "").strip().lower() == "true":
+                error_info = (items_el.findtext(f"{_NM}ErrorInfo") or "").strip()
+                raise _parse_save_waybill_error(
+                    _extract_leading_code(error_info),
+                    error_info,
+                )
+            val_el = items_el.find(f"{_NM}Value")
+            if val_el is not None and (val_el.text or "").strip():
+                return (val_el.text or "").strip()
+
+        raise RuntimeError("CSE: SaveDocuments returned no document number")
+
     # ── GetFormsForDocuments ──────────────────────────────────────────────────
 
     _DEFAULT_PRINT_FORM_NAME = "Универсальная печатная форма документа ЗАКАЗ"
+    _GMH_LABEL_FORM_NAME = "Марка ГМХ 10х9"
+
+    _ALLOWED_PRINT_FORMATS = ("pdf", "xlsx", "xml")
 
     def _build_print_form_inner(
-        self, waybill_number: str, creds: dict, *, form_name: str | None
+        self,
+        waybill_number: str,
+        creds: dict,
+        *,
+        form_name: str | None,
+        document_type: str = "order",
+        fmt: str = "pdf",
     ) -> str:
         name_xml = (
             f"<m:List><m:Key>Name</m:Key><m:Value>{_esc(form_name)}</m:Value>"
@@ -750,10 +962,10 @@ class CSEAPIClient(CarrierAPIClient):
             + "</m:documents>"
             + "<m:parameters>"
             + "<m:Key>Parameters</m:Key>"
-            + "<m:List><m:Key>DocumentType</m:Key><m:Value>order</m:Value><m:ValueType>string</m:ValueType></m:List>"
+            + f"<m:List><m:Key>DocumentType</m:Key><m:Value>{_esc(document_type)}</m:Value><m:ValueType>string</m:ValueType></m:List>"
             + "<m:List><m:Key>Type</m:Key><m:Value>print</m:Value><m:ValueType>string</m:ValueType></m:List>"
             + name_xml
-            + "<m:List><m:Key>Format</m:Key><m:Value>pdf</m:Value><m:ValueType>string</m:ValueType></m:List>"
+            + f"<m:List><m:Key>Format</m:Key><m:Value>{_esc(fmt)}</m:Value><m:ValueType>string</m:ValueType></m:List>"
             + "</m:parameters>"
         )
 
@@ -799,10 +1011,23 @@ class CSEAPIClient(CarrierAPIClient):
         return None
 
     def _call_print_form(
-        self, waybill_number: str, creds: dict, *, form_name: str | None
+        self,
+        waybill_number: str,
+        creds: dict,
+        *,
+        form_name: str | None,
+        document_type: str = "order",
+        fmt: str = "pdf",
     ) -> tuple[bytes | None, str | None, str | None, str]:
-        """Single GetFormsForDocuments call. Returns (pdf, err_code, err_info, raw_xml)."""
-        inner = self._build_print_form_inner(waybill_number, creds, form_name=form_name)
+        """Single GetFormsForDocuments call. Returns (payload, err_code, err_info, raw_xml).
+
+        ``payload`` is decoded base64 bytes; for `fmt='pdf'` that's the PDF, for
+        `fmt='xlsx'` / `fmt='xml'` — the corresponding file bytes.
+        """
+        inner = self._build_print_form_inner(
+            waybill_number, creds, form_name=form_name,
+            document_type=document_type, fmt=fmt,
+        )
         resp = httpx.post(
             self._url(creds),
             content=build_envelope("GetFormsForDocuments", inner),
@@ -883,9 +1108,272 @@ class CSEAPIClient(CarrierAPIClient):
             f"CSE: no PDF data returned for waybill {waybill_number}; response: {response_snippet}"
         )
 
+    # ── CreateGMH (cargo places) ─────────────────────────────────────────────
+
+    def create_cargo_places(
+        self,
+        waybill_number: str,
+        packages: list[dict],
+        creds: dict,
+    ) -> list[str]:
+        """
+        Create individual cargo-place records for a Waybill (метод CreateGMH).
+
+        By CSE spec, CreateGMH accepts only DocumentType='Waybill' — an Order
+        won't fly (error 05224). Each package is created with a unique
+        `ClientCode` (штрихкод / уникальный номер) and its own ВГХ; those
+        codes appear on the ГМХ marks printed by GetFormsForDocuments.
+
+        ``packages`` — list of dicts with keys:
+            client_code    — required; unique per waybill (barcode)
+            weight_kg      — required (positive)
+            length_cm      — optional
+            width_cm       — optional
+            height_cm      — optional
+            description    — optional; overrides Cargo description for this place
+
+        Returns the list of created GMH GUIDs in the same order as the input.
+        Raises CSEWaybillValidationError on validation failures (e.g. 05224).
+        """
+        if not packages:
+            raise RuntimeError("CSE CreateGMH: packages list is empty")
+
+        items_xml_parts: list[str] = []
+        for i, p in enumerate(packages, start=1):
+            code = (p.get("client_code") or "").strip()
+            if not code:
+                raise RuntimeError(
+                    f"CSE CreateGMH: package #{i} is missing client_code (штрихкод)"
+                )
+            weight = float(p.get("weight_kg") or 0)
+            if weight <= 0:
+                raise RuntimeError(
+                    f"CSE CreateGMH: package #{i} weight_kg must be positive"
+                )
+            length = float(p.get("length_cm") or p.get("depth_cm") or 0)
+            width = float(p.get("width_cm") or 0)
+            height = float(p.get("height_cm") or 0)
+            dims_xml = ""
+            if length > 0 and width > 0 and height > 0:
+                dims_xml = (
+                    f"<m:Length>{length:g}</m:Length>"
+                    f"<m:Width>{width:g}</m:Width>"
+                    f"<m:Height>{height:g}</m:Height>"
+                )
+            desc_xml = (
+                f"<m:Description>{_esc(p['description'])}</m:Description>"
+                if p.get("description") else ""
+            )
+            items_xml_parts.append(
+                "<m:Items>"
+                f"<m:ClientCode>{_esc(code)}</m:ClientCode>"
+                f"<m:Weight>{weight:g}</m:Weight>"
+                + dims_xml
+                + desc_xml
+                + "</m:Items>"
+            )
+
+        inner = (
+            self._auth(creds)
+            + f"<m:Number>{_esc(waybill_number)}</m:Number>"
+            + "<m:DocumentType>Waybill</m:DocumentType>"
+            + "<m:CargoPlaces>"
+            + "".join(items_xml_parts)
+            + "</m:CargoPlaces>"
+        )
+
+        resp = httpx.post(
+            self._url(creds),
+            content=build_envelope("CreateGMH", inner),
+            headers={"Content-Type": "text/xml; charset=utf-8"},
+            timeout=_TIMEOUT,
+        )
+        if resp.status_code >= 400:
+            body_snippet = mask_pii_text(resp.text or "")[:2000]
+            logger.error(
+                "CSE CreateGMH HTTP %s waybill=%s body=%s",
+                resp.status_code, waybill_number, body_snippet,
+            )
+            raise RuntimeError(
+                f"CSE CreateGMH HTTP {resp.status_code}: {body_snippet}"
+            )
+
+        ret = extract_return(resp.text, "CreateGMH")
+
+        guids: list[str] = []
+        for item in ret.findall(f"{_NM}Items"):
+            item_error = item.find(f"{_NM}Error")
+            if item_error is not None and (item_error.text or "").strip().lower() == "true":
+                error_info = (item.findtext(f"{_NM}ErrorInfo") or "").strip()
+                raise _parse_save_waybill_error(
+                    _extract_leading_code(error_info),
+                    error_info,
+                )
+            guid_el = item.find(f"{_NM}GUID")
+            if guid_el is None:
+                guid_el = item.find(f"{_NM}Value")
+            if guid_el is not None and (guid_el.text or "").strip():
+                guids.append((guid_el.text or "").strip())
+
+        if not guids:
+            raise RuntimeError(
+                f"CSE CreateGMH: no cargo-place GUIDs returned for waybill {waybill_number}"
+            )
+        return guids
+
+    # ── UpdateDocuments (weight/dims sync after CreateGMH) ───────────────────
+
+    def update_waybill_dimensions(
+        self,
+        waybill_number: str,
+        creds: dict,
+        *,
+        packages: list[dict] | None = None,
+        total_weight_kg: float | None = None,
+        total_volume_weight_kg: float | None = None,
+    ) -> bool:
+        """
+        Update a Waybill's aggregate ВГХ after CreateGMH (метод UpdateDocuments).
+
+        Either pass ``packages`` (per-place ВГХ — same shape as
+        create_cargo_places) and the method sums them, or pass explicit totals.
+
+        Returns True on success. Raises CSEWaybillValidationError on failure.
+        """
+        vol_divisor = 5000.0
+        if packages:
+            weight = sum(float(p.get("weight_kg") or 0) for p in packages)
+            vol = 0.0
+            for p in packages:
+                l = float(p.get("length_cm") or p.get("depth_cm") or 0)
+                w = float(p.get("width_cm") or 0)
+                h = float(p.get("height_cm") or 0)
+                if l > 0 and w > 0 and h > 0:
+                    vol += (l * w * h) / vol_divisor
+        else:
+            weight = float(total_weight_kg or 0)
+            vol = float(total_volume_weight_kg or 0)
+
+        if weight <= 0:
+            raise RuntimeError("CSE UpdateDocuments: total weight must be positive")
+
+        vol_xml = (
+            f"<m:VolumeWeight>{round(vol, 3)}</m:VolumeWeight>"
+            if vol > 0 else ""
+        )
+
+        inner = (
+            self._auth(creds)
+            + "<m:documents>"
+            + "<m:Key>Documents</m:Key>"
+            + "<m:Properties>"
+            + "<m:Key>DocumentType</m:Key><m:Value>Waybill</m:Value>"
+            + "<m:ValueType>string</m:ValueType>"
+            + "</m:Properties>"
+            + f"<m:List><m:Key>{_esc(waybill_number)}</m:Key>"
+            + f"<m:Fields><m:Key>Weight</m:Key><m:Value>{round(weight, 3)}</m:Value>"
+            + "<m:ValueType>float</m:ValueType></m:Fields>"
+            + (
+                f"<m:Fields><m:Key>VolumeWeight</m:Key><m:Value>{round(vol, 3)}</m:Value>"
+                "<m:ValueType>float</m:ValueType></m:Fields>"
+                if vol > 0 else ""
+            )
+            + "</m:List>"
+            + "</m:documents>"
+            + "<m:parameters><m:Key>Parameters</m:Key></m:parameters>"
+        )
+        # Note: vol_xml above is unused (kept for grep). The dims land as Fields
+        # inside the document's <List>; VolumeWeight duplication is harmless
+        # because CSE ignores unknown children.
+        _ = vol_xml
+
+        resp = httpx.post(
+            self._url(creds),
+            content=build_envelope("UpdateDocuments", inner),
+            headers={"Content-Type": "text/xml; charset=utf-8"},
+            timeout=_TIMEOUT,
+        )
+        if resp.status_code >= 400:
+            body_snippet = mask_pii_text(resp.text or "")[:2000]
+            logger.error(
+                "CSE UpdateDocuments HTTP %s waybill=%s body=%s",
+                resp.status_code, waybill_number, body_snippet,
+            )
+            raise RuntimeError(
+                f"CSE UpdateDocuments HTTP {resp.status_code}: {body_snippet}"
+            )
+
+        ret = extract_return(resp.text, "UpdateDocuments")
+        # Per-item error check (same shape as DeleteDocuments/SaveWaybillOffice).
+        for item in ret.findall(f"{_NM}Items"):
+            item_error = item.find(f"{_NM}Error")
+            if item_error is not None and (item_error.text or "").strip().lower() == "true":
+                error_info = (item.findtext(f"{_NM}ErrorInfo") or "").strip()
+                raise _parse_save_waybill_error(
+                    _extract_leading_code(error_info),
+                    error_info,
+                )
+        return True
+
+    # ── GetFormsForDocuments: Марка ГМХ 10х9 (per-place labels) ──────────────
+
+    def get_gmh_labels(
+        self,
+        waybill_number: str,
+        creds: dict,
+        *,
+        fmt: str = "pdf",
+    ) -> bytes:
+        """Download «Марка ГМХ 10х9» labels for all cargo places of a Waybill.
+
+        Differs from get_print_form in three ways:
+          1. DocumentType='waybill' (not 'order');
+          2. form_name is the ГМХ label name — CSE emits one page per place;
+          3. fmt allows pdf/xlsx/xml (get_print_form is PDF-only for now).
+        """
+        if fmt not in self._ALLOWED_PRINT_FORMATS:
+            raise RuntimeError(
+                f"CSE get_gmh_labels: unsupported format {fmt!r}; "
+                f"expected one of {self._ALLOWED_PRINT_FORMATS}"
+            )
+        payload, err_code, err_info, raw = self._call_print_form(
+            waybill_number,
+            creds,
+            form_name=self._GMH_LABEL_FORM_NAME,
+            document_type="waybill",
+            fmt=fmt,
+        )
+        if payload is not None:
+            return payload
+
+        # No retry-without-Name here: the ГМХ label is a specific form, so if
+        # CSE can't find it we want a loud failure (form not enabled on the
+        # contract). Surface both code and info to the caller.
+        if err_code is not None:
+            snippet = mask_pii_text(raw or "")[:2000]
+            logger.error(
+                "CSE ГМХ label fetch failed for waybill=%s: code=%s info=%r; response=%s",
+                waybill_number, err_code, err_info, snippet,
+            )
+            raise RuntimeError(
+                f"CSE get_gmh_labels error for waybill {waybill_number}: "
+                f"code={err_code}"
+                + (f" info={err_info!r}" if err_info else "")
+            )
+        snippet = mask_pii_text(raw or "")[:2000]
+        raise RuntimeError(
+            f"CSE get_gmh_labels: no BData for waybill {waybill_number}; response: {snippet}"
+        )
+
     # ── Tracking ──────────────────────────────────────────────────────────────
 
-    def tracking(self, waybill_number: str, creds: dict) -> list[dict]:
+    def tracking(
+        self,
+        waybill_number: str,
+        creds: dict,
+        *,
+        client_number: str | None = None,
+    ) -> list[dict]:
         """Get status event history for an Order.
 
         Per CSE Web API docs (Tracking method, page 137–145):
@@ -899,7 +1387,22 @@ class CSEAPIClient(CarrierAPIClient):
           - A trailing <m:Tables Key="Waybills"> contains waybill-level events
             (delivery legs); we merge them into the same event list so the
             customer sees the full timeline.
+
+        ``client_number`` — если задан наш внутренний ClientNumber (передавали
+        при создании накладной через SaveWaybillOffice), CSE вернёт статусы
+        и прямой, и возвратной накладной под этим номером. Отправляется
+        дополнительным <m:List> ключом; CSE ищет и по нашему коду, и по
+        своему номеру, так что двусторонний трек не теряется.
+
+        События из обоих ключей дедуплицируются по (guid, occurred_at) — если
+        CSE прислал один и тот же статус дважды (в ответе на waybill_number и
+        client_number), мы вставим только один.
         """
+        client_key_xml = (
+            f"<m:List><m:Key>{_esc(client_number)}</m:Key></m:List>"
+            if client_number and client_number != waybill_number
+            else ""
+        )
         inner = (
             self._auth(creds)
             + "<m:documents>"
@@ -915,6 +1418,7 @@ class CSEAPIClient(CarrierAPIClient):
             + "<m:ValueType>boolean</m:ValueType>"
             + "</m:Properties>"
             + f"<m:List><m:Key>{_esc(waybill_number)}</m:Key></m:List>"
+            + client_key_xml
             + "</m:documents>"
             + "<m:parameters><m:Key>Parameters</m:Key></m:parameters>"
         )
@@ -932,9 +1436,21 @@ class CSEAPIClient(CarrierAPIClient):
                     for status_item in list_items(waybill_item):
                         events.extend(_tracking_events_from(status_item))
 
+        # Dedup by (guid, occurred_at) — the same physical event can appear
+        # under both the CSE waybill number lookup AND the ClientNumber lookup.
+        # Keep first-seen (already chronologically stable inside a single doc).
+        seen: set[tuple[str, str]] = set()
+        deduped: list[dict] = []
+        for ev in events:
+            key = (ev.get("guid", ""), ev.get("occurred_at", ""))
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(ev)
+
         # Sort by occurred_at ascending so caller sees chronological order.
-        events.sort(key=lambda e: e.get("occurred_at", ""))
-        return events
+        deduped.sort(key=lambda e: e.get("occurred_at", ""))
+        return deduped
 
     # ── Calc ──────────────────────────────────────────────────────────────────
 
@@ -976,12 +1492,19 @@ class CSEAPIClient(CarrierAPIClient):
         declared_value: float = 0.0,
         insurance_rate: float = 0.0,
         additional_service_guids: list[str] | None = None,
+        cod_amount: float = 0.0,
+        cod_currency: str = "KZT",
     ) -> dict | None:
         """Second-Calc for a specific urgency including add-on services.
 
         Used by the checkout flow: after the user picks Страхование / declared
         value / Самовывоз, we ask CSE for the fully-loaded final price so what
         the customer clicks "Pay" for matches CSE billing.
+
+        ``cod_amount`` / ``cod_currency`` — when the customer selects COD at
+        checkout, CSE quotes an agent-fee that is billed on top of the base
+        tariff. Passing the amount here folds that fee into the returned
+        price so «Оплатить» matches the actual invoice.
 
         Returns a single tariff dict for the requested urgency (or None if CSE
         returned no matching row).
@@ -1001,6 +1524,8 @@ class CSEAPIClient(CarrierAPIClient):
             declared_value=declared_value,
             insurance_rate=insurance_rate,
             additional_service_guids=additional_service_guids,
+            cod_amount=cod_amount,
+            cod_currency=cod_currency,
         )
         ret = self._post("Calc", inner, creds, timeout=_CALC_TIMEOUT)
         tariffs = parse_calc_response(ret)
@@ -1091,6 +1616,45 @@ class CSEAPIClient(CarrierAPIClient):
         }
         delivery_type = order_data.get("delivery_type", "door_to_door")
         cse_delivery = _DELIVERY_TYPE_MAP.get(delivery_type, "ДоставкаДоДверей")
+
+        # ── COD (Cash On Delivery) ────────────────────────────────────────
+        # order_data["cod"] = {"amount": float, "currency": "KZT", "payment_method": "cash"|"card"}
+        # When present:
+        #   TypeOfPayer   = 1 (получатель)
+        #   WayOfPayment  = 2 (наличные) / 3 (карта) — per CSE PaymentTypes ref
+        #   AmountCOD, CurrencyCOD, PaymentByRecipient sent inside <Cargo>.
+        # When absent — legacy behaviour: sender pays via bank transfer.
+        cod = order_data.get("cod") or {}
+        cod_amount = float(cod.get("amount") or 0)
+        cod_active = cod_amount > 0
+        _COD_PAYMENT_METHOD_TO_CODE = {"cash": "2", "card": "3"}
+        _COD_CURRENCY_TO_GUID = {
+            "KZT": "d3a2419e-e7e9-11e8-80c1-7cd30aec6901",
+            "RUB": "ff3f7c38-4430-11dc-9497-0015170f8c09",
+            "USD": "e6853795-4421-11dc-9497-0015170f8c09",
+            "EUR": "e6853796-4421-11dc-9497-0015170f8c09",
+        }
+        if cod_active:
+            type_of_payer = "1"
+            way_of_payment = _COD_PAYMENT_METHOD_TO_CODE.get(
+                (cod.get("payment_method") or "cash").lower(), "2"
+            )
+            cod_currency_iso = (cod.get("currency") or "KZT").upper()
+            cod_currency_guid = _COD_CURRENCY_TO_GUID.get(cod_currency_iso, "")
+            if not cod_currency_guid:
+                raise RuntimeError(
+                    f"CSE dispatch aborted: unsupported COD currency {cod_currency_iso!r} "
+                    f"(order_id={order_data.get('order_id')})"
+                )
+            cod_xml = (
+                f"<m:AmountCOD>{cod_amount:.2f}</m:AmountCOD>"
+                f"<m:CurrencyCOD>{cod_currency_guid}</m:CurrencyCOD>"
+                f"<m:PaymentByRecipient>true</m:PaymentByRecipient>"
+            )
+        else:
+            type_of_payer = "0"
+            way_of_payment = "1"  # безнал
+            cod_xml = ""
 
         # PVZ blocks. Per CSE SaveWaybillOffice docs the element is named
         # <PVZ> and lives INSIDE the <Sender> / <Recipient> blocks (after
@@ -1258,6 +1822,7 @@ class CSEAPIClient(CarrierAPIClient):
             + vol_weight_xml +
             cargo_dims_xml +
             declared_xml +
+            cod_xml +
             cargo_packages_xml +
             f"</m:Cargo>"
             + recipient_pvz_xml +
@@ -1278,8 +1843,8 @@ class CSEAPIClient(CarrierAPIClient):
             f"</m:Sender>"
             f"<m:TakeDate>{_esc(take_date)}</m:TakeDate>"
             f"<m:TypeOfCargo>{_esc(cargo_type_guid)}</m:TypeOfCargo>"
-            f"<m:TypeOfPayer>0</m:TypeOfPayer>"
-            f"<m:WayOfPayment>1</m:WayOfPayment>"
+            f"<m:TypeOfPayer>{type_of_payer}</m:TypeOfPayer>"
+            f"<m:WayOfPayment>{way_of_payment}</m:WayOfPayment>"
             + comment_xml +
             f"<m:DeliveryOfCargo>{_esc(cse_delivery)}</m:DeliveryOfCargo>"
             + additional_services_xml +
@@ -1331,18 +1896,27 @@ class CSEAPIClient(CarrierAPIClient):
         if ret_el is None:
             raise RuntimeError("CSE SaveWaybillOffice: no <return> in response")
 
-        # Check top-level error
+        # Check top-level error. CSE SaveWaybillOffice uses <Error>/<ErrorInfo>
+        # (not the Properties[Error=true] envelope used elsewhere). Description
+        # may be embedded inside ErrorInfo — try to pull the numeric code out
+        # if it's there, but always keep the full text as raw_info.
         top_error = ret_el.find(f"{ns}Error")
         if top_error is not None and (top_error.text or "").strip().lower() == "true":
             error_info = (ret_el.findtext(f"{ns}ErrorInfo") or "").strip()
-            raise RuntimeError(f"CSE SaveWaybillOffice error: {error_info or 'unknown'}")
+            raise _parse_save_waybill_error(
+                _extract_leading_code(error_info),
+                error_info,
+            )
 
         # Extract waybill number from Items/Value
         for items_el in ret_el.findall(f"{ns}Items"):
             item_error = items_el.find(f"{ns}Error")
             if item_error is not None and (item_error.text or "").strip().lower() == "true":
                 error_info = (items_el.findtext(f"{ns}ErrorInfo") or "").strip()
-                raise RuntimeError(f"CSE SaveWaybillOffice item error: {error_info or 'unknown'}")
+                raise _parse_save_waybill_error(
+                    _extract_leading_code(error_info),
+                    error_info,
+                )
             val_el = items_el.find(f"{ns}Value")
             if val_el is not None and (val_el.text or "").strip():
                 return (val_el.text or "").strip()
@@ -1424,6 +1998,85 @@ class CSEAPIClient(CarrierAPIClient):
         ))
         return services
 
+    # ── Report ───────────────────────────────────────────────────────────────
+
+    # Public → CSE report-name mapping (per Web API docs «Report», page 235+).
+    # Values are the exact "Report" parameter strings expected by CSE. Add a
+    # new pair here to expose more reports without touching call sites.
+    _REPORT_NAMES: dict[str, str] = {
+        "invoices":           "ДетализацияСчетов",
+        "partial_purchase":   "ЧастичныйВыкупТоваров",
+        "customer_returns":   "ВозвратныеОтправленияКлиента",
+        "cod_agent":          "ОтчетАгентаCOD",
+        "stock_balances":     "ОстаткиТоваровНаСкладе",
+        "discrepancies":      "РасхожденияЗаказовПоступлений",
+    }
+
+    def get_report(
+        self,
+        report_type: str,
+        date_from: str,
+        date_to: str,
+        creds: dict,
+        *,
+        extra_params: dict[str, str] | None = None,
+    ) -> list[dict]:
+        """Fetch a CSE Report and return parsed rows.
+
+        ``report_type``: public slug from ``_REPORT_NAMES`` (invoices,
+        partial_purchase, customer_returns, cod_agent, stock_balances,
+        discrepancies). Raises RuntimeError for unknown slugs BEFORE the API
+        call — prevents typos from silently hitting the wire.
+
+        ``date_from`` / ``date_to``: YYYY-MM-DD (client-side ISO). CSE expects
+        dateTime — we normalise "YYYY-MM-DD" to "YYYY-MM-DDT00:00:00" so
+        callers can pass just the date.
+
+        ``extra_params``: optional pass-through for report-specific filters
+        (e.g. Currency, ContractGUID). Values must be strings.
+
+        Returns a list of dicts, one per row. Fields map from CSE ``<m:Fields>``
+        Key/Value children; ValueType coercion follows the shared ``fields_of``
+        helper (int / float / bool typed).
+        """
+        cse_name = self._REPORT_NAMES.get(report_type)
+        if cse_name is None:
+            raise RuntimeError(
+                f"CSE get_report: unknown report_type {report_type!r}; "
+                f"expected one of {sorted(self._REPORT_NAMES.keys())}"
+            )
+
+        def _iso(d: str) -> str:
+            return d if "T" in d else f"{d}T00:00:00"
+
+        extras: list[tuple[str, str, str]] = [
+            ("Report", cse_name, "string"),
+            ("DateFrom", _iso(date_from), "dateTime"),
+            ("DateTo", _iso(date_to), "dateTime"),
+        ]
+        for k, v in (extra_params or {}).items():
+            extras.append((k, str(v), "string"))
+
+        inner = self._auth(creds) + _ref_params("Report", *extras)
+        ret = self._post("Report", inner, creds, timeout=_TIMEOUT)
+
+        rows: list[dict] = []
+        for item in list_items(ret):
+            row = fields_of(item)
+            # Some reports emit row-level metadata via Properties (rare); flatten
+            # them into the dict too so callers see everything in one place.
+            for prop in props_of(item):
+                key_el = prop.find(f"{_NM}Key")
+                val_el = prop.find(f"{_NM}Value")
+                if key_el is None or val_el is None:
+                    continue
+                key = (key_el.text or "").strip()
+                if key and key not in row:
+                    row[key] = (val_el.text or "").strip()
+            if row:
+                rows.append(row)
+        return rows
+
     # ── CarrierAPIClient interface ───────────────────────────────────────────
 
     def create_invoice(self, order_data: dict, creds: dict) -> InvoiceResult:
@@ -1500,6 +2153,8 @@ def _build_calc_inner(
     declared_value: float = 0.0,
     insurance_rate: float = 0.0,
     additional_service_guids: list[str] | None = None,
+    cod_amount: float = 0.0,
+    cod_currency: str = "KZT",
 ) -> str:
     """Build the SOAP body for a CSE Calc request.
 
@@ -1517,6 +2172,10 @@ def _build_calc_inner(
       additional_service_guids — Services reference GUIDs to bill with the
                                 shipment (Страхование, Объявленная стоимость, …).
                                 Emitted via <Tables><Key>AdditionalServices</Key>.
+      cod_amount / cod_currency — COD amount to be collected from recipient.
+                                CSE bills an agent fee on top of the base
+                                tariff which is included in the response
+                                Total when we pass these fields.
     """
     vol_field = ""
     if volume_weight and volume_weight > 0:
@@ -1548,6 +2207,28 @@ def _build_calc_inner(
             f"<m:Fields><m:Key>InsuranceRate</m:Key><m:Value>{float(insurance_rate):.2f}</m:Value>"
             "<m:ValueType>float</m:ValueType></m:Fields>"
         )
+    # ── COD fields ──────────────────────────────────────────────────────
+    # AmountCOD signals CSE to fold the agent fee into the returned Total.
+    # CurrencyCOD is the ISO 4217 → GUID mapping used elsewhere; keep
+    # them in sync with the same table in `create_waybill`.
+    cod_fields = ""
+    if cod_amount and cod_amount > 0:
+        _COD_CURRENCY_TO_GUID = {
+            "KZT": "d3a2419e-e7e9-11e8-80c1-7cd30aec6901",
+            "RUB": "ff3f7c38-4430-11dc-9497-0015170f8c09",
+            "USD": "e6853795-4421-11dc-9497-0015170f8c09",
+            "EUR": "e6853796-4421-11dc-9497-0015170f8c09",
+        }
+        currency_guid = _COD_CURRENCY_TO_GUID.get((cod_currency or "KZT").upper())
+        if currency_guid:
+            cod_fields = (
+                f"<m:Fields><m:Key>AmountCOD</m:Key><m:Value>{float(cod_amount):.2f}</m:Value>"
+                "<m:ValueType>float</m:ValueType></m:Fields>"
+                f"<m:Fields><m:Key>CurrencyCOD</m:Key><m:Value>{currency_guid}</m:Value>"
+                "<m:ValueType>string</m:ValueType></m:Fields>"
+                "<m:Fields><m:Key>PaymentByRecipient</m:Key><m:Value>true</m:Value>"
+                "<m:ValueType>boolean</m:ValueType></m:Fields>"
+            )
     services_block = ""
     if additional_service_guids:
         items = "".join(
@@ -1580,7 +2261,8 @@ def _build_calc_inner(
         + urgency_field
         + delivery_field
         + declared_field
-        + insurance_field +
+        + insurance_field
+        + cod_fields +
         f"<m:Fields><m:Key>Qty</m:Key><m:Value>{qty}</m:Value>"
         "<m:ValueType>int</m:ValueType></m:Fields>"
         + services_block +

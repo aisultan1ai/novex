@@ -44,6 +44,8 @@ class GatewayTrackingEvent:
     location: str | None
     occurred_at: datetime
     description: str | None
+    planned_delivery_at: datetime | None = None
+    delivered_at: datetime | None = None
 
 
 class CarrierGatewayClient:
@@ -110,6 +112,9 @@ class CarrierGatewayClient:
             timeout=_TRACKING_TIMEOUT,
         )
         self._raise_for_carrier_error(resp)
+        def _parse_optional(value: str | None) -> datetime | None:
+            return datetime.fromisoformat(value) if value else None
+
         return [
             GatewayTrackingEvent(
                 status=e["status"],
@@ -117,6 +122,8 @@ class CarrierGatewayClient:
                 location=e.get("location"),
                 occurred_at=datetime.fromisoformat(e["occurred_at"]),
                 description=e.get("description"),
+                planned_delivery_at=_parse_optional(e.get("planned_delivery_at")),
+                delivered_at=_parse_optional(e.get("delivered_at")),
             )
             for e in resp.json()["events"]
         ]
