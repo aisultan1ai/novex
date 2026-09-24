@@ -188,6 +188,38 @@ services:
     volumes:
       - ../../backend:/app
 
+  tracking-poller:
+    build:
+      context: ../..
+      dockerfile: infra/docker/worker.Dockerfile
+    container_name: novex-tracking-poller
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      carrier-gateway:
+        condition: service_started
+    working_dir: /app
+    environment:
+      ENVIRONMENT: development
+      SECRET_KEY: "${SECRET_KEY}"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-novex}:${POSTGRES_PASSWORD:-novex}@postgres:5432/${POSTGRES_DB:-novex}
+      REDIS_URL: redis://redis:6379/0
+      CARRIER_GATEWAY_URL: "http://carrier-gateway:8100"
+      GATEWAY_SECRET: "${GATEWAY_SECRET:-}"
+      CSE_LOGIN: "${CSE_LOGIN:-}"
+      CSE_PASSWORD: "${CSE_PASSWORD:-}"
+      CSE_API_URL: "${CSE_API_URL:-http://web.cse.ru/1c/ws/Web1C.1cws}"
+      EXLINE_EXTRA: "${EXLINE_EXTRA:-}"
+      EXLINE_LOGIN: "${EXLINE_LOGIN:-}"
+      EXLINE_PASSWORD: "${EXLINE_PASSWORD:-}"
+      EXLINE_API_URL: "${EXLINE_API_URL:-https://home.courierexe.ru/api/}"
+    volumes:
+      - ../../backend:/app
+    command: ["python", "-m", "workers.tracking_poller"]
+
   carrier-gateway:
     build:
       context: ../..

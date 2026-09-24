@@ -806,8 +806,11 @@ def refresh_waybill(
     for doc in stale_docs:
         try:
             storage.delete_file(doc.file_url)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(
+                "Failed to delete stale label from storage: %s (%s)",
+                doc.file_url, exc,
+            )
         db.delete(doc)
 
     get_redis().delete(f"pdf:label:{order_id}")
