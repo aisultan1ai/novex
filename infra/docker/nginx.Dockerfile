@@ -8,6 +8,7 @@ COPY infra/nginx/nginx.conf /etc/nginx/nginx.conf
 RUN rm -f /etc/nginx/conf.d/default.conf
 COPY infra/nginx/routes.conf /etc/nginx/conf.d/routes.conf
 COPY infra/nginx/init-cert.sh /docker-entrypoint.d/10-init-cert.sh
-RUN chmod +x /docker-entrypoint.d/10-init-cert.sh
+COPY infra/nginx/reload-certs.sh /docker-entrypoint.d/40-reload-certs.sh
+RUN chmod +x /docker-entrypoint.d/10-init-cert.sh /docker-entrypoint.d/40-reload-certs.sh
 
 EXPOSE 80 443

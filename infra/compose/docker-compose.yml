@@ -326,6 +326,7 @@ services:
   certbot:
     image: certbot/certbot:latest
     container_name: novex-certbot
+    restart: unless-stopped
     volumes:
       - certbot_www:/var/www/certbot
       - certbot_certs:/etc/letsencrypt
@@ -335,8 +336,6 @@ services:
                certbot renew --webroot --webroot-path=/var/www/certbot --quiet;
                sleep 12h & wait $${!};
              done"
-    profiles:
-      - tls
 
 volumes:
   postgres_data:

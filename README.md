@@ -62,7 +62,7 @@ Migrations run automatically on startup via a one-shot `migrate` container.
 docker compose -f infra/compose/docker-compose.yml up -d
 ```
 
-TLS is handled by Certbot (enable `--profile tls` to activate the renewal container).
+TLS is handled by Certbot: the `certbot` container renews every 12h, nginx reloads every 6h to pick up new certs.
 
 ## Domain modules
 
