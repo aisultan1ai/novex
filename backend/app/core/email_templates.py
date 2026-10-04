@@ -355,6 +355,46 @@ def cancellation_email(
             return None
 
 
+# ── staff alerts (admin + operator) ────────────────────────────────────────
+
+def _admin_order_link(order_id: int) -> str:
+    return f"{get_settings().frontend_url}/dashboard/admin/orders?order={order_id}"
+
+
+def staff_email(event_type: str, order_id: int, payload: dict) -> tuple[str, str] | None:
+    """Alerts for staff — see app.modules.notifications.staff."""
+    cta = f'<a href="{_admin_order_link(order_id)}" style="{_BTN_STYLE}">Открыть заказ</a>'
+    match event_type:
+        case "staff_payment_proof":
+            subject = f"Проверьте оплату по заказу #{order_id}"
+            body = (
+                f'<span style="{_BADGE_BLUE}">Новый чек</span>'
+                f'<h1 style="{_HEADER_STYLE}">Клиент загрузил чек</h1>'
+                f'<p style="{_BODY_STYLE}">По заказу <b>#{order_id}</b> загружено подтверждение оплаты. '
+                "Проверьте чек и подтвердите или отклоните оплату — до этого заказ не уйдёт перевозчику.</p>"
+            )
+        case "staff_cancellation_request":
+            reason = _html.escape(str(payload.get("reason") or "—"))
+            subject = f"Заявка на отмену заказа #{order_id}"
+            body = (
+                f'<span style="{_BADGE_RED}">Отмена</span>'
+                f'<h1 style="{_HEADER_STYLE}">Клиент просит отменить заказ</h1>'
+                f'<p style="{_BODY_STYLE}">Заказ <b>#{order_id}</b>.<br>Причина: {reason}</p>'
+            )
+        case "staff_dispatch_failed":
+            error = _html.escape(str(payload.get("error") or "—"))
+            subject = f"Заказ #{order_id} не отправлен перевозчику"
+            body = (
+                f'<span style="{_BADGE_RED}">Ошибка отправки</span>'
+                f'<h1 style="{_HEADER_STYLE}">Заказ не ушёл перевозчику</h1>'
+                f'<p style="{_BODY_STYLE}">Заказ <b>#{order_id}</b> требует ручной проверки.<br>'
+                f'<span style="font-family:monospace;font-size:13px">{error}</span></p>'
+            )
+        case _:
+            return None
+    return subject, _wrap(body + cta)
+
+
 # ── public API ─────────────────────────────────────────────────────────────
 
 def order_status_email(

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
     Date,
+    DateTime,
     ForeignKey,
     Integer,
     Numeric,
@@ -78,6 +79,13 @@ class OrderDraft(Base, TimestampMixin):
     # their own, so we enforce idempotency on our side).
     pickup_scheduled_azimuth_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     pickup_error: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Waybill(s) left at the carrier after a pickup reschedule whose cancel
+    # call failed (comma-separated). Shown as a warning in the admin order
+    # card until an operator confirms it was cancelled manually.
+    orphan_waybill_number: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # When the customer confirmed they have consent to pass the sender /
+    # recipient personal data (third parties) for this shipment.
+    pd_consent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     carrier_code_snapshot: Mapped[str] = mapped_column(String(50), nullable=False)
     carrier_name_snapshot: Mapped[str] = mapped_column(String(100), nullable=False)

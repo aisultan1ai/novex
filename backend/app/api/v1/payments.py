@@ -174,6 +174,9 @@ async def upload_payment_proof(
         )
         raise HTTPException(status_code=400, detail=str(exc))
 
+    from app.modules.notifications.staff import notify_staff
+    notify_staff(db, event="payment_proof", order_id=draft_id)
+
     return {
         "proof_id": proof.id,
         "status": proof.review_status,

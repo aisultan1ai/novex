@@ -603,6 +603,9 @@ class OrdersService:
 
         order_draft.call_before_delivery = payload.call_before_delivery
         order_draft.insurance = payload.insurance
+        if payload.pd_consent and order_draft.pd_consent_at is None:
+            from app.common.time_utils import utcnow as _utcnow
+            order_draft.pd_consent_at = _utcnow()
         order_draft.fragile = payload.fragile
 
         order_draft.delivery_type = payload.delivery_type
@@ -756,6 +759,13 @@ class OrdersService:
                     "(non-fatal — proceeding with re-dispatch)",
                     shipment.carrier_tracking_number, draft_id,
                 )
+                # The old waybill is still live at the carrier — a courier may
+                # come twice. Flag it for the admin/operator to cancel by hand.
+                previous = order_draft.orphan_waybill_number
+                order_draft.orphan_waybill_number = (
+                    f"{previous}, {shipment.carrier_tracking_number}"
+                    if previous else shipment.carrier_tracking_number
+                )
             # Wipe the tracking number so dispatch_worker's idempotency
             # guard does NOT skip create_invoice this time.
             shipment.carrier_tracking_number = None
@@ -798,7 +808,8 @@ class OrdersService:
         # job. Skip publishing when we didn't enqueue a new job.
         if dispatch_job is not None:
             try:
-                from app.core.streams import STREAM_DISPATCH, stream_publish
+                from app.core.streams import STREAM_DISPATCH
+                from app.core.streams import publish as stream_publish
                 stream_publish(STREAM_DISPATCH, {
                     "dispatch_job_id": str(dispatch_job.id),
                     "order_id": str(order_draft.id),

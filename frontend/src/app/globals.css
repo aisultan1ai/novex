@@ -164,3 +164,23 @@ h1, h2, h3,
     scroll-behavior: auto !important;
   }
 }
+
+/* ── Admin orders list (admin / operator) ─────────────────────────────────
+   Desktop: 7-column table. Phone: each row becomes a 2-column card —
+   #id | status · client | price · route | carrier · actions full width. */
+.admin-orders-grid {
+  display: grid;
+  grid-template-columns: 70px 160px 1fr 150px 110px 150px 160px;
+  gap: 12px;
+}
+@media (max-width: 639px) {
+  .admin-orders-head { display: none !important; }
+  .admin-orders-grid { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; padding: 14px 16px !important; }
+  .admin-orders-grid > :nth-child(1) { order: 1; }
+  .admin-orders-grid > :nth-child(6) { order: 2; justify-self: end; align-items: flex-end !important; }
+  .admin-orders-grid > :nth-child(2) { order: 3; }
+  .admin-orders-grid > :nth-child(5) { order: 4; justify-self: end; text-align: right; }
+  .admin-orders-grid > :nth-child(3) { order: 5; }
+  .admin-orders-grid > :nth-child(4) { order: 6; justify-self: end; text-align: right; }
+  .admin-orders-grid > :nth-child(7) { order: 7; grid-column: 1 / -1; }
+}

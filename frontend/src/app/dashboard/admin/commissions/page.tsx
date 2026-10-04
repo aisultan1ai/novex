@@ -14,6 +14,7 @@ import {
 } from "@/lib/api/commission_configs";
 import type { AdminCommission, CommissionSummary, PlatformSettings } from "@/types/admin";
 import ExportXlsxButton from "@/components/ui/ExportXlsxButton";
+import { useIsAdmin } from "@/hooks/use-is-admin";
 
 const TYPE_LABELS: Record<CommissionType, string> = {
   percentage: "Процент",
@@ -71,6 +72,7 @@ function SummaryCard({ label, value, sub, color }: { label: string; value: strin
 }
 
 export default function AdminCommissionsPage() {
+  const isAdmin = useIsAdmin();
   // ── Settings modal ────────────────────────────────────────────
   const [showSettings, setShowSettings] = useState(false);
   const [globalOpen, setGlobalOpen] = useState(false);
@@ -238,27 +240,29 @@ export default function AdminCommissionsPage() {
       {/* ── Export + Settings buttons (below cards) ─────────── */}
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginBottom: 28 }}>
         <ExportXlsxButton endpoint="/admin/commissions/export" />
-        <button
-          onClick={openSettings}
-          style={{
-            display: "flex", alignItems: "center", gap: 8,
-            padding: "9px 18px",
-            borderRadius: 10,
-            border: "1px solid #E2E8EE",
-            background: "#fff",
-            color: "#475569",
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: "pointer",
-            fontFamily: "inherit",
-            boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-          }}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-          </svg>
-          Настройки ставок
-        </button>
+        {isAdmin && (
+          <button
+            onClick={openSettings}
+            style={{
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "9px 18px",
+              borderRadius: 10,
+              border: "1px solid #E2E8EE",
+              background: "#fff",
+              color: "#475569",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+            Настройки ставок
+          </button>
+        )}
       </div>
 
       {/* ── History error ─────────────────────────────────────── */}

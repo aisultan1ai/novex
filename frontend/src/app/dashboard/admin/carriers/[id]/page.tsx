@@ -11,6 +11,7 @@ import {
   type CarrierAccount,
 } from "@/lib/api/admin";
 import type { AdminCarrierDetail } from "@/types/admin";
+import { useIsAdmin } from "@/hooks/use-is-admin";
 
 const inp: React.CSSProperties = {
   border: "1px solid #E2E8EE", borderRadius: 8, padding: "8px 12px",
@@ -25,6 +26,7 @@ const lbl: React.CSSProperties = {
 const EMPTY_ACCOUNT = { email: "", full_name: "", temp_password: "" };
 
 export default function AdminCarrierOverviewPage() {
+  const isAdmin = useIsAdmin();
   const { id } = useParams<{ id: string }>();
   const carrierId = Number(id);
 
@@ -117,6 +119,7 @@ export default function AdminCarrierOverviewPage() {
     <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 20, alignItems: "start" }}>
       {/* Edit form */}
       <form onSubmit={handleSave} style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 14, padding: "24px" }}>
+<fieldset disabled={!isAdmin} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
         <div style={{ fontSize: 15, fontWeight: 700, color: "#0B2545", marginBottom: 18 }}>Основные данные</div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
@@ -169,7 +172,8 @@ export default function AdminCarrierOverviewPage() {
         <button type="submit" disabled={saving} style={{ padding: "10px 24px", borderRadius: 10, border: "none", background: "#0B2545", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
           {saving ? "Сохраняем…" : "Сохранить"}
         </button>
-      </form>
+      </fieldset>
+</form>
 
       {/* Account section */}
       <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 14, padding: "22px 24px" }}>
@@ -221,7 +225,7 @@ export default function AdminCarrierOverviewPage() {
           </div>
         )}
 
-        {!showAccountForm ? (
+        {!isAdmin ? null : !showAccountForm ? (
           <button
             onClick={() => setShowAccountForm(true)}
             style={{ padding: "9px 18px", borderRadius: 10, border: "1px solid #c7d2fe", background: "#eef2ff", color: "#4338ca", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}

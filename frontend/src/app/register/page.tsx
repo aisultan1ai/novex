@@ -9,6 +9,7 @@ import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { ApiError, registerUser } from "@/lib/api/auth";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import type { CustomerType, RegisterRequest } from "@/types/auth";
+import PdConsentCheckbox from "@/components/forms/PdConsentCheckbox";
 
 /* ─── Password strength ──────────────────────────────────────────────────── */
 
@@ -147,6 +148,7 @@ type FormState = {
   customer_type: CustomerType;
   company_name: string;
   tax_id: string;
+  pd_consent: boolean;
 };
 
 const initial: FormState = {
@@ -157,6 +159,7 @@ const initial: FormState = {
   customer_type: "individual",
   company_name: "",
   tax_id: "",
+  pd_consent: false,
 };
 
 /* ─── Page ───────────────────────────────────────────────────────────────── */
@@ -185,6 +188,7 @@ export default function RegisterPage() {
       customer_type: form.customer_type,
       company_name: isCompany ? form.company_name.trim() || null : null,
       tax_id: form.tax_id.trim(),
+      pd_consent: form.pd_consent,
     };
   }
 
@@ -201,6 +205,10 @@ export default function RegisterPage() {
     setError(null);
     const taxErr = validateTaxId();
     if (taxErr) { setError(taxErr); return; }
+    if (!form.pd_consent) {
+      setError("Чтобы создать аккаунт, подтвердите согласие на обработку персональных данных.");
+      return;
+    }
     setIsSubmitting(true);
     try {
       const created = await registerUser(toPayload());
@@ -447,6 +455,8 @@ export default function RegisterPage() {
               required
               inputMode="numeric"
             />
+
+            <PdConsentCheckbox checked={form.pd_consent} onChange={(v) => set("pd_consent", v)} />
 
             {error && (
               <div

@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.core.dependencies import require_admin
+from app.core.dependencies import require_admin, require_admin_or_operator
 from app.modules.audit.service import AuditService
 from app.modules.identity.models import User
 from app.modules.platform_settings.repository import PlatformSettingsRepository
@@ -57,7 +57,7 @@ def _load_bank(db: Session) -> BankTransferSettings:
 @router.get("", response_model=PlatformSettingsResponse, summary="Настройки платформы")
 def get_settings(
     db: Session = Depends(get_db),
-    _=Depends(require_admin),
+    _=Depends(require_admin_or_operator),
 ) -> PlatformSettingsResponse:
     rate = _repo.get(db, COMMISSION_RATE_KEY, default="0.00")
     return PlatformSettingsResponse(commission_rate=rate, bank_transfer=_load_bank(db))

@@ -158,6 +158,9 @@ class UpdateShipmentDetailsRequest(BaseModel):
     # `ReschedulePickupRequest` reuses these two — see below.
     pickup_contact_person: str | None = Field(default=None, max_length=255)
     pickup_contact_phone: str | None = Field(default=None, max_length=50)
+    # Customer confirms consent of the sender / recipient (third parties) to
+    # pass their personal data for delivery. Recorded on the order.
+    pd_consent: bool = False
 
     @model_validator(mode="after")
     def _validate_pickup(self) -> "UpdateShipmentDetailsRequest":

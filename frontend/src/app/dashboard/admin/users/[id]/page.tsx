@@ -7,6 +7,7 @@ import { useParams } from "next/navigation";
 import { getAdminUser, updateAdminUser } from "@/lib/api/admin";
 import { orderStatusColors, orderStatusLabel } from "@/lib/status-labels";
 import type { AdminUserDetail } from "@/types/admin";
+import { useIsAdmin } from "@/hooks/use-is-admin";
 
 function formatPrice(price: number, currency: string) {
   return `${new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(price)} ${currency}`;
@@ -18,6 +19,7 @@ function getInitials(name: string | null, email: string) {
 }
 
 export default function AdminUserDetailPage() {
+  const isAdmin = useIsAdmin();
   const params = useParams();
   const userId = Number(params.id);
 
@@ -81,13 +83,15 @@ export default function AdminUserDetailPage() {
               )}
             </div>
           </div>
-          <button
-            onClick={() => void handleToggle()}
-            disabled={toggling}
-            style={{ padding: "10px 20px", borderRadius: 10, border: `1px solid ${user.is_active ? "#fecaca" : "#bbf7d0"}`, background: user.is_active ? "#fef2f2" : "#f0fdf4", color: user.is_active ? "#b91c1c" : "#166534", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: toggling ? 0.7 : 1 }}
-          >
-            {user.is_active ? "Заблокировать" : "Разблокировать"}
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => void handleToggle()}
+              disabled={toggling}
+              style={{ padding: "10px 20px", borderRadius: 10, border: `1px solid ${user.is_active ? "#fecaca" : "#bbf7d0"}`, background: user.is_active ? "#fef2f2" : "#f0fdf4", color: user.is_active ? "#b91c1c" : "#166534", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: toggling ? 0.7 : 1 }}
+            >
+              {user.is_active ? "Заблокировать" : "Разблокировать"}
+            </button>
+          )}
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>

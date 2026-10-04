@@ -9,13 +9,14 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.core.dependencies import require_admin
+from app.core.dependencies import require_admin, require_admin_or_operator
+from app.core.limiter import limiter
 from app.modules.carriers.api_clients.cse import CSEAPIClient
 from app.modules.carriers.cse_error_codes import CSEWaybillValidationError
 
@@ -128,9 +129,21 @@ class TrackingEvent(BaseModel):
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+#
+# Access model:
+#   * Reference lookups (geography, pvz, delivery-*, take-dates) stay public —
+#     the shipment form calls them — but are rate-limited because every call
+#     spends our CSE credentials.
+#   * /waybills/* is staff-only: it exposes recipient PII and DELETE cancels a
+#     real waybill at CSE. CSE waybill numbers are sequential, so leaving these
+#     open would let anyone enumerate and cancel shipments.
+
+_PUBLIC_RATE_LIMIT = "30/minute"
 
 @router.get("/geography", response_model=list[GeoItem], summary="Search CSE geography")
+@limiter.limit(_PUBLIC_RATE_LIMIT)
 def search_geography(
+    request: Request,
     search: str = Query(..., min_length=2, description="City name, postal code, or FIAS"),
     db: Session = Depends(get_db),
 ) -> list[GeoItem]:
@@ -145,7 +158,9 @@ def search_geography(
 
 
 @router.get("/pvz", response_model=list[PvzItem], summary="List CSE pickup/delivery points")
+@limiter.limit(_PUBLIC_RATE_LIMIT)
 def list_pvz(
+    request: Request,
     city_guid: str | None = Query(default=None, description="Filter by CSE city GUID"),
     city: str | None = Query(
         default=None,
@@ -183,7 +198,9 @@ def list_pvz(
     response_model=DeliveryInfoResponse,
     summary="Get delivery info for a route",
 )
+@limiter.limit(_PUBLIC_RATE_LIMIT)
 def delivery_info(
+    request: Request,
     from_geo: str = Query(..., description="CSE GUID, postcode-KZ-XXXXXX, or KZ city name"),
     to_geo: str = Query(..., description="CSE GUID, postcode-KZ-XXXXXX, or KZ city name"),
     db: Session = Depends(get_db),
@@ -205,7 +222,9 @@ def delivery_info(
     response_model=list[AvailableDateItem],
     summary="Available delivery date/time slots",
 )
+@limiter.limit(_PUBLIC_RATE_LIMIT)
 def available_delivery_dates(
+    request: Request,
     from_geo: str = Query(..., description="CSE GUID, postcode-KZ-XXXXXX, or KZ city name (sender)"),
     to_geo: str = Query(..., description="CSE GUID, postcode-KZ-XXXXXX, or KZ city name (recipient)"),
     db: Session = Depends(get_db),
@@ -227,7 +246,9 @@ def available_delivery_dates(
     response_model=list[AvailableDateItem],
     summary="Available courier pickup date/time slots",
 )
+@limiter.limit(_PUBLIC_RATE_LIMIT)
 def available_take_dates(
+    request: Request,
     from_geo: str = Query(..., description="CSE GUID, postcode-KZ-XXXXXX, or KZ city name (sender)"),
     db: Session = Depends(get_db),
 ) -> list[AvailableDateItem]:
@@ -246,6 +267,7 @@ def available_take_dates(
     "/waybills/{waybill_number}",
     response_model=WaybillInfo,
     summary="Get waybill data",
+    dependencies=[Depends(require_admin_or_operator)],
 )
 def get_waybill(
     waybill_number: str,
@@ -273,6 +295,7 @@ def get_waybill(
     "/waybills/{waybill_number}/tracking",
     response_model=list[TrackingEvent],
     summary="Get waybill tracking history",
+    dependencies=[Depends(require_admin_or_operator)],
 )
 def get_tracking(
     waybill_number: str,
@@ -300,6 +323,7 @@ def get_tracking(
 @router.get(
     "/waybills/{waybill_number}/pdf",
     summary="Download waybill PDF",
+    dependencies=[Depends(require_admin_or_operator)],
     response_class=Response,
     responses={200: {"content": {"application/pdf": {}}, "description": "PDF waybill"}},
 )
@@ -326,6 +350,7 @@ def download_waybill_pdf(
 @router.delete(
     "/waybills/{waybill_number}",
     summary="Cancel a CSE waybill",
+    dependencies=[Depends(require_admin_or_operator)],
 )
 def cancel_waybill(
     waybill_number: str,

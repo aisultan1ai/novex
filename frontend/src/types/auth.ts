@@ -11,6 +11,7 @@ export interface RegisterRequest {
   company_name?: string | null;
   billing_mode?: BillingMode | null;
   tax_id: string;
+  pd_consent: boolean;
 }
 
 export interface LoginRequest {

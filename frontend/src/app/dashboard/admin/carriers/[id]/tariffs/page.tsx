@@ -7,6 +7,7 @@ import {
   listAdminRates, updateAdminRate, uploadTariffGrid,
 } from "@/lib/api/admin";
 import type { AdminCarrierService, AdminTariffRate } from "@/types/admin";
+import { useIsAdmin } from "@/hooks/use-is-admin";
 
 const TEMPLATE: object[] = [
   { zone: 0, weight_from_kg: 0, weight_to_kg: 1, base_price: 1200, eta_days_min: 1, eta_days_max: 1, currency: "KZT" },
@@ -31,6 +32,7 @@ const inp: React.CSSProperties = {
 };
 
 export default function AdminCarrierTariffsPage() {
+  const isAdmin = useIsAdmin();
   const { id } = useParams<{ id: string }>();
   const carrierId = Number(id);
 
@@ -174,12 +176,14 @@ export default function AdminCarrierTariffsPage() {
         <div style={{ background: "#ffffff", border: "1px solid #E2E8EE", borderRadius: 16, overflow: "hidden" }}>
           <div style={{ padding: "14px 16px", borderBottom: "1px solid #E2E8EE", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: "#0B2545" }}>Услуги</span>
-            <button
-              onClick={() => setShowServiceForm((v) => !v)}
-              style={{ fontSize: 20, lineHeight: 1, background: "none", border: "none", cursor: "pointer", color: "#64748b", padding: 0, fontFamily: "inherit" }}
-            >
-              +
-            </button>
+            {isAdmin && (
+              <button
+                onClick={() => setShowServiceForm((v) => !v)}
+                style={{ fontSize: 20, lineHeight: 1, background: "none", border: "none", cursor: "pointer", color: "#64748b", padding: 0, fontFamily: "inherit" }}
+              >
+                +
+              </button>
+            )}
           </div>
 
           {showServiceForm && (
@@ -234,10 +238,12 @@ export default function AdminCarrierTariffsPage() {
                 <button onClick={downloadTemplate} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid #E2E8EE", background: "#fff", color: "#0B2545", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                   Шаблон JSON
                 </button>
-                <label style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: "#0B2545", color: "#ffffff", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  {uploading ? "Загружаем..." : "Загрузить JSON"}
-                  <input ref={fileRef} type="file" accept=".json" style={{ display: "none" }} onChange={handleUpload} disabled={uploading} />
-                </label>
+                {isAdmin && (
+                  <label style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: "#0B2545", color: "#ffffff", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    {uploading ? "Загружаем..." : "Загрузить JSON"}
+                    <input ref={fileRef} type="file" accept=".json" style={{ display: "none" }} onChange={handleUpload} disabled={uploading} />
+                  </label>
+                )}
               </div>
             </div>
 
@@ -288,8 +294,12 @@ export default function AdminCarrierTariffsPage() {
                           <span style={{ color: "#64748b" }}>{rate.eta_days_min ?? "-"}</span>
                           <span style={{ color: "#64748b" }}>{rate.eta_days_max ?? "-"}</span>
                           <div style={{ display: "flex", gap: 4 }}>
-                            <button onClick={() => startEdit(rate)} style={{ flex: 1, height: 28, borderRadius: 6, border: "1px solid #e2e8f0", background: "#fff", color: "#475569", cursor: "pointer", fontSize: 13, padding: 0 }}>✎</button>
-                            <button onClick={() => void handleDeleteRate(rate.id)} style={{ flex: 1, height: 28, borderRadius: 6, border: "1px solid #fecaca", background: "#fff", color: "#ef4444", cursor: "pointer", fontSize: 14, padding: 0 }}>×</button>
+                            {isAdmin && (
+                              <button onClick={() => startEdit(rate)} style={{ flex: 1, height: 28, borderRadius: 6, border: "1px solid #e2e8f0", background: "#fff", color: "#475569", cursor: "pointer", fontSize: 13, padding: 0 }}>✎</button>
+                            )}
+                            {isAdmin && (
+                              <button onClick={() => void handleDeleteRate(rate.id)} style={{ flex: 1, height: 28, borderRadius: 6, border: "1px solid #fecaca", background: "#fff", color: "#ef4444", cursor: "pointer", fontSize: 14, padding: 0 }}>×</button>
+                            )}
                           </div>
                         </>
                       )}

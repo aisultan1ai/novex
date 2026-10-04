@@ -33,6 +33,8 @@ const PUBLIC_PATHS = [
   "/tracking",
   "/quote",
   "/partners",
+  "/privacy",
+  "/terms",
   "/api",
   "/_next",
   "/favicon",

@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.core.dependencies import require_admin, require_admin_or_operator
+from app.core.dependencies import require_admin_or_operator
 from app.core.excel import MAX_EXPORT_ROWS, build_xlsx_response, fmt_dt
 from app.core.limiter import limiter
 from app.modules.commissions.models import Commission
@@ -83,7 +83,7 @@ def list_commissions(
     date_to: datetime | None = Query(default=None),
     carrier_code: str | None = Query(default=None),
     db: Session = Depends(get_db),
-    _=Depends(require_admin),
+    _=Depends(require_admin_or_operator),
 ) -> dict:
     return _service.list_commissions(
         db,
@@ -171,6 +171,6 @@ def commissions_summary(
     date_to: datetime | None = Query(default=None),
     carrier_code: str | None = Query(default=None),
     db: Session = Depends(get_db),
-    _=Depends(require_admin),
+    _=Depends(require_admin_or_operator),
 ) -> CommissionSummary:
     return _service.get_summary(db, date_from=date_from, date_to=date_to, carrier_code=carrier_code)

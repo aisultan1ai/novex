@@ -103,14 +103,59 @@ def get_dispatch_queue(
     return {"items": items, "total": len(items)}
 
 
+# Declared before "/{order_id}" so "counters" is not parsed as an order id.
+@router.get("/counters")
+def get_work_counters(
+    db: Session = Depends(get_db),
+    _=Depends(require_admin_or_operator),
+) -> dict:
+    """Counters for the admin / operator workspace (audit 2026-10-04, T6)."""
+    from datetime import timedelta
+
+    from app.common.time_utils import utcnow
+    from app.modules.cancellations.models import CancellationRequest
+    from app.modules.dispatch.models import DispatchJob, DispatchJobStatus
+
+    def _count_orders(*statuses: str) -> int:
+        return db.scalar(
+            select(func.count()).select_from(OrderDraft).where(OrderDraft.status.in_(statuses))
+        ) or 0
+
+    # A job claimed for longer than this is no longer "in progress": the
+    # worker died mid-call and the job needs a human (see DispatchWorker T2).
+    stuck_before = utcnow() - timedelta(minutes=10)
+
+    return {
+        "payment_review": _count_orders("payment_under_review"),
+        "awaiting_dispatch": _count_orders("paid", "dispatch_queued"),
+        "dispatch_failed": _count_orders("dispatch_failed"),
+        "cancellation_pending": db.scalar(
+            select(func.count()).select_from(CancellationRequest)
+            .where(CancellationRequest.status == "pending")
+        ) or 0,
+        "orphan_waybills": db.scalar(
+            select(func.count()).select_from(OrderDraft)
+            .where(OrderDraft.orphan_waybill_number.is_not(None))
+        ) or 0,
+        "stuck_dispatch_jobs": db.scalar(
+            select(func.count()).select_from(DispatchJob).where(
+                DispatchJob.status == DispatchJobStatus.PROCESSING,
+                DispatchJob.updated_at < stuck_before,
+            )
+        ) or 0,
+    }
+
+
 @router.get("")
 @limiter.limit("120/minute")
 def list_all_orders(
     request: Request,
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
-    status: str | None = Query(default=None),
+    status: str | None = Query(default=None, description="One status or a comma-separated list"),
     user_id: int | None = Query(default=None),
+    order_id: int | None = Query(default=None),
+    orphan_waybill: bool = Query(default=False, description="Only orders with a leftover waybill (T3)"),
     barcode: str | None = Query(default=None, description="Substring match on carrier barcode / tracking numbers"),
     db: Session = Depends(get_db),
     _=Depends(require_admin_or_operator),
@@ -119,7 +164,12 @@ def list_all_orders(
 
     stmt = select(OrderDraft).order_by(OrderDraft.created_at.desc())
     if status:
-        stmt = stmt.where(OrderDraft.status == status)
+        statuses = [s.strip() for s in status.split(",") if s.strip()]
+        stmt = stmt.where(OrderDraft.status.in_(statuses))
+    if order_id:
+        stmt = stmt.where(OrderDraft.id == order_id)
+    if orphan_waybill:
+        stmt = stmt.where(OrderDraft.orphan_waybill_number.is_not(None))
     if user_id:
         stmt = stmt.where(OrderDraft.user_id == user_id)
     if barcode:
@@ -583,6 +633,7 @@ def get_order(
         "cancellation": cancellation,
         "refund_status": refund_status,
         "cancellation_request": cancellation_request,
+        "orphan_waybill_number": order.orphan_waybill_number,
     }
 
 
@@ -894,3 +945,29 @@ def mark_dispatched(
         "status": order.status,
         "carrier_tracking_number": payload.tracking_number,
     }
+
+
+@router.post("/{order_id}/orphan-waybill/resolve")
+def resolve_orphan_waybill(
+    order_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin_or_operator),
+) -> dict:
+    """Staff confirms the leftover waybill (after a failed reschedule cancel)
+    was cancelled with the carrier by hand — clears the warning."""
+    order = db.get(OrderDraft, order_id)
+    if not order:
+        raise HTTPException(404, "Заказ не найден")
+    old_value = order.orphan_waybill_number
+    order.orphan_waybill_number = None
+    _audit_svc.log(
+        db,
+        actor=admin,
+        action="order.orphan_waybill_resolved",
+        resource_type="order",
+        resource_id=order.id,
+        old_value={"orphan_waybill_number": old_value},
+        new_value={"orphan_waybill_number": None},
+    )
+    db.commit()
+    return {"id": order.id, "orphan_waybill_number": None}

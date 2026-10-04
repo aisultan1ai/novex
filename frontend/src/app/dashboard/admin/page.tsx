@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
+import WorkCounters from "@/components/admin/WorkCounters";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import { getAdminStats } from "@/lib/api/admin";
 import type { AdminStats } from "@/types/admin";
 
@@ -55,6 +57,7 @@ function QuickLink({ href, title, desc, icon }: { href: string; title: string; d
 export default function AdminOverviewPage() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     getAdminStats()
@@ -64,13 +67,16 @@ export default function AdminOverviewPage() {
 
   return (
     <>
+      <WorkCounters />
+
       {error && (
         <div style={{ padding: "12px 16px", borderRadius: 10, background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c", fontSize: 14, marginBottom: 24 }}>
           {error}
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20, marginBottom: 32 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>Статистика</div>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(auto-fit, minmax(170px, 1fr))", gap: isMobile ? 10 : 20, marginBottom: 32 }}>
         <StatCard
           label="Пользователи"
           value={stats?.total_users ?? "-"}
@@ -95,12 +101,13 @@ export default function AdminOverviewPage() {
         />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      {/* Quick links lead to desktop-only sections — hidden on phones. */}
+      {!isMobile && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         <QuickLink href="/dashboard/admin/orders" title="Управление заказами" desc="Просмотр всех заказов, смена статуса" icon="📦" />
         <QuickLink href="/dashboard/admin/users" title="Пользователи" desc="Список клиентов, детали аккаунтов" icon="👥" />
         <QuickLink href="/dashboard/admin/carriers" title="Перевозчики" desc="Добавить перевозчика, загрузить тарифы" icon="🚚" />
         <QuickLink href="/dashboard/admin/commissions" title="Комиссии" desc="Отчёт по комиссиям Novex от заказов" icon="💰" />
-      </div>
+      </div>}
     </>
   );
 }

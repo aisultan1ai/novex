@@ -690,6 +690,12 @@ class CancellationRequestsService:
                 return
             notify_cancellation_created(db, req=req, order_id=order_id)
 
+            from app.modules.notifications.staff import notify_staff
+            notify_staff(
+                db, event="cancellation_request", order_id=order_id,
+                payload={"reason": req.reason or ""},
+            )
+
     def _post_commit_notify_customer(self, order_id: int, user_id: int) -> None:
         """Уведомление клиенту про переход в cancelled — тем же путём, что и
         обычная смена статуса заказа."""

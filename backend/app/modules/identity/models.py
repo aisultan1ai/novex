@@ -68,6 +68,10 @@ class User(Base, TimestampMixin):
     email_verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # Timestamp of the last verification email — used to rate-limit resend.
     email_verify_sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # When the user accepted the personal-data processing consent at sign-up
+    # (KZ «О персональных данных и их защите»). NULL for accounts created
+    # before the consent checkbox existed.
+    pd_consent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     role_id: Mapped[int] = mapped_column(ForeignKey("roles.id"), nullable=False)
 

@@ -10,6 +10,7 @@ import {
   type AdminUserCreatePayload,
 } from "@/lib/api/admin";
 import type { AdminUser } from "@/types/admin";
+import { useIsAdmin } from "@/hooks/use-is-admin";
 
 const ROLE_LABELS: Record<string, string> = {
   customer: "Клиент",
@@ -30,6 +31,7 @@ const EMPTY_FORM: AdminUserCreatePayload = {
 };
 
 export default function AdminUsersPage() {
+  const isAdmin = useIsAdmin();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -114,12 +116,14 @@ export default function AdminUsersPage() {
           <p style={{ margin: "4px 0 0", fontSize: 14, color: "#64748b" }}>Все аккаунты · {total} всего</p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <button
-            onClick={openCreate}
-            style={{ padding: "10px 18px", borderRadius: 10, border: "none", background: "#0B2545", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}
-          >
-            + Добавить
-          </button>
+          {isAdmin && (
+            <button
+              onClick={openCreate}
+              style={{ padding: "10px 18px", borderRadius: 10, border: "none", background: "#0B2545", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}
+            >
+              + Добавить
+            </button>
+          )}
           <form onSubmit={handleSearch} style={{ display: "flex", gap: 8 }}>
             <input
               value={searchInput}
@@ -192,13 +196,15 @@ export default function AdminUsersPage() {
                   {user.is_active ? "Активен" : "Заблок."}
                 </span>
 
-                <button
-                  onClick={() => void toggleActive(user)}
-                  disabled={togglingId === user.id}
-                  style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #E2E8EE", background: "#ffffff", color: user.is_active ? "#b91c1c" : "#16a34a", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: togglingId === user.id ? 0.5 : 1 }}
-                >
-                  {user.is_active ? "Блок." : "Разблок."}
-                </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => void toggleActive(user)}
+                    disabled={togglingId === user.id}
+                    style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #E2E8EE", background: "#ffffff", color: user.is_active ? "#b91c1c" : "#16a34a", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: togglingId === user.id ? 0.5 : 1 }}
+                  >
+                    {user.is_active ? "Блок." : "Разблок."}
+                  </button>
+                )}
               </div>
             );
           })

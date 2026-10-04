@@ -77,6 +77,20 @@ class RegisterRequest(BaseModel):
     company_name: str | None = Field(default=None, max_length=255)
     billing_mode: BillingMode | None = None
     tax_id: str = Field(min_length=12, max_length=12, description="ИИН / БИН — 12 цифр")
+    pd_consent: bool = Field(
+        default=False,
+        # validate_default: a missing field must hit the validator below too,
+        # otherwise omitting `pd_consent` would silently skip the check.
+        validate_default=True,
+        description="Согласие на обработку персональных данных — обязательно",
+    )
+
+    @field_validator("pd_consent")
+    @classmethod
+    def require_pd_consent(cls, value: bool) -> bool:
+        if not value:
+            raise ValueError("Необходимо согласие на обработку персональных данных")
+        return value
 
     @field_validator("email")
     @classmethod

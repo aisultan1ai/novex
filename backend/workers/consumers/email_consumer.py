@@ -65,7 +65,7 @@ def _recover_pending(r) -> None:
 def _process(data: dict) -> None:
     from app.core.db import SessionLocal
     from app.core.email import send_email
-    from app.core.email_templates import cancellation_email, order_status_email
+    from app.core.email_templates import cancellation_email, order_status_email, staff_email
     from app.modules.identity.models import User
 
     user_id = int(data["user_id"])
@@ -75,6 +75,19 @@ def _process(data: dict) -> None:
     # Override для писем, которые уходят НЕ клиенту (например, ops-адрес
     # перевозчика). user_id тогда чаще всего = 0 (sentinel).
     to_email_override: str | None = data.get("to_email_override") or None
+
+    # Staff alerts (admin / operator): recipient is always the override.
+    if event_type.startswith("staff_"):
+        if not to_email_override:
+            logger.warning("Email consumer: staff event %s without recipient, skipping", event_type)
+            return
+        rendered = staff_email(event_type, order_id, payload)
+        if rendered is None:
+            return
+        subject, html_body = rendered
+        send_email(to=to_email_override, subject=subject, html=html_body)
+        logger.info("Email consumer: staff event %s → %s (order_id=%d)", event_type, to_email_override, order_id)
+        return
 
     # Cancellation events route through a separate template dispatcher: those
     # emails carry per-event fields (reason, contacts, portal URL) that don't

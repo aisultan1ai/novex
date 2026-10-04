@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.db import get_db
-from app.core.dependencies import require_admin
+from app.core.dependencies import require_admin, require_admin_or_operator
 from app.core.security import get_password_hash
 from app.modules.audit.service import AuditService
 from app.modules.carriers.models import Carrier
@@ -119,7 +119,7 @@ _PAID_AND_BEYOND_STATUSES = {
 @router.get("/stats")
 def get_stats(
     db: Session = Depends(get_db),
-    _=Depends(require_admin),
+    _=Depends(require_admin_or_operator),
 ) -> dict:
     total_users = db.scalar(select(func.count(User.id))) or 0
     active_users = (
@@ -152,7 +152,7 @@ def list_users(
     size: int = Query(default=20, ge=1, le=100),
     search: str | None = Query(default=None),
     db: Session = Depends(get_db),
-    _=Depends(require_admin),
+    _=Depends(require_admin_or_operator),
 ) -> dict:
     stmt = (
         select(User)
@@ -206,7 +206,7 @@ def list_users(
 def get_user(
     user_id: int,
     db: Session = Depends(get_db),
-    _=Depends(require_admin),
+    _=Depends(require_admin_or_operator),
 ) -> dict:
     user = db.scalar(
         select(User)

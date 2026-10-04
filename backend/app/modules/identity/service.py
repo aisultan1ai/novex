@@ -83,6 +83,8 @@ class IdentityService:
             phone=payload.phone,
             role=customer_role,
         )
+        from app.common.time_utils import utcnow as _utcnow
+        user.pd_consent_at = _utcnow()
 
         billing_mode = self._resolve_billing_mode(
             customer_type=payload.customer_type,

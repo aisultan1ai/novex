@@ -76,6 +76,8 @@ export interface AdminOrderDetail extends AdminOrderRow {
   cancellation: AdminOrderCancellation | null;
   refund_status: "refund_pending" | "refunded" | null;
   cancellation_request: AdminOrderCancellationRequest | null;
+  // Waybill(s) left live at the carrier after a failed reschedule cancel.
+  orphan_waybill_number?: string | null;
 }
 
 export interface AdminCarrier {

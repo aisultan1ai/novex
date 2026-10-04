@@ -58,15 +58,37 @@ export const createAdminUser = (body: AdminUserCreatePayload): Promise<{ id: num
   req("/admin/users", { method: "POST", body: JSON.stringify(body) });
 
 // ── Orders ────────────────────────────────────────────────────────────────────
-export const listAdminOrders = (params: { page?: number; size?: number; status?: string; user_id?: number; barcode?: string } = {}): Promise<PaginatedResponse<AdminOrderRow>> => {
+export const listAdminOrders = (params: {
+  page?: number;
+  size?: number;
+  status?: string;          // one status or comma-separated list
+  user_id?: number;
+  order_id?: number;
+  orphan_waybill?: boolean;
+  barcode?: string;
+} = {}): Promise<PaginatedResponse<AdminOrderRow>> => {
   const q = new URLSearchParams();
   if (params.page) q.set("page", String(params.page));
   if (params.size) q.set("size", String(params.size));
   if (params.status) q.set("status", params.status);
   if (params.user_id) q.set("user_id", String(params.user_id));
+  if (params.order_id) q.set("order_id", String(params.order_id));
+  if (params.orphan_waybill) q.set("orphan_waybill", "true");
   if (params.barcode) q.set("barcode", params.barcode);
   return req(`/admin/orders?${q}`);
 };
+
+// Workspace counters for admin / operator (things that need a human).
+export interface WorkCounters {
+  payment_review: number;
+  awaiting_dispatch: number;
+  dispatch_failed: number;
+  cancellation_pending: number;
+  orphan_waybills: number;
+  stuck_dispatch_jobs: number;
+}
+
+export const getWorkCounters = (): Promise<WorkCounters> => req("/admin/orders/counters");
 
 export const getAdminOrder = (id: number): Promise<AdminOrderDetail> =>
   req(`/admin/orders/${id}`);
@@ -239,6 +261,9 @@ export const listSupportedCarrierAPIs = (): Promise<{ carrier_codes: string[] }>
 
 export const retryOrderDispatch = (draftId: number): Promise<{ ok: boolean; message?: string }> =>
   req(`/admin/orders/${draftId}/retry-dispatch`, { method: "POST" });
+
+export const resolveOrphanWaybill = (orderId: number): Promise<{ id: number; orphan_waybill_number: null }> =>
+  req(`/admin/orders/${orderId}/orphan-waybill/resolve`, { method: "POST" });
 
 // ── Carrier integration settings ──────────────────────────────────────────────
 

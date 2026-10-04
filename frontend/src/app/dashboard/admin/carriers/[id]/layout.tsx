@@ -6,8 +6,10 @@ import { useEffect, useState } from "react";
 import { useParams, usePathname } from "next/navigation";
 import { getAdminCarrier } from "@/lib/api/admin";
 import type { AdminCarrierDetail } from "@/types/admin";
+import { useIsAdmin } from "@/hooks/use-is-admin";
 
 export default function CarrierDetailLayout({ children }: { children: ReactNode }) {
+  const isAdmin = useIsAdmin();
   const { id } = useParams<{ id: string }>();
   const carrierId = Number(id);
   const pathname = usePathname();
@@ -21,8 +23,13 @@ export default function CarrierDetailLayout({ children }: { children: ReactNode 
   const tabs = [
     { label: "Обзор",      href: base },
     { label: "Тарифы",     href: `${base}/tariffs` },
-    { label: "Интеграция", href: `${base}/integration` },
-    { label: "API",        href: `${base}/api` },
+    // Integration / API tabs show carrier secrets — admin only.
+    ...(isAdmin
+      ? [
+          { label: "Интеграция", href: `${base}/integration` },
+          { label: "API",        href: `${base}/api` },
+        ]
+      : []),
   ];
 
   return (

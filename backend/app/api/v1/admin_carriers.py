@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import get_settings
 from app.core.db import get_db
-from app.core.dependencies import require_admin
+from app.core.dependencies import require_admin, require_admin_or_operator
 from app.modules.carriers.integration_log import IntegrationLogRepository
 from app.modules.carriers.models import (
     Carrier,
@@ -153,7 +153,7 @@ def _rate_dict(r: CarrierTariffRate) -> dict:
 @router.get("")
 def list_carriers(
     db: Session = Depends(get_db),
-    _=Depends(require_admin),
+    _=Depends(require_admin_or_operator),
 ) -> list[dict]:
     carriers = db.scalars(select(Carrier).order_by(Carrier.name)).all()
     return [_carrier_dict(c) for c in carriers]
@@ -179,7 +179,7 @@ def create_carrier(
 def get_carrier(
     carrier_id: int,
     db: Session = Depends(get_db),
-    _=Depends(require_admin),
+    _=Depends(require_admin_or_operator),
 ) -> dict:
     carrier = db.scalar(
         select(Carrier)
@@ -236,7 +236,7 @@ def update_carrier(
 def list_services(
     carrier_id: int,
     db: Session = Depends(get_db),
-    _=Depends(require_admin),
+    _=Depends(require_admin_or_operator),
 ) -> list[dict]:
     if not db.get(Carrier, carrier_id):
         raise HTTPException(404, "Перевозчик не найден")
@@ -292,7 +292,7 @@ def list_rates(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
-    _=Depends(require_admin),
+    _=Depends(require_admin_or_operator),
 ) -> dict:
     base = (
         select(CarrierTariffRate)
@@ -437,7 +437,7 @@ def list_zone_cities(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
-    _=Depends(require_admin),
+    _=Depends(require_admin_or_operator),
 ) -> dict:
     base = (
         select(CarrierZoneCity)
@@ -483,7 +483,7 @@ def add_zone_city(
 def list_carrier_accounts(
     carrier_id: int,
     db: Session = Depends(get_db),
-    _=Depends(require_admin),
+    _=Depends(require_admin_or_operator),
 ) -> list[dict]:
     """Список пользователей-сотрудников этого перевозчика (по carrier_profiles)."""
     if not db.get(Carrier, carrier_id):

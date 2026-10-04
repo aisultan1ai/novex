@@ -6,6 +6,7 @@ import {
   listAdminOrders,
   updateOrderStatus,
   getAdminOrder,
+  resolveOrphanWaybill,
   getAdminOrderTracking,
   getAdminOrderPayments,
   getAdminPayment,
@@ -223,6 +224,7 @@ function OrderDetailPanel({ orderId, onCancellationResolved }: { orderId: number
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [cancelMsg, setCancelMsg] = useState<string | null>(null);
+  const [orphanBusy, setOrphanBusy] = useState(false);
 
   const [tracking, setTracking] = useState<AdminTrackingResponse | null>(null);
   const [trackingOpen, setTrackingOpen] = useState(false);
@@ -275,6 +277,19 @@ function OrderDetailPanel({ orderId, onCancellationResolved }: { orderId: number
     }
   }
 
+  async function handleResolveOrphan() {
+    if (!window.confirm("Подтвердите, что старая накладная отменена у перевозчика вручную.")) return;
+    setOrphanBusy(true);
+    try {
+      await resolveOrphanWaybill(orderId);
+      reload();
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Ошибка");
+    } finally {
+      setOrphanBusy(false);
+    }
+  }
+
   async function handleRetryCancellation(requestId: number) {
     setCancelBusy("retry");
     setCancelMsg(null);
@@ -305,6 +320,25 @@ function OrderDetailPanel({ orderId, onCancellationResolved }: { orderId: number
 
   return (
     <div style={dp.wrap}>
+      {/* ── Неотменённая накладная после переноса забора ────────────── */}
+      {detail.orphan_waybill_number && (
+        <div style={{ marginBottom: 16, padding: "14px 18px", background: "#FEF2F2", border: "1px solid #FCA5A5", borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ fontSize: 13, color: "#991B1B", lineHeight: 1.5 }}>
+            <b>Старая накладная не отменена у перевозчика:</b>{" "}
+            <span style={{ fontFamily: "monospace" }}>{detail.orphan_waybill_number}</span>
+            <br />
+            Клиент перенёс забор, а автоматическая отмена не прошла. Отмените её у перевозчика вручную, иначе курьер может приехать дважды.
+          </div>
+          <button
+            onClick={() => void handleResolveOrphan()}
+            disabled={orphanBusy}
+            style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid #DC2626", background: "#fff", color: "#B91C1C", fontSize: 13, fontWeight: 600, cursor: orphanBusy ? "default" : "pointer", whiteSpace: "nowrap" }}
+          >
+            {orphanBusy ? "Сохраняем…" : "Отменено вручную"}
+          </button>
+        </div>
+      )}
+
       {/* ── Активная заявка на отмену ───────────────────────────────── */}
       {cReq && cReq.status === "pending" && (
         <div style={{ marginBottom: 16, padding: "14px 18px", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 10 }}>
@@ -628,7 +662,8 @@ const OrderRow = memo(function OrderRow({
   return (
     <div>
       <div
-        style={{ display: "grid", gridTemplateColumns: "70px 160px 1fr 150px 110px 150px 160px", gap: 12, padding: "14px 20px", borderBottom: isLast && !isEditing && !isPaymentOpen && !isDetailOpen ? "none" : "1px solid #f1f5f9", alignItems: "center", fontSize: 14 }}
+        className="admin-orders-grid"
+        style={{ padding: "14px 20px", borderBottom: isLast && !isEditing && !isPaymentOpen && !isDetailOpen ? "none" : "1px solid #f1f5f9", alignItems: "center", fontSize: 14 }}
         onMouseEnter={(e) => { e.currentTarget.style.background = "#f8fafc"; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = ""; }}
       >
@@ -771,6 +806,26 @@ export default function AdminOrdersPage() {
   const [paymentOpenId, setPaymentOpenId] = useState<number | null>(null);
   const [detailOpenId, setDetailOpenId] = useState<number | null>(null);
 
+  // Deep-link filters from the workspace cards and staff emails:
+  //   ?status=a,b   ?order=42   ?orphan=1
+  const [orderIdFilter, setOrderIdFilter] = useState<number | null>(null);
+  const [orphanOnly, setOrphanOnly] = useState(false);
+  const [urlReady, setUrlReady] = useState(false);
+
+  useEffect(() => {
+    // window.location instead of useSearchParams: no Suspense boundary needed.
+    const q = new URLSearchParams(window.location.search);
+    const st = q.get("status");
+    if (st) setStatusFilter(st);
+    const oid = Number(q.get("order"));
+    if (Number.isInteger(oid) && oid > 0) {
+      setOrderIdFilter(oid);
+      setDetailOpenId(oid);
+    }
+    if (q.get("orphan") === "1") setOrphanOnly(true);
+    setUrlReady(true);
+  }, []);
+
   const SIZE = 20;
 
   const load = useCallback(() => {
@@ -779,14 +834,23 @@ export default function AdminOrdersPage() {
       page,
       size: SIZE,
       status: statusFilter || undefined,
+      order_id: orderIdFilter ?? undefined,
+      orphan_waybill: orphanOnly || undefined,
       barcode: barcodeQuery.trim() || undefined,
     })
       .then((res) => { setOrders(res.items); setTotal(res.total); })
       .catch((e: Error) => setError(e.message))
       .finally(() => setIsLoading(false));
-  }, [page, statusFilter, barcodeQuery]);
+  }, [page, statusFilter, orderIdFilter, orphanOnly, barcodeQuery]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { if (urlReady) void load(); }, [load, urlReady]);
+
+  const clearDeepLink = useCallback(() => {
+    setOrderIdFilter(null);
+    setOrphanOnly(false);
+    setPage(1);
+    window.history.replaceState(null, "", window.location.pathname);
+  }, []);
 
   // Stable callbacks for row-level actions so React.memo on OrderRow can
   // skip re-render of untouched rows. All setters returned by useState are
@@ -829,6 +893,14 @@ export default function AdminOrdersPage() {
         <div>
           <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0B2545" }}>Заказы</h2>
           <p style={{ margin: "4px 0 0", fontSize: 14, color: "#64748b" }}>Все заказы платформы · {total} всего</p>
+          {(orderIdFilter || orphanOnly) && (
+            <button
+              onClick={clearDeepLink}
+              style={{ marginTop: 8, padding: "4px 10px", borderRadius: 999, border: "1px solid #c7d2fe", background: "#eef2ff", color: "#4338ca", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+            >
+              {orderIdFilter ? `Заказ #${orderIdFilter}` : "Неотменённые накладные"} ×
+            </button>
+          )}
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <form
@@ -859,6 +931,11 @@ export default function AdminOrdersPage() {
             style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid #E2E8EE", background: "#ffffff", fontSize: 14, cursor: "pointer", fontFamily: "inherit", color: "#0B2545" }}
           >
             <option value="">Все статусы</option>
+            {statusFilter.includes(",") && (
+              <option value={statusFilter}>
+                {statusFilter.split(",").map((s) => STATUS_LABELS[s] ?? s).join(" + ")}
+              </option>
+            )}
             {ALL_STATUSES.map((s) => (
               <option key={s} value={s}>{STATUS_LABELS[s]}</option>
             ))}
@@ -876,7 +953,7 @@ export default function AdminOrdersPage() {
       {error && <div style={{ padding: "12px 16px", borderRadius: 10, background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c", fontSize: 14, marginBottom: 20 }}>{error}</div>}
 
       <div style={{ background: "#ffffff", border: "1px solid #E2E8EE", borderRadius: 16, overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "70px 160px 1fr 150px 110px 150px 160px", gap: 12, padding: "12px 20px", background: "#f8fafc", borderBottom: "1px solid #E2E8EE", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+        <div className="admin-orders-grid admin-orders-head" style={{ padding: "12px 20px", background: "#f8fafc", borderBottom: "1px solid #E2E8EE", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
           <span>№</span>
           <span>Клиент</span>
           <span>Маршрут</span>

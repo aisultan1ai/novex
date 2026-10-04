@@ -50,6 +50,11 @@ def _retry_delays_seconds() -> list[int]:
     delays = get_settings().dispatch_retry_delays_seconds
     return delays if delays else [60, 300, 900]
 
+def _notify_staff_dispatch_failed(db: Session, order_id: int, error: str) -> None:
+    from app.modules.notifications.staff import notify_staff
+    notify_staff(db, event="dispatch_failed", order_id=order_id, payload={"error": error[:500]})
+
+
 @dataclass
 class _DispatchOutcome:
     """Values captured from a successful dispatch, to persist on the Shipment."""
@@ -172,22 +177,39 @@ class DispatchWorker:
         return processed
 
     def _process_job(self, db: Session, job: DispatchJob) -> None:
+        """Dispatch one job to the carrier.
+
+        Two phases with different failure rules (audit 2026-10-04, T2):
+
+        * Before the carrier call — retryable. The claim (QUEUED → PROCESSING)
+          is committed up front so a worker crash mid-call leaves the job in
+          PROCESSING (visible, manual review) instead of silently rolling back
+          to QUEUED and creating a second waybill on the next tick. The order
+          row is then locked and must still be ``dispatch_queued``; a
+          cancellation that arrives during the call waits for our commit and
+          sees ``sent_to_carrier`` (→ regular cancel-via-API path).
+        * After the carrier accepted the order — NOT retryable. Any failure
+          from here on is recorded with the waybill number for manual review;
+          retrying would create a duplicate waybill (Azimuth cannot cancel).
+        """
         # Atomically transition QUEUED → PROCESSING. Only one concurrent caller
         # wins this UPDATE; the other sees scalar() == None and bails out.
-        # This closes the race between the stream consumer and the scheduler.
         claimed = db.execute(
             sa_update(DispatchJob)
             .where(DispatchJob.id == job.id, DispatchJob.status == DispatchJobStatus.QUEUED)
             .values(status=DispatchJobStatus.PROCESSING, attempts=DispatchJob.attempts + 1)
             .returning(DispatchJob.id)
         ).scalar()
-        db.flush()
         if claimed is None:
+            db.rollback()
             logger.info("dispatch_worker: job %s already claimed by another worker, skipping", job.id)
             return
+        db.commit()
+        job_id = job.id
         db.refresh(job)
 
-        order = db.get(OrderDraft, job.order_id)
+        # Lock the order for the whole carrier call (see docstring).
+        order = db.get(OrderDraft, job.order_id, with_for_update=True, populate_existing=True)
         if not order:
             logger.error("dispatch_worker: order %s not found for job %s", job.order_id, job.id)
             job.status = DispatchJobStatus.FAILED
@@ -195,14 +217,24 @@ class DispatchWorker:
             db.commit()
             return
 
+        if order.status != "dispatch_queued":
+            # Cancelled / already dispatched / moved by an admin while the job
+            # sat in the queue. Calling the carrier now would create a waybill
+            # nobody wants.
+            logger.warning(
+                "dispatch_worker: job %s skipped — order %s is in status %r, not dispatch_queued",
+                job.id, order.id, order.status,
+            )
+            job.status = DispatchJobStatus.CANCELLED
+            job.last_error = f"Skipped: order status is '{order.status}', expected 'dispatch_queued'"
+            job.completed_at = _utcnow()
+            db.commit()
+            return
+
+        # ── Phase 1: get a waybill from the carrier (retryable) ──────────────
         try:
-            # ── Idempotency guard ─────────────────────────────────────────
-            # If a previous attempt already created a Shipment WITH a carrier
-            # tracking number, the invoice exists on the carrier's side. Do
-            # not call create_invoice again — a second call would produce a
-            # duplicate waybill (Azimuth has no cancel, Exline / CSE would
-            # bill twice). Instead, fast-forward to the "sent_to_carrier"
-            # transition using the tracking we already stored.
+            # Idempotency guard: a previous attempt already stored the
+            # carrier's waybill — never call create_invoice twice.
             existing_shipment = _shipments_repo.get_by_order_id(db, order.id)
             if existing_shipment and existing_shipment.carrier_tracking_number:
                 logger.info(
@@ -216,132 +248,201 @@ class DispatchWorker:
                 )
             else:
                 outcome = self._dispatch_to_carrier(db, order)
+        except Exception as exc:
+            self._handle_retryable_failure(db, job_id, exc)
+            return
 
-            _shipments_svc.create_for_order(
-                db,
-                order_draft_id=order.id,
-                carrier_code=order.carrier_code_snapshot,
-            )
+        # ── Phase 2: persist the result (NOT retryable) ──────────────────────
+        try:
+            self._complete_dispatch(db, job, order, outcome)
+        except Exception as exc:
+            self._handle_post_dispatch_failure(db, job_id, outcome, exc)
+            return
+
+    def _complete_dispatch(
+        self,
+        db: Session,
+        job: DispatchJob,
+        order: OrderDraft,
+        outcome: _DispatchOutcome,
+    ) -> None:
+        _shipments_svc.create_for_order(
+            db,
+            order_draft_id=order.id,
+            carrier_code=order.carrier_code_snapshot,
+        )
+        shipment = _shipments_repo.get_by_order_id(db, order.id)
+        if shipment and outcome.tracking_number:
+            shipment.carrier_tracking_number = outcome.tracking_number
+            # Persist physical barcode separately — Exline returns a
+            # scannable code distinct from orderno. When carrier does not
+            # issue a distinct barcode (CSE), we fall back to the order
+            # number so admin search still resolves.
+            shipment.carrier_barcode = outcome.barcode or outcome.tracking_number
+            shipment.status = "dispatched"
+
+        record_order_status(
+            db,
+            order=order,
+            new_status="sent_to_carrier",
+            source="system_worker",
+            comment=f"Dispatched via job {job.id}",
+        )
+
+        job.status = DispatchJobStatus.COMPLETED
+        job.completed_at = _utcnow()
+        db.commit()
+        logger.info("dispatch_worker: job %s completed, order %s sent_to_carrier", job.id, order.id)
+
+        # Side effects below run after the commit: the waybill and the status
+        # are durable, so a failure here can no longer cause a re-dispatch.
+
+        # Customer notification: use our own public tracking number
+        # (shipment.tracking_number, e.g. EXLINE-H7WO0SP9VM7X). That's
+        # what the customer sees in the order card and what /tracking
+        # accepts as input on our site. It differs from:
+        #   - outcome.tracking_number  = orderno for carrier statusreq
+        #                                (e.g. NOVEX-000023) — internal
+        #   - outcome.barcode          = physical package barcode
+        #                                (e.g. KAZ000090191) — internal
+        try:
             shipment = _shipments_repo.get_by_order_id(db, order.id)
-            if shipment and outcome.tracking_number:
-                shipment.carrier_tracking_number = outcome.tracking_number
-                # Persist physical barcode separately — Exline returns a
-                # scannable code distinct from orderno. When carrier does not
-                # issue a distinct barcode (CSE), we fall back to the order
-                # number so admin search still resolves.
-                shipment.carrier_barcode = outcome.barcode or outcome.tracking_number
-                shipment.status = "dispatched"
-                # Persist the tracking number as soon as we know it so a
-                # subsequent crash between here and the outer db.commit()
-                # does not leave the invoice orphaned. The idempotency guard
-                # above depends on this row being visible on retry.
-                db.flush()
-
-            record_order_status(
+            _notifications_svc.notify_order_status(
                 db,
-                order=order,
-                new_status="sent_to_carrier",
-                source="system_worker",
-                comment=f"Dispatched via job {job.id}",
+                user_id=order.user_id,
+                order_id=order.id,
+                status="sent_to_carrier",
+                tracking_number=shipment.tracking_number if shipment else None,
+            )
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.exception(
+                "dispatch_worker: notify_order_status failed for order %s (non-fatal)",
+                order.id,
             )
 
-            # Customer notification: use our own public tracking number
-            # (shipment.tracking_number, e.g. EXLINE-H7WO0SP9VM7X). That's
-            # what the customer sees in the order card and what /tracking
-            # accepts as input on our site. It differs from:
-            #   - outcome.tracking_number  = orderno for carrier statusreq
-            #                                (e.g. NOVEX-000023) — internal
-            #   - outcome.barcode          = physical package barcode
-            #                                (e.g. KAZ000090191) — internal
-            # Both are opaque to the customer; the Novex-branded ID lets
-            # them plug it back into our tracking page.
-            customer_tracking = shipment.tracking_number if shipment else None
+        # ── Azimuth /order-courier (optional second step) ──────────────
+        # Independent of the main dispatch: a pickup failure does NOT roll
+        # back the invoice — Azimuth has no undo for a created waybill.
+        # _schedule_azimuth_pickup records pickup_error so an admin can
+        # trigger a pickup-only retry via a dedicated endpoint.
+        if (
+            order.carrier_code_snapshot
+            and order.carrier_code_snapshot.lower() == "azimuth"
+            and order.pickup_requested
+            and not order.pickup_scheduled_azimuth_id
+        ):
             try:
-                _notifications_svc.notify_order_status(
-                    db,
-                    user_id=order.user_id,
-                    order_id=order.id,
-                    status="sent_to_carrier",
-                    tracking_number=customer_tracking,
-                )
+                self._schedule_azimuth_pickup(db, order)
+                db.commit()
             except Exception:
-                # Notification failures must not roll back the dispatch —
-                # the carrier already has the waybill.
+                db.rollback()
                 logger.exception(
-                    "dispatch_worker: notify_order_status failed for order %s (non-fatal)",
+                    "dispatch_worker: Azimuth pickup scheduling failed for order %s (non-fatal)",
                     order.id,
                 )
 
-            # ── Azimuth /order-courier (optional second step) ──────────────
-            # After create_invoice succeeds, if the customer asked us to
-            # schedule a courier pickup, fire the separate order-courier
-            # request. This is INDEPENDENT of the main dispatch: a pickup
-            # failure does NOT roll back the invoice — Azimuth has no undo
-            # for a created waybill, and retrying dispatch as a whole would
-            # spawn a second waybill. Instead we record pickup_error so an
-            # admin can trigger a pickup-only retry via a dedicated endpoint.
-            if (
-                order.carrier_code_snapshot
-                and order.carrier_code_snapshot.lower() == "azimuth"
-                and order.pickup_requested
-                and not order.pickup_scheduled_azimuth_id
-            ):
-                self._schedule_azimuth_pickup(db, order)
+    def _handle_retryable_failure(self, db: Session, job_id: int, exc: Exception) -> None:
+        """The carrier did not return a waybill — safe to retry."""
+        exc_msg = str(exc) or repr(exc) or f"{type(exc).__name__}: (no message)"
+        # Discard partial writes (and release the order row lock) before the
+        # error bookkeeping below.
+        db.rollback()
 
-            job.status = DispatchJobStatus.COMPLETED
-            job.completed_at = _utcnow()
-            logger.info("dispatch_worker: job %s completed, order %s sent_to_carrier", job.id, order.id)
+        job = db.get(DispatchJob, job_id)
+        if job is None:
+            logger.error("dispatch_worker: job %s vanished after rollback", job_id)
+            return
+        logger.warning(
+            "dispatch_worker: job %s attempt %d/%d failed [%s]: %s",
+            job.id, job.attempts, job.max_attempts, type(exc).__name__, exc_msg,
+        )
+        order = db.get(OrderDraft, job.order_id)
+        job.last_error = exc_msg
 
-            job_id = job.id
-        except Exception as exc:
-            exc_msg = str(exc) or repr(exc) or f"{type(exc).__name__}: (no message)"
-            logger.warning(
-                "dispatch_worker: job %s attempt %d/%d failed [%s]: %s",
-                job.id,
-                job.attempts,
-                job.max_attempts,
-                type(exc).__name__,
-                exc_msg,
-            )
-            # Discard any partial writes from _dispatch_to_carrier /
-            # create_for_order / record_order_status before we mark FAILED.
-            # Without this, `db.commit()` at the bottom would flush the
-            # half-baked shipment/history rows together with our error
-            # bookkeeping. Rollback expires all attached objects, so re-load
-            # job and order below.
-            db.rollback()
-
-            job = db.get(DispatchJob, job_id)
-            if job is None:
-                logger.error("dispatch_worker: job %s vanished after rollback", job_id)
-                return
-            order = db.get(OrderDraft, job.order_id)
-            job.last_error = exc_msg
-
-            if _is_permanent_error(exc):
-                logger.error(
-                    "dispatch_worker: job %s permanent error (no retry): %s",
-                    job.id, exc,
+        permanent = _is_permanent_error(exc)
+        if not permanent and job.attempts < job.max_attempts:
+            delays = _retry_delays_seconds()
+            delay = delays[min(job.attempts - 1, len(delays) - 1)]
+            job.next_retry_at = _utcnow() + timedelta(seconds=delay)
+            job.status = DispatchJobStatus.QUEUED
+        else:
+            if permanent:
+                logger.error("dispatch_worker: job %s permanent error (no retry): %s", job.id, exc)
+            job.status = DispatchJobStatus.FAILED
+            # Surface it on the order too — otherwise a permanent error (bad
+            # carrier credentials) left the order in dispatch_queued forever.
+            if order is not None and order.status == "dispatch_queued":
+                order.dispatch_error = exc_msg
+                record_order_status(
+                    db,
+                    order=order,
+                    new_status="dispatch_failed",
+                    source="system_worker",
+                    comment=f"Max attempts reached: {exc_msg}",
                 )
-                job.status = DispatchJobStatus.FAILED
-            elif job.attempts < job.max_attempts:
-                delays = _retry_delays_seconds()
-                delay = delays[min(job.attempts - 1, len(delays) - 1)]
-                job.next_retry_at = _utcnow() + timedelta(seconds=delay)
-                job.status = DispatchJobStatus.QUEUED
-            else:
-                job.status = DispatchJobStatus.FAILED
-                if order is not None:
-                    order.dispatch_error = str(exc)
+        db.commit()
+        if job.status == DispatchJobStatus.FAILED:
+            _notify_staff_dispatch_failed(db, job.order_id, exc_msg)
+
+    def _handle_post_dispatch_failure(
+        self,
+        db: Session,
+        job_id: int,
+        outcome: _DispatchOutcome,
+        exc: Exception,
+    ) -> None:
+        """The carrier already created a waybill but we failed to record it.
+
+        Never retry automatically. Store the waybill number on the shipment
+        (so the idempotency guard short-circuits any manual retry) and flag
+        the order for manual review.
+        """
+        waybill = outcome.tracking_number or "?"
+        msg = (
+            f"Накладная {waybill} создана у перевозчика, но заказ не удалось "
+            f"обновить: {exc}. Требуется ручная проверка — повторная отправка "
+            f"не создаст новую накладную."
+        )
+        logger.error("dispatch_worker: job %s post-dispatch failure: %s", job_id, msg, exc_info=exc)
+        db.rollback()
+
+        job = db.get(DispatchJob, job_id)
+        if job is None:
+            logger.error("dispatch_worker: job %s vanished after rollback (waybill=%s)", job_id, waybill)
+            return
+        job.status = DispatchJobStatus.FAILED
+        job.last_error = msg
+        db.commit()  # the job row alone must survive even if the rest fails
+
+        try:
+            order = db.get(OrderDraft, job.order_id)
+            if order is not None:
+                _shipments_svc.create_for_order(
+                    db, order_draft_id=order.id, carrier_code=order.carrier_code_snapshot,
+                )
+                shipment = _shipments_repo.get_by_order_id(db, order.id)
+                if shipment and outcome.tracking_number:
+                    shipment.carrier_tracking_number = outcome.tracking_number
+                    shipment.carrier_barcode = outcome.barcode or outcome.tracking_number
+                order.dispatch_error = msg
+                if order.status == "dispatch_queued":
                     record_order_status(
                         db,
                         order=order,
                         new_status="dispatch_failed",
                         source="system_worker",
-                        comment=f"Max attempts reached: {exc}",
+                        comment=msg,
                     )
-
-        db.commit()
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.exception(
+                "dispatch_worker: could not persist waybill %s for job %s — see job.last_error",
+                waybill, job_id,
+            )
+        _notify_staff_dispatch_failed(db, job.order_id, msg)
 
     def retry_for_order(
         self,

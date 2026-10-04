@@ -15,12 +15,28 @@ def test_register_returns_201(client):
     with patch("app.api.v1.auth.identity_service.register_user", return_value=mock_profile):
         r = client.post(
             "/api/v1/auth/register",
-            json={"email": "new@example.com", "password": "securepass1"},
+            json={
+                "email": "new@example.com", "password": "securepass1",
+                "tax_id": "990101300123", "pd_consent": True,
+            },
             headers={"X-Real-IP": "10.0.0.1"},
         )
     assert r.status_code == 201
     assert r.json()["email"] == "new@example.com"
     assert r.json()["role"] == "customer"
+
+
+def test_register_requires_pd_consent(client):
+    """KZ personal-data law: no account without consent (audit T10)."""
+    with patch("app.api.v1.auth.identity_service.register_user") as register:
+        r = client.post(
+            "/api/v1/auth/register",
+            json={"email": "new@example.com", "password": "securepass1", "tax_id": "990101300123"},
+            headers={"X-Real-IP": "10.0.0.2"},
+        )
+    assert r.status_code == 422
+    assert "согласие" in r.text
+    register.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

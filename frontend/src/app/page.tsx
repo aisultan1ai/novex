@@ -121,7 +121,7 @@ function TariffBadge({ name }: { name: string }) {
     bg = "#F3F4F6"; color = "#374151";
   }
   return (
-    <span style={{ background: bg, color, padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600 }}>
+    <span style={{ background: bg, color, padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600, lineHeight: 1.25, whiteSpace: "nowrap" }}>
       {name}
     </span>
   );
@@ -700,11 +700,12 @@ export default function HomePage() {
                         background: isSelected ? "#F1F5F9" : "#ffffff",
                         borderRadius: 16,
                         border: `1.5px solid ${isSelected ? "#22C9E0" : isBest ? "#0B2545" : "#E2E8EE"}`,
-                        padding: "20px 24px",
+                        padding: isMobile ? "16px" : "20px 24px",
                         display: "flex",
-                        alignItems: "center",
+                        flexDirection: isMobile ? "column" : "row",
+                        alignItems: isMobile ? "stretch" : "center",
                         justifyContent: "space-between",
-                        gap: 16,
+                        gap: isMobile ? 14 : 16,
                         cursor: "pointer",
                         boxShadow: isSelected
                           ? "0 0 0 4px rgba(34,201,224,0.18)"
@@ -753,8 +754,8 @@ export default function HomePage() {
                               rate.carrier_name[0]
                             )}
                           </div>
-                          <div>
-                            <span style={{ font: "600 16px/1 Inter Variable, sans-serif", color: "#0E1826", marginRight: 8 }}>
+                          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, minWidth: 0 }}>
+                            <span style={{ font: "600 16px/1.25 Inter Variable, sans-serif", color: "#0E1826", marginRight: 2 }}>
                               {rate.carrier_name}
                             </span>
                             <TariffBadge name={rate.tariff_name} />
@@ -765,8 +766,8 @@ export default function HomePage() {
                                   color: badgeInfo.color,
                                   padding: "3px 10px",
                                   borderRadius: 999,
-                                  font: "600 12px/1 Inter Variable, sans-serif",
-                                  marginLeft: 6,
+                                  font: "600 12px/1.25 Inter Variable, sans-serif",
+                                  whiteSpace: "nowrap",
                                 }}
                               >
                                 {badgeInfo.label}
@@ -790,12 +791,23 @@ export default function HomePage() {
                       </div>
 
                       {/* Price + CTA */}
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0 }}>
-                        <div>
-                          <div style={{ font: "700 24px/1 'Space Grotesk Variable', 'Inter Variable', sans-serif", color: "#0E1826", textAlign: "right" }}>
+                      <div
+                        style={isMobile ? {
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 12,
+                          paddingTop: 14,
+                          borderTop: "1px solid #EEF2F6",
+                        } : {
+                          display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0,
+                        }}
+                      >
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ font: `700 ${isMobile ? 22 : 24}px/1 'Space Grotesk Variable', 'Inter Variable', sans-serif`, color: "#0E1826", textAlign: isMobile ? "left" : "right", whiteSpace: "nowrap" }}>
                             {formatPrice(rate.price, rate.currency)}
                           </div>
-                          <div style={{ font: "400 12px/1 Inter Variable, sans-serif", color: "#9CA3AF", textAlign: "right", marginTop: 4 }}>
+                          <div style={{ font: "400 12px/1 Inter Variable, sans-serif", color: "#9CA3AF", textAlign: isMobile ? "left" : "right", marginTop: 4 }}>
                             с НДС
                           </div>
                         </div>
@@ -806,11 +818,12 @@ export default function HomePage() {
                             background: isSelected ? "#0B2545" : "#ffffff",
                             color: isSelected ? "#ffffff" : "#0E1826",
                             borderRadius: 10,
-                            padding: "8px 20px",
+                            padding: isMobile ? "10px 20px" : "8px 20px",
                             font: "600 14px/1 Inter Variable, sans-serif",
                             cursor: "pointer",
                             fontFamily: "inherit",
                             transition: "all 0.15s",
+                            flexShrink: 0,
                           }}
                           onMouseEnter={(e) => {
                             if (!isSelected) {

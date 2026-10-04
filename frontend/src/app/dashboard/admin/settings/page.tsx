@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getAdminSettings, updateAdminSettings } from "@/lib/api/admin";
 import type { BankTransferSettings } from "@/types/admin";
+import { useIsAdmin } from "@/hooks/use-is-admin";
 
 const EMPTY_BANK: BankTransferSettings = {
   recipient_name: "",
@@ -13,6 +14,7 @@ const EMPTY_BANK: BankTransferSettings = {
 };
 
 export default function AdminSettingsPage() {
+  const isAdmin = useIsAdmin();
   const [commissionRate, setCommissionRate] = useState("");
   const [bank, setBank] = useState<BankTransferSettings>(EMPTY_BANK);
   const [loading, setLoading] = useState(true);
@@ -71,7 +73,7 @@ export default function AdminSettingsPage() {
         <div style={s.card}>
           <h3 style={s.cardTitle}>Комиссия платформы</h3>
           <label style={s.label}>Ставка (от 0 до 1, например 0.05 = 5%)</label>
-          <input
+          <input disabled={!isAdmin}
             value={commissionRate}
             onChange={(e) => setCommissionRate(e.target.value)}
             placeholder="0.0500"
@@ -87,7 +89,7 @@ export default function AdminSettingsPage() {
           <div style={s.grid}>
             <div>
               <label style={s.label}>Получатель (название компании)</label>
-              <input
+              <input disabled={!isAdmin}
                 value={bank.recipient_name}
                 onChange={(e) => setBank({ ...bank, recipient_name: e.target.value })}
                 placeholder="ТОО Novex"
@@ -96,7 +98,7 @@ export default function AdminSettingsPage() {
             </div>
             <div>
               <label style={s.label}>Название банка</label>
-              <input
+              <input disabled={!isAdmin}
                 value={bank.bank_name}
                 onChange={(e) => setBank({ ...bank, bank_name: e.target.value })}
                 placeholder="Halyk Bank"
@@ -105,7 +107,7 @@ export default function AdminSettingsPage() {
             </div>
             <div style={{ gridColumn: "1 / -1" }}>
               <label style={s.label}>IBAN</label>
-              <input
+              <input disabled={!isAdmin}
                 value={bank.iban}
                 onChange={(e) => setBank({ ...bank, iban: e.target.value })}
                 placeholder="KZ00 0000 0000 0000 0000"
@@ -114,7 +116,7 @@ export default function AdminSettingsPage() {
             </div>
             <div>
               <label style={s.label}>БИН организации</label>
-              <input
+              <input disabled={!isAdmin}
                 value={bank.bin}
                 onChange={(e) => setBank({ ...bank, bin: e.target.value })}
                 placeholder="000000000000"
@@ -123,7 +125,7 @@ export default function AdminSettingsPage() {
             </div>
             <div>
               <label style={s.label}>КНП</label>
-              <input
+              <input disabled={!isAdmin}
                 value={bank.knp}
                 onChange={(e) => setBank({ ...bank, knp: e.target.value })}
                 placeholder="710"
@@ -133,9 +135,11 @@ export default function AdminSettingsPage() {
           </div>
         </div>
 
-        <button onClick={handleSave} disabled={saving} style={s.btn}>
-          {saving ? "Сохранение…" : "Сохранить настройки"}
-        </button>
+        {isAdmin && (
+          <button onClick={handleSave} disabled={saving} style={s.btn}>
+            {saving ? "Сохранение…" : "Сохранить настройки"}
+          </button>
+        )}
       </div>
     </>
   );

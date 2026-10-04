@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.core.dependencies import get_current_user, require_admin
+from app.core.dependencies import get_current_user
 from app.main import app
 from app.modules.identity.models import RoleCode
 from tests.api.conftest import make_mock_user
@@ -19,7 +19,8 @@ def test_admin_stats_customer_gets_403(client, mock_db):
 
 def test_admin_stats_admin_gets_200(client, mock_db):
     admin = make_mock_user(2, RoleCode.ADMIN)
-    app.dependency_overrides[require_admin] = lambda: admin
+    # Override the user, not the guard: /stats is admin-or-operator since T4.
+    app.dependency_overrides[get_current_user] = lambda: admin
     mock_db.scalar.return_value = 0
     r = client.get("/api/v1/admin/users/stats")
     assert r.status_code == 200

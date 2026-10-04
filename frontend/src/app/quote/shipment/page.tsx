@@ -27,6 +27,7 @@ import type {
   ShipmentPartyInput,
   UpdateShipmentDetailsRequest,
 } from "@/types/order";
+import PdConsentCheckbox from "@/components/forms/PdConsentCheckbox";
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 
@@ -961,6 +962,7 @@ function ShipmentPageInner() {
   const [error, setError] = useState<string | null>(null);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pdConsent, setPdConsent] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
 
   // Cached PVZ lists per side; keyed by (side, city) so switching city refreshes.
@@ -1354,11 +1356,18 @@ function ShipmentPageInner() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft) { setError("Черновик заказа ещё не создан."); return; }
+    if (!pdConsent) {
+      setError("Подтвердите согласие на обработку персональных данных отправителя и получателя.");
+      return;
+    }
     setError(null);
     setIsSubmitting(true);
     try {
       const isDocument = (draft.shipment_type_snapshot ?? "").toLowerCase() === "document";
-      await updateOrderDraftShipment(draft.draft_id, buildShipmentPayload(form, isDocument, isAzimuth, isCse));
+      await updateOrderDraftShipment(draft.draft_id, {
+        ...buildShipmentPayload(form, isDocument, isAzimuth, isCse),
+        pd_consent: pdConsent,
+      });
       clearSavedForm();
       router.push(`/checkout?draftId=${draft.draft_id}`);
     } catch (err) {
@@ -1798,6 +1807,13 @@ function ShipmentPageInner() {
                     />
                   )}
                 </>
+              )}
+
+              {/* Consent — the form carries third-party personal data. */}
+              {currentStep === 2 && (
+                <PdConsentCheckbox checked={pdConsent} onChange={setPdConsent}>
+                  Я подтверждаю, что получил согласие отправителя и получателя на передачу их персональных данных для доставки, и даю согласие на обработку
+                </PdConsentCheckbox>
               )}
 
               {/* Navigation */}

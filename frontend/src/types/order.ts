@@ -83,6 +83,9 @@ export interface UpdateShipmentDetailsRequest {
   pickup_time_slot?: string | null; // e.g. "14:00-18:00"
   pickup_contact_person?: string | null;
   pickup_contact_phone?: string | null;
+  // Customer confirms consent of sender / recipient (third parties) to pass
+  // their personal data for delivery. Recorded on the order (audit T10).
+  pd_consent?: boolean;
 }
 
 export type ShipmentPartyResponse = {

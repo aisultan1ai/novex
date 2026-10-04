@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { createAdminCarrier, createCarrierAccount, listAdminCarriers, updateAdminCarrier } from "@/lib/api/admin";
 import type { AdminCarrier } from "@/types/admin";
+import { useIsAdmin } from "@/hooks/use-is-admin";
 
 const inp: React.CSSProperties = {
   border: "1px solid #E2E8EE", borderRadius: 10, padding: "10px 14px",
@@ -16,6 +17,7 @@ const EMPTY_CARRIER = { code: "", name: "", description: "" };
 const EMPTY_ACCOUNT = { email: "", full_name: "", temp_password: "" };
 
 export default function AdminCarriersPage() {
+  const isAdmin = useIsAdmin();
   const [carriers, setCarriers] = useState<AdminCarrier[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +95,7 @@ export default function AdminCarriersPage() {
           <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0B2545" }}>Перевозчики</h2>
           <p style={{ margin: "4px 0 0", fontSize: 14, color: "#64748b" }}>Управление перевозчиками и тарифными сетками</p>
         </div>
-        {!showForm && (
+        {isAdmin && !showForm && (
           <button
             onClick={openForm}
             style={{ padding: "10px 20px", borderRadius: 10, border: "none", background: "#0B2545", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
@@ -217,13 +219,15 @@ export default function AdminCarriersPage() {
                 >
                   Тарифы →
                 </Link>
-                <button
-                  onClick={() => void toggleActive(carrier)}
-                  disabled={togglingId === carrier.id}
-                  style={{ padding: "8px 14px", borderRadius: 10, border: `1px solid ${carrier.is_active ? "#fecaca" : "#bbf7d0"}`, background: carrier.is_active ? "#fef2f2" : "#f0fdf4", color: carrier.is_active ? "#b91c1c" : "#166534", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: togglingId === carrier.id ? 0.5 : 1 }}
-                >
-                  {carrier.is_active ? "Деактивировать" : "Активировать"}
-                </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => void toggleActive(carrier)}
+                    disabled={togglingId === carrier.id}
+                    style={{ padding: "8px 14px", borderRadius: 10, border: `1px solid ${carrier.is_active ? "#fecaca" : "#bbf7d0"}`, background: carrier.is_active ? "#fef2f2" : "#f0fdf4", color: carrier.is_active ? "#b91c1c" : "#166534", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: togglingId === carrier.id ? 0.5 : 1 }}
+                  >
+                    {carrier.is_active ? "Деактивировать" : "Активировать"}
+                  </button>
+                )}
               </div>
             </div>
           ))}
