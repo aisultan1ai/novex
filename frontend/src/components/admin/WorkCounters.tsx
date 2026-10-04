@@ -74,23 +74,18 @@ export default function WorkCounters() {
           const value = counters?.[r.key];
           const active = (value ?? 0) > 0;
           const lastRow = i >= rows.length - (rows.length % columns || columns);
-          return (
-            <Link
-              key={r.key}
-              href={r.href}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                padding: isMobile ? "14px 16px" : "16px 20px",
-                textDecoration: "none",
-                borderBottom: lastRow ? "none" : `1px solid ${BORDER}`,
-                borderRight: columns > 1 && i % columns === 0 ? `1px solid ${BORDER}` : "none",
-                transition: "background 0.15s",
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "#F8FAFC"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-            >
+          const rowStyle: React.CSSProperties = {
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: isMobile ? "14px 16px" : "16px 20px",
+            textDecoration: "none",
+            borderBottom: lastRow ? "none" : `1px solid ${BORDER}`,
+            borderRight: columns > 1 && i % columns === 0 ? `1px solid ${BORDER}` : "none",
+            transition: "background 0.15s",
+          };
+          const content = (
+            <>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: active ? NAVY : "#64748b" }}>{r.label}</div>
                 <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>{r.hint}</div>
@@ -98,7 +93,22 @@ export default function WorkCounters() {
               <div style={{ fontSize: 22, fontWeight: 700, color: active ? NAVY : "#CBD5E1", minWidth: 24, textAlign: "right" }}>
                 {value ?? "–"}
               </div>
-              <span aria-hidden style={{ color: "#CBD5E1", fontSize: 18, lineHeight: 1 }}>›</span>
+              <span aria-hidden style={{ color: active ? "#94a3b8" : "transparent", fontSize: 18, lineHeight: 1 }}>›</span>
+            </>
+          );
+          // Nothing to open while the count is zero — a plain row, no link.
+          if (!active) {
+            return <div key={r.key} style={rowStyle}>{content}</div>;
+          }
+          return (
+            <Link
+              key={r.key}
+              href={r.href}
+              style={rowStyle}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "#F8FAFC"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+            >
+              {content}
             </Link>
           );
         })}

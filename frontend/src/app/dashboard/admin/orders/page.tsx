@@ -1,6 +1,7 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import {
   listAdminOrders,
@@ -789,7 +790,16 @@ const OrderRow = memo(function OrderRow({
   );
 });
 
+// useSearchParams needs a Suspense boundary in the app router.
 export default function AdminOrdersPage() {
+  return (
+    <Suspense fallback={null}>
+      <AdminOrdersPageInner />
+    </Suspense>
+  );
+}
+
+function AdminOrdersPageInner() {
   const [orders, setOrders] = useState<AdminOrderRow[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -811,20 +821,26 @@ export default function AdminOrdersPage() {
   const [orderIdFilter, setOrderIdFilter] = useState<number | null>(null);
   const [orphanOnly, setOrphanOnly] = useState(false);
   const [urlReady, setUrlReady] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const searchKey = searchParams.toString();
 
+  // Re-read filters on EVERY URL change, not only on mount: clicking the
+  // «Заказы» tab while a deep-link filter is active must show all orders.
   useEffect(() => {
-    // window.location instead of useSearchParams: no Suspense boundary needed.
-    const q = new URLSearchParams(window.location.search);
-    const st = q.get("status");
-    if (st) setStatusFilter(st);
+    const q = new URLSearchParams(searchKey);
+    setStatusFilter(q.get("status") ?? "");
     const oid = Number(q.get("order"));
-    if (Number.isInteger(oid) && oid > 0) {
-      setOrderIdFilter(oid);
-      setDetailOpenId(oid);
-    }
-    if (q.get("orphan") === "1") setOrphanOnly(true);
+    const validOid = Number.isInteger(oid) && oid > 0 ? oid : null;
+    setOrderIdFilter(validOid);
+    setDetailOpenId(validOid);
+    setOrphanOnly(q.get("orphan") === "1");
+    setBarcodeInput("");
+    setBarcodeQuery("");
+    setPage(1);
     setUrlReady(true);
-  }, []);
+  }, [searchKey]);
 
   const SIZE = 20;
 
@@ -845,12 +861,29 @@ export default function AdminOrdersPage() {
 
   useEffect(() => { if (urlReady) void load(); }, [load, urlReady]);
 
-  const clearDeepLink = useCallback(() => {
+  const hasFilter = Boolean(statusFilter || orderIdFilter || orphanOnly || barcodeQuery);
+  const filterLabel = orderIdFilter
+    ? `Заказ #${orderIdFilter}`
+    : orphanOnly
+      ? "Неотменённые накладные"
+      : statusFilter
+        ? statusFilter.split(",").map((st) => STATUS_LABELS[st] ?? st).join(" + ")
+        : barcodeQuery
+          ? `Поиск: ${barcodeQuery}`
+          : "";
+
+  const resetFilters = useCallback(() => {
+    // Reset local state directly (the URL may already be clean, e.g. when
+    // the filter came from the status select) and drop query params.
+    setStatusFilter("");
     setOrderIdFilter(null);
     setOrphanOnly(false);
+    setBarcodeInput("");
+    setBarcodeQuery("");
+    setDetailOpenId(null);
     setPage(1);
-    window.history.replaceState(null, "", window.location.pathname);
-  }, []);
+    if (searchKey) router.replace(pathname);
+  }, [pathname, router, searchKey]);
 
   // Stable callbacks for row-level actions so React.memo on OrderRow can
   // skip re-render of untouched rows. All setters returned by useState are
@@ -892,14 +925,19 @@ export default function AdminOrdersPage() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0B2545" }}>Заказы</h2>
-          <p style={{ margin: "4px 0 0", fontSize: 14, color: "#64748b" }}>Все заказы платформы · {total} всего</p>
-          {(orderIdFilter || orphanOnly) && (
-            <button
-              onClick={clearDeepLink}
-              style={{ marginTop: 8, padding: "4px 10px", borderRadius: 999, border: "1px solid #c7d2fe", background: "#eef2ff", color: "#4338ca", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
-            >
-              {orderIdFilter ? `Заказ #${orderIdFilter}` : "Неотменённые накладные"} ×
-            </button>
+          <p style={{ margin: "4px 0 0", fontSize: 14, color: "#64748b" }}>{hasFilter ? `Найдено по фильтру: ${total}` : `Все заказы платформы · ${total} всего`}</p>
+          {hasFilter && (
+            <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 13, color: "#64748b" }}>
+                Фильтр: <b style={{ color: "#0B2545", fontWeight: 600 }}>{filterLabel}</b>
+              </span>
+              <button
+                onClick={resetFilters}
+                style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid #E2E8EE", background: "#ffffff", color: "#0B2545", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+              >
+                Сбросить фильтр ×
+              </button>
+            </div>
           )}
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
