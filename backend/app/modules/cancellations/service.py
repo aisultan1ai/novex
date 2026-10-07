@@ -51,6 +51,17 @@ _CANCELLABLE_STATUSES: set[str] = {
     "sent_to_carrier",
 }
 
+# Заказ ещё не оплачен (чек не загружен): деньги не двигались, перевозчику
+# ничего не отправлено — клиент отменяет сам, мгновенно, без заявки и без
+# участия админа. `payment_under_review` сюда НЕ входит: клиент уже заплатил и
+# загрузил чек, отмена потребует возврата — это решение оператора.
+_UNPAID_CANCELLABLE_STATUSES: set[str] = {
+    "shipment_details_completed",
+    "ready_for_checkout",
+    "awaiting_payment",
+    "payment_rejected",
+}
+
 # У кого есть API отмены — только эти пробуем. Azimuth не в списке.
 _CARRIERS_WITH_CANCEL_API: set[str] = {"cse", "exline"}
 
@@ -111,9 +122,16 @@ class CancellationRequestsService:
             raise NotFoundError("Заказ не найден")
         if order.user_id != user_id:
             raise ForbiddenError("Заказ не принадлежит текущему пользователю")
+        if order.status in _UNPAID_CANCELLABLE_STATUSES:
+            return self._cancel_unpaid(db, order=order, user_id=user_id, reason=reason)
+
+        if order.status == "payment_under_review":
+            raise ValidationError(
+                "Оплата на проверке — отменить заказ сейчас нельзя. Напишите в поддержку."
+            )
         if order.status not in _CANCELLABLE_STATUSES:
             raise ValidationError(
-                f"Отмена невозможна для статуса «{order.status}». "
+                "Отмена в текущем статусе недоступна. "
                 "Если посылка уже в пути, обратитесь в поддержку."
             )
 
@@ -170,6 +188,50 @@ class CancellationRequestsService:
             api_attempted=True,
             api_error=err,
         )
+
+    def _cancel_unpaid(self, db: Session, *, order, user_id: int, reason: str) -> CancellationOutcome:
+        """Отмена неоплаченного заказа: сразу cancelled, без заявки.
+
+        Открытые платёжные транзакции закрываем, чтобы они не висели у
+        оператора как «ждут оплаты». Админам уведомление не шлём — отменять
+        нечего, возвращать нечего.
+        """
+        from sqlalchemy import select as _select
+
+        from app.modules.payments.transaction_models import (
+            PaymentStatusHistory,
+            PaymentTransaction,
+            TxStatus,
+        )
+
+        open_statuses = (TxStatus.UNPAID, TxStatus.AWAITING_PAYMENT, TxStatus.PAYMENT_REJECTED)
+        open_txs = db.scalars(
+            _select(PaymentTransaction).where(
+                PaymentTransaction.order_id == order.id,
+                PaymentTransaction.status.in_(open_statuses),
+            )
+        ).all()
+        for tx in open_txs:
+            db.add(PaymentStatusHistory(
+                payment_id=tx.id,
+                old_status=tx.status.value if hasattr(tx.status, "value") else str(tx.status),
+                new_status=TxStatus.CANCELLED.value,
+                changed_by_user_id=user_id,
+                comment=f"Заказ отменён клиентом до оплаты: {reason}",
+            ))
+            tx.status = TxStatus.CANCELLED
+
+        self._finalize_cancellation(
+            db,
+            order=order,
+            request=None,
+            reason=reason,
+            actor_user_id=user_id,
+            source="customer_cancel_unpaid",
+            notify_admins=False,
+        )
+        db.commit()
+        return CancellationOutcome(kind="cancelled", request=None)
 
     # ─────────────────────────────────────────────────────────────────────
     # Public — resolution paths
@@ -552,6 +614,7 @@ class CancellationRequestsService:
         reason: str,
         actor_user_id: int,
         source: str,
+        notify_admins: bool = True,
     ) -> None:
         """Переводит заказ в cancelled + история + tracking event + сторно
         комиссии + refund_pending на платежах + уведомление админам.
@@ -646,7 +709,7 @@ class CancellationRequestsService:
             _select(User.id).join(User.role).where(
                 Role.code == RoleCode.ADMIN, User.is_active.is_(True)
             )
-        ).all()
+        ).all() if notify_admins else []
         if admin_ids:
             title = (
                 f"Заказ #{order.id} отменён"

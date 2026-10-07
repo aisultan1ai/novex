@@ -100,6 +100,16 @@ export async function cancelOrder(
   });
 }
 
+// Not paid yet: the customer cancels instantly (no request, nothing to refund).
+// `payment_under_review` is deliberately absent — a proof is uploaded, so it is
+// an operator decision.
+export const UNPAID_CANCELLABLE_STATUSES: readonly string[] = [
+  "shipment_details_completed",
+  "ready_for_checkout",
+  "awaiting_payment",
+  "payment_rejected",
+];
+
 export const CANCELLABLE_STATUSES: readonly string[] = [
   "paid",
   "dispatch_queued",

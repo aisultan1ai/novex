@@ -97,6 +97,7 @@ function Stepper({ current }: { current: number }) {
 }
 
 function ReqRow({ label, value, copy: copyable }: { label: string; value: string; copy?: boolean }) {
+  const isMobile = useIsMobile();
   const [copied, setCopied] = useState(false);
   const handleCopy = () => {
     void navigator.clipboard.writeText(value);
@@ -104,9 +105,34 @@ function ReqRow({ label, value, copy: copyable }: { label: string; value: string
     setTimeout(() => setCopied(false), 1500);
   };
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid #F1F5F9", gap: 12 }}>
-      <span style={{ font: "400 13px/1 Inter Variable, sans-serif", color: "#5F6E7E", minWidth: 160, flexShrink: 0 }}>{label}</span>
-      <span style={{ font: "500 14px/1.4 Inter Variable, sans-serif", color: "#0E1826", display: "flex", gap: 10, alignItems: "center", textAlign: "right" }}>
+    <div
+      style={{
+        display: "flex",
+        // Phone: label above value. Side by side, a 160px label + IBAN + «Копировать»
+        // is wider than the screen and pushes the whole page sideways.
+        flexDirection: isMobile ? "column" : "row",
+        justifyContent: "space-between",
+        alignItems: isMobile ? "flex-start" : "center",
+        padding: "10px 0",
+        borderBottom: "1px solid #F1F5F9",
+        gap: isMobile ? 6 : 12,
+      }}
+    >
+      <span style={{ font: "400 13px/1 Inter Variable, sans-serif", color: "#5F6E7E", minWidth: isMobile ? 0 : 160, flexShrink: 0 }}>{label}</span>
+      <span
+        style={{
+          font: "500 14px/1.4 Inter Variable, sans-serif",
+          color: "#0E1826",
+          display: "flex",
+          gap: 10,
+          alignItems: "center",
+          flexWrap: "wrap",
+          minWidth: 0,
+          maxWidth: "100%",
+          textAlign: isMobile ? "left" : "right",
+          overflowWrap: "anywhere",
+        }}
+      >
         {value}
         {copyable && (
           <button
@@ -384,7 +410,7 @@ function CheckoutPageInner() {
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
             {/* Route & carrier */}
-            <div style={{ ...card, padding: "24px 28px" }}>
+            <div style={{ ...card, padding: isMobile ? "20px 16px" : "24px 28px" }}>
               <div style={{ font: "700 11px/1 Inter Variable, sans-serif", color: "#5F6E7E", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>
                 Маршрут и тариф
               </div>
@@ -413,7 +439,7 @@ function CheckoutPageInner() {
 
             {/* Sender + Recipient */}
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
-              <div style={{ ...card, padding: "24px 28px" }}>
+              <div style={{ ...card, padding: isMobile ? "20px 16px" : "24px 28px" }}>
                 <div style={{ font: "700 11px/1 Inter Variable, sans-serif", color: "#5F6E7E", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>
                   Отправитель
                 </div>
@@ -425,7 +451,7 @@ function CheckoutPageInner() {
                 <InfoRow lbl="Почтовый индекс" val={sender?.postal_code} />
                 <InfoRow lbl="Комментарий" val={sender?.comment} />
               </div>
-              <div style={{ ...card, padding: "24px 28px" }}>
+              <div style={{ ...card, padding: isMobile ? "20px 16px" : "24px 28px" }}>
                 <div style={{ font: "700 11px/1 Inter Variable, sans-serif", color: "#5F6E7E", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>
                   Получатель
                 </div>
@@ -440,7 +466,7 @@ function CheckoutPageInner() {
             </div>
 
             {/* Packages */}
-            <div style={{ ...card, padding: "24px 28px" }}>
+            <div style={{ ...card, padding: isMobile ? "20px 16px" : "24px 28px" }}>
               <div style={{ font: "700 11px/1 Inter Variable, sans-serif", color: "#5F6E7E", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>
                 Грузовые места ({draft.packages.length})
               </div>
@@ -462,7 +488,7 @@ function CheckoutPageInner() {
             </div>
 
             {/* Payment CTA */}
-            <div style={{ ...card, padding: "24px 28px" }}>
+            <div style={{ ...card, padding: isMobile ? "20px 16px" : "24px 28px" }}>
               <div style={{ font: "700 11px/1 Inter Variable, sans-serif", color: "#5F6E7E", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>
                 Способ оплаты
               </div>
@@ -510,7 +536,7 @@ function CheckoutPageInner() {
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
             {/* Bank details */}
-            <div style={{ ...card, padding: "24px 28px" }}>
+            <div style={{ ...card, padding: isMobile ? "20px 16px" : "24px 28px" }}>
               <div style={{ font: "700 11px/1 Inter Variable, sans-serif", color: "#5F6E7E", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 20 }}>
                 Реквизиты для оплаты
               </div>
@@ -532,7 +558,7 @@ function CheckoutPageInner() {
 
             {/* Upload proof */}
             {status !== "paid" && status !== "dispatch_queued" && (
-              <div style={{ ...card, padding: "24px 28px" }}>
+              <div style={{ ...card, padding: isMobile ? "20px 16px" : "24px 28px" }}>
                 <div style={{ font: "700 11px/1 Inter Variable, sans-serif", color: "#5F6E7E", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 20 }}>
                   Подтверждение оплаты
                 </div>

@@ -40,6 +40,23 @@ const initialForm: FormState = {
   depthCm: "10",
 };
 
+/** One shipping calculation for the given form (no React state touched). */
+async function requestQuote(f: FormState): Promise<ShippingQuoteResponse> {
+  const isDoc = f.shipmentType === "document";
+  return calculateShippingQuote({
+    from_country: "KZ",
+    from_city: f.fromCity.trim(),
+    to_country: "KZ",
+    to_city: f.toCity.trim(),
+    shipment_type: f.shipmentType,
+    weight_kg: Number(f.weightKg),
+    quantity: Number(f.quantity),
+    width_cm: isDoc ? 0 : (Number(f.widthCm) || 0),
+    height_cm: isDoc ? 0 : (Number(f.heightCm) || 0),
+    depth_cm: isDoc ? 0 : (Number(f.depthCm) || 0),
+  });
+}
+
 function validateQuoteForm(form: FormState): string | null {
   if (!form.fromCity.trim()) return "Укажите город отправления.";
   if (!form.toCity.trim()) return "Укажите город доставки.";
@@ -282,10 +299,18 @@ export default function HomePage() {
     // use the fresh data; on failure keep the form and ask for a new calculation.
     getShippingQuote(saved.quote_session_id, saved.public_token)
       .then((fresh) => {
-        // Avoid a needless re-render + re-scroll when nothing changed.
-        if (JSON.stringify(fresh) !== JSON.stringify(saved)) setResults(fresh);
+        // The GET response has NO public_token — keep ours, otherwise every
+        // «Выбрать» fails with «Расчёт недоступен».
+        const merged = { ...fresh, public_token: saved.public_token };
+        if (JSON.stringify(merged.quotes) !== JSON.stringify(saved.quotes)) setResults(merged);
       })
-      .catch(() => { setResults(null); clearHomeQuote(); });
+      .catch(() => {
+        // Session expired / gone: recalculate by ourselves from the saved form
+        // so the customer does not have to press «Рассчитать» again.
+        requestQuote(snapshot.form)
+          .then((res) => { setResults(res); saveHomeQuote(snapshot.form, res); })
+          .catch(() => { setResults(null); clearHomeQuote(); });
+      });
   }, []);
 
   useEffect(() => {
@@ -326,19 +351,7 @@ export default function HomePage() {
     setResults(null);
     setSelectedRate(null);
     try {
-      const isDoc = form.shipmentType === "document";
-      const res = await calculateShippingQuote({
-        from_country: "KZ",
-        from_city: form.fromCity.trim(),
-        to_country: "KZ",
-        to_city: form.toCity.trim(),
-        shipment_type: form.shipmentType,
-        weight_kg: Number(form.weightKg),
-        quantity: Number(form.quantity),
-        width_cm: isDoc ? 0 : (Number(form.widthCm) || 0),
-        height_cm: isDoc ? 0 : (Number(form.heightCm) || 0),
-        depth_cm: isDoc ? 0 : (Number(form.depthCm) || 0),
-      });
+      const res = await requestQuote(form);
       setResults(res);
       saveHomeQuote(form, res);
     } catch (err) {
@@ -360,6 +373,28 @@ export default function HomePage() {
       );
       setSelectedRate(rate);
     } catch (err) {
+      // 403 / 404 / 410 = the calculation is gone or its token is invalid. Don't
+      // make the customer start over: recalculate with the same form and pick
+      // the same carrier + tariff in the fresh results.
+      if (err instanceof ApiError && [403, 404, 410].includes(err.status) && validateQuoteForm(form) === null) {
+        try {
+          const fresh = await requestQuote(form);
+          setResults(fresh);
+          saveHomeQuote(form, fresh);
+          const same = fresh.quotes.find(
+            (q) => q.carrier_code === rate.carrier_code && q.tariff_name === rate.tariff_name && q.id !== null,
+          );
+          if (same) {
+            await selectShippingQuote(fresh.quote_session_id, { rate_quote_id: same.id as number }, fresh.public_token);
+            setSelectedRate(same);
+          } else {
+            setError("Тарифы обновились — выберите тариф ещё раз.");
+          }
+          return;
+        } catch {
+          /* fall through to the generic message below */
+        }
+      }
       setError(err instanceof ApiError ? err.detail : "Не удалось выбрать тариф.");
     } finally {
       setIsSelectingRate(false);

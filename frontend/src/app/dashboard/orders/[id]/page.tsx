@@ -9,6 +9,7 @@ import { useIsMobile } from "@/hooks/use-is-mobile";
 import {
   ApiError,
   CANCELLABLE_STATUSES,
+  UNPAID_CANCELLABLE_STATUSES,
   RESCHEDULE_PICKUP_STATUSES,
   cancelOrder,
   deleteOrderDraft,
@@ -314,7 +315,7 @@ export default function OrderDetailPage() {
                   Перенести забор
                 </button>
               )}
-              {CANCELLABLE_STATUSES.includes(order.status) && (
+              {(CANCELLABLE_STATUSES.includes(order.status) || UNPAID_CANCELLABLE_STATUSES.includes(order.status)) && (
                 <button
                   onClick={() => { setCancelError(null); setShowCancelModal(true); }}
                   // Блокируем повторное нажатие, если заявка уже ожидает решения -
@@ -325,7 +326,7 @@ export default function OrderDetailPage() {
                     : undefined}
                   style={{ padding: "10px 20px", borderRadius: 10, border: "1px solid #fecaca", background: "#fff", color: "#ef4444", fontSize: 14, fontWeight: 600, cursor: order.cancellation_request?.status === "pending" ? "not-allowed" : "pointer", opacity: order.cancellation_request?.status === "pending" ? 0.5 : 1, fontFamily: "inherit" }}
                 >
-                  Отменить заявку
+                  {UNPAID_CANCELLABLE_STATUSES.includes(order.status) ? "Отменить заказ" : "Отменить заявку"}
                 </button>
               )}
             </div>
@@ -560,7 +561,12 @@ export default function OrderDetailPage() {
             <h2 style={{ margin: "0 0 8px", fontSize: 20, fontWeight: 800, color: "#0E1826" }}>
               Отменить заказ #{order.draft_id}?
             </h2>
-            {order.status !== "sent_to_carrier" && (
+            {UNPAID_CANCELLABLE_STATUSES.includes(order.status) ? (
+              <p style={{ margin: "0 0 16px", fontSize: 13, color: "#64748b", lineHeight: 1.5 }}>
+                Заказ будет отменён сразу. Оплата ещё не производилась, возвращать ничего не нужно.
+                Если вы уже перевели деньги — загрузите чек на странице оплаты или напишите в поддержку.
+              </p>
+            ) : order.status !== "sent_to_carrier" && (
               <p style={{ margin: "0 0 16px", fontSize: 13, color: "#64748b", lineHeight: 1.5 }}>
                 Заказ будет отменён. Возврат средств оформит администратор - обычно 3-5 рабочих дней.
               </p>
@@ -600,7 +606,9 @@ export default function OrderDetailPage() {
                 disabled={isCancelling || cancelReason.trim().length < 3}
                 style={{ padding: "10px 20px", borderRadius: 10, border: "none", background: "#ef4444", color: "#fff", fontSize: 14, fontWeight: 600, cursor: (isCancelling || cancelReason.trim().length < 3) ? "not-allowed" : "pointer", opacity: (isCancelling || cancelReason.trim().length < 3) ? 0.6 : 1, fontFamily: "inherit" }}
               >
-                {isCancelling ? "Отменяем…" : "Отменить заявку"}
+                {isCancelling
+                  ? "Отменяем…"
+                  : UNPAID_CANCELLABLE_STATUSES.includes(order.status) ? "Отменить заказ" : "Отменить заявку"}
               </button>
             </div>
           </div>
