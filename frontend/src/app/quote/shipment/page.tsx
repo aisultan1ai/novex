@@ -28,6 +28,8 @@ import type {
   UpdateShipmentDetailsRequest,
 } from "@/types/order";
 import PdConsentCheckbox from "@/components/forms/PdConsentCheckbox";
+import EmailVerificationNotice from "@/components/auth/EmailVerificationNotice";
+import { clearHomeQuote } from "@/lib/home-quote-store";
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 
@@ -892,7 +894,7 @@ function ProhibitedItemsAccordion() {
 function ShipmentPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { currentUser, isAuthenticated, isLoading, logout } = useAuth();
+  const { currentUser, isAuthenticated, isLoading, logout, isProfileReady } = useAuth();
   const isMobile = useIsMobile();
 
   const quoteSessionId = useMemo(() => {
@@ -1026,13 +1028,17 @@ function ShipmentPageInner() {
   // любой ре-эмит currentUser из auth-provider (refresh токена, revalidate)
   // повторно вливал бы данные профиля в sender и мог бы затирать выбор из
   // адресной книги, если контактное поле по какой-то причине оказалось пустым.
+  //
+  // Ждём isProfileReady: в localStorage лежит урезанный профиль (без телефона,
+  // ИИН/БИН, компании), полный приходит из API после входа. Без ожидания guard
+  // сработал бы на урезанном профиле и поля отправителя остались бы пустыми.
   const senderMergedForUserRef = useRef<number | null>(null);
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser || !isProfileReady) return;
     if (senderMergedForUserRef.current === currentUser.user_id) return;
     senderMergedForUserRef.current = currentUser.user_id;
     setForm((prev) => ({ ...prev, sender: mergeSenderWithCurrentUser(prev.sender, currentUser) }));
-  }, [currentUser]);
+  }, [currentUser, isProfileReady]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -1197,9 +1203,14 @@ function ShipmentPageInner() {
     form.packageItem.quantity,
   ]);
 
+  // The latest profile for bootstrap() without making it an effect dependency:
+  // a profile refresh must NOT restart bootstrap (that would create a second draft).
+  const currentUserRef = useRef(currentUser);
+  currentUserRef.current = currentUser;
+
   useEffect(() => {
-    if (isLoading || !isAuthenticated) return;
-    if (!quoteSessionId) { setError("Не найден quoteSessionId. Вернитесь к выбору тарифа."); setIsBootstrapping(false); return; }
+    if (isLoading || !isAuthenticated || !isProfileReady) return;
+    if (!quoteSessionId) { setError("Не найден расчёт. Вернитесь на главную и рассчитайте доставку заново."); setIsBootstrapping(false); return; }
     if (createDraftRequestedRef.current) return;
     createDraftRequestedRef.current = true;
 
@@ -1211,14 +1222,12 @@ function ShipmentPageInner() {
         const created = await createDraftFromQuote({ quote_session_id: quoteSessionId!, public_token: quoteToken });
         if (cancelled) return;
         setDraft(created);
-        setForm(mapDraftToForm(created, currentUser));
+        setForm(mapDraftToForm(created, currentUserRef.current));
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError) {
           if (err.status === 401) { logout(`/login?next=${encodeURIComponent(fullNextUrl)}`); return; }
           setError(err.detail);
-        } else if (err instanceof Error) {
-          setError(err.message);
         } else {
           setError("Не удалось подготовить черновик заказа.");
         }
@@ -1228,7 +1237,7 @@ function ShipmentPageInner() {
     }
     void bootstrap();
     return () => { cancelled = true; createDraftRequestedRef.current = false; };
-  }, [currentUser, fullNextUrl, isAuthenticated, isLoading, logout, quoteSessionId, quoteToken]);
+  }, [fullNextUrl, isAuthenticated, isLoading, isProfileReady, logout, quoteSessionId, quoteToken]);
 
   function updateForm(updater: (prev: ShipmentFormState) => ShipmentFormState) {
     setForm((prev) => { const next = updater(prev); saveForm(next); return next; });
@@ -1369,13 +1378,12 @@ function ShipmentPageInner() {
         pd_consent: pdConsent,
       });
       clearSavedForm();
+      clearHomeQuote();
       router.push(`/checkout?draftId=${draft.draft_id}`);
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.status === 401) { logout(`/login?next=${encodeURIComponent(fullNextUrl)}`); return; }
         setError(err.detail);
-      } else if (err instanceof Error) {
-        setError(err.message);
       } else {
         setError("Не удалось сохранить данные отправления.");
       }
@@ -1431,10 +1439,9 @@ function ShipmentPageInner() {
               Оформление отправления
             </h1>
             <button
-              onClick={() => {
-                if (!quoteSessionId) { router.push("/"); return; }
-                router.push(`/quote/results?quoteSessionId=${quoteSessionId}${quoteToken ? `&token=${quoteToken}` : ""}`);
-              }}
+              // Home restores the calculation (cities, parcel, tariff list with
+              // carrier logos) from sessionStorage — see lib/home-quote-store.ts.
+              onClick={() => router.push("/")}
               style={{
                 border: "1.5px solid #E2E8EE",
                 background: "#ffffff",
@@ -1451,7 +1458,7 @@ function ShipmentPageInner() {
               onMouseEnter={(e) => (e.currentTarget.style.background = "#F9FAFB")}
               onMouseLeave={(e) => (e.currentTarget.style.background = "#ffffff")}
             >
-              ← Назад
+              ← К тарифам
             </button>
           </div>
 
@@ -1484,12 +1491,17 @@ function ShipmentPageInner() {
           </div>
         ) : draft ? (
           <>
+            {/* Unverified email: the order cannot be paid until confirmed — say so now, not at checkout. */}
+            {currentUser?.email_verified === false && (
+              <div style={{ marginBottom: 16 }}>
+                <EmailVerificationNotice variant="banner" />
+              </div>
+            )}
+
             {/* Tariff summary */}
             <TariffSummary
               draft={draft}
-              onChangeTariff={() =>
-                router.push(quoteSessionId ? `/quote/results?quoteSessionId=${quoteSessionId}` : "/")
-              }
+              onChangeTariff={() => router.push("/")}
               livePrice={livePrice}
               isRecalculating={isRecalculating}
               cseInfo={isCse ? cseDeliveryInfo : null}

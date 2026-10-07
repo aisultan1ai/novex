@@ -10,9 +10,10 @@ import { useIsMobile } from "@/hooks/use-is-mobile";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import { CONTACTS } from "@/lib/config/contacts";
-import { LANDING_STATS, SUPPORTED_CARRIERS } from "@/lib/config/landing";
+import { getCarrierLogo, LANDING_STATS, SUPPORTED_CARRIERS } from "@/lib/config/landing";
+import { clearHomeQuote, loadHomeQuote, saveHomeQuote } from "@/lib/home-quote-store";
 import CitySelect from "@/components/ui/CitySelect";
-import { ApiError, calculateShippingQuote, selectShippingQuote } from "@/lib/api/shipping";
+import { ApiError, calculateShippingQuote, getShippingQuote, selectShippingQuote } from "@/lib/api/shipping";
 import type { RateQuoteItem, ShipmentType, ShippingQuoteResponse } from "@/types/quote";
 
 /* ─── Types & helpers ────────────────────────────────────────────────────── */
@@ -181,22 +182,6 @@ function InputField({
   );
 }
 
-/* ─── Carrier logos ──────────────────────────────────────────────────────── */
-
-// Two-letter aliases still map to full carrier codes; keep in sync with the
-// canonical list in @/lib/config/landing.ts (SUPPORTED_CARRIERS).
-const _CARRIER_LOGO_ALIASES: Record<string, string> = {
-  az:  "azimuth",
-  ex:  "exline",
-  kse: "cse",
-};
-
-function getCarrierLogo(carrierCode: string): string | null {
-  const code = carrierCode.toLowerCase();
-  const canonical = _CARRIER_LOGO_ALIASES[code] ?? code;
-  return SUPPORTED_CARRIERS.find((c) => c.code === canonical)?.logo ?? null;
-}
-
 /* ─── Static sections ────────────────────────────────────────────────────── */
 
 const HOW_IT_WORKS = [
@@ -283,11 +268,32 @@ export default function HomePage() {
     }
   }, [results]);
 
+  // Coming back from the order form (browser «Назад», «На главную», «Изменить
+  // тариф»): restore the calculation the customer left, so cities, parcel
+  // parameters and the tariff list are all still there.
+  useEffect(() => {
+    const snapshot = loadHomeQuote();
+    if (!snapshot) return;
+    setForm((prev) => ({ ...prev, ...snapshot.form }));
+    const saved = snapshot.results;
+    if (!saved) return;
+    setResults(saved);
+    // The quote session may have expired meanwhile — re-check it. On success
+    // use the fresh data; on failure keep the form and ask for a new calculation.
+    getShippingQuote(saved.quote_session_id, saved.public_token)
+      .then((fresh) => {
+        // Avoid a needless re-render + re-scroll when nothing changed.
+        if (JSON.stringify(fresh) !== JSON.stringify(saved)) setResults(fresh);
+      })
+      .catch(() => { setResults(null); clearHomeQuote(); });
+  }, []);
+
   useEffect(() => {
     const handler = () => {
       setResults(null);
       setSelectedRate(null);
       setError(null);
+      clearHomeQuote();
     };
     window.addEventListener("novex:resetHome", handler);
     return () => window.removeEventListener("novex:resetHome", handler);
@@ -334,6 +340,7 @@ export default function HomePage() {
         depth_cm: isDoc ? 0 : (Number(form.depthCm) || 0),
       });
       setResults(res);
+      saveHomeQuote(form, res);
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : "Не удалось рассчитать тарифы.");
     } finally {
@@ -361,6 +368,8 @@ export default function HomePage() {
 
   function handleProceed() {
     if (!selectedRate || !results) return;
+    // Remember the calculation (form may have been edited since) for «Назад».
+    saveHomeQuote(form, results);
     const token = results.public_token;
     router.push(
       `/quote/shipment?quoteSessionId=${results.quote_session_id}${token ? `&token=${token}` : ""}`,

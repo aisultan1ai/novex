@@ -30,6 +30,9 @@ const PUBLIC_PATHS = [
   "/register",
   "/forgot-password",
   "/reset-password",
+  // The link from the verification email is opened in whatever browser the mail
+  // app uses (often with no session) and carries a one-time token in the query.
+  "/verify-email",
   "/tracking",
   "/quote",
   "/partners",
@@ -95,7 +98,8 @@ export function middleware(req: NextRequest) {
   const token = req.cookies.get("access_token")?.value;
   if (!token) {
     const loginUrl = new URL("/login", req.url);
-    loginUrl.searchParams.set("next", pathname);
+    // Keep the query string: /checkout?draftId=… must survive the login detour.
+    loginUrl.searchParams.set("next", `${pathname}${req.nextUrl.search}`);
     return NextResponse.redirect(loginUrl);
   }
 

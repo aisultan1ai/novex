@@ -12,6 +12,7 @@ import {
   type CancellationStatus,
 } from "@/lib/api/cancellations";
 import { useIsMobile } from "@/hooks/use-is-mobile";
+import { errorMessage } from "@/lib/api/client";
 
 const FILTERS: { value: CancellationStatus | ""; label: string }[] = [
   { value: "pending", label: "Ожидают" },
@@ -127,7 +128,7 @@ function CancellationCard({ req, isMobile, onChanged }: { req: CancellationReque
       await fn();
       onChanged();
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : "Ошибка");
+      setMsg(errorMessage(e, "Ошибка"));
     } finally {
       setBusy(null);
     }

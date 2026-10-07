@@ -28,7 +28,7 @@ def get_token_payload(
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authorization credentials are required",
+            detail="Войдите в аккаунт, чтобы продолжить.",
         )
 
     try:
@@ -49,7 +49,7 @@ def get_current_user_id(
     if subject is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token subject is missing",
+            detail="Сессия недействительна. Войдите в аккаунт снова.",
         )
 
     try:
@@ -57,7 +57,7 @@ def get_current_user_id(
     except (TypeError, ValueError) as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token subject",
+            detail="Сессия недействительна. Войдите в аккаунт снова.",
         ) from exc
 
 
@@ -70,13 +70,13 @@ def get_current_user(
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Current user not found",
+            detail="Аккаунт не найден. Войдите в аккаунт снова.",
         )
 
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Current user is inactive",
+            detail="Аккаунт отключён. Обратитесь в поддержку.",
         )
 
     # Verify token version — invalidated when admin changes role or calls invalidate_user_tokens()
@@ -84,7 +84,7 @@ def get_current_user(
     if ver_in_token != get_token_version(user.id):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Session expired. Please log in again.",
+            detail="Сессия истекла. Войдите в аккаунт снова.",
         )
 
     return user
@@ -119,7 +119,7 @@ def require_admin(current_user: User = Depends(get_current_user)) -> User:
     if current_user.role.code != RoleCode.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access restricted to administrators",
+            detail="Недостаточно прав для этого действия.",
         )
     return current_user
 
@@ -130,7 +130,7 @@ def require_admin_or_operator(current_user: User = Depends(get_current_user)) ->
     if current_user.role.code not in (RoleCode.ADMIN, RoleCode.OPERATOR):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access restricted to administrators and operators",
+            detail="Недостаточно прав для этого действия.",
         )
     return current_user
 
@@ -141,7 +141,7 @@ def require_carrier(current_user: User = Depends(get_current_user)) -> User:
     if current_user.role.code != RoleCode.CARRIER:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access restricted to carriers",
+            detail="Недостаточно прав для этого действия.",
         )
     return current_user
 
@@ -160,6 +160,6 @@ def get_current_carrier_id(
     if not profile:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Carrier profile not found",
+            detail="Профиль перевозчика не найден. Обратитесь в поддержку.",
         )
     return profile.carrier_id

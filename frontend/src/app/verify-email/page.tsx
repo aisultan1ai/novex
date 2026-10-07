@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { ApiError, verifyEmail } from "@/lib/api/auth";
+import { ApiError, fetchProfileQuietly, verifyEmail } from "@/lib/api/auth";
 
 type PageState = "loading" | "success" | "expired";
 
@@ -19,9 +19,20 @@ function VerifyEmailInner() {
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
 
   useEffect(() => {
+    // The page is also reached without a token — after a reload (the token is
+    // stripped from the URL below) or when the link was already used. If the
+    // signed-in account is verified, that is a success, not an error.
+    const alreadyVerified = async () => (await fetchProfileQuietly())?.email_verified === true;
+
     if (!token) {
-      setState("expired");
-      setErrorDetail("Ссылка не содержит токен. Запросите новую из письма.");
+      void (async () => {
+        if (await alreadyVerified()) {
+          setState("success");
+          return;
+        }
+        setState("expired");
+        setErrorDetail("Ссылка не содержит токен. Запросите новую из письма.");
+      })();
       return;
     }
     router.replace("/verify-email");
@@ -30,6 +41,10 @@ function VerifyEmailInner() {
         await verifyEmail(token);
         setState("success");
       } catch (err) {
+        if (await alreadyVerified()) {
+          setState("success");
+          return;
+        }
         setState("expired");
         setErrorDetail(
           err instanceof ApiError

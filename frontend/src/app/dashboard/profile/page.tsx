@@ -65,7 +65,7 @@ const lbl: React.CSSProperties = {
 };
 
 export default function ProfilePage() {
-  const { isAuthenticated, isLoading: authLoading, currentUser, refreshSession } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, currentUser, refreshSession, refreshProfile } = useAuth();
   const router = useRouter();
   const isMobile = useIsMobile();
 
@@ -136,6 +136,9 @@ export default function ProfilePage() {
       setProfile(updated);
       saveAuthSession(updated);
       refreshSession();
+      // Keep the in-memory full profile (phone, ИИН/БИН, ...) in sync so the
+      // order form prefills the new values without a reload.
+      void refreshProfile(updated);
       setSuccessMsg("Данные сохранены");
       setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err) {

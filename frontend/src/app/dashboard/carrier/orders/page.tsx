@@ -6,6 +6,7 @@ import { listCarrierOrders, type CarrierOrderItem } from "@/lib/api/carrier";
 import { ORDER_STATUS_LABELS, orderStatusColors, orderStatusLabel } from "@/lib/status-labels";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import ExportXlsxButton from "@/components/ui/ExportXlsxButton";
+import { errorMessage } from "@/lib/api/client";
 
 const badge: React.CSSProperties = {
   padding: "2px 10px",
@@ -83,7 +84,7 @@ export default function CarrierOrdersPage() {
       setOrders(res.items);
       setTotal(res.total);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка загрузки");
+      setError(errorMessage(e, "Ошибка загрузки"));
     } finally {
       setLoading(false);
     }

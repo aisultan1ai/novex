@@ -15,6 +15,7 @@ import {
 import type { AdminCommission, CommissionSummary, PlatformSettings } from "@/types/admin";
 import ExportXlsxButton from "@/components/ui/ExportXlsxButton";
 import { useIsAdmin } from "@/hooks/use-is-admin";
+import { errorMessage } from "@/lib/api/client";
 
 const TYPE_LABELS: Record<CommissionType, string> = {
   percentage: "Процент",
@@ -152,7 +153,7 @@ export default function AdminCommissionsPage() {
       setRateSaved(true);
       setTimeout(() => setRateSaved(false), 3000);
     } catch (e: unknown) {
-      setRateError(e instanceof Error ? e.message : "Ошибка");
+      setRateError(errorMessage(e, "Ошибка"));
     } finally { setSavingRate(false); }
   }
 
@@ -190,14 +191,14 @@ export default function AdminCommissionsPage() {
       setEditingCode(null);
       loadConfigs();
     } catch (e: unknown) {
-      setFormError(e instanceof Error ? e.message : "Ошибка сохранения");
+      setFormError(errorMessage(e, "Ошибка сохранения"));
     } finally { setSaving(false); }
   }
 
   async function handleDeleteConfig(code: string) {
     setDeletingCode(code);
     try { await deleteCommissionConfig(code); loadConfigs(); }
-    catch (e: unknown) { setConfigsError(e instanceof Error ? e.message : "Ошибка удаления"); }
+    catch (e: unknown) { setConfigsError(errorMessage(e, "Ошибка удаления")); }
     finally { setDeletingCode(null); }
   }
 

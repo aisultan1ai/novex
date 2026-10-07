@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Download } from "lucide-react";
+import { errorMessage, responseToApiError, safeFetch } from "@/lib/api/client";
 
 type Props = {
   /** API-путь БЕЗ префикса /api/v1 (например "/admin/orders/export"). */
@@ -36,17 +37,10 @@ export default function ExportXlsxButton({
     setBusy(true);
     try {
       const url = `${API_BASE}${endpoint}${query ? `?${query}` : ""}`;
-      const res = await fetch(url, { credentials: "include", cache: "no-store" });
+      const res = await safeFetch(url, { credentials: "include", cache: "no-store" });
 
       if (!res.ok) {
-        // Пытаемся вытащить нормальное сообщение (наш translatePydanticMsg
-        // в client.ts не подключен здесь, парсим сами).
-        let msg = `Ошибка ${res.status}`;
-        try {
-          const data = await res.json();
-          if (typeof data?.detail === "string") msg = data.detail;
-        } catch { /* ignore */ }
-        alert(msg);
+        alert((await responseToApiError(res)).detail);
         return;
       }
 
@@ -66,7 +60,7 @@ export default function ExportXlsxButton({
       // Пауза перед revoke — Firefox иногда не успевает начать download до revoke.
       setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Не удалось скачать файл");
+      alert(errorMessage(e, "Не удалось скачать файл"));
     } finally {
       setBusy(false);
     }

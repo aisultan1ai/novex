@@ -124,7 +124,7 @@ class RegisterRequest(BaseModel):
     @model_validator(mode="after")
     def validate_company_fields(self) -> RegisterRequest:
         if self.customer_type == CustomerType.COMPANY and not self.company_name:
-            raise ValueError("company_name is required for company customer type")
+            raise ValueError("Укажите название компании для типа аккаунта «Компания».")
         return self
 
 

@@ -1,4 +1,4 @@
-import { apiRequest, ApiError } from "./client";
+import { apiRequest, ApiError, safeFetch } from "./client";
 import type {
   LoginRequest,
   ProfileResponse,
@@ -30,6 +30,28 @@ export async function logoutUser(): Promise<void> {
 
 export async function getProfile(): Promise<ProfileResponse> {
   return apiRequest<ProfileResponse>("/auth/profile", { method: "GET" });
+}
+
+const PROFILE_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") ?? "/api/v1";
+
+/**
+ * Background profile sync used by AuthProvider. Unlike getProfile() it never
+ * throws and never triggers the global "session expired" redirect — a stale
+ * browser session on a public page must not bounce the visitor to /login.
+ */
+export async function fetchProfileQuietly(): Promise<ProfileResponse | null> {
+  try {
+    const res = await safeFetch(`${PROFILE_BASE_URL}/auth/profile`, {
+      method: "GET",
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as ProfileResponse;
+  } catch {
+    return null;
+  }
 }
 
 export async function updateProfile(payload: {

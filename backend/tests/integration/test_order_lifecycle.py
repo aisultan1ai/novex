@@ -41,7 +41,7 @@ def test_register_duplicate_email_raises_conflict(db, identity_svc):
     payload = RegisterRequest(email="dup@example.com", password="StrongPass123")
     identity_svc.register_user(db, payload)
 
-    with pytest.raises(ConflictError, match="already exists"):
+    with pytest.raises(ConflictError, match="уже зарегистрирован"):
         identity_svc.register_user(db, payload)
 
 

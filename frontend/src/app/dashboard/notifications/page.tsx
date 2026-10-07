@@ -11,6 +11,7 @@ import {
   markNotificationRead,
 } from "@/lib/api/notifications";
 import type { Notification } from "@/types/notifications";
+import { errorMessage } from "@/lib/api/client";
 
 function formatDateTime(iso: string) {
   // Backend returns naive UTC without 'Z' - append it so browser parses as UTC, not local
@@ -81,7 +82,7 @@ export default function NotificationsPage() {
       setItems((prev) => prev.map((n) => ({ ...n, is_read: true })));
       setUnread(0);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Ошибка");
+      setError(errorMessage(e, "Ошибка"));
     } finally {
       setMarkingAll(false);
     }

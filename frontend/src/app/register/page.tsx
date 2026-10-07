@@ -10,6 +10,7 @@ import { ApiError, registerUser } from "@/lib/api/auth";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import type { CustomerType, RegisterRequest } from "@/types/auth";
 import PdConsentCheckbox from "@/components/forms/PdConsentCheckbox";
+import { errorMessage } from "@/lib/api/client";
 
 /* ─── Password strength ──────────────────────────────────────────────────── */
 
@@ -171,6 +172,7 @@ export default function RegisterPage() {
   const [showPwd, setShowPwd] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [emailTaken, setEmailTaken] = useState(false);
   const [verifyModalEmail, setVerifyModalEmail] = useState<string | null>(null);
 
   const isCompany = useMemo(() => form.customer_type === "company", [form.customer_type]);
@@ -203,6 +205,7 @@ export default function RegisterPage() {
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+    setEmailTaken(false);
     const taxErr = validateTaxId();
     if (taxErr) { setError(taxErr); return; }
     if (!form.pd_consent) {
@@ -221,13 +224,9 @@ export default function RegisterPage() {
       }
       router.push("/login?registered=1");
     } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.detail
-          : err instanceof Error
-            ? err.message
-            : "Не удалось создать аккаунт.",
-      );
+      setError(errorMessage(err, "Не удалось создать аккаунт. Попробуйте ещё раз."));
+      // 409 = email already registered: offer the way out (log in / reset password).
+      setEmailTaken(err instanceof ApiError && err.status === 409);
     } finally {
       setIsSubmitting(false);
     }
@@ -470,6 +469,12 @@ export default function RegisterPage() {
                 }}
               >
                 {error}
+                {emailTaken && (
+                  <div style={{ marginTop: 8, display: "flex", gap: 14, flexWrap: "wrap" }}>
+                    <Link href="/login" style={{ color: "#0B2545", fontWeight: 600, textDecoration: "underline" }}>Войти</Link>
+                    <Link href="/forgot-password" style={{ color: "#0B2545", fontWeight: 600, textDecoration: "underline" }}>Забыли пароль?</Link>
+                  </div>
+                )}
               </div>
             )}
 

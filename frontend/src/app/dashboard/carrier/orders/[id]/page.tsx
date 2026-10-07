@@ -16,6 +16,7 @@ import {
 } from "@/lib/api/cancellations";
 import { ORDER_STATUS_LABELS, orderStatusColors } from "@/lib/status-labels";
 import { TrackingTimeline } from "@/components/orders/tracking-timeline";
+import { errorMessage } from "@/lib/api/client";
 
 const ACCEPT_STATUSES = new Set(["sent_to_carrier", "pending_manual", "pending_manual_dispatch", "dispatch_failed"]);
 const REJECT_STATUSES = new Set(["sent_to_carrier", "pending_manual", "pending_manual_dispatch"]);
@@ -51,7 +52,7 @@ export default function CarrierOrderDetailPage() {
       const data = await getCarrierOrder(orderId);
       setOrder(data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка загрузки");
+      setError(errorMessage(e, "Ошибка загрузки"));
     }
   };
 
@@ -72,7 +73,7 @@ export default function CarrierOrderDetailPage() {
       setActionMsg(res.message);
       await reload();
     } catch (e) {
-      setActionErr(e instanceof Error ? e.message : "Ошибка");
+      setActionErr(errorMessage(e, "Ошибка"));
     } finally {
       setActionLoading(false);
     }
@@ -90,7 +91,7 @@ export default function CarrierOrderDetailPage() {
       setRejectReason("");
       await reload();
     } catch (e) {
-      setActionErr(e instanceof Error ? e.message : "Ошибка");
+      setActionErr(errorMessage(e, "Ошибка"));
     } finally {
       setActionLoading(false);
     }
@@ -104,7 +105,7 @@ export default function CarrierOrderDetailPage() {
       await carrierApproveCancellation(requestId);
       await reload();
     } catch (e) {
-      setCancelMsg(e instanceof Error ? e.message : "Ошибка");
+      setCancelMsg(errorMessage(e, "Ошибка"));
     } finally {
       setCancelBusy(null);
     }
@@ -124,7 +125,7 @@ export default function CarrierOrderDetailPage() {
       setCancelRejectReason("");
       await reload();
     } catch (e) {
-      setCancelMsg(e instanceof Error ? e.message : "Ошибка");
+      setCancelMsg(errorMessage(e, "Ошибка"));
     } finally {
       setCancelBusy(null);
     }
@@ -142,7 +143,7 @@ export default function CarrierOrderDetailPage() {
       if (fileRef.current) fileRef.current.value = "";
       await reload();
     } catch (e) {
-      setActionErr(e instanceof Error ? e.message : "Ошибка загрузки файла");
+      setActionErr(errorMessage(e, "Ошибка загрузки файла"));
     } finally {
       setPodLoading(false);
     }

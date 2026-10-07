@@ -11,6 +11,7 @@ import {
 } from "@/lib/api/admin";
 import type { AdminUser } from "@/types/admin";
 import { useIsAdmin } from "@/hooks/use-is-admin";
+import { errorMessage } from "@/lib/api/client";
 
 const ROLE_LABELS: Record<string, string> = {
   customer: "Клиент",
@@ -100,7 +101,7 @@ export default function AdminUsersPage() {
       setShowCreate(false);
       void load();
     } catch (e: unknown) {
-      setCreateError(e instanceof Error ? e.message : "Ошибка создания");
+      setCreateError(errorMessage(e, "Ошибка создания"));
     } finally {
       setCreating(false);
     }

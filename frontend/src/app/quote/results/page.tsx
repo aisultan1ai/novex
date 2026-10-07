@@ -6,8 +6,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import Navbar from "@/components/layout/Navbar";
 import { useIsMobile } from "@/hooks/use-is-mobile";
+import { getCarrierLogo } from "@/lib/config/landing";
 import { ApiError, getShippingQuote, selectShippingQuote } from "@/lib/api/shipping";
 import type { RateQuoteItem, ShippingQuoteResponse } from "@/types/quote";
+import { errorMessage } from "@/lib/api/client";
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
 
@@ -87,7 +89,7 @@ function QuoteResultsPageInner() {
         if (isMounted) setData(res);
       } catch (err) {
         if (!isMounted) return;
-        setError(err instanceof ApiError ? err.detail : err instanceof Error ? err.message : "Не удалось загрузить результаты.");
+        setError(err instanceof ApiError ? err.detail : errorMessage(err, "Не удалось загрузить результаты."));
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -108,7 +110,7 @@ function QuoteResultsPageInner() {
     try {
       nextData = await selectShippingQuote(quoteSessionId, { rate_quote_id: rate.id }, token);
     } catch (err) {
-      nextError = err instanceof ApiError ? err.detail : err instanceof Error ? err.message : "Не удалось выбрать тариф.";
+      nextError = err instanceof ApiError ? err.detail : errorMessage(err, "Не удалось выбрать тариф.");
     }
 
     flushSync(() => {
@@ -334,9 +336,19 @@ function QuoteResultsPageInner() {
                             font: `700 ${isMobile ? 16 : 20}px/1 Inter Variable, sans-serif`,
                             color: "#0B2545",
                             flexShrink: 0,
+                            overflow: "hidden",
                           }}
                         >
-                          {rate.carrier_name[0]}
+                          {getCarrierLogo(rate.carrier_code) ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={getCarrierLogo(rate.carrier_code)!}
+                              alt={rate.carrier_name}
+                              style={{ width: isMobile ? 32 : 40, height: isMobile ? 32 : 40, objectFit: "contain" }}
+                            />
+                          ) : (
+                            rate.carrier_name[0]
+                          )}
                         </div>
                         <div style={{ minWidth: 0, flex: 1, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
                           <span style={{

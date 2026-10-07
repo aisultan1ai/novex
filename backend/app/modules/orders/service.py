@@ -106,7 +106,7 @@ class OrdersService:
                 payload.quote_session_id,
                 user_id,
             )
-            raise NotFoundError("Quote session not found")
+            raise NotFoundError("Расчёт не найден. Выполните расчёт заново.")
 
         if payload.public_token != quote_session.public_token:
             logger.warning(
@@ -114,7 +114,7 @@ class OrdersService:
                 payload.quote_session_id,
                 user_id,
             )
-            raise ForbiddenError("Invalid or missing quote token")
+            raise ForbiddenError("Расчёт недоступен. Выполните расчёт заново.")
 
         if quote_session.expires_at and quote_session.expires_at < _utcnow():
             logger.warning(
@@ -122,7 +122,7 @@ class OrdersService:
                 payload.quote_session_id,
                 user_id,
             )
-            raise ValidationError("Quote session has expired")
+            raise ValidationError("Расчёт устарел. Выполните расчёт заново.")
 
         selected_rate_quote = self.repository.get_selected_rate_quote_for_session(
             db,
@@ -134,7 +134,7 @@ class OrdersService:
                 payload.quote_session_id,
                 user_id,
             )
-            raise NotFoundError("No selected rate quote for the given quote session")
+            raise NotFoundError("Сначала выберите тариф.")
 
         existing_draft = self.repository.get_order_draft_by_user_and_quote_session(
             db,
@@ -182,7 +182,7 @@ class OrdersService:
                 db, existing_draft.id
             )
             if refreshed_draft is None:
-                raise NotFoundError("Failed to load updated order draft")
+                raise NotFoundError("Не удалось загрузить заказ. Попробуйте ещё раз.")
 
             return self._build_order_draft_response(refreshed_draft)
 
@@ -221,7 +221,7 @@ class OrdersService:
 
         draft = self.repository.get_order_draft_by_id(db, created_draft.id)
         if draft is None:
-            raise NotFoundError("Failed to load created order draft")
+            raise NotFoundError("Не удалось загрузить заказ. Попробуйте ещё раз.")
 
         logger.info(
             "Order draft created: draft_id=%s user_id=%s carrier=%s",
@@ -243,7 +243,7 @@ class OrdersService:
             logger.warning(
                 "Order draft not found: draft_id=%s user_id=%s", draft_id, user_id
             )
-            raise NotFoundError("Order draft not found")
+            raise NotFoundError("Заказ не найден.")
 
         if order_draft.user_id != user_id:
             logger.warning(
@@ -252,7 +252,7 @@ class OrdersService:
                 order_draft.user_id,
                 user_id,
             )
-            raise ForbiddenError("Order draft does not belong to the current user")
+            raise ForbiddenError("Нет доступа к этому заказу.")
 
         from sqlalchemy import select as _select
 
@@ -347,9 +347,9 @@ class OrdersService:
     ) -> OrderDraftResponse:
         order_draft = self.repository.get_order_draft_by_id(db, draft_id)
         if order_draft is None:
-            raise NotFoundError("Order draft not found")
+            raise NotFoundError("Заказ не найден.")
         if order_draft.user_id != user_id:
-            raise ForbiddenError("Order draft does not belong to the current user")
+            raise ForbiddenError("Нет доступа к этому заказу.")
         if order_draft.status != "shipment_details_completed":
             raise ValidationError(
                 f"Cannot proceed to checkout from status '{order_draft.status}'. "
@@ -396,7 +396,7 @@ class OrdersService:
 
         refreshed = self.repository.get_order_draft_by_id(db, draft_id)
         if refreshed is None:
-            raise NotFoundError("Failed to load order draft")
+            raise NotFoundError("Не удалось загрузить заказ. Попробуйте ещё раз.")
 
         logger.info(
             "Order draft moved to checkout: draft_id=%s user_id=%s", draft_id, user_id
@@ -416,9 +416,9 @@ class OrdersService:
         """
         order_draft = self.repository.get_order_draft_by_id(db, draft_id)
         if order_draft is None:
-            raise NotFoundError("Order draft not found")
+            raise NotFoundError("Заказ не найден.")
         if order_draft.user_id != user_id:
-            raise ForbiddenError("Order draft does not belong to the current user")
+            raise ForbiddenError("Нет доступа к этому заказу.")
         if order_draft.status not in ("ready_for_checkout", "awaiting_payment"):
             raise ValidationError(
                 f"Cannot confirm payment from status '{order_draft.status}'"
@@ -431,7 +431,7 @@ class OrdersService:
 
         refreshed = self.repository.get_order_draft_by_id(db, draft_id)
         if refreshed is None:
-            raise NotFoundError("Failed to load order draft")
+            raise NotFoundError("Не удалось загрузить заказ. Попробуйте ещё раз.")
 
         logger.info(
             "Order draft paid (mock): draft_id=%s user_id=%s", draft_id, user_id
@@ -450,7 +450,7 @@ class OrdersService:
             logger.warning(
                 "Order draft not found: draft_id=%s user_id=%s", draft_id, user_id
             )
-            raise NotFoundError("Order draft not found")
+            raise NotFoundError("Заказ не найден.")
 
         if order_draft.user_id != user_id:
             logger.warning(
@@ -459,7 +459,7 @@ class OrdersService:
                 order_draft.user_id,
                 user_id,
             )
-            raise ForbiddenError("Order draft does not belong to the current user")
+            raise ForbiddenError("Нет доступа к этому заказу.")
 
         if order_draft.status not in ("draft", "shipment_details_completed"):
             logger.warning(
@@ -467,7 +467,7 @@ class OrdersService:
                 draft_id,
                 order_draft.status,
             )
-            raise ValidationError("Only unpaid orders can be deleted")
+            raise ValidationError("Удалить можно только неоплаченный заказ.")
 
         self.repository.delete_order_draft_by_id(db, draft_id=draft_id)
         db.commit()
@@ -515,7 +515,7 @@ class OrdersService:
 
         refreshed = self.repository.get_order_draft_by_id(db, order_id)
         if refreshed is None:
-            raise NotFoundError("Failed to reload order")
+            raise NotFoundError("Не удалось загрузить заказ. Попробуйте ещё раз.")
         shipment = db.scalar(
             _select(Shipment).where(Shipment.order_draft_id == order_id)
         )
@@ -555,7 +555,7 @@ class OrdersService:
             logger.warning(
                 "Order draft not found: draft_id=%s user_id=%s", draft_id, user_id
             )
-            raise NotFoundError("Order draft not found")
+            raise NotFoundError("Заказ не найден.")
 
         if order_draft.user_id != user_id:
             logger.warning(
@@ -564,7 +564,7 @@ class OrdersService:
                 order_draft.user_id,
                 user_id,
             )
-            raise ForbiddenError("Order draft does not belong to the current user")
+            raise ForbiddenError("Нет доступа к этому заказу.")
 
         _EDITABLE_STATUSES = {"draft", "shipment_details_completed"}
         if order_draft.status not in _EDITABLE_STATUSES:
@@ -658,7 +658,7 @@ class OrdersService:
 
         refreshed_draft = self.repository.get_order_draft_by_id(db, draft_id)
         if refreshed_draft is None:
-            raise NotFoundError("Failed to load updated order draft")
+            raise NotFoundError("Не удалось загрузить заказ. Попробуйте ещё раз.")
 
         logger.info(
             "Shipment details updated: draft_id=%s user_id=%s packages=%s",
@@ -709,9 +709,9 @@ class OrdersService:
 
         order_draft = self.repository.get_order_draft_by_id(db, draft_id)
         if order_draft is None:
-            raise NotFoundError("Order draft not found")
+            raise NotFoundError("Заказ не найден.")
         if order_draft.user_id != user_id:
-            raise ForbiddenError("Order draft does not belong to the current user")
+            raise ForbiddenError("Нет доступа к этому заказу.")
 
         if order_draft.status not in self._PICKUP_RESCHEDULE_ALLOWED_STATUSES:
             raise ValidationError(
@@ -845,9 +845,9 @@ class OrdersService:
         """
         order_draft = self.repository.get_order_draft_by_id(db, draft_id)
         if order_draft is None:
-            raise NotFoundError("Order draft not found")
+            raise NotFoundError("Заказ не найден.")
         if order_draft.user_id != user_id:
-            raise ForbiddenError("Order draft does not belong to the current user")
+            raise ForbiddenError("Нет доступа к этому заказу.")
 
         overrides = _RecalcOverrides.from_payload(payload)
 

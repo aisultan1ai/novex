@@ -24,11 +24,11 @@ quotes_service = QuotesService()
 def _validate_token(db: Session, quote_session_id: int, token: str | None) -> QuoteSession:
     session = db.get(QuoteSession, quote_session_id)
     if not session:
-        raise HTTPException(status_code=404, detail="Quote session not found")
+        raise HTTPException(status_code=404, detail="Расчёт не найден. Выполните расчёт заново.")
     if token != session.public_token:
-        raise HTTPException(status_code=403, detail="Invalid or missing quote token")
+        raise HTTPException(status_code=403, detail="Расчёт недоступен. Выполните расчёт заново.")
     if session.expires_at and session.expires_at < datetime.now(UTC).replace(tzinfo=None):
-        raise HTTPException(status_code=410, detail="Quote session has expired")
+        raise HTTPException(status_code=410, detail="Расчёт устарел. Выполните расчёт заново.")
     return session
 
 
@@ -53,14 +53,14 @@ async def get_carrier_services(
     if client is None:
         raise HTTPException(
             status_code=404,
-            detail=f"Carrier '{carrier_code}' is not supported",
+            detail=f"Перевозчик «{carrier_code}» не поддерживается.",
         )
 
     creds_obj = CarrierAPICredentialsRepository().get_by_carrier_code(db, carrier_code)
     if creds_obj is None or not creds_obj.is_active:
         raise HTTPException(
             status_code=404,
-            detail=f"No active API credentials configured for carrier '{carrier_code}'",
+            detail=f"Для перевозчика «{carrier_code}» не настроен доступ к API.",
         )
 
     creds = {

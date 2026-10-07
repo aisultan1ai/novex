@@ -9,6 +9,7 @@ import { useIsMobile } from "@/hooks/use-is-mobile";
 import { getPublicTracking } from "@/lib/api/tracking";
 import type { PublicTrackingResponse } from "@/types/tracking";
 import { ApiError } from "@/lib/api/client";
+import { errorMessage } from "@/lib/api/client";
 
 /* ─── Status badge config ──────────────────────────────────────────────────── */
 
@@ -435,7 +436,7 @@ function TrackingPageInner() {
       if (e instanceof ApiError && e.status === 404) {
         setError("Трек-номер не найден. Проверьте правильность ввода.");
       } else {
-        setError(e instanceof Error ? e.message : "Не удалось получить данные");
+        setError(errorMessage(e, "Не удалось получить данные"));
       }
     } finally {
       setIsLoading(false);

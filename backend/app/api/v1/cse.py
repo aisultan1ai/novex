@@ -60,7 +60,7 @@ def _get_cse_creds(db: Session) -> dict:
     repo = CarrierAPICredentialsRepository()
     record = repo.get_by_carrier_code(db, "cse")
     if not record or not record.is_active:
-        raise HTTPException(status_code=503, detail="CSE carrier is not configured")
+        raise HTTPException(status_code=503, detail="Интеграция с КСЭ не настроена.")
     creds = {
         "api_url": record.api_url or "",
         "api_token": record.api_token or "",
@@ -153,7 +153,7 @@ def search_geography(
         results = _client.search_geography(search, creds)
     except Exception as exc:
         logger.warning("CSE geography search failed: %s", exc)
-        raise HTTPException(status_code=502, detail=f"CSE API error: {exc}") from exc
+        raise HTTPException(status_code=502, detail="Справочник КСЭ временно недоступен. Попробуйте позже.") from exc
     return [GeoItem(**r) for r in results]
 
 
@@ -189,7 +189,7 @@ def list_pvz(
         results = _client.get_pvz(creds, geography_guid=resolved_guid)
     except Exception as exc:
         logger.warning("CSE pvz list failed: %s", exc)
-        raise HTTPException(status_code=502, detail=f"CSE API error: {exc}") from exc
+        raise HTTPException(status_code=502, detail="Справочник КСЭ временно недоступен. Попробуйте позже.") from exc
     return [PvzItem(**r) for r in results]
 
 
@@ -213,7 +213,7 @@ def delivery_info(
         info = _client.get_delivery_info(from_geo, to_geo, creds)
     except Exception as exc:
         logger.warning("CSE delivery_info failed: %s", exc)
-        raise HTTPException(status_code=502, detail=f"CSE API error: {exc}") from exc
+        raise HTTPException(status_code=502, detail="Справочник КСЭ временно недоступен. Попробуйте позже.") from exc
     return DeliveryInfoResponse(**info)
 
 
@@ -237,7 +237,7 @@ def available_delivery_dates(
         results = _client.get_available_delivery_dates(from_geo, to_geo, creds)
     except Exception as exc:
         logger.warning("CSE delivery dates failed: %s", exc)
-        raise HTTPException(status_code=502, detail=f"CSE API error: {exc}") from exc
+        raise HTTPException(status_code=502, detail="Справочник КСЭ временно недоступен. Попробуйте позже.") from exc
     return [AvailableDateItem(**r) for r in results]
 
 
@@ -259,7 +259,7 @@ def available_take_dates(
         results = _client.get_available_take_dates(from_geo, creds)
     except Exception as exc:
         logger.warning("CSE take dates failed: %s", exc)
-        raise HTTPException(status_code=502, detail=f"CSE API error: {exc}") from exc
+        raise HTTPException(status_code=502, detail="Справочник КСЭ временно недоступен. Попробуйте позже.") from exc
     return [AvailableDateItem(**r) for r in results]
 
 
@@ -279,7 +279,7 @@ def get_waybill(
         data = _client.get_documents(waybill_number, creds)
     except Exception as exc:
         logger.warning("CSE get_documents failed: %s", exc)
-        raise HTTPException(status_code=502, detail=f"CSE API error: {exc}") from exc
+        raise HTTPException(status_code=502, detail=f"Ошибка КСЭ: {exc}") from exc
     w = data.get("weight")
     return WaybillInfo(
         number=data.get("number", waybill_number),
@@ -307,7 +307,7 @@ def get_tracking(
         events = _client.tracking(waybill_number, creds)
     except Exception as exc:
         logger.warning("CSE tracking failed: %s", exc)
-        raise HTTPException(status_code=502, detail=f"CSE API error: {exc}") from exc
+        raise HTTPException(status_code=502, detail=f"Ошибка КСЭ: {exc}") from exc
     return [
         TrackingEvent(
             guid=ev.get("guid", ""),
@@ -337,7 +337,7 @@ def download_waybill_pdf(
         pdf_bytes = _client.get_print_form(waybill_number, creds)
     except Exception as exc:
         logger.warning("CSE print form failed: %s", exc)
-        raise HTTPException(status_code=502, detail=f"CSE API error: {exc}") from exc
+        raise HTTPException(status_code=502, detail=f"Ошибка КСЭ: {exc}") from exc
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
@@ -363,7 +363,7 @@ def cancel_waybill(
     creds = _get_cse_creds(db)
     success = _client.delete_document(waybill_number, reason, contact, phone, creds)
     if not success:
-        raise HTTPException(status_code=502, detail="CSE: cancellation request failed")
+        raise HTTPException(status_code=502, detail="КСЭ не принял запрос на отмену накладной.")
     return {"waybill_number": waybill_number, "cancelled": True}
 
 
@@ -403,7 +403,7 @@ def _raise_cse_error(exc: Exception, method: str) -> None:
     if isinstance(exc, CSEWaybillValidationError):
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     logger.warning("CSE %s failed: %s", method, exc)
-    raise HTTPException(status_code=502, detail=f"CSE API error: {exc}") from exc
+    raise HTTPException(status_code=502, detail=f"Ошибка КСЭ: {exc}") from exc
 
 
 @router.post(
@@ -490,7 +490,7 @@ def update_waybill_dimensions(
     if not payload.packages and payload.total_weight_kg is None:
         raise HTTPException(
             status_code=422,
-            detail="Provide either `packages` or `total_weight_kg`",
+            detail="Укажите `packages` или `total_weight_kg`.",
         )
     creds = _get_cse_creds(db)
     try:
@@ -578,7 +578,7 @@ def get_cse_report(
         if "unknown report_type" in msg:
             raise HTTPException(status_code=422, detail=msg) from exc
         logger.warning("CSE report failed: %s", exc)
-        raise HTTPException(status_code=502, detail=f"CSE API error: {exc}") from exc
+        raise HTTPException(status_code=502, detail=f"Ошибка КСЭ: {exc}") from exc
     return ReportResponse(
         report_type=report_type,
         date_from=date_from,

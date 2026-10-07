@@ -29,6 +29,7 @@ import {
   orderStatusLabel,
 } from "@/lib/status-labels";
 import type { AdminOrderRow, AdminOrderDetail, AdminPaymentDetail } from "@/types/admin";
+import { errorMessage } from "@/lib/api/client";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -251,7 +252,7 @@ function OrderDetailPanel({ orderId, onCancellationResolved }: { orderId: number
       reload();
       onCancellationResolved?.();
     } catch (e) {
-      setCancelMsg(e instanceof Error ? e.message : "Ошибка");
+      setCancelMsg(errorMessage(e, "Ошибка"));
     } finally {
       setCancelBusy(null);
     }
@@ -272,7 +273,7 @@ function OrderDetailPanel({ orderId, onCancellationResolved }: { orderId: number
       reload();
       onCancellationResolved?.();
     } catch (e) {
-      setCancelMsg(e instanceof Error ? e.message : "Ошибка");
+      setCancelMsg(errorMessage(e, "Ошибка"));
     } finally {
       setCancelBusy(null);
     }
@@ -285,7 +286,7 @@ function OrderDetailPanel({ orderId, onCancellationResolved }: { orderId: number
       await resolveOrphanWaybill(orderId);
       reload();
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : "Ошибка");
+      window.alert(errorMessage(e, "Ошибка"));
     } finally {
       setOrphanBusy(false);
     }
@@ -299,7 +300,7 @@ function OrderDetailPanel({ orderId, onCancellationResolved }: { orderId: number
       reload();
       onCancellationResolved?.();
     } catch (e) {
-      setCancelMsg(e instanceof Error ? e.message : "Ошибка");
+      setCancelMsg(errorMessage(e, "Ошибка"));
     } finally {
       setCancelBusy(null);
     }

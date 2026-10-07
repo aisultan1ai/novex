@@ -147,10 +147,10 @@ async def upload_payment_proof(
         raise HTTPException(status_code=400, detail=str(exc))
     except RuntimeError as exc:
         logger.error("Storage unavailable: %s", exc)
-        raise HTTPException(status_code=500, detail="File storage unavailable")
+        raise HTTPException(status_code=500, detail="Хранилище файлов временно недоступно. Попробуйте позже.")
     except Exception as exc:
         logger.error("File upload failed: %s", exc)
-        raise HTTPException(status_code=500, detail="File upload failed")
+        raise HTTPException(status_code=500, detail="Не удалось загрузить файл. Попробуйте ещё раз.")
 
     try:
         proof = payment_svc.submit_proof(

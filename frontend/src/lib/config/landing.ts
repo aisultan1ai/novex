@@ -32,3 +32,18 @@ export const SUPPORTED_CARRIERS: readonly SupportedCarrier[] = [
   { code: "exline",  name: "Exline",        logo: "/carriers/exline.svg"  },
   { code: "cse",     name: "CSE",           logo: "/carriers/cse.png"     },
 ] as const;
+
+// Two-letter aliases still map to full carrier codes.
+const CARRIER_LOGO_ALIASES: Record<string, string> = {
+  az:  "azimuth",
+  ex:  "exline",
+  kse: "cse",
+};
+
+/** Logo path for a carrier code, or null when we have none. Shared by the
+ *  landing page and the tariff list so both look the same. */
+export function getCarrierLogo(carrierCode: string): string | null {
+  const code = carrierCode.toLowerCase();
+  const canonical = CARRIER_LOGO_ALIASES[code] ?? code;
+  return SUPPORTED_CARRIERS.find((c) => c.code === canonical)?.logo ?? null;
+}

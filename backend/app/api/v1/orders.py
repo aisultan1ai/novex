@@ -124,7 +124,7 @@ def mock_pay_order_draft(
     from app.core.config import get_settings
     if get_settings().is_production:
         from fastapi import HTTPException
-        raise HTTPException(status_code=403, detail="Mock payment is disabled in production")
+        raise HTTPException(status_code=403, detail="Тестовая оплата отключена.")
     return orders_service.confirm_payment_mock(
         db, user_id=current_user_id, draft_id=draft_id
     )

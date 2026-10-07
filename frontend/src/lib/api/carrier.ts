@@ -1,4 +1,4 @@
-import { apiRequest } from "./client";
+import { apiRequest, responseToApiError, safeFetch } from "./client";
 import type {
   CarrierMeResponse,
   CarrierRatesResponse,
@@ -108,39 +108,36 @@ export const getCarrierOrder = (orderId: number): Promise<CarrierOrderItem> =>
   apiRequest(`/carrier/orders/${orderId}`);
 
 export const acceptCarrierOrder = async (orderId: number): Promise<{ order_id: number; status: string; message: string }> => {
-  const res = await fetch(`${BASE}/carrier/orders/${orderId}/accept`, {
+  const res = await safeFetch(`${BASE}/carrier/orders/${orderId}/accept`, {
     method: "POST",
     credentials: "include",
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.detail ?? `HTTP ${res.status}`);
-  return data;
+  if (!res.ok) throw await responseToApiError(res);
+  return res.json();
 };
 
 export const rejectCarrierOrder = async (orderId: number, reason: string): Promise<{ order_id: number; status: string; message: string }> => {
   const form = new FormData();
   form.append("reason", reason);
-  const res = await fetch(`${BASE}/carrier/orders/${orderId}/reject`, {
+  const res = await safeFetch(`${BASE}/carrier/orders/${orderId}/reject`, {
     method: "POST",
     credentials: "include",
     body: form,
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.detail ?? `HTTP ${res.status}`);
-  return data;
+  if (!res.ok) throw await responseToApiError(res);
+  return res.json();
 };
 
 export const uploadCarrierPod = async (orderId: number, file: File): Promise<{ document_id: number; file_url: string; file_name: string; order_status: string; message: string }> => {
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch(`${BASE}/carrier/orders/${orderId}/pod`, {
+  const res = await safeFetch(`${BASE}/carrier/orders/${orderId}/pod`, {
     method: "POST",
     credentials: "include",
     body: form,
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.detail ?? `HTTP ${res.status}`);
-  return data;
+  if (!res.ok) throw await responseToApiError(res);
+  return res.json();
 };
 
 // ── Commissions (read-only for carrier) ────────────────────────────────────

@@ -10,6 +10,7 @@ import {
   type CommissionConfigUpsert,
   type CommissionType,
 } from "@/lib/api/commission_configs";
+import { errorMessage } from "@/lib/api/client";
 
 const TYPE_LABELS: Record<CommissionType, string> = {
   percentage: "Процент",
@@ -91,7 +92,7 @@ export default function AdminCommissionConfigsPage() {
       setEditingCode(null);
       load();
     } catch (e: unknown) {
-      setFormError(e instanceof Error ? e.message : "Ошибка сохранения");
+      setFormError(errorMessage(e, "Ошибка сохранения"));
     } finally {
       setSaving(false);
     }
@@ -103,7 +104,7 @@ export default function AdminCommissionConfigsPage() {
       await deleteCommissionConfig(carrierCode);
       load();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Ошибка удаления");
+      setError(errorMessage(e, "Ошибка удаления"));
     } finally {
       setDeletingCode(null);
     }

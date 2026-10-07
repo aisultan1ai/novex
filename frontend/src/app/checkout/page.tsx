@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Copy, Check } from "lucide-react";
 
 import { useAuth } from "@/components/providers/auth-provider";
+import EmailVerificationNotice from "@/components/auth/EmailVerificationNotice";
+import { errorMessage } from "@/lib/api/client";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { ApiError, getOrderDraft, proceedToCheckout } from "@/lib/api/orders";
 import {
@@ -137,6 +139,10 @@ function CheckoutPageInner() {
   const [draft, setDraft] = useState<OrderDraftResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Unverified customers get 403 {code: "email_not_verified"} from checkout /
+  // payment — show a dedicated «подтвердите email» panel instead of a raw error.
+  const [needsEmailVerify, setNeedsEmailVerify] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   // View: "summary" → show order details + pay button; "payment" → show bank details + upload
   const [view, setView] = useState<"summary" | "payment">("summary");
@@ -164,6 +170,8 @@ function CheckoutPageInner() {
     if (!isAuthenticated || !draftId) return;
     async function load() {
       setIsLoading(true);
+      setError(null);
+      setNeedsEmailVerify(false);
       try {
         let data = await getOrderDraft(draftId!);
         if (data.status === "shipment_details_completed") {
@@ -182,13 +190,17 @@ function CheckoutPageInner() {
           setView("payment");
         }
       } catch (err) {
-        setError(err instanceof ApiError ? err.detail : "Не удалось загрузить заказ.");
+        if (err instanceof ApiError && err.code === "email_not_verified") {
+          setNeedsEmailVerify(true);
+        } else {
+          setError(errorMessage(err, "Не удалось загрузить заказ."));
+        }
       } finally {
         setIsLoading(false);
       }
     }
     void load();
-  }, [isAuthenticated, draftId, router]);
+  }, [isAuthenticated, draftId, router, reloadKey]);
 
   useEffect(() => {
     if (!uploadSuccess || !draftId) return;
@@ -225,7 +237,11 @@ function CheckoutPageInner() {
       setStatus(data.status);
       setView("payment");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Ошибка при инициализации оплаты");
+      if (err instanceof ApiError && err.code === "email_not_verified") {
+        setNeedsEmailVerify(true);
+      } else {
+        setError(errorMessage(err, "Не удалось начать оплату. Попробуйте ещё раз."));
+      }
     } finally {
       setIsPaying(false);
     }
@@ -246,7 +262,7 @@ function CheckoutPageInner() {
       setUploadSuccess(true);
       setStatus("payment_under_review");
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "Ошибка загрузки файла");
+      setUploadError(errorMessage(err, "Не удалось загрузить файл. Попробуйте ещё раз."));
     } finally {
       setUploading(false);
     }
@@ -350,6 +366,8 @@ function CheckoutPageInner() {
           <div style={{ ...card, padding: 48, textAlign: "center", color: "#5F6E7E", font: "400 14px/1 Inter Variable, sans-serif" }}>
             Загружаем заказ…
           </div>
+        ) : needsEmailVerify ? (
+          <EmailVerificationNotice variant="card" onVerified={() => setReloadKey((k) => k + 1)} />
         ) : error && !draft ? (
           <div style={{ ...card, padding: 28 }}>
             <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10, padding: "14px 16px", color: "#B91C1C", font: "400 14px/1.4 Inter Variable, sans-serif", marginBottom: 16 }}>

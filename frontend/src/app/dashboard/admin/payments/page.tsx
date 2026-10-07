@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { errorMessage, responseToApiError, safeFetch } from "@/lib/api/client";
 
 interface PaymentItem {
   id: number;
@@ -78,14 +79,36 @@ const badgeBase: React.CSSProperties = {
   display: "inline-block",
 };
 
+// POST helper for the approve / refund / reject actions: never throws, never
+// shows a raw backend / network text, and always returns a Russian message.
+async function postPaymentAction(url: string, body?: unknown): Promise<{ ok: boolean; message: string }> {
+  try {
+    const res = await safeFetch(url, {
+      method: "POST",
+      credentials: "include",
+      ...(body !== undefined
+        ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
+        : {}),
+    });
+    if (res.ok) {
+      const data = await res.json().catch(() => null);
+      return { ok: true, message: (data as { message?: string } | null)?.message ?? "Готово." };
+    }
+    return { ok: false, message: (await responseToApiError(res)).detail };
+  } catch (err) {
+    return { ok: false, message: errorMessage(err, "Не удалось выполнить действие. Попробуйте ещё раз.") };
+  }
+}
+
 function ProofModal({ paymentId, onClose }: { paymentId: number; onClose: () => void }) {
   const [detail, setDetail] = useState<PaymentDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/v1/admin/payments/${paymentId}`, { credentials: "include" })
-      .then((r) => r.json())
+    safeFetch(`${API_BASE}/api/v1/admin/payments/${paymentId}`, { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
       .then((d) => setDetail(d))
+      .catch(() => setDetail(null))
       .finally(() => setLoading(false));
   }, [paymentId]);
 
@@ -221,13 +244,19 @@ export default function AdminPaymentsPage() {
     setLoading(true);
     const params = new URLSearchParams({ page: String(page), size: "20" });
     if (statusFilter) params.set("status", statusFilter);
-    const res = await fetch(`${API_BASE}/api/v1/admin/payments?${params}`, {
-      credentials: "include",
-    });
-    if (res.ok) {
-      const data: PaymentListResponse = await res.json();
-      setPayments(data.items);
-      setTotal(data.total);
+    try {
+      const res = await safeFetch(`${API_BASE}/api/v1/admin/payments?${params}`, {
+        credentials: "include",
+      });
+      if (res.ok) {
+        const data: PaymentListResponse = await res.json();
+        setPayments(data.items);
+        setTotal(data.total);
+      } else {
+        setActionMsg((await responseToApiError(res)).detail);
+      }
+    } catch (err) {
+      setActionMsg(errorMessage(err, "Не удалось загрузить платежи."));
     }
     setLoading(false);
   }, [statusFilter, page]);
@@ -239,14 +268,10 @@ export default function AdminPaymentsPage() {
   const handleApprove = async (id: number) => {
     setActionLoading(true);
     setActionMsg(null);
-    const res = await fetch(`${API_BASE}/api/v1/admin/payments/${id}/approve`, {
-      method: "POST",
-      credentials: "include",
-    });
-    const data = await res.json();
-    setActionMsg(res.ok ? data.message : data.detail);
+    const result = await postPaymentAction(`${API_BASE}/api/v1/admin/payments/${id}/approve`);
+    setActionMsg(result.message);
     setActionLoading(false);
-    if (res.ok) {
+    if (result.ok) {
       setStatusFilter("");
       setPage(1);
     }
@@ -259,16 +284,10 @@ export default function AdminPaymentsPage() {
     }
     setActionLoading(true);
     setActionMsg(null);
-    const res = await fetch(`${API_BASE}/api/v1/admin/payments/${id}/refund`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reason: refundReason }),
-    });
-    const data = await res.json();
-    setActionMsg(res.ok ? data.message : data.detail);
+    const result = await postPaymentAction(`${API_BASE}/api/v1/admin/payments/${id}/refund`, { reason: refundReason });
+    setActionMsg(result.message);
     setActionLoading(false);
-    if (res.ok) {
+    if (result.ok) {
       setRefundId(null);
       setRefundReason("");
       setStatusFilter("");
@@ -283,16 +302,10 @@ export default function AdminPaymentsPage() {
     }
     setActionLoading(true);
     setActionMsg(null);
-    const res = await fetch(`${API_BASE}/api/v1/admin/payments/${id}/reject`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reject_reason: rejectReason }),
-    });
-    const data = await res.json();
-    setActionMsg(res.ok ? data.message : data.detail);
+    const result = await postPaymentAction(`${API_BASE}/api/v1/admin/payments/${id}/reject`, { reject_reason: rejectReason });
+    setActionMsg(result.message);
     setActionLoading(false);
-    if (res.ok) {
+    if (result.ok) {
       setSelectedId(null);
       setRejectReason("");
       setStatusFilter("");

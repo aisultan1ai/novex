@@ -8,6 +8,7 @@ import { useAuth } from "@/components/providers/auth-provider";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { createAddress, deleteAddress, listAddresses } from "@/lib/api/address_book";
 import type { AddressEntry, AddressEntryCreate } from "@/types/address_book";
+import { errorMessage } from "@/lib/api/client";
 
 const inp: React.CSSProperties = {
   border: "1px solid #E2E8EE",
@@ -124,7 +125,7 @@ export default function AddressBookPage() {
       setShowForm(false);
       setForm(EMPTY);
     } catch (e: unknown) {
-      setFormError(e instanceof Error ? e.message : "Ошибка при сохранении");
+      setFormError(errorMessage(e, "Ошибка при сохранении"));
     } finally {
       setSaving(false);
     }
@@ -137,7 +138,7 @@ export default function AddressBookPage() {
       await deleteAddress(id);
       setAddresses((prev) => prev.filter((a) => a.id !== id));
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Не удалось удалить");
+      setError(errorMessage(e, "Не удалось удалить"));
     } finally {
       setDeletingId(null);
     }

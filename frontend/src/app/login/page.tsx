@@ -8,7 +8,8 @@ import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 
 import { useAuth } from "@/components/providers/auth-provider";
 import { useIsMobile } from "@/hooks/use-is-mobile";
-import { ApiError, loginUser } from "@/lib/api/auth";
+import { loginUser } from "@/lib/api/auth";
+import { errorMessage } from "@/lib/api/client";
 
 /* ─── Shared input component ─────────────────────────────────────────────── */
 
@@ -133,13 +134,7 @@ function LoginPageInner() {
         router.push(nextPath);
       }
     } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.detail
-          : err instanceof Error
-            ? err.message
-            : "Не удалось выполнить вход.",
-      );
+      setError(errorMessage(err, "Не удалось выполнить вход. Попробуйте ещё раз."));
     } finally {
       setIsSubmitting(false);
     }

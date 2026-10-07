@@ -10,6 +10,7 @@ import { getOrderTracking } from "@/lib/api/tracking";
 import { createReview, getOrderReview, type ReviewResponse } from "@/lib/api/reviews";
 import { TrackingTimeline } from "@/components/orders/tracking-timeline";
 import type { TrackingEvent } from "@/types/tracking";
+import { errorMessage } from "@/lib/api/client";
 
 const REVIEWABLE_STATUSES = new Set(["delivered", "returned"]);
 
@@ -61,7 +62,7 @@ function ReviewForm({
       const review = await createReview(orderId, { rating, comment: comment.trim() || null });
       onSubmitted(review);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Не удалось отправить отзыв");
+      setError(errorMessage(e, "Не удалось отправить отзыв"));
     } finally {
       setSubmitting(false);
     }

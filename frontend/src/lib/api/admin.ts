@@ -1,4 +1,4 @@
-import { apiRequest, ApiError } from "./client";
+import { apiRequest, ApiError, responseToApiError, safeFetch } from "./client";
 import type {
   AdminCarrier, AdminCarrierDetail, AdminCarrierService,
   AdminCommission, AdminOrderDetail, AdminOrderRow, AdminStats,
@@ -16,15 +16,14 @@ const req = apiRequest;
 async function upload<T>(path: string, file: File): Promise<T> {
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await safeFetch(`${BASE}${path}`, {
     method: "POST",
     credentials: "include",
     body: form,
     cache: "no-store",
   });
-  const data = await res.json().catch(() => null);
-  if (!res.ok) throw new ApiError(res.status, (data as { detail?: string })?.detail ?? `HTTP ${res.status}`);
-  return data as T;
+  if (!res.ok) throw await responseToApiError(res);
+  return (await res.json().catch(() => null)) as T;
 }
 
 // ── Stats ─────────────────────────────────────────────────────────────────────

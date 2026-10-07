@@ -57,26 +57,20 @@ class StorageService(ABC):
 
 def validate_upload(file_data: bytes, original_name: str, mime_type: str) -> None:
     if len(file_data) > MAX_FILE_SIZE:
-        raise ValueError(f"File size exceeds {MAX_FILE_SIZE // (1024 * 1024)} MB limit")
+        raise ValueError(f"Файл слишком большой (максимум {MAX_FILE_SIZE // (1024 * 1024)} МБ).")
 
     if mime_type not in ALLOWED_MIME_TYPES:
-        raise ValueError(
-            f"File type '{mime_type}' not allowed. "
-            f"Allowed: {', '.join(sorted(ALLOWED_MIME_TYPES))}"
-        )
+        raise ValueError("Неподдерживаемый тип файла. Допустимы JPG, PNG и PDF.")
 
     import os
     ext = os.path.splitext(original_name)[1].lower()
     if ext not in ALLOWED_EXTENSIONS:
-        raise ValueError(
-            f"File extension '{ext}' not allowed. "
-            f"Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}"
-        )
+        raise ValueError("Неподдерживаемое расширение файла. Допустимы JPG, PNG и PDF.")
 
     # Detect real MIME from magic bytes to prevent type spoofing
     detected = _detect_mime(file_data)
     if detected and detected not in ALLOWED_MIME_TYPES:
-        raise ValueError(f"Detected file type '{detected}' does not match allowed types")
+        raise ValueError("Содержимое файла не соответствует разрешённому типу. Допустимы JPG, PNG и PDF.")
 
 
 def _detect_mime(data: bytes) -> str | None:

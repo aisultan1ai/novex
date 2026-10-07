@@ -67,7 +67,7 @@ class IdentityService:
             logger.warning(
                 "Registration conflict: email=%s already exists", payload.email
             )
-            raise ConflictError("User with this email already exists")
+            raise ConflictError("Пользователь с таким email уже зарегистрирован. Войдите или восстановите пароль.")
 
         customer_role = self.repository.ensure_role(
             db,
@@ -104,7 +104,7 @@ class IdentityService:
 
         created_user = self.repository.get_user_by_id(db, user.id)
         if created_user is None:
-            raise NotFoundError("Failed to load created user")
+            raise NotFoundError("Не удалось создать аккаунт. Попробуйте ещё раз.")
 
         logger.info(
             "User registered: user_id=%s email=%s", created_user.id, created_user.email
@@ -213,11 +213,11 @@ class IdentityService:
         user = self.repository.get_user_by_email(db, payload.email)
         if user is None or not verify_password(payload.password, user.password_hash):
             logger.warning("Failed login attempt: email=%s", payload.email)
-            raise UnauthorizedError("Invalid email or password")
+            raise UnauthorizedError("Неверный email или пароль.")
 
         if not user.is_active:
             logger.warning("Login denied — inactive account: user_id=%s", user.id)
-            raise UnauthorizedError("User account is inactive")
+            raise UnauthorizedError("Аккаунт отключён. Обратитесь в поддержку.")
 
         role_code = user.role.code.value if user.role else RoleCode.CUSTOMER.value
 
@@ -241,7 +241,7 @@ class IdentityService:
     def get_profile(self, db: Session, user_id: int) -> ProfileResponse:
         user = self.repository.get_user_by_id(db, user_id)
         if user is None:
-            raise NotFoundError("User not found")
+            raise NotFoundError("Пользователь не найден.")
         return self._build_profile_response(user)
 
     def update_profile(
@@ -253,7 +253,7 @@ class IdentityService:
     ) -> ProfileResponse:
         user = self.repository.get_user_by_id(db, user_id)
         if user is None:
-            raise NotFoundError("User not found")
+            raise NotFoundError("Пользователь не найден.")
 
         # Admins / operators / carriers historically had no CustomerProfile row —
         # only customers got one on register. But тут же в /profile форме им нужно
@@ -282,7 +282,7 @@ class IdentityService:
                 db.rollback()
                 user = self.repository.get_user_by_id(db, user_id)
                 if user is None or user.customer_profile is None:
-                    raise NotFoundError("Failed to load customer profile after race")
+                    raise NotFoundError("Не удалось загрузить профиль. Попробуйте ещё раз.")
                 profile = user.customer_profile
 
         self.repository.update_user(
@@ -311,7 +311,7 @@ class IdentityService:
 
         updated_user = self.repository.get_user_by_id(db, user_id)
         if updated_user is None:
-            raise NotFoundError("Failed to load updated user")
+            raise NotFoundError("Не удалось загрузить профиль. Попробуйте ещё раз.")
 
         return self._build_profile_response(updated_user)
 
@@ -499,7 +499,7 @@ class IdentityService:
 
         profile = user.customer_profile
         if profile is None:
-            raise NotFoundError("Customer profile is missing")
+            raise NotFoundError("Профиль не заполнен. Откройте раздел «Профиль» и заполните данные.")
 
         return ProfileResponse(
             user_id=user.id,

@@ -137,10 +137,10 @@ class PaymentService:
     ) -> PaymentTransaction:
         tx = db.get(PaymentTransaction, payment_id)
         if not tx or tx.order_id != order_id:
-            raise NotFoundError("Payment transaction not found")
+            raise NotFoundError("Платёж не найден.")
         if tx.status not in (TxStatus.AWAITING_PAYMENT, TxStatus.PAYMENT_REJECTED):
             raise ValidationError(
-                f"Cannot upload proof for payment in status '{tx.status}'"
+                "Сейчас нельзя загрузить чек для этой оплаты. Обновите страницу заказа."
             )
         return tx
 
@@ -159,9 +159,9 @@ class PaymentService:
     ) -> PaymentProof:
         tx = db.get(PaymentTransaction, payment_id)
         if not tx or tx.order_id != order_id:
-            raise NotFoundError("Payment transaction not found")
+            raise NotFoundError("Платёж не найден.")
         if tx.status not in (TxStatus.AWAITING_PAYMENT, TxStatus.PAYMENT_REJECTED):
-            raise ValidationError(f"Cannot upload proof for payment in status '{tx.status}'")
+            raise ValidationError("Сейчас нельзя загрузить чек для этой оплаты. Обновите страницу заказа.")
 
         proof = PaymentProof(
             payment_id=tx.id,
@@ -225,9 +225,9 @@ class PaymentService:
     ) -> PaymentTransaction:
         tx = db.get(PaymentTransaction, payment_id)
         if not tx:
-            raise NotFoundError("Payment transaction not found")
+            raise NotFoundError("Платёж не найден.")
         if tx.status != TxStatus.PAYMENT_UNDER_REVIEW:
-            raise ValidationError(f"Cannot approve payment in status '{tx.status}'")
+            raise ValidationError(f"Нельзя подтвердить оплату в текущем статусе ({tx.status}).")
 
         # Approve the latest pending proof
         proof = db.scalar(
@@ -317,9 +317,9 @@ class PaymentService:
     ) -> PaymentTransaction:
         tx = db.get(PaymentTransaction, payment_id)
         if not tx:
-            raise NotFoundError("Payment transaction not found")
+            raise NotFoundError("Платёж не найден.")
         if tx.status != TxStatus.PAYMENT_UNDER_REVIEW:
-            raise ValidationError(f"Cannot reject payment in status '{tx.status}'")
+            raise ValidationError(f"Нельзя отклонить оплату в текущем статусе ({tx.status}).")
 
         proof = db.scalar(
             select(PaymentProof).where(
@@ -396,7 +396,7 @@ class PaymentService:
         """
         tx = db.get(PaymentTransaction, payment_id)
         if not tx:
-            raise NotFoundError("Payment transaction not found")
+            raise NotFoundError("Платёж не найден.")
         if tx.status not in (TxStatus.AWAITING_PAYMENT, TxStatus.PAYMENT_UNDER_REVIEW):
             raise ValidationError(
                 f"Cannot auto-confirm payment in status '{tx.status}'"

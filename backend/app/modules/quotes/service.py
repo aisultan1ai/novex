@@ -142,7 +142,7 @@ class QuotesService:
         session = db.scalar(stmt)
         if not session:
             logger.warning("Quote session not found: session_id=%s", session_id)
-            raise NotFoundError("Quote session not found.")
+            raise NotFoundError("Расчёт не найден. Выполните расчёт заново.")
 
         return ShippingQuoteResponse(
             quote_session_id=session.id,
@@ -170,7 +170,7 @@ class QuotesService:
                 quote_session_id,
                 payload.rate_quote_id,
             )
-            raise NotFoundError("Rate quote not found.")
+            raise NotFoundError("Тариф не найден. Выполните расчёт заново.")
 
         db.execute(
             update(RateQuote)

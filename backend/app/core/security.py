@@ -87,9 +87,9 @@ def decode_access_token(token: str) -> dict[str, Any]:
     try:
         return jwt.decode(token, _secret_key(), algorithms=[JWT_ALGORITHM])
     except ExpiredSignatureError as exc:
-        raise ValueError("Token has expired") from exc
+        raise ValueError("Сессия истекла. Войдите в аккаунт снова.") from exc
     except InvalidTokenError as exc:
-        raise ValueError(f"Invalid token: {exc}") from exc
+        raise ValueError("Сессия недействительна. Войдите в аккаунт снова.") from exc
 
 
 # ---------------------------------------------------------------------------

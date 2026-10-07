@@ -18,7 +18,7 @@ import {
   getStoredCurrentUser,
   saveAuthSession,
 } from "@/lib/auth/session";
-import { logoutUser } from "@/lib/api/auth";
+import { fetchProfileQuietly, logoutUser } from "@/lib/api/auth";
 import type { ProfileResponse } from "@/types/auth";
 
 type AuthContextValue = {
@@ -28,6 +28,14 @@ type AuthContextValue = {
   login: (profile: ProfileResponse, expiresIn?: number) => void;
   logout: (redirectTo?: string) => void;
   refreshSession: () => void;
+  /**
+   * False until the full profile (phone, ИИН/БИН, company, email_verified) has
+   * been loaded from the API once after sign-in. localStorage keeps only a thin
+   * copy, so forms that prefill from the profile must wait for this flag.
+   */
+  isProfileReady: boolean;
+  /** Re-load the profile from the API (or apply an already fetched one). */
+  refreshProfile: (profile?: ProfileResponse) => Promise<ProfileResponse | null>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -39,7 +47,12 @@ type AuthProviderProps = {
 export function AuthProvider({ children }: AuthProviderProps) {
   const router = useRouter();
 
-  const [currentUser, setCurrentUser] = useState<ProfileResponse | null>(null);
+  // `storedUser` is the thin copy from localStorage (no phone / tax id /
+  // company, email_verified assumed true). `serverProfile` is the full profile
+  // from the API, kept in memory only. `currentUser` merges them.
+  const [storedUser, setCurrentUser] = useState<ProfileResponse | null>(null);
+  const [serverProfile, setServerProfile] = useState<ProfileResponse | null>(null);
+  const [syncedUserId, setSyncedUserId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const sessionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -97,6 +110,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     (profile: ProfileResponse, expiresIn?: number) => {
       saveAuthSession(profile, expiresIn);
       setCurrentUser(getStoredCurrentUser());
+      // The login response already carries the full profile — use it as is.
+      setServerProfile(profile);
+      setSyncedUserId(profile.user_id);
       const expiresAt = getSessionExpiresAt();
       if (expiresAt !== null) {
         scheduleSessionExpiry(expiresAt);
@@ -115,10 +131,46 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
       clearAuthSession();
       setCurrentUser(null);
+      setServerProfile(null);
+      setSyncedUserId(null);
       router.push(redirectTo);
     },
     [clearSessionTimer, router],
   );
+
+  const currentUser = useMemo<ProfileResponse | null>(() => {
+    if (!storedUser) return null;
+    return serverProfile && serverProfile.user_id === storedUser.user_id
+      ? { ...storedUser, ...serverProfile }
+      : storedUser;
+  }, [storedUser, serverProfile]);
+
+  const storedUserId = storedUser?.user_id ?? null;
+
+  const refreshProfile = useCallback(
+    async (profile?: ProfileResponse) => {
+      const full = profile ?? (await fetchProfileQuietly());
+      if (full) setServerProfile(full);
+      setSyncedUserId(full?.user_id ?? storedUserId);
+      return full;
+    },
+    [storedUserId],
+  );
+
+  // Load the full profile once per signed-in user. Failure is not fatal: the
+  // thin profile keeps working and the flag flips so forms stop waiting.
+  useEffect(() => {
+    if (storedUserId === null || syncedUserId === storedUserId) return;
+    let cancelled = false;
+    void fetchProfileQuietly().then((full) => {
+      if (cancelled) return;
+      if (full && full.user_id === storedUserId) setServerProfile(full);
+      setSyncedUserId(storedUserId);
+    });
+    return () => { cancelled = true; };
+  }, [storedUserId, syncedUserId]);
+
+  const isProfileReady = storedUserId === null || syncedUserId === storedUserId;
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -128,8 +180,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       login,
       logout,
       refreshSession,
+      isProfileReady,
+      refreshProfile,
     }),
-    [currentUser, isLoading, login, logout, refreshSession],
+    [currentUser, isLoading, login, logout, refreshSession, isProfileReady, refreshProfile],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

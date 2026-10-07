@@ -103,6 +103,18 @@ async def forbidden_handler(request: Request, exc: ForbiddenError) -> JSONRespon
     return JSONResponse(status_code=403, content={"detail": str(exc)})
 
 
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Last line of defence: an unexpected error must reach the customer as a
+    readable Russian message, never as a bare "Internal Server Error" or a
+    stack trace. Starlette still re-raises after this handler, so the failure
+    is logged and reported to Sentry as usual."""
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Внутренняя ошибка сервера. Мы уже разбираемся — попробуйте позже."},
+    )
+
+
 app.include_router(api_router, prefix=settings.api_v1_prefix)
 
 
