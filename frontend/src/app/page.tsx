@@ -40,6 +40,25 @@ const initialForm: FormState = {
   depthCm: "10",
 };
 
+// True once HomePage has mounted in this document (page load). Distinguishes
+// "the page was just (re)loaded" from "the customer came back here inside the app".
+let homeMountedInDocument = false;
+
+/** Do two forms describe the same calculation? (Dimensions only matter for parcels.) */
+function sameCalcParams(a: FormState, b: FormState): boolean {
+  if (a.fromCity.trim() !== b.fromCity.trim() || a.toCity.trim() !== b.toCity.trim()) return false;
+  if (a.shipmentType !== b.shipmentType) return false;
+  if (Number(a.weightKg) !== Number(b.weightKg) || Number(a.quantity) !== Number(b.quantity)) return false;
+  if (a.shipmentType !== "document") {
+    return (
+      Number(a.widthCm) === Number(b.widthCm) &&
+      Number(a.heightCm) === Number(b.heightCm) &&
+      Number(a.depthCm) === Number(b.depthCm)
+    );
+  }
+  return true;
+}
+
 /** One shipping calculation for the given form (no React state touched). */
 async function requestQuote(f: FormState): Promise<ShippingQuoteResponse> {
   const isDoc = f.shipmentType === "document";
@@ -254,6 +273,10 @@ export default function HomePage() {
   const [form, setForm] = useState<FormState>(initialForm);
 
   const [results, setResults] = useState<ShippingQuoteResponse | null>(null);
+  // The form the prices in `results` were calculated for. The summary, the
+  // price card and the saved snapshot must show THESE values — never the live
+  // form, which the customer may have edited since pressing «Рассчитать».
+  const [calcForm, setCalcForm] = useState<FormState | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedRate, setSelectedRate] = useState<RateQuoteItem | null>(null);
@@ -289,12 +312,27 @@ export default function HomePage() {
   // тариф»): restore the calculation the customer left, so cities, parcel
   // parameters and the tariff list are all still there.
   useEffect(() => {
+    // First mount after a page load: restore ONLY when the document itself came
+    // from history (back / forward). A refresh, a typed address or a link must
+    // start from a clean form — sessionStorage survives a reload, so without
+    // this check «обновить страницу» never reset anything.
+    if (!homeMountedInDocument) {
+      homeMountedInDocument = true;
+      const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+      if (nav?.type !== "back_forward") {
+        clearHomeQuote();
+        return;
+      }
+    }
+    // Later mounts in the same document are in-app navigation («К тарифам»,
+    // «Изменить», browser back inside the app) — those restore the calculation.
     const snapshot = loadHomeQuote();
     if (!snapshot) return;
     setForm((prev) => ({ ...prev, ...snapshot.form }));
     const saved = snapshot.results;
     if (!saved) return;
     setResults(saved);
+    setCalcForm({ ...initialForm, ...snapshot.form });
     // The quote session may have expired meanwhile — re-check it. On success
     // use the fresh data; on failure keep the form and ask for a new calculation.
     getShippingQuote(saved.quote_session_id, saved.public_token)
@@ -308,14 +346,15 @@ export default function HomePage() {
         // Session expired / gone: recalculate by ourselves from the saved form
         // so the customer does not have to press «Рассчитать» again.
         requestQuote(snapshot.form)
-          .then((res) => { setResults(res); saveHomeQuote(snapshot.form, res); })
-          .catch(() => { setResults(null); clearHomeQuote(); });
+          .then((res) => { setResults(res); setCalcForm({ ...initialForm, ...snapshot.form }); saveHomeQuote(snapshot.form, res); })
+          .catch(() => { setResults(null); setCalcForm(null); clearHomeQuote(); });
       });
   }, []);
 
   useEffect(() => {
     const handler = () => {
       setResults(null);
+      setCalcForm(null);
       setSelectedRate(null);
       setError(null);
       clearHomeQuote();
@@ -353,6 +392,7 @@ export default function HomePage() {
     try {
       const res = await requestQuote(form);
       setResults(res);
+      setCalcForm(form);
       saveHomeQuote(form, res);
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : "Не удалось рассчитать тарифы.");
@@ -363,6 +403,10 @@ export default function HomePage() {
 
   async function handleSelectRate(rate: RateQuoteItem) {
     if (!results || rate.id === null) return;
+    if (isStale) {
+      setError("Вы изменили параметры — нажмите «Пересчитать», чтобы обновить стоимость.");
+      return;
+    }
     setIsSelectingRate(true);
     setError(null);
     try {
@@ -376,11 +420,13 @@ export default function HomePage() {
       // 403 / 404 / 410 = the calculation is gone or its token is invalid. Don't
       // make the customer start over: recalculate with the same form and pick
       // the same carrier + tariff in the fresh results.
-      if (err instanceof ApiError && [403, 404, 410].includes(err.status) && validateQuoteForm(form) === null) {
+      const base = calcForm ?? form;
+      if (err instanceof ApiError && [403, 404, 410].includes(err.status) && validateQuoteForm(base) === null) {
         try {
-          const fresh = await requestQuote(form);
+          const fresh = await requestQuote(base);
           setResults(fresh);
-          saveHomeQuote(form, fresh);
+          setCalcForm(base);
+          saveHomeQuote(base, fresh);
           const same = fresh.quotes.find(
             (q) => q.carrier_code === rate.carrier_code && q.tariff_name === rate.tariff_name && q.id !== null,
           );
@@ -403,8 +449,9 @@ export default function HomePage() {
 
   function handleProceed() {
     if (!selectedRate || !results) return;
-    // Remember the calculation (form may have been edited since) for «Назад».
-    saveHomeQuote(form, results);
+    // Remember the calculation for «Назад» — the form it was calculated for, not
+    // whatever is typed in the fields now.
+    saveHomeQuote(calcForm ?? form, results);
     const token = results.public_token;
     router.push(
       `/quote/shipment?quoteSessionId=${results.quote_session_id}${token ? `&token=${token}` : ""}`,
@@ -413,14 +460,17 @@ export default function HomePage() {
 
   const hasResults = results !== null;
   const minPrice = results ? Math.min(...results.quotes.map((q) => q.price)) : null;
-  const chargeable = form.shipmentType === "document"
-    ? Number(form.weightKg) * Number(form.quantity)
+  // Everything below the form describes the CALCULATED parameters.
+  const shown = calcForm ?? form;
+  const isStale = hasResults && calcForm !== null && !sameCalcParams(form, calcForm);
+  const chargeable = shown.shipmentType === "document"
+    ? Number(shown.weightKg) * Number(shown.quantity)
     : calcChargeable(
-        Number(form.weightKg),
-        Number(form.widthCm),
-        Number(form.heightCm),
-        Number(form.depthCm),
-        Number(form.quantity),
+        Number(shown.weightKg),
+        Number(shown.widthCm),
+        Number(shown.heightCm),
+        Number(shown.depthCm),
+        Number(shown.quantity),
       );
 
   return (
@@ -602,7 +652,7 @@ export default function HomePage() {
                     if (!isLoading) e.currentTarget.style.background = "#0B2545";
                   }}
                 >
-                  {isLoading ? "Рассчитываем..." : "Рассчитать"}
+                  {isLoading ? "Рассчитываем..." : isStale ? "Пересчитать" : "Рассчитать"}
                 </button>
               </div>
 
@@ -687,7 +737,7 @@ export default function HomePage() {
             >
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <span style={{ font: "600 18px/1 Inter Variable, sans-serif", color: "#0E1826" }}>
-                  {form.fromCity} → {form.toCity}
+                  {shown.fromCity} → {shown.toCity}
                 </span>
                 <span
                   style={{
@@ -698,11 +748,11 @@ export default function HomePage() {
                     borderRadius: 999,
                   }}
                 >
-                  {form.weightKg} кг · {form.shipmentType === "parcel" ? "Посылка" : "Документ"}
+                  {shown.weightKg} кг · {shown.shipmentType === "parcel" ? "Посылка" : "Документ"}
                 </span>
               </div>
               <button
-                onClick={() => { setResults(null); setSelectedRate(null); }}
+                onClick={() => { setResults(null); setCalcForm(null); setSelectedRate(null); }}
                 style={{
                   background: "none",
                   border: "none",
@@ -718,12 +768,30 @@ export default function HomePage() {
               </button>
             </div>
 
+            {isStale && !isLoading && (
+              <div
+                role="status"
+                style={{
+                  marginBottom: 16,
+                  padding: "12px 16px",
+                  borderRadius: 12,
+                  background: "#F8FAFC",
+                  border: "1px solid #E2E8EE",
+                  color: "#0B2545",
+                  font: "500 14px/1.5 Inter Variable, sans-serif",
+                }}
+              >
+                Вы изменили параметры. Стоимость ниже рассчитана для{" "}
+                <b>{shown.fromCity} → {shown.toCity}, {shown.weightKg} кг</b> — нажмите «Пересчитать», чтобы обновить.
+              </div>
+            )}
+
             {isLoading ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 <SkeletonCard /><SkeletonCard /><SkeletonCard />
               </div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, opacity: isStale ? 0.5 : 1, transition: "opacity 0.15s" }}>
                 {results.quotes.map((rate) => {
                   const isBest = rate.price === minPrice;
                   const isSelected = selectedRate === rate;
@@ -857,6 +925,8 @@ export default function HomePage() {
                         </div>
                         <button
                           onClick={(e) => { e.stopPropagation(); void handleSelectRate(rate); }}
+                          disabled={isStale}
+                          title={isStale ? "Параметры изменены — сначала нажмите «Пересчитать»" : undefined}
                           style={{
                             border: isSelected ? "none" : "1.5px solid #E2E8EE",
                             background: isSelected ? "#0B2545" : "#ffffff",
@@ -864,7 +934,7 @@ export default function HomePage() {
                             borderRadius: 10,
                             padding: isMobile ? "10px 20px" : "8px 20px",
                             font: "600 14px/1 Inter Variable, sans-serif",
-                            cursor: "pointer",
+                            cursor: isStale ? "not-allowed" : "pointer",
                             fontFamily: "inherit",
                             transition: "all 0.15s",
                             flexShrink: 0,
@@ -1208,8 +1278,8 @@ export default function HomePage() {
             <hr style={{ border: "none", borderTop: "1px solid #E2E8EE", margin: "0 0 20px" }} />
 
             <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
-              <DetailRow label="Маршрут" value={`${form.fromCity} → ${form.toCity}`} />
-              <DetailRow label="Груз" value={`${form.weightKg} кг × ${form.quantity} шт · ${form.shipmentType === "parcel" ? "Посылка" : "Документ"}`} />
+              <DetailRow label="Маршрут" value={`${shown.fromCity} → ${shown.toCity}`} />
+              <DetailRow label="Груз" value={`${shown.weightKg} кг × ${shown.quantity} шт · ${shown.shipmentType === "parcel" ? "Посылка" : "Документ"}`} />
               <DetailRow label="Расчётный вес" value={`${chargeable.toFixed(2)} кг`} />
             </div>
 
