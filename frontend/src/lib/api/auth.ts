@@ -40,18 +40,28 @@ const PROFILE_BASE_URL =
  * throws and never triggers the global "session expired" redirect — a stale
  * browser session on a public page must not bounce the visitor to /login.
  */
-export async function fetchProfileQuietly(): Promise<ProfileResponse | null> {
+export async function fetchProfileResult(): Promise<{
+  profile: ProfileResponse | null;
+  /** The server rejected the session (no / expired / invalid cookie). */
+  unauthorized: boolean;
+}> {
   try {
     const res = await safeFetch(`${PROFILE_BASE_URL}/auth/profile`, {
       method: "GET",
       credentials: "include",
       cache: "no-store",
     });
-    if (!res.ok) return null;
-    return (await res.json()) as ProfileResponse;
+    if (res.status === 401) return { profile: null, unauthorized: true };
+    if (!res.ok) return { profile: null, unauthorized: false };
+    return { profile: (await res.json()) as ProfileResponse, unauthorized: false };
   } catch {
-    return null;
+    // Offline / server hiccup: says nothing about the session — don't treat as signed out.
+    return { profile: null, unauthorized: false };
   }
+}
+
+export async function fetchProfileQuietly(): Promise<ProfileResponse | null> {
+  return (await fetchProfileResult()).profile;
 }
 
 export async function updateProfile(payload: {

@@ -98,3 +98,50 @@ def test_profile_with_valid_token_returns_200(client):
 def test_profile_without_token_returns_401(client):
     r = client.get("/api/v1/auth/profile")
     assert r.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Session cookie hygiene (audit 2026-10-08)
+# ---------------------------------------------------------------------------
+
+
+def _access_cookies(response) -> list[str]:
+    return [c for c in response.headers.get_list("set-cookie") if c.startswith("access_token=")]
+
+
+def test_login_expires_legacy_host_only_cookie_before_setting_shared_one(client, monkeypatch):
+    """A stale host-only `access_token` (set before the `.domain` cookie existed)
+    must not shadow the fresh token: login expires it, then sets the shared one."""
+    import app.api.v1.auth as auth_api
+
+    monkeypatch.setattr(auth_api, "_access_cookie_domain", lambda: ".novex.kz")
+    profile = make_profile(email="login@example.com")
+    with patch(
+        "app.api.v1.auth.identity_service.authenticate_user",
+        return_value=make_token_response(profile),
+    ):
+        r = client.post(
+            "/api/v1/auth/login",
+            json={"email": "login@example.com", "password": "securepass1"},
+            headers={"X-Real-IP": "10.0.0.7"},
+        )
+
+    assert r.status_code == 200
+    cookies = _access_cookies(r)
+    assert len(cookies) == 2
+    expired, fresh = cookies
+    assert "Max-Age=0" in expired and "Domain" not in expired      # legacy host-only → expired first
+    assert "Domain=.novex.kz" in fresh and "HttpOnly" in fresh     # then the real one
+
+
+def test_logout_clears_both_cookie_variants(client, monkeypatch):
+    import app.api.v1.auth as auth_api
+
+    monkeypatch.setattr(auth_api, "_access_cookie_domain", lambda: ".novex.kz")
+    r = client.post("/api/v1/auth/logout", headers={"X-Real-IP": "10.0.0.8"})
+
+    assert r.status_code == 200
+    cookies = _access_cookies(r)
+    assert any("Domain=.novex.kz" in c for c in cookies)
+    assert any("Domain" not in c for c in cookies)
+    assert all("Max-Age=0" in c for c in cookies)

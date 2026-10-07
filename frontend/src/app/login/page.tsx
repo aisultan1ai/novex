@@ -8,7 +8,7 @@ import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 
 import { useAuth } from "@/components/providers/auth-provider";
 import { useIsMobile } from "@/hooks/use-is-mobile";
-import { loginUser } from "@/lib/api/auth";
+import { fetchProfileResult, loginUser } from "@/lib/api/auth";
 import { errorMessage } from "@/lib/api/client";
 
 /* ─── Shared input component ─────────────────────────────────────────────── */
@@ -122,6 +122,19 @@ function LoginPageInner() {
     setIsSubmitting(true);
     try {
       const res = await loginUser({ email: email.trim().toLowerCase(), password });
+
+      // The password was right, but did the browser keep the session cookie?
+      // If not, every next page bounces back here with no message at all —
+      // say what is wrong instead. (Offline / server errors are not blocking.)
+      const check = await fetchProfileResult();
+      if (check.unauthorized) {
+        setError(
+          "Пароль верный, но браузер не сохранил сессию. Проверьте, что cookie для novex.kz не заблокированы " +
+          "(Safari: Настройки → Safari → выключите «Блокировать все cookie») или откройте сайт в другом браузере.",
+        );
+        return;
+      }
+
       login(res.profile, res.expires_in);
 
       const role = res.profile.role;

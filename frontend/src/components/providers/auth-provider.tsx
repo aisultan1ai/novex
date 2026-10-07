@@ -18,7 +18,7 @@ import {
   getStoredCurrentUser,
   saveAuthSession,
 } from "@/lib/auth/session";
-import { fetchProfileQuietly, logoutUser } from "@/lib/api/auth";
+import { fetchProfileQuietly, fetchProfileResult, logoutUser } from "@/lib/api/auth";
 import type { ProfileResponse } from "@/types/auth";
 
 type AuthContextValue = {
@@ -157,18 +157,32 @@ export function AuthProvider({ children }: AuthProviderProps) {
     [storedUserId],
   );
 
-  // Load the full profile once per signed-in user. Failure is not fatal: the
-  // thin profile keeps working and the flag flips so forms stop waiting.
+  // Load the full profile once per signed-in user. A network / server failure
+  // is not fatal: the thin profile keeps working and the flag flips so forms
+  // stop waiting. A 401 is different — the browser still remembers a session
+  // (localStorage) that the server no longer accepts (cookie expired, cleared
+  // or invalid). Showing «Кабинет» then is a lie and the next click bounces
+  // to /login, so drop the stale local session right away.
   useEffect(() => {
     if (storedUserId === null || syncedUserId === storedUserId) return;
     let cancelled = false;
-    void fetchProfileQuietly().then((full) => {
+    void fetchProfileResult().then(({ profile: full, unauthorized }) => {
       if (cancelled) return;
+      if (unauthorized) {
+        clearSessionTimer();
+        clearAuthSession();
+        setCurrentUser(null);
+        setServerProfile(null);
+        setSyncedUserId(null);
+        // Also expire the stale cookie so the middleware stops treating the visitor as signed in.
+        void logoutUser().catch(() => { /* best effort */ });
+        return;
+      }
       if (full && full.user_id === storedUserId) setServerProfile(full);
       setSyncedUserId(storedUserId);
     });
     return () => { cancelled = true; };
-  }, [storedUserId, syncedUserId]);
+  }, [storedUserId, syncedUserId, clearSessionTimer]);
 
   const isProfileReady = storedUserId === null || syncedUserId === storedUserId;
 

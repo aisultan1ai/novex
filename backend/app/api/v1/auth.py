@@ -47,6 +47,12 @@ def _access_cookie_domain() -> str | None:
 
 def _set_auth_cookie(response: Response, token: str) -> None:
     settings = get_settings()
+    if _access_cookie_domain():
+        # Sessions created before the shared `.domain` cookie existed live in a
+        # separate host-only cookie with the same name. Browsers send both, and
+        # a stale one can shadow the fresh token (login "succeeds" but every
+        # request is rejected). Expire the host-only variant first.
+        response.delete_cookie(key="access_token", path="/")
     response.set_cookie(
         key="access_token",
         value=token,
@@ -164,6 +170,8 @@ def logout_user(
     if token:
         revoke_refresh_token(token)
     response.delete_cookie(key="access_token", path="/", domain=_access_cookie_domain())
+    # ...and the legacy host-only variant (see _set_auth_cookie).
+    response.delete_cookie(key="access_token", path="/")
     response.delete_cookie(key=_REFRESH_COOKIE, path="/api/v1/auth")
     return {"detail": "Вышли из системы"}
 
