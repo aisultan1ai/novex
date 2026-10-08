@@ -35,6 +35,8 @@ class BankTransferDetails(BaseModel):
     iban: str
     bin: str
     knp: str
+    bik: str = ""
+    kbe: str = ""
     purpose: str
     amount: str
     currency: str
@@ -90,6 +92,8 @@ def initiate_bank_transfer(
             iban=details["iban"],
             bin=details["bin"],
             knp=details["knp"],
+            bik=details.get("bik", ""),
+            kbe=details.get("kbe", ""),
             purpose=f"Оплата доставки по заказу {tx.payment_reference or f'NOVEX-{order.id:06d}'}",
             amount=str(tx.amount),
             currency=tx.currency,

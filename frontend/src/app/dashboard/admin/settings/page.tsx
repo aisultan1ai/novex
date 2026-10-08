@@ -11,6 +11,8 @@ const EMPTY_BANK: BankTransferSettings = {
   iban: "",
   bin: "",
   knp: "",
+  bik: "",
+  kbe: "",
 };
 
 export default function AdminSettingsPage() {
@@ -25,7 +27,7 @@ export default function AdminSettingsPage() {
     getAdminSettings()
       .then((s) => {
         setCommissionRate(s.commission_rate);
-        setBank(s.bank_transfer ?? EMPTY_BANK);
+        setBank({ ...EMPTY_BANK, ...s.bank_transfer });
       })
       .catch(() => setMsg({ text: "Ошибка загрузки настроек", ok: false }))
       .finally(() => setLoading(false));
@@ -129,6 +131,24 @@ export default function AdminSettingsPage() {
                 value={bank.knp}
                 onChange={(e) => setBank({ ...bank, knp: e.target.value })}
                 placeholder="710"
+                style={s.input}
+              />
+            </div>
+            <div>
+              <label style={s.label}>БИК банка <span style={{ color: "#94a3b8", fontWeight: 400 }}>(необязательно)</span></label>
+              <input disabled={!isAdmin}
+                value={bank.bik}
+                onChange={(e) => setBank({ ...bank, bik: e.target.value })}
+                placeholder="CASPKZKA"
+                style={s.input}
+              />
+            </div>
+            <div>
+              <label style={s.label}>КБе <span style={{ color: "#94a3b8", fontWeight: 400 }}>(необязательно)</span></label>
+              <input disabled={!isAdmin}
+                value={bank.kbe}
+                onChange={(e) => setBank({ ...bank, kbe: e.target.value })}
+                placeholder="17"
                 style={s.input}
               />
             </div>

@@ -22,12 +22,16 @@ class ManualBankTransferProvider(PaymentProvider):
         iban: str,
         bin_number: str,
         knp: str,
+        bik: str = "",
+        kbe: str = "",
     ) -> None:
         self._recipient_name = recipient_name
         self._bank_name = bank_name
         self._iban = iban
         self._bin = bin_number
         self._knp = knp
+        self._bik = bik
+        self._kbe = kbe
 
     def initiate_payment(
         self,
@@ -47,6 +51,8 @@ class ManualBankTransferProvider(PaymentProvider):
                 "iban": self._iban,
                 "bin": self._bin,
                 "knp": self._knp,
+                "bik": self._bik,
+                "kbe": self._kbe,
                 "purpose": f"Оплата доставки по заказу NOVEX-{order_id:06d}",
                 "amount": str(amount),
                 "currency": currency,
@@ -72,4 +78,6 @@ class ManualBankTransferProvider(PaymentProvider):
             "iban": self._iban,
             "bin": self._bin,
             "knp": self._knp,
+            "bik": self._bik,
+            "kbe": self._kbe,
         }

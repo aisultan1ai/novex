@@ -54,6 +54,8 @@ def _get_manual_provider(db: Session) -> ManualBankTransferProvider:
         iban=iban,
         bin_number=_settings_repo.get(db, "bank_bin", default=""),
         knp=_settings_repo.get(db, "bank_knp", default="710"),
+        bik=_settings_repo.get(db, "bank_bik", default=""),
+        kbe=_settings_repo.get(db, "bank_kbe", default=""),
     )
 
 

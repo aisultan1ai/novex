@@ -153,6 +153,8 @@ export interface BankTransferSettings {
   iban: string;
   bin: string;
   knp: string;
+  bik: string;
+  kbe: string;
 }
 
 export interface PlatformSettings {

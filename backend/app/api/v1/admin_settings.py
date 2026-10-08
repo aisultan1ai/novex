@@ -23,6 +23,8 @@ BANK_KEYS = [
     "bank_iban",
     "bank_bin",
     "bank_knp",
+    "bank_bik",
+    "bank_kbe",
 ]
 
 
@@ -32,6 +34,10 @@ class BankTransferSettings(BaseModel):
     iban: str = ""
     bin: str = ""
     knp: str = ""
+    # Optional: companies paying by платёжное поручение need the bank's БИК and
+    # the beneficiary's КБе (17 for a ТОО); individuals in a bank app usually do not.
+    bik: str = ""
+    kbe: str = ""
 
 
 class PlatformSettingsResponse(BaseModel):
@@ -51,6 +57,8 @@ def _load_bank(db: Session) -> BankTransferSettings:
         iban=_repo.get(db, "bank_iban", default=""),
         bin=_repo.get(db, "bank_bin", default=""),
         knp=_repo.get(db, "bank_knp", default="710"),
+        bik=_repo.get(db, "bank_bik", default=""),
+        kbe=_repo.get(db, "bank_kbe", default=""),
     )
 
 
@@ -85,6 +93,8 @@ def update_settings(
         _repo.set(db, "bank_iban", bt.iban.strip())
         _repo.set(db, "bank_bin", bt.bin.strip())
         _repo.set(db, "bank_knp", bt.knp.strip())
+        _repo.set(db, "bank_bik", bt.bik.strip().upper())
+        _repo.set(db, "bank_kbe", bt.kbe.strip())
 
     db.commit()
     _audit_svc.log(

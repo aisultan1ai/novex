@@ -8,6 +8,8 @@ export interface BankDetails {
   iban: string;
   bin: string;
   knp: string;
+  bik?: string;
+  kbe?: string;
   purpose: string;
   amount: string;
   currency: string;

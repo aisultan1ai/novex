@@ -104,6 +104,8 @@ function ReqRow({ label, value, copy: copyable }: { label: string; value: string
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
+  // A detail the admin left empty in «Настройки» is not shown to the customer.
+  if (!value || !value.trim()) return null;
   return (
     <div
       style={{
@@ -543,8 +545,10 @@ function CheckoutPageInner() {
               <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
                 <ReqRow label="Получатель" value={paymentData.bank_details.recipient_name} />
                 <ReqRow label="Банк" value={paymentData.bank_details.bank_name} />
+                <ReqRow label="БИК" value={paymentData.bank_details.bik ?? ""} copy />
                 <ReqRow label="IBAN" value={paymentData.bank_details.iban} copy />
                 <ReqRow label="БИН" value={paymentData.bank_details.bin} />
+                <ReqRow label="КБе" value={paymentData.bank_details.kbe ?? ""} />
                 <ReqRow label="КНП" value={paymentData.bank_details.knp} />
                 <ReqRow label="Назначение платежа" value={paymentData.bank_details.purpose} copy />
               </div>
