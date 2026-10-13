@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useLocale, useTranslations } from "next-intl";
 
 import Footer from "@/components/layout/Footer";
 import Navbar from "@/components/layout/Navbar";
@@ -28,6 +29,8 @@ export default function LegalPage({
   intro: ReactNode;
   sections: LegalSection[];
 }) {
+  const t = useTranslations("legal");
+  const locale = useLocale();
   return (
     <>
       <Navbar />
@@ -47,7 +50,12 @@ export default function LegalPage({
           <h1 style={{ margin: "0 0 8px", font: "700 clamp(24px, 4vw, 32px)/1.2 'Space Grotesk Variable', 'Inter Variable', sans-serif", color: "#0B2545" }}>
             {title}
           </h1>
-          <p style={{ margin: "0 0 28px", fontSize: 13, color: "#64748b" }}>Редакция от {updatedAt}</p>
+          <p style={{ margin: "0 0 28px", fontSize: 13, color: "#64748b" }}>{t("edition", { date: updatedAt })}</p>
+          {locale === "kk" && (
+            <p style={{ margin: "0 0 28px", padding: "10px 14px", background: "#F1F5F9", borderRadius: 10, fontSize: 13, color: "#3E6E8A" }}>
+              {t("russianOnly")}
+            </p>
+          )}
           <div style={{ marginBottom: 28 }}>{intro}</div>
           {sections.map((s, i) => (
             <section key={s.title} style={{ marginBottom: 24 }}>

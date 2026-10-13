@@ -41,6 +41,33 @@ _STATUS_TITLES: dict[str, str] = {
     "pending_manual_dispatch": "Заказ оформлен, передаётся перевозчику",
 }
 
+_STATUS_TITLES_KK: dict[str, str] = {
+    "paid": "Төлем расталды",
+    "awaiting_payment": "Төлемді күтуде",
+    "payment_under_review": "Түбіртек тексерілуде",
+    "payment_rejected": "Түбіртек қабылданбады — қайта төлеу қажет",
+    "ready_for_checkout": "Рәсімдеуге дайын",
+    "sent_to_carrier": "Тасымалдаушыға берілді",
+    "picked_up": "Тасымалдаушы алып кетті",
+    "in_transit": "Жолда",
+    "out_for_delivery": "Курьер алушыға шықты",
+    "arrived": "Беру пунктіне келді",
+    "delivery_failed": "Жеткізу әрекеті сәтсіз болды",
+    "customs_hold": "Кеденде ұсталды",
+    "delivered": "Жеткізілді",
+    "cancelled": "Бас тартылды",
+    "refunded": "Қаражат қайтарылды",
+    "return": "Қайтару",
+    "return_requested": "Қайтаруға сұраныс жіберілді",
+    "return_in_progress": "Қайтарылуда",
+    "returned": "Қайтарылды",
+    "dispatched": "Тапсырыс тасымалдаушыға берілді",
+    "dispatch_queued": "Тапсырыс жөнелту кезегіне қойылды",
+    "dispatch_failed": "Тапсырыс рәсімделді, жеткізу мәліметтерін нақтылап жатырмыз",
+    "pending_manual": "Тапсырыс рәсімделді, тасымалдаушыға берілуде",
+    "pending_manual_dispatch": "Тапсырыс рәсімделді, тасымалдаушыға берілуде",
+}
+
 
 class NotificationsService:
     def __init__(self, repo: NotificationsRepository | None = None) -> None:
@@ -56,17 +83,28 @@ class NotificationsService:
         reject_reason: str | None = None,
         tracking_number: str | None = None,
     ) -> None:
-        title = _STATUS_TITLES.get(status, f"Статус обновлён: {status}")
+        # Текст сразу на языке получателя (users.locale).
+        kk = self.repo.user_locale(db, user_id) == "kk"
+        if kk:
+            title = _STATUS_TITLES_KK.get(status, f"Мәртебе жаңартылды: {status}")
+        else:
+            title = _STATUS_TITLES.get(status, f"Статус обновлён: {status}")
         # sent_to_carrier — момент когда у нас впервые есть трек-номер:
         # клиенту важно увидеть его в push/центре уведомлений вместе с
         # инструкцией «ждите звонка курьера», без перехода на страницу заказа.
         if status == "sent_to_carrier" and tracking_number:
             body = (
+                f"#{order_id} тапсырыс тасымалдаушыға берілді. "
+                f"Курьердің қоңырауын күтіңіз. Трек-нөмір: {tracking_number}"
+                if kk else
                 f"Заказ #{order_id} передан перевозчику. "
                 f"Ожидайте звонка курьера. Трек-номер: {tracking_number}"
             )
         else:
-            body = f"Заказ #{order_id}: {title.lower()}"
+            body = (
+                f"#{order_id} тапсырыс: {title[0].lower() + title[1:]}"
+                if kk else f"Заказ #{order_id}: {title.lower()}"
+            )
         # Payment-adjacent statuses take the user to /checkout so they land on
         # the pay/upload-proof screen instead of the read-only order card.
         # Everything else routes to the order detail page.

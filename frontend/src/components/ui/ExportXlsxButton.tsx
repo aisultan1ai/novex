@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Download } from "lucide-react";
+import { Download, Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { errorMessage, responseToApiError, safeFetch } from "@/lib/api/client";
 
 type Props = {
@@ -27,9 +28,10 @@ const API_BASE =
 export default function ExportXlsxButton({
   endpoint,
   query,
-  label = "Экспорт .xlsx",
+  label,
   variant = "outline",
 }: Props) {
+  const t = useTranslations("export");
   const [busy, setBusy] = useState(false);
 
   async function handleClick() {
@@ -60,7 +62,7 @@ export default function ExportXlsxButton({
       // Пауза перед revoke — Firefox иногда не успевает начать download до revoke.
       setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
     } catch (e) {
-      alert(errorMessage(e, "Не удалось скачать файл"));
+      alert(errorMessage(e, t("failed")));
     } finally {
       setBusy(false);
     }
@@ -72,6 +74,8 @@ export default function ExportXlsxButton({
       type="button"
       onClick={handleClick}
       disabled={busy}
+      aria-busy={busy}
+      aria-live="polite"
       style={{
         display: "inline-flex",
         alignItems: "center",
@@ -88,10 +92,14 @@ export default function ExportXlsxButton({
         opacity: busy ? 0.7 : 1,
         transition: "background 0.15s, border-color 0.15s",
       }}
-      title="Скачать таблицу в формате Excel"
+      title={busy ? t("busyTitle") : t("title")}
     >
-      <Download size={16} />
-      {busy ? "Готовим…" : label}
+      {busy ? (
+        <Loader2 size={16} style={{ animation: "spin 0.8s linear infinite" }} aria-hidden />
+      ) : (
+        <Download size={16} aria-hidden />
+      )}
+      {busy ? t("busy") : (label ?? t("label"))}
     </button>
   );
 }

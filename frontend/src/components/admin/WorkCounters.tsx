@@ -1,10 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { getWorkCounters, type WorkCounters as Counters } from "@/lib/api/admin";
 import { useIsMobile } from "@/hooks/use-is-mobile";
+import { Link } from "@/i18n/navigation";
 
 interface RowDef {
   key: keyof Counters;
@@ -17,12 +18,13 @@ interface RowDef {
 
 // Order matters: the most frequent operator task first.
 const ROWS: RowDef[] = [
-  { key: "payment_review",       label: "Ждут проверки оплаты",   hint: "Клиент загрузил чек",          href: "/dashboard/admin/orders?status=payment_under_review" },
-  { key: "awaiting_dispatch",    label: "Ждут отправки",          hint: "Оплачены, уходят перевозчику", href: "/dashboard/admin/orders?status=paid,dispatch_queued" },
-  { key: "cancellation_pending", label: "Заявки на отмену",       hint: "Нужно решение",                href: "/dashboard/admin/cancellations" },
-  { key: "dispatch_failed",      label: "Ошибки отправки",        hint: "Не ушли перевозчику",          href: "/dashboard/admin/orders?status=dispatch_failed" },
-  { key: "orphan_waybills",      label: "Неотменённые накладные", hint: "После переноса забора",        href: "/dashboard/admin/orders?orphan=1",  hideWhenZero: true },
-  { key: "stuck_dispatch_jobs",  label: "Зависшие отправки",      hint: "Не завершились за 10 минут",   href: "/dashboard/admin/dispatch-queue",   hideWhenZero: true },
+  // label/hint - admin.counters.<key>.{label,hint}
+  { key: "payment_review",       label: "payment_review",       hint: "payment_review",       href: "/dashboard/admin/orders?status=payment_under_review" },
+  { key: "awaiting_dispatch",    label: "awaiting_dispatch",    hint: "awaiting_dispatch",    href: "/dashboard/admin/orders?status=paid,dispatch_queued" },
+  { key: "cancellation_pending", label: "cancellation_pending", hint: "cancellation_pending", href: "/dashboard/admin/cancellations" },
+  { key: "dispatch_failed",      label: "dispatch_failed",      hint: "dispatch_failed",      href: "/dashboard/admin/orders?status=dispatch_failed" },
+  { key: "orphan_waybills",      label: "orphan_waybills",      hint: "orphan_waybills",      href: "/dashboard/admin/orders?orphan=1",  hideWhenZero: true },
+  { key: "stuck_dispatch_jobs",  label: "stuck_dispatch_jobs",  hint: "stuck_dispatch_jobs",  href: "/dashboard/admin/dispatch-queue",   hideWhenZero: true },
 ];
 
 const NAVY = "#0B2545";
@@ -32,6 +34,7 @@ const BORDER = "#E2E8EE";
 /** «Требует внимания» — things that need a human (audit T6). */
 export default function WorkCounters() {
   const isMobile = useIsMobile();
+  const t = useTranslations("admin.counters");
   const [counters, setCounters] = useState<Counters | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,11 +56,11 @@ export default function WorkCounters() {
   return (
     <section style={{ marginBottom: 32 }}>
       <div style={{ fontSize: 13, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>
-        Требует внимания
+        {t("title")}
       </div>
 
       {error && (
-        <div style={{ fontSize: 13, color: "#64748b", marginBottom: 10 }}>Не удалось загрузить счётчики: {error}</div>
+        <div style={{ fontSize: 13, color: "#64748b", marginBottom: 10 }}>{t("loadFailed", { error })}</div>
       )}
 
       <div
@@ -87,8 +90,8 @@ export default function WorkCounters() {
           const content = (
             <>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: active ? NAVY : "#64748b" }}>{r.label}</div>
-                <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>{r.hint}</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: active ? NAVY : "#64748b" }}>{t(`${r.label}.label`)}</div>
+                <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>{t(`${r.hint}.hint`)}</div>
               </div>
               <div style={{ fontSize: 22, fontWeight: 700, color: active ? NAVY : "#CBD5E1", minWidth: 24, textAlign: "right" }}>
                 {value ?? "–"}

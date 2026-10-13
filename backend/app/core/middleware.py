@@ -71,3 +71,24 @@ class SecurityHeadersMiddleware:
             await send(message)
 
         await self.app(scope, receive, _send)
+
+
+class LocaleMiddleware:
+    """Pure ASGI middleware: язык ответа из ``X-Locale`` или ``Accept-Language`` (ru|kk).
+
+    Значение кладётся в contextvar (app.core.i18n), его читают обработчики
+    ошибок и сервисы. Без заголовка — русский.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        from app.core.i18n import ACCEPT_LANGUAGE, LOCALE_HEADER, locale_from_headers, set_request_locale
+
+        headers = Headers(scope=scope)
+        set_request_locale(locale_from_headers(headers.get(LOCALE_HEADER), headers.get(ACCEPT_LANGUAGE)))
+        await self.app(scope, receive, send)

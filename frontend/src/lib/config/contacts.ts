@@ -20,6 +20,10 @@ export const CONTACTS = {
   officeAddress: process.env.NEXT_PUBLIC_OFFICE_ADDRESS || "Алматы, Казахстан",
 } as const;
 
+// Адрес по умолчанию переводится на язык страницы (footer.officeAddress);
+// адрес из .env показывается как есть.
+export const OFFICE_ADDRESS_IS_DEFAULT = !process.env.NEXT_PUBLIC_OFFICE_ADDRESS;
+
 // Телефон для href="tel:" - убираем всё кроме цифр и ведущего +.
 export function phoneHref(phone: string): string {
   const cleaned = phone.replace(/[^\d+]/g, "");

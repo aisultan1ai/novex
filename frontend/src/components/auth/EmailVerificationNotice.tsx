@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { useAuth } from "@/components/providers/auth-provider";
 import { errorMessage } from "@/lib/api/client";
@@ -22,6 +23,7 @@ export default function EmailVerificationNotice({
   onVerified?: () => void;
 }) {
   const { currentUser, refreshProfile } = useAuth();
+  const t = useTranslations("emailVerify");
   const [sending, setSending] = useState(false);
   const [checking, setChecking] = useState(false);
   const [info, setInfo] = useState<{ tone: "ok" | "warn"; text: string } | null>(null);
@@ -31,9 +33,9 @@ export default function EmailVerificationNotice({
     setInfo(null);
     try {
       await resendVerificationEmail();
-      setInfo({ tone: "ok", text: "Письмо отправлено — проверьте почту (и папку «Спам»)." });
+      setInfo({ tone: "ok", text: t("sent") });
     } catch (err) {
-      setInfo({ tone: "warn", text: errorMessage(err, "Не удалось отправить письмо. Попробуйте позже.") });
+      setInfo({ tone: "warn", text: errorMessage(err, t("sendFailed")) });
     } finally {
       setSending(false);
     }
@@ -47,7 +49,7 @@ export default function EmailVerificationNotice({
     if (profile?.email_verified) {
       onVerified?.();
     } else {
-      setInfo({ tone: "warn", text: "Email пока не подтверждён. Откройте письмо и перейдите по ссылке." });
+      setInfo({ tone: "warn", text: t("notYet") });
     }
   }
 
@@ -75,11 +77,10 @@ export default function EmailVerificationNotice({
       }}
     >
       <div style={{ fontSize: isCard ? 18 : 15, fontWeight: 700, color: "#0B2545", marginBottom: 6 }}>
-        Подтвердите email, чтобы оплатить заказ
+        {t("title")}
       </div>
       <div style={{ fontSize: 14, color: "#5F6E7E", lineHeight: 1.5, marginBottom: 14 }}>
-        Мы отправили письмо со ссылкой на <b style={{ color: "#0B2545" }}>{email}</b>. Перейдите по ссылке из письма,
-        затем вернитесь сюда — ваши данные сохранены.
+        {t.rich("text", { email, b: (c) => <b style={{ color: "#0B2545" }}>{c}</b> })}
       </div>
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -89,7 +90,7 @@ export default function EmailVerificationNotice({
           disabled={checking}
           style={{ ...btnBase, background: "#0B2545", color: "#ffffff", border: "none", opacity: checking ? 0.7 : 1 }}
         >
-          {checking ? "Проверяем…" : "Я подтвердил email"}
+          {checking ? t("checking") : t("confirmed")}
         </button>
         <button
           type="button"
@@ -97,7 +98,7 @@ export default function EmailVerificationNotice({
           disabled={sending}
           style={{ ...btnBase, background: "#ffffff", color: "#0B2545", border: "1px solid #E2E8EE", opacity: sending ? 0.7 : 1 }}
         >
-          {sending ? "Отправляем…" : "Отправить письмо ещё раз"}
+          {sending ? t("sending") : t("resend")}
         </button>
       </div>
 

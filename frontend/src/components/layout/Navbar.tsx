@@ -1,19 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
 import { Menu, X } from "lucide-react";
+import { useTranslations } from "next-intl";
+import LocaleSwitcher from "@/components/layout/LocaleSwitcher";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useIsMobile } from "@/hooks/use-is-mobile";
+import { Link, usePathname, useRouter } from "@/i18n/navigation";
 
 const NAV_LINKS = [
-  { label: "Доставка",      href: "/" },
-  { label: "Отслеживание",  href: "/tracking" },
-  { label: "Партнёрам",     href: "/partners" },
-];
+  { key: "delivery", href: "/" },
+  { key: "tracking", href: "/tracking" },
+  { key: "partners", href: "/partners" },
+] as const;
 
 export default function Navbar() {
+  const t = useTranslations("nav");
   const pathname = usePathname();
   const router = useRouter();
   const { isAuthenticated, isLoading, currentUser } = useAuth();
@@ -68,7 +70,7 @@ export default function Navbar() {
               router.push("/");
             }
           }}
-          aria-label="Novex — на главную"
+          aria-label={t("homeAria")}
           style={{
             display: "flex",
             alignItems: "center",
@@ -102,7 +104,7 @@ export default function Navbar() {
         {/* Desktop nav links */}
         {!isMobile && (
           <nav style={{ display: "flex", gap: 30, height: 64, alignItems: "stretch" }}>
-            {NAV_LINKS.map(({ label, href }) => {
+            {NAV_LINKS.map(({ key, href }) => {
               const active =
                 href === "/" ? pathname === "/" : pathname.startsWith(href);
               return (
@@ -121,7 +123,7 @@ export default function Navbar() {
                   onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = "#0E1826"; }}
                   onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = "#5F6E7E"; }}
                 >
-                  {label}
+                  {t(key)}
                 </Link>
               );
             })}
@@ -131,6 +133,7 @@ export default function Navbar() {
         {/* Desktop auth buttons */}
         {!isMobile && !isLoading && (
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <LocaleSwitcher />
             {isAuthenticated ? (
               <Link
                 href="/dashboard"
@@ -148,7 +151,7 @@ export default function Navbar() {
               >
                 {currentUser?.full_name
                   ? currentUser.full_name.split(" ")[0]
-                  : "Кабинет"}
+                  : t("cabinet")}
               </Link>
             ) : (
               <>
@@ -163,7 +166,7 @@ export default function Navbar() {
                   onMouseEnter={(e) => (e.currentTarget.style.color = "#0B2545")}
                   onMouseLeave={(e) => (e.currentTarget.style.color = "#0E1826")}
                 >
-                  Войти
+                  {t("login")}
                 </Link>
                 <Link
                   href="/register"
@@ -179,7 +182,7 @@ export default function Navbar() {
                   onMouseEnter={(e) => (e.currentTarget.style.background = "#0E2E5C")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "#0B2545")}
                 >
-                  Регистрация
+                  {t("register")}
                 </Link>
               </>
             )}
@@ -188,9 +191,11 @@ export default function Navbar() {
 
         {/* Mobile burger button */}
         {isMobile && (
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <LocaleSwitcher />
           <button
             onClick={() => setMenuOpen((o) => !o)}
-            aria-label={menuOpen ? "Закрыть меню" : "Открыть меню"}
+            aria-label={menuOpen ? t("closeMenu") : t("openMenu")}
             aria-expanded={menuOpen}
             style={{
               background: "none",
@@ -207,6 +212,7 @@ export default function Navbar() {
           >
             {menuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
+          </div>
         )}
       </header>
 
@@ -231,7 +237,7 @@ export default function Navbar() {
         >
           {/* Nav links */}
           <nav style={{ display: "flex", flexDirection: "column" }}>
-            {NAV_LINKS.map(({ label, href }) => {
+            {NAV_LINKS.map(({ key, href }) => {
               const active =
                 href === "/" ? pathname === "/" : pathname.startsWith(href);
               return (
@@ -249,7 +255,7 @@ export default function Navbar() {
                     background: active ? "#F1F5F9" : "transparent",
                   }}
                 >
-                  {label}
+                  {t(key)}
                 </Link>
               );
             })}
@@ -274,8 +280,8 @@ export default function Navbar() {
                   }}
                 >
                   {currentUser?.full_name
-                    ? `${currentUser.full_name.split(" ")[0]} · Кабинет`
-                    : "Личный кабинет"}
+                    ? `${currentUser.full_name.split(" ")[0]} · ${t("cabinet")}`
+                    : t("personalCabinet")}
                 </Link>
               ) : (
                 <>
@@ -293,7 +299,7 @@ export default function Navbar() {
                       textDecoration: "none",
                     }}
                   >
-                    Зарегистрироваться
+                    {t("signUp")}
                   </Link>
                   <Link
                     href="/login"
@@ -310,7 +316,7 @@ export default function Navbar() {
                       textDecoration: "none",
                     }}
                   >
-                    Войти
+                    {t("login")}
                   </Link>
                 </>
               )}

@@ -1,0 +1,346 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { intlLocale } from "@/i18n/runtime";
+
+import {
+  deleteCarrierAPICredentials,
+  getAdminCarrier,
+  getCarrierAPICredentials,
+  testCarrierAPIConnection,
+  upsertCarrierAPICredentials,
+  type CarrierAPICredentials,
+} from "@/lib/api/admin";
+import type { AdminCarrierDetail } from "@/types/admin";
+
+const CARRIER_DEFAULTS: Record<string, { api_url: string; extra_config: Record<string, unknown>; hint: string; no_token?: boolean }> = {
+  azimuth: {
+    api_url: "https://api.azimuthcargo.kz",
+    // payer_tin здесь больше НЕ нужен - бэк берёт ИИН/БИН из карточки
+    // отправителя в заказе (профиль клиента). Можно добавить ключом опционально
+    // как fallback для старых заказов без tax_id, но по умолчанию не показываем,
+    // чтобы админ не думал что его нужно заполнять на каждого перевозчика.
+    extra_config: { payment_type: 2, payer: 1 },
+    // hint - ключ перевода admin.api.hints.<…>
+    hint: "hints.azimuth",
+  },
+  exline: {
+    api_url: "https://home.courierexe.ru/api/",
+    extra_config: { extra: "", login: "", password: "" },
+    hint: "hints.exline",
+    no_token: true,
+  },
+  cse: {
+    api_url: "http://web.cse.ru/1c/ws/Web1C.1cws",
+    extra_config: { login: "", password: "" },
+    hint: "hints.cse",
+    no_token: true,
+  },
+};
+
+const FALLBACK_DEFAULTS = { api_url: "", extra_config: {}, hint: "hints.generic" };
+
+function getCarrierDefaults(code: string) {
+  return CARRIER_DEFAULTS[code.toLowerCase()] ?? FALLBACK_DEFAULTS;
+}
+
+const inp: React.CSSProperties = {
+  border: "1px solid #E2E8EE",
+  borderRadius: 8,
+  padding: "8px 12px",
+  fontSize: 13,
+  width: "100%",
+  boxSizing: "border-box",
+  fontFamily: "inherit",
+  outline: "none",
+  background: "#f8fafc",
+  color: "#0B2545",
+};
+
+const label: React.CSSProperties = {
+  display: "block",
+  fontSize: 12,
+  fontWeight: 600,
+  color: "#64748b",
+  marginBottom: 6,
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+};
+
+export default function CarrierAPIPage() {
+  const t = useTranslations("admin.api");
+  const params = useParams();
+  const carrierId = Number(params.id);
+
+  const [carrier, setCarrier] = useState<AdminCarrierDetail | null>(null);
+  const [creds, setCreds] = useState<CarrierAPICredentials | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const [form, setForm] = useState({
+    api_url: "",
+    api_token: "",
+    is_active: true,
+    extra_config_str: "{}",
+  });
+  const [configError, setConfigError] = useState<string | null>(null);
+
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    getAdminCarrier(carrierId)
+      .then((c) => {
+        setCarrier(c);
+        const defaults = getCarrierDefaults(c.code);
+        return getCarrierAPICredentials(c.code)
+          .then((saved) => {
+            setCreds(saved);
+            setForm({
+              api_url: saved.api_url,
+              api_token: "",
+              is_active: saved.is_active,
+              extra_config_str: JSON.stringify(saved.extra_config ?? defaults.extra_config, null, 2),
+            });
+          })
+          .catch(() => {
+            setForm({
+              api_url: defaults.api_url,
+              api_token: "",
+              is_active: true,
+              extra_config_str: JSON.stringify(defaults.extra_config, null, 2),
+            });
+          });
+      })
+      .finally(() => setLoading(false));
+  }, [carrierId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function validateConfig(): Record<string, unknown> | null {
+    try {
+      const parsed = JSON.parse(form.extra_config_str);
+      setConfigError(null);
+      return parsed;
+    } catch {
+      setConfigError(t("badJson"));
+      return null;
+    }
+  }
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    const extra = validateConfig();
+    if (extra === null) return;
+    if (!carrier) return;
+
+    setSaving(true);
+    setSaveMsg(null);
+    try {
+      const saved = await upsertCarrierAPICredentials(carrier.code, {
+        carrier_code: carrier.code,
+        api_url: form.api_url.trim(),
+        api_token: form.api_token.trim(),  // "" is valid - backend re-encrypts with current key
+        is_active: form.is_active,
+        extra_config: extra,
+      });
+      setCreds(saved);
+      setForm((f) => ({ ...f, api_token: "" }));
+      setSaveMsg(`✓ ${t("saved")}`);
+    } catch (err: unknown) {
+      setSaveMsg(`✗ ${t("error", { error: (err as Error).message })}`);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleTest() {
+    if (!carrier) return;
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const r = await testCarrierAPIConnection(carrier.code);
+      setTestResult(r);
+    } catch (err: unknown) {
+      setTestResult({ ok: false, message: (err as Error).message });
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!carrier || !confirm(t("deleteConfirm"))) return;
+    setDeleting(true);
+    try {
+      await deleteCarrierAPICredentials(carrier.code);
+      setCreds(null);
+      const defaults = getCarrierDefaults(carrier.code);
+      setForm({ api_url: defaults.api_url, api_token: "", is_active: true, extra_config_str: JSON.stringify(defaults.extra_config, null, 2) });
+      setSaveMsg(`✓ ${t("deleted")}`);
+    } catch (err: unknown) {
+      setSaveMsg(`✗ ${t("error", { error: (err as Error).message })}`);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  if (loading) return <div style={{ padding: 48, textAlign: "center", color: "#64748b" }}>{t("loading")}</div>;
+  if (!carrier) return null;
+
+  const dispatchBadge = creds?.is_active
+    ? { label: t("badgeActive"), bg: "#dcfce7", color: "#166534" }
+    : creds
+    ? { label: t("badgeDisabled"), bg: "#fef3c7", color: "#92400e" }
+    : { label: t("badgeWebhook"), bg: "#f1f5f9", color: "#475569" };
+
+  return (
+    <>
+      <div style={{ marginBottom: 20 }}>
+        <span style={{ padding: "4px 12px", borderRadius: 999, fontSize: 12, fontWeight: 700, background: dispatchBadge.bg, color: dispatchBadge.color }}>
+          {dispatchBadge.label}
+        </span>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 20, alignItems: "start" }}>
+        {/* Main form */}
+        <form onSubmit={handleSave} style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 16, padding: "24px 28px" }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#0B2545", marginBottom: 20 }}>
+            {creds ? t("updateTitle") : t("setupTitle")}
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <label style={label}>API URL</label>
+            <input
+              style={inp}
+              value={form.api_url}
+              onChange={(e) => setForm((f) => ({ ...f, api_url: e.target.value }))}
+              placeholder={carrier ? getCarrierDefaults(carrier.code).api_url : "https://"}
+              required
+            />
+          </div>
+
+          {!getCarrierDefaults(carrier.code).no_token && (
+            <div style={{ marginBottom: 16 }}>
+              <label style={label}>{t("token")}</label>
+              <input
+                style={inp}
+                type="password"
+                value={form.api_token}
+                onChange={(e) => setForm((f) => ({ ...f, api_token: e.target.value }))}
+                placeholder={creds ? t("tokenCurrent", { token: creds.api_token_masked }) : t("tokenPlaceholder")}
+                autoComplete="off"
+              />
+              {creds && (
+                <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
+                  {t("tokenSaved")} <span style={{ fontFamily: "monospace" }}>{creds.api_token_masked}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div style={{ marginBottom: 16 }}>
+            <label style={label}>{t("extra")}</label>
+            <textarea
+              style={{ ...inp, minHeight: 130, resize: "vertical", fontFamily: "monospace", fontSize: 12 }}
+              value={form.extra_config_str}
+              onChange={(e) => { setForm((f) => ({ ...f, extra_config_str: e.target.value })); setConfigError(null); }}
+              spellCheck={false}
+            />
+            {configError && <div style={{ fontSize: 12, color: "#dc2626", marginTop: 4 }}>{configError}</div>}
+            <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
+              {t(carrier ? getCarrierDefaults(carrier.code).hint : "hints.generic")}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
+            <input
+              type="checkbox"
+              id="is_active"
+              checked={form.is_active}
+              onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))}
+              style={{ width: 16, height: 16, cursor: "pointer" }}
+            />
+            <label htmlFor="is_active" style={{ fontSize: 13, color: "#0B2545", cursor: "pointer", fontWeight: 500 }}>
+              {t("activeCheckbox")}
+            </label>
+          </div>
+
+          {saveMsg && (
+            <div style={{ padding: "10px 14px", borderRadius: 8, marginBottom: 16, fontSize: 13, background: saveMsg.startsWith("✗") ? "#fef2f2" : "#f0fdf4", color: saveMsg.startsWith("✗") ? "#b91c1c" : "#166534" }}>
+              {saveMsg}
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              type="submit"
+              disabled={saving}
+              style={{ padding: "10px 24px", borderRadius: 10, border: "none", background: "#0B2545", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+            >
+              {saving ? t("saving") : creds ? t("update") : t("save")}
+            </button>
+            {creds && (
+              <button
+                type="button"
+                onClick={() => void handleDelete()}
+                disabled={deleting}
+                style={{ padding: "10px 16px", borderRadius: 10, border: "1px solid #fecaca", background: "#fff", color: "#dc2626", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+              >
+                {deleting ? "…" : t("delete")}
+              </button>
+            )}
+          </div>
+        </form>
+
+        {/* Right panel: test + info */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* Test connection */}
+          <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 16, padding: "20px 22px" }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#0B2545", marginBottom: 12 }}>{t("testTitle")}</div>
+            <p style={{ fontSize: 13, color: "#64748b", marginTop: 0, marginBottom: 14 }}>
+              {t("testHint")}
+            </p>
+            <button
+              onClick={() => void handleTest()}
+              disabled={testing || !creds}
+              style={{ width: "100%", padding: "10px", borderRadius: 10, border: "1px solid #E2E8EE", background: creds ? "#f8fafc" : "#f1f5f9", color: creds ? "#0B2545" : "#94a3b8", fontSize: 13, fontWeight: 600, cursor: creds ? "pointer" : "not-allowed", fontFamily: "inherit" }}
+            >
+              {testing ? t("testing") : t("testSubmit")}
+            </button>
+            {testResult && (
+              <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: 8, fontSize: 13, background: testResult.ok ? "#f0fdf4" : "#fef2f2", color: testResult.ok ? "#166534" : "#b91c1c" }}>
+                {testResult.ok ? "✓ " : "✗ "}{testResult.message}
+              </div>
+            )}
+          </div>
+
+          {/* How it works */}
+          <div style={{ background: "#f8fafc", border: "1px solid #E2E8EE", borderRadius: 16, padding: "18px 20px" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#0B2545", marginBottom: 10 }}>{t("howTitle")}</div>
+            <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "#475569", lineHeight: 1.7 }}>
+              <li>{t("how1")}</li>
+              <li>{t("how2")}</li>
+              <li>{t("how3")}</li>
+              <li>{t("how4")}</li>
+              <li>{t("how5")}</li>
+            </ol>
+          </div>
+
+          {/* Current status */}
+          {creds && (
+            <div style={{ background: "#fff", border: "1px solid #E2E8EE", borderRadius: 16, padding: "18px 20px" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#0B2545", marginBottom: 10 }}>{t("current")}</div>
+              <div style={{ fontSize: 12, color: "#64748b", display: "grid", gap: 6 }}>
+                <div><span style={{ color: "#94a3b8" }}>URL:</span> <span style={{ fontFamily: "monospace", color: "#0B2545" }}>{creds.api_url}</span></div>
+                <div><span style={{ color: "#94a3b8" }}>{t("tokenLabel")}</span> <span style={{ fontFamily: "monospace", color: "#0B2545" }}>{creds.api_token_masked}</span></div>
+                <div><span style={{ color: "#94a3b8" }}>{t("updatedLabel")}</span> {new Date(creds.updated_at).toLocaleString(intlLocale())}</div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}

@@ -10,7 +10,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { usePathname, useRouter } from "next/navigation";
 
 import {
   clearAuthSession,
@@ -20,6 +19,8 @@ import {
 } from "@/lib/auth/session";
 import { fetchProfileQuietly, fetchProfileResult, logoutUser } from "@/lib/api/auth";
 import type { ProfileResponse } from "@/types/auth";
+import { useTranslations } from "next-intl";
+import { usePathname, useRouter } from "@/i18n/navigation";
 
 type AuthContextValue = {
   currentUser: ProfileResponse | null;
@@ -227,6 +228,7 @@ export function RequireAuth({
   const router = useRouter();
   const pathname = usePathname();
   const { isAuthenticated, isLoading } = useAuth();
+  const t = useTranslations("common");
 
   useEffect(() => {
     if (isLoading || isAuthenticated) {
@@ -251,7 +253,7 @@ export function RequireAuth({
               "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
           }}
         >
-          Проверяем сессию...
+          {t("checkingSession")}
         </div>
       )
     );

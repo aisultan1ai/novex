@@ -91,6 +91,7 @@ def _deliver(db: Session, job: NotificationJob, payload: dict) -> None:
         user_name=user.full_name,
         reject_reason=payload.get("reject_reason"),
         tracking_number=payload.get("tracking_number"),
+        locale=user.locale or "ru",
     )
     if result is None:
         return

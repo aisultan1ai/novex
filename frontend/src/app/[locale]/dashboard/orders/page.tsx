@@ -1,0 +1,367 @@
+"use client";
+
+import type { CSSProperties } from "react";
+import { Suspense, memo, useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
+
+import { useAuth } from "@/components/providers/auth-provider";
+import { useIsMobile } from "@/hooks/use-is-mobile";
+import { ApiError, listOrders } from "@/lib/api/orders";
+import { cityLabel } from "@/lib/cities";
+import { orderStatusColors, useOrderStatusLabel } from "@/lib/status-labels";
+import type { OrderDraftResponse } from "@/types/order";
+import { Link, useRouter } from "@/i18n/navigation";
+import { intlLocale } from "@/i18n/runtime";
+
+const FILTER_GROUPS: Record<string, string[]> = {
+  all: [],
+  active: [
+    "draft", "shipment_details_completed", "ready_for_checkout",
+    "awaiting_payment", "payment_under_review", "payment_rejected",
+    "dispatch_queued", "dispatch_failed", "pending_manual", "pending_manual_dispatch",
+    "sent_to_carrier", "picked_up", "in_transit", "out_for_delivery",
+    "arrived", "delivery_failed", "customs_hold",
+  ],
+  completed: ["delivered", "paid"],
+  cancelled: ["cancelled", "return_requested", "return_in_progress", "returned"],
+};
+
+// Значения - ключи перевода dashboard.orders.filters.<key>.
+const FILTER_LABELS: Record<string, string> = {
+  all:       "all",
+  active:    "active",
+  completed: "completed",
+  cancelled: "cancelled",
+};
+
+function CancelPendingBadge() {
+  const t = useTranslations("dashboard.orders");
+  return (
+    <span
+      title={t("cancelPendingTitle")}
+      style={{
+        display: "inline-flex", alignItems: "center", padding: "2px 8px",
+        borderRadius: 999, background: "#fef3c7", color: "#92400e",
+        fontSize: 11, fontWeight: 700, letterSpacing: "0.02em",
+      }}
+    >
+      {t("cancelPending")}
+    </span>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const colors = orderStatusColors(status);
+  const orderStatusLabel = useOrderStatusLabel();
+  return (
+    <span style={{ display: "inline-block", padding: "4px 12px", borderRadius: 999, fontSize: 12, fontWeight: 600, lineHeight: 1.35, background: colors.bg, color: colors.color, maxWidth: "100%", whiteSpace: "normal", wordBreak: "break-word" }}>
+      {orderStatusLabel(status)}
+    </span>
+  );
+}
+
+function parseUTC(iso: string): Date {
+  return new Date(/[Z+]/.test(iso) ? iso : iso + "Z");
+}
+
+function formatDate(isoString: string): string {
+  return parseUTC(isoString).toLocaleDateString(intlLocale(), { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function formatPrice(price: number, currency: string): string {
+  return `${new Intl.NumberFormat(intlLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(price)} ${currency}`;
+}
+
+function IconTruck() {
+  return (
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 12 }}>
+      <rect x="1" y="3" width="15" height="13" rx="2" />
+      <path d="M16 8h4l3 6v3h-7V8z" />
+      <circle cx="5.5" cy="18.5" r="2.5" />
+      <circle cx="18.5" cy="18.5" r="2.5" />
+    </svg>
+  );
+}
+
+const cardStyle: CSSProperties = {
+  border: "1px solid #E2E8EE",
+  borderRadius: 16,
+  background: "#ffffff",
+  overflow: "hidden",
+};
+
+// Row components extracted + memoised so toggling top-level state (filter,
+// auth, etc.) does not re-render every row when the underlying order object
+// has not changed.
+type OrderRowProps = { order: OrderDraftResponse; isLast: boolean; onOpen: (id: number) => void };
+
+const MobileOrderCard = memo(function MobileOrderCard({ order, onOpen }: OrderRowProps) {
+  const t = useTranslations("dashboard.orders");
+  const locale = useLocale();
+  return (
+    <div
+      onClick={() => onOpen(order.draft_id)}
+      style={{ ...cardStyle, padding: "16px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 10 }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#0E1826", marginBottom: 2 }}>
+            {cityLabel(order.from_city_snapshot, locale)} → {cityLabel(order.to_city_snapshot, locale)}
+          </div>
+          <div style={{ fontSize: 12, color: "#94a3b8" }}>
+            #{order.draft_id} · {formatDate(order.created_at)}
+          </div>
+        </div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 2 }}>
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+          <StatusBadge status={order.status} />
+          {order.cancellation_request?.status === "pending" && <CancelPendingBadge />}
+        </div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#0E1826" }}>
+          {formatPrice(order.price_snapshot, order.currency_snapshot)}
+        </div>
+      </div>
+
+      <div style={{ fontSize: 12, color: "#64748b" }}>
+        {order.carrier_name_snapshot} · {order.tariff_name_snapshot} · {t("days", { min: order.eta_days_min_snapshot, max: order.eta_days_max_snapshot })}
+      </div>
+    </div>
+  );
+});
+
+const DesktopOrderRow = memo(function DesktopOrderRow({ order, isLast, onOpen }: OrderRowProps) {
+  const t = useTranslations("dashboard.orders");
+  const locale = useLocale();
+  return (
+    <div
+      onClick={() => onOpen(order.draft_id)}
+      style={{ display: "grid", gridTemplateColumns: "100px 1fr 170px 180px 130px 32px", gap: 12, padding: "16px 24px", borderBottom: isLast ? "none" : "1px solid #f1f5f9", alignItems: "center", cursor: "pointer", transition: "background 0.1s" }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = "#f8fafc"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = ""; }}
+    >
+      <span style={{ fontFamily: "monospace", fontSize: 13, color: "#475569", fontWeight: 600 }}>
+        #{order.draft_id}
+      </span>
+
+      <div>
+        <div style={{ fontSize: 14, fontWeight: 600, color: "#0E1826", marginBottom: 3 }}>
+          {order.to_city_snapshot ? cityLabel(order.to_city_snapshot, locale) : "-"}
+        </div>
+        <div style={{ fontSize: 12, color: "#94a3b8" }}>
+          {cityLabel(order.from_city_snapshot, locale)} → {cityLabel(order.to_city_snapshot, locale)} · {formatDate(order.created_at)}
+        </div>
+      </div>
+
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 500, color: "#0E1826", marginBottom: 3 }}>
+          {order.carrier_name_snapshot}
+        </div>
+        <div style={{ fontSize: 12, color: "#94a3b8" }}>
+          {order.tariff_name_snapshot} · {t("days", { min: order.eta_days_min_snapshot, max: order.eta_days_max_snapshot })}
+        </div>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-start" }}>
+        <StatusBadge status={order.status} />
+        {order.cancellation_request?.status === "pending" && <CancelPendingBadge />}
+      </div>
+
+      <div style={{ fontSize: 14, fontWeight: 700, color: "#0E1826" }}>
+        {formatPrice(order.price_snapshot, order.currency_snapshot)}
+      </div>
+
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="9 18 15 12 9 6" />
+      </svg>
+    </div>
+  );
+});
+
+function MyOrdersPageInner() {
+  const t = useTranslations("dashboard.orders");
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const isMobile = useIsMobile();
+
+  const justPaid = useMemo(() => searchParams.get("paid") === "1", [searchParams]);
+
+  const [orders, setOrders] = useState<OrderDraftResponse[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState<string>("all");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const PAGE_SIZE = 20;
+
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) router.push("/login");
+  }, [isAuthenticated, authLoading, router]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    setIsLoading(true);
+    async function fetchOrders() {
+      try {
+        // Фильтр по статусам передаём на бэк, чтобы total и pages были
+        // согласованы с тем, что видит пользователь на текущей вкладке.
+        const statuses = FILTER_GROUPS[activeFilter];
+        const data = await listOrders(
+          page,
+          PAGE_SIZE,
+          statuses.length > 0 ? statuses : undefined,
+        );
+        setOrders(data.items);
+        setTotal(data.total);
+      } catch (err) {
+        setError(err instanceof ApiError ? err.detail : t("loadFailed"));
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    void fetchOrders();
+  }, [isAuthenticated, page, activeFilter]);
+
+  // Filter switching resets to page 1 so users don't land on an empty page
+  // when they had paginated deep into "all" and then narrow the view.
+  useEffect(() => {
+    setPage(1);
+  }, [activeFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  // Stable identity so React.memo'd row components can skip re-render when
+  // the filter or auth state changes without affecting a given order.
+  const openOrder = useCallback(
+    (draftId: number) => router.push(`/dashboard/orders/${draftId}`),
+    [router],
+  );
+
+  // Фильтрация делается на бэке (см. fetchOrders выше). Здесь просто
+  // отдаём то, что пришло с сервера.
+  const filteredOrders = orders;
+
+  if (authLoading || (!isAuthenticated && !authLoading)) return null;
+
+  return (
+    <>
+      {justPaid && (
+        <div style={{ marginBottom: 20, padding: "14px 20px", background: "#dcfce7", border: "1px solid #86efac", borderRadius: 12, fontSize: 14, fontWeight: 600, color: "#166534", display: "flex", alignItems: "center", gap: 10 }}>
+          {t("justPaid")}
+        </div>
+      )}
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
+        <h1 style={{ margin: 0, fontSize: isMobile ? 22 : 28, fontWeight: 800, color: "#0E1826" }}>{t("title")}</h1>
+        <Link
+          href="/"
+          style={{ background: "#0B2545", color: "#ffffff", borderRadius: 10, padding: "10px 20px", fontSize: 14, fontWeight: 600, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}
+        >
+          {t("newDelivery")}
+        </Link>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+        {Object.entries(FILTER_LABELS).map(([key, label]) => {
+          const active = activeFilter === key;
+          return (
+            <button
+              key={key}
+              onClick={() => setActiveFilter(key)}
+              style={{ padding: "6px 16px", borderRadius: 999, border: active ? "none" : "1px solid #E2E8EE", background: active ? "#0B2545" : "#ffffff", color: active ? "#ffffff" : "#5F6E7E", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+            >
+              {t(`filters.${label}`)}
+            </button>
+          );
+        })}
+      </div>
+
+      {isLoading ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <style>{`@keyframes skeleton-pulse { 0%,100%{opacity:1} 50%{opacity:.4} }`}</style>
+          {[1, 2, 3].map((i) => (
+            <div key={i} style={{ ...cardStyle, padding: "20px 24px", animation: "skeleton-pulse 1.5s ease infinite", animationDelay: `${i * 0.15}s` }}>
+              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                <div style={{ width: 80, height: 16, borderRadius: 6, background: "#E2E8EE", flexShrink: 0 }} />
+                <div style={{ flex: 1, height: 16, borderRadius: 6, background: "#E2E8EE" }} />
+                <div style={{ width: 90, height: 24, borderRadius: 999, background: "#E2E8EE", flexShrink: 0 }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : error ? (
+        <div style={{ ...cardStyle, border: "1px solid #fecaca", background: "#fef2f2", color: "#b91c1c", padding: "20px 24px", fontSize: 14 }}>
+          {error}
+        </div>
+      ) : filteredOrders.length === 0 ? (
+        <div style={{ ...cardStyle, padding: "64px 24px", textAlign: "center" }}>
+          <IconTruck />
+          <p style={{ fontSize: 16, fontWeight: 700, margin: "0 0 8px", color: "#0E1826" }}>
+            {activeFilter === "all" ? t("emptyAll") : t("emptyFiltered")}
+          </p>
+          <p style={{ margin: "0 0 24px", fontSize: 14, color: "#64748b" }}>{t("emptyHint")}</p>
+          <Link href="/" style={{ background: "#0B2545", color: "#ffffff", borderRadius: 10, padding: "10px 20px", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
+            {t("calculate")}
+          </Link>
+        </div>
+      ) : isMobile ? (
+        /* ── Mobile: card list ── */
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {filteredOrders.map((order, idx) => (
+            <MobileOrderCard
+              key={order.draft_id}
+              order={order}
+              isLast={idx === filteredOrders.length - 1}
+              onOpen={openOrder}
+            />
+          ))}
+        </div>
+      ) : (
+        /* ── Desktop: table ── */
+        <div style={cardStyle}>
+          <div style={{ display: "grid", gridTemplateColumns: "100px 1fr 170px 180px 130px 32px", gap: 12, padding: "12px 24px", background: "#f8fafc", borderBottom: "1px solid #E2E8EE", fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", alignItems: "center" }}>
+            <span>{t("cols.ref")}</span>
+            <span>{t("cols.recipient")}</span>
+            <span>{t("cols.carrier")}</span>
+            <span>{t("cols.status")}</span>
+            <span>{t("cols.payment")}</span>
+            <span />
+          </div>
+
+          {filteredOrders.map((order, idx) => (
+            <DesktopOrderRow
+              key={order.draft_id}
+              order={order}
+              isLast={idx === filteredOrders.length - 1}
+              onOpen={openOrder}
+            />
+          ))}
+        </div>
+      )}
+
+      {!isLoading && !error && totalPages > 1 && (
+        <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 24, flexWrap: "wrap" }}>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+            <button
+              key={p}
+              onClick={() => setPage(p)}
+              style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid #E2E8EE", background: p === page ? "#0B2545" : "#ffffff", color: p === page ? "#ffffff" : "#0B2545", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+export default function MyOrdersPage() {
+  return <Suspense><MyOrdersPageInner /></Suspense>;
+}

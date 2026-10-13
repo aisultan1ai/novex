@@ -1,6 +1,16 @@
 import type { MetadataRoute } from "next";
+import { SITE_URL } from "@/i18n/seo";
 
-const SITE_URL = "https://novex.kz";
+// Закрытые разделы - для обеих языковых версий (/... и /kz/...).
+const PRIVATE = [
+  "/dashboard/",
+  "/checkout/",
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+  "/verify-email",
+];
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -8,16 +18,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: [
-          "/api/",
-          "/dashboard/",
-          "/checkout/",
-          "/login",
-          "/register",
-          "/forgot-password",
-          "/reset-password",
-          "/verify-email",
-        ],
+        disallow: ["/api/", ...PRIVATE, ...PRIVATE.map((p) => `/kz${p}`)],
       },
     ],
     sitemap: `${SITE_URL}/sitemap.xml`,

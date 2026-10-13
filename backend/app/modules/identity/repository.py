@@ -61,6 +61,7 @@ class IdentityRepository:
         full_name: str | None,
         phone: str | None,
         role: Role,
+        locale: str = "ru",
     ) -> User:
         user = User(
             email=email,
@@ -69,6 +70,9 @@ class IdentityRepository:
             phone=phone,
             role_id=role.id,
             is_active=True,
+            # Язык писем и уведомлений. Самостоятельная регистрация передаёт
+            # язык страницы; аккаунты, созданные админом, — русский по умолчанию.
+            locale=locale,
         )
         db.add(user)
         db.flush()

@@ -2,7 +2,10 @@
 // Логика по Azimuth (raw description) и защита от дублей «Доставлен/Доставлен»
 // живут ЗДЕСЬ — чтобы у всех трёх ролей поведение совпадало и не расходилось.
 
-import { ORDER_STATUS_LABELS } from "@/lib/status-labels";
+import { useTranslations } from "next-intl";
+
+import { useOrderStatusLabel } from "@/lib/status-labels";
+import { intlLocale } from "@/i18n/runtime";
 
 export interface TrackingEvent {
   status: string;
@@ -31,16 +34,21 @@ const TIMELINE_COLORS: Record<string, { dot: string; line: string }> = {
 // лейбла — для них показываем сырой текст перевозчика (Azimuth просил).
 const RAW_DESCRIPTION_CARRIERS = new Set(["azimuth"]);
 
-function eventLabel(event: TrackingEvent, carrierCode: string | null): string {
+function eventLabel(
+  event: TrackingEvent,
+  carrierCode: string | null,
+  statusLabel: (s: string) => string,
+  fallback: string,
+): string {
   const raw = event.description?.trim();
   if (carrierCode && RAW_DESCRIPTION_CARRIERS.has(carrierCode) && raw) return raw;
-  const normalized = ORDER_STATUS_LABELS[event.status];
-  if (normalized) return normalized;
-  return raw || "Обновление статуса";
+  const normalized = statusLabel(event.status);
+  if (normalized !== event.status) return normalized;
+  return raw || fallback;
 }
 
 function formatDateTime(iso: string) {
-  return new Date(iso).toLocaleString("ru-RU", {
+  return new Date(iso).toLocaleString(intlLocale(), {
     day: "2-digit", month: "short", year: "numeric",
     hour: "2-digit", minute: "2-digit",
   });
@@ -53,13 +61,15 @@ export function TrackingTimeline({
   events: readonly TrackingEvent[];
   carrierCode: string | null;
 }) {
+  const statusLabel = useOrderStatusLabel();
+  const t = useTranslations("tracking");
   if (events.length === 0) return null;
   return (
     <>
       {events.map((event, idx) => {
         const colors = TIMELINE_COLORS[event.status] ?? { dot: "#94a3b8", line: "#E2E8EE" };
         const isLast = idx === events.length - 1;
-        const label = eventLabel(event, carrierCode);
+        const label = eventLabel(event, carrierCode, statusLabel, t("statusUpdate"));
         // subtitle показываем только если description != label — так не
         // получаем дубль вида «Доставлен / Доставлен» (было раньше).
         const subtitle = event.description && event.description.trim() !== label

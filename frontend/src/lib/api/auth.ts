@@ -64,6 +64,14 @@ export async function fetchProfileQuietly(): Promise<ProfileResponse | null> {
   return (await fetchProfileResult()).profile;
 }
 
+/** Запомнить язык интерфейса (ru | kk) — на нём будут приходить письма и уведомления. */
+export async function saveMyLocale(locale: "ru" | "kk"): Promise<void> {
+  await apiRequest<null>("/auth/locale", {
+    method: "PATCH",
+    body: JSON.stringify({ locale }),
+  });
+}
+
 export async function updateProfile(payload: {
   full_name?: string | null;
   phone?: string | null;

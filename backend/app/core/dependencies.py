@@ -90,6 +90,7 @@ def get_current_user(
     return user
 
 
+
 def require_verified_email(current_user: User = Depends(get_current_user)) -> User:
     """Guard for actions that require a confirmed email — placing orders,
     paying, etc. Returns 403 with a machine-readable error code so the

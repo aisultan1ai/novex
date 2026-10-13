@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.common.status_machine import can_transition
+from app.core.i18n import translate
 from app.core.db import get_db
 from app.core.dependencies import get_current_user_id, require_verified_email
 from app.core.exceptions import NotFoundError, ValidationError
@@ -184,7 +185,7 @@ async def upload_payment_proof(
     return {
         "proof_id": proof.id,
         "status": proof.review_status,
-        "message": "Чек загружен. Оплата отправлена на проверку оператором.",
+        "message": translate("Чек загружен. Оплата отправлена на проверку оператором."),
     }
 
 

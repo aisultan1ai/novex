@@ -1,38 +1,49 @@
 "use client";
 
-import Link from "next/link";
-import { useIsMobile } from "@/hooks/use-is-mobile";
-import { CONTACTS, phoneHref } from "@/lib/config/contacts";
+import { useTranslations } from "next-intl";
 
-const FOOTER_COLS = [
+import LocaleSwitcher from "@/components/layout/LocaleSwitcher";
+import { useIsMobile } from "@/hooks/use-is-mobile";
+import { CONTACTS, OFFICE_ADDRESS_IS_DEFAULT, phoneHref } from "@/lib/config/contacts";
+import { Link } from "@/i18n/navigation";
+
+// label — ключ перевода footer.<label>; raw: true — показать label как есть
+// (сами контакты: email, телефон, адрес из .env).
+type FooterLink = { label: string; href: string; raw?: boolean };
+
+const FOOTER_COLS: { title: string; links: FooterLink[] }[] = [
   {
-    title: "Сервис",
+    title: "service",
     links: [
-      { label: "Рассчитать доставку", href: "/" },
-      { label: "Отслеживание", href: "/tracking" },
-      { label: "Партнёрам", href: "/partners" },
+      { label: "calculate", href: "/" },
+      { label: "tracking", href: "/tracking" },
+      { label: "partners", href: "/partners" },
     ],
   },
   {
-    title: "Поддержка",
+    title: "support",
     links: [
-      { label: "Часто задаваемые вопросы", href: "/#help" },
-      { label: "Написать в поддержку", href: `mailto:${CONTACTS.supportEmail}` },
-      { label: "Условия доставки", href: "/terms" },
+      { label: "faq", href: "/#help" },
+      { label: "writeSupport", href: `mailto:${CONTACTS.supportEmail}` },
+      { label: "deliveryTerms", href: "/terms" },
     ],
   },
   {
-    title: "Контакты",
+    title: "contacts",
+    // raw: подпись - сам контакт, а не ключ перевода
     links: [
-      { label: CONTACTS.supportEmail, href: `mailto:${CONTACTS.supportEmail}` },
-      { label: CONTACTS.supportPhone, href: phoneHref(CONTACTS.supportPhone) },
-      { label: CONTACTS.officeAddress, href: "#" },
+      { label: CONTACTS.supportEmail, href: `mailto:${CONTACTS.supportEmail}`, raw: true },
+      { label: CONTACTS.supportPhone, href: phoneHref(CONTACTS.supportPhone), raw: true },
+      OFFICE_ADDRESS_IS_DEFAULT
+        ? { label: "officeAddress", href: "#", raw: false }
+        : { label: CONTACTS.officeAddress, href: "#", raw: true },
     ],
   },
 ];
 
 export default function Footer() {
   const isMobile = useIsMobile();
+  const t = useTranslations("footer");
 
   return (
     <footer
@@ -56,7 +67,7 @@ export default function Footer() {
           <div style={isMobile ? { gridColumn: "1 / -1" } : {}}>
             <Link
               href="/"
-              aria-label="Novex — на главную"
+              aria-label={t("homeAria")}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -95,9 +106,11 @@ export default function Footer() {
                 maxWidth: 260,
               }}
             >
-              Агрегатор курьерских служб Казахстана. Сравниваем тарифы и
-              оформляем доставку в пару кликов.
+              {t("tagline")}
             </p>
+            <div style={{ marginTop: 20 }}>
+              <LocaleSwitcher tone="dark" placement="top" align="left" />
+            </div>
           </div>
 
           {/* Link columns */}
@@ -112,7 +125,7 @@ export default function Footer() {
                   marginBottom: 20,
                 }}
               >
-                {col.title}
+                {t(col.title)}
               </div>
               <ul
                 style={{
@@ -141,7 +154,7 @@ export default function Footer() {
                         (e.currentTarget.style.color = "#94A3B8")
                       }
                     >
-                      {l.label}
+                      {l.raw ? l.label : t(l.label)}
                     </Link>
                   </li>
                 ))}
@@ -169,12 +182,12 @@ export default function Footer() {
               color: "#64748B",
             }}
           >
-            © {new Date().getFullYear()} Novex. Все права защищены.
+            © {new Date().getFullYear()} Novex. {t("rights")}
           </span>
           <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
             {[
-              { label: "Политика конфиденциальности", href: "/privacy" },
-              { label: "Условия использования", href: "/terms" },
+              { label: t("privacy"), href: "/privacy" },
+              { label: t("termsOfUse"), href: "/terms" },
             ].map((l) => (
               <Link
                 key={l.href}

@@ -15,12 +15,13 @@ from sqlalchemy import insert as _sa_insert
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.i18n import Bi, resolve
 from app.core.streams import STREAM_EMAILS, publish
 from app.modules.cancellations.models import CancellationRequest
 from app.modules.carriers.models import Carrier
 from app.modules.identity.models import CarrierProfile, Role, RoleCode, User
 from app.modules.notifications.models import Notification as _Notification
-from app.modules.notifications.repository import NotificationsRepository
+from app.modules.notifications.repository import NotificationsRepository, user_locales
 from app.modules.orders.models import OrderDraft
 from app.modules.shipments.models import Shipment
 
@@ -72,8 +73,11 @@ def notify_cancellation_created(
             db,
             user_ids=carrier_user_ids,
             type="cancellation_incoming",
-            title=f"Клиент запросил отмену заказа #{order.id}",
-            body=f"Причина: {req.reason}",
+            title=Bi(
+                f"Клиент запросил отмену заказа #{order.id}",
+                f"Клиент #{order.id} тапсырыстан бас тартуды сұрады",
+            ),
+            body=Bi(f"Причина: {req.reason}", f"Себебі: {req.reason}"),
             link_url=f"/dashboard/carrier/cancellation-requests/{req.id}",
         )
 
@@ -103,8 +107,14 @@ def notify_cancellation_created(
             db,
             user_id=customer.id,
             type="cancellation_requested",
-            title=f"Заявка на отмену заказа #{order.id} отправлена",
-            body="Ожидаем подтверждение перевозчика. Мы уведомим вас, как только будет решение.",
+            title=Bi(
+                f"Заявка на отмену заказа #{order.id} отправлена",
+                f"#{order.id} тапсырыстан бас тарту өтінімі жіберілді",
+            ),
+            body=Bi(
+                "Ожидаем подтверждение перевозчика. Мы уведомим вас, как только будет решение.",
+                "Тасымалдаушының растауын күтеміз. Шешім шыққанда сізге хабарлаймыз.",
+            ),
             link_url=f"/dashboard/orders/{order.id}",
         )
 
@@ -122,8 +132,14 @@ def notify_cancellation_rejected(db: Session, *, req: CancellationRequest) -> No
         db,
         user_id=req.requested_by_user_id,
         type="cancellation_rejected",
-        title=f"Заявка на отмену заказа #{order.id} отклонена",
-        body=req.carrier_response or "Перевозчик отклонил заявку без комментария.",
+        title=Bi(
+            f"Заявка на отмену заказа #{order.id} отклонена",
+            f"#{order.id} тапсырыстан бас тарту өтінімі қабылданбады",
+        ),
+        body=req.carrier_response or Bi(
+            "Перевозчик отклонил заявку без комментария.",
+            "Тасымалдаушы өтінімді түсініктемесіз қабылдамады.",
+        ),
         link_url=f"/dashboard/orders/{order.id}",
     )
 
@@ -228,20 +244,24 @@ def _bulk_notify(
     *,
     user_ids: list[int],
     type: str,
-    title: str,
-    body: str,
+    title: str | Bi,
+    body: str | Bi,
     link_url: str | None,
 ) -> None:
     if not user_ids:
         return
+    # Bi(ru, kk) → текст на языке каждого получателя (users.locale).
+    locales: dict[int, str] = {}
+    if isinstance(title, Bi) or isinstance(body, Bi):
+        locales = user_locales(db, user_ids)
     db.execute(
         _sa_insert(_Notification),
         [
             {
                 "user_id": uid,
                 "type": type,
-                "title": title,
-                "body": body,
+                "title": resolve(title, locales.get(uid)),
+                "body": resolve(body, locales.get(uid)),
                 "link_url": link_url,
                 "is_read": False,
             }

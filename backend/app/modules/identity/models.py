@@ -72,6 +72,12 @@ class User(Base, TimestampMixin):
     # (KZ «О персональных данных и их защите»). NULL for accounts created
     # before the consent checkbox existed.
     pd_consent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Язык интерфейса пользователя ("ru" | "kk"). Обновляется автоматически по
+    # заголовку X-Locale (см. core.dependencies.get_current_user) и используется
+    # для писем и уведомлений, которые отправляются вне HTTP-запроса.
+    locale: Mapped[str] = mapped_column(
+        String(2), nullable=False, default="ru", server_default="ru"
+    )
 
     role_id: Mapped[int] = mapped_column(ForeignKey("roles.id"), nullable=False)
 

@@ -134,6 +134,10 @@ h1, h2, h3,
   50%       { opacity: 0.4; }
 }
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* ─── Utility classes ────────────────────────────────────────────────────── */
 .animate-fade-in-up {
   animation: fadeInUp 0.25s ease both;
@@ -154,6 +158,15 @@ h1, h2, h3,
   animation: shimmer 1.4s infinite;
   border-radius: var(--radius-sm);
 }
+
+/* Скелетоны появляются каскадом, как карточки результатов. Задержка общая для
+   обеих анимаций, поэтому и волна shimmer идёт по карточкам по очереди. */
+.skeleton-group > .skeleton {
+  animation: fadeIn 0.25s ease both, shimmer 1.4s infinite;
+}
+.skeleton-group > .skeleton:nth-child(2) { animation-delay: 0.10s; }
+.skeleton-group > .skeleton:nth-child(3) { animation-delay: 0.20s; }
+.skeleton-group > .skeleton:nth-child(4) { animation-delay: 0.30s; }
 
 /* Уважаем системную настройку — тихо, без анимаций */
 @media (prefers-reduced-motion: reduce) {

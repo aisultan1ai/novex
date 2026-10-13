@@ -7,6 +7,7 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
+from app.core.i18n import translate
 from app.core.config import get_settings
 from app.core.email import send_email
 from app.core.limiter import limiter
@@ -138,4 +139,4 @@ def submit_partner_application(
         "partners.apply: accepted company=%s email=%s integration=%s",
         payload.company_name, payload.email, payload.integration_type,
     )
-    return {"ok": True, "message": "Заявка принята"}
+    return {"ok": True, "message": translate("Заявка принята")}

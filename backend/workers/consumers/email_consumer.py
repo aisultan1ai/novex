@@ -96,11 +96,13 @@ def _process(data: dict) -> None:
         with SessionLocal() as db:
             recipient: str | None = to_email_override
             user_name: str | None = None
+            locale = "ru"
             if not recipient:
                 user = db.get(User, user_id) if user_id else None
                 if user and user.email:
                     recipient = user.email
                     user_name = user.full_name
+                    locale = user.locale or "ru"
             if not recipient:
                 logger.warning(
                     "Email consumer: cancellation event %s without recipient (user_id=%d, override=%r), skipping",
@@ -109,7 +111,7 @@ def _process(data: dict) -> None:
                 return
 
             rendered = cancellation_email(
-                event_type, order_id, payload, user_name=user_name
+                event_type, order_id, payload, user_name=user_name, locale=locale
             )
             if rendered is None:
                 return
@@ -134,6 +136,7 @@ def _process(data: dict) -> None:
             user_name=user.full_name,
             reject_reason=payload.get("reject_reason"),
             tracking_number=payload.get("tracking_number"),
+            locale=user.locale or "ru",
         )
         if rendered is None:
             return

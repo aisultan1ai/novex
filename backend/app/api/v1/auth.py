@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, Request, Response
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.db import get_db
-from app.core.dependencies import get_current_user_id
+from app.core.dependencies import get_current_user, get_current_user_id
 from app.core.limiter import limiter
 from app.core.security import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
@@ -16,6 +19,7 @@ from app.core.security import (
     get_token_version,
     revoke_refresh_token,
 )
+from app.modules.identity.models import User
 from app.modules.identity.schemas import (
     ForgotPasswordRequest,
     LoginRequest,
@@ -186,6 +190,24 @@ def get_my_profile(
     db: Session = Depends(get_db),
 ) -> ProfileResponse:
     return identity_service.get_profile(db, current_user_id)
+
+
+class LocaleUpdateRequest(BaseModel):
+    locale: Literal["ru", "kk"]
+
+
+@router.patch(
+    "/locale",
+    status_code=204,
+    summary="Сохранить язык интерфейса (для писем и уведомлений)",
+)
+def update_my_locale(
+    payload: LocaleUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    identity_service.set_locale(db, current_user, payload.locale)
+    return Response(status_code=204)
 
 
 @router.patch(

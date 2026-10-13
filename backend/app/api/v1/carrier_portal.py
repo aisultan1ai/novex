@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Reques
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.i18n import Bi, translate
 from app.core.db import get_db
 from app.core.dependencies import get_current_carrier_id, require_carrier
 from app.core.excel import MAX_EXPORT_ROWS, build_xlsx_response, fmt_dt
@@ -714,12 +715,15 @@ def accept_order(
         db,
         user_id=order.user_id,
         type="order_status",
-        title="Заказ принят перевозчиком",
-        body=f"Заказ #{order.id} принят перевозчиком {carrier.name} и готовится к отправке.",
+        title=Bi("Заказ принят перевозчиком", "Тапсырысты тасымалдаушы қабылдады"),
+        body=Bi(
+            f"Заказ #{order.id} принят перевозчиком {carrier.name} и готовится к отправке.",
+            f"#{order.id} тапсырысты {carrier.name} тасымалдаушысы қабылдады, ол жөнелтуге дайындалуда.",
+        ),
     )
 
     db.commit()
-    return {"order_id": order.id, "status": order.status, "message": "Заказ принят"}
+    return {"order_id": order.id, "status": order.status, "message": translate("Заказ принят")}
 
 
 @router.post("/orders/{order_id}/reject", summary="Отклонить заказ")
@@ -774,7 +778,7 @@ def reject_order(
         )
 
     db.commit()
-    return {"order_id": order.id, "status": order.status, "message": "Заказ отклонён, администраторы уведомлены"}
+    return {"order_id": order.id, "status": order.status, "message": translate("Заказ отклонён, администраторы уведомлены")}
 
 
 @router.post("/orders/{order_id}/pod", summary="Загрузить подтверждение доставки (POD)")
@@ -850,8 +854,11 @@ async def upload_pod(
             db,
             user_id=order.user_id,
             type="order_status",
-            title="Заказ доставлен",
-            body=f"Заказ #{order.id} доставлен. Подтверждение доставки прикреплено.",
+            title=Bi("Заказ доставлен", "Тапсырыс жеткізілді"),
+            body=Bi(
+                f"Заказ #{order.id} доставлен. Подтверждение доставки прикреплено.",
+                f"#{order.id} тапсырыс жеткізілді. Жеткізуді растау тіркелген.",
+            ),
         )
 
     db.commit()
@@ -861,7 +868,7 @@ async def upload_pod(
         "file_url": doc.file_url,
         "file_name": doc.file_name,
         "order_status": order.status,
-        "message": "Подтверждение доставки загружено",
+        "message": translate("Подтверждение доставки загружено"),
     }
 
 

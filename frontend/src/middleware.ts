@@ -1,16 +1,10 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import createIntlMiddleware from "next-intl/middleware";
 
-function decodeJwtPayload(token: string): Record<string, unknown> | null {
-  try {
-    const part = token.split(".")[1];
-    if (!part) return null;
-    const decoded = atob(part.replace(/-/g, "+").replace(/_/g, "/"));
-    return JSON.parse(decoded) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
+import { localePrefix, routing, splitLocalePath } from "@/i18n/routing";
+
+const intlMiddleware = createIntlMiddleware(routing);
 
 function isSafeNext(raw: string, base: string): boolean {
   if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return false;
@@ -22,8 +16,6 @@ function isSafeNext(raw: string, base: string): boolean {
     return false;
   }
 }
-
-const ADMIN_ROLES = new Set(["admin", "operator"]);
 
 const PUBLIC_PATHS = [
   "/login",
@@ -43,49 +35,33 @@ const PUBLIC_PATHS = [
   "/favicon",
 ];
 
+// Админка открывается на основном домене по /dashboard/admin; роль проверяет
+// AdminShell по профилю, а данные защищает бэкенд (JWT с подписью). Отдельного
+// поддомена admin.* нет, поэтому роль из токена здесь не читается.
 export function middleware(req: NextRequest) {
-  const host = req.headers.get("host") ?? "";
-  const { pathname } = req.nextUrl;
-
-  const isLocal = host.includes("localhost") || host.includes("127.0.0.1");
-
-  // ── Subdomain routing (production only) ──────────────────────────────────
-  if (!isLocal) {
-    const isAdminDomain = host.startsWith("admin.");
-    const mainDomain = isAdminDomain ? host.slice("admin.".length) : host;
-
-    if (isAdminDomain) {
-      const token = req.cookies.get("access_token")?.value;
-      if (!token) {
-        return NextResponse.redirect(new URL(`https://${mainDomain}/login`));
-      }
-      const payload = decodeJwtPayload(token);
-      const role = payload?.role as string | undefined;
-      if (!role || !ADMIN_ROLES.has(role)) {
-        return NextResponse.redirect(new URL(`https://${mainDomain}/dashboard/orders`));
-      }
-      if (pathname === "/") {
-        return NextResponse.redirect(new URL("/admin/dashboard", req.url));
-      }
-      return NextResponse.next();
-    }
-
-    if (pathname.startsWith("/admin")) {
-      return NextResponse.redirect(new URL("/", req.url));
-    }
+  // API-прокси (rewrites в next.config) и внутренности Next - без локализации,
+  // иначе next-intl переписал бы /api/v1/... в /ru/api/v1/...
+  const rawPath = req.nextUrl.pathname;
+  if (rawPath.startsWith("/api/") || rawPath.startsWith("/_next")) {
+    return NextResponse.next();
   }
+
+  // Все правила ниже работают с путём без языкового префикса ("/kz/login" → "/login"),
+  // а редиректы возвращают префикс обратно, чтобы пользователь не терял язык.
+  const { locale, path: pathname } = splitLocalePath(rawPath);
+  const prefix = localePrefix(locale);
 
   // ── Sanitize ?next= on /login (open-redirect protection) ─────────────────
   if (pathname === "/login") {
     const next = req.nextUrl.searchParams.get("next");
     if (next && !isSafeNext(next, req.url)) {
-      const cleanUrl = new URL("/login", req.url);
+      const cleanUrl = new URL(`${prefix}/login`, req.url);
       req.nextUrl.searchParams.forEach((value, key) => {
         if (key !== "next") cleanUrl.searchParams.set(key, value);
       });
       return NextResponse.redirect(cleanUrl);
     }
-    return NextResponse.next();
+    return intlMiddleware(req);
   }
 
   // ── Auth guard for protected paths ────────────────────────────────────────
@@ -93,17 +69,17 @@ export function middleware(req: NextRequest) {
     pathname === "/" ||
     PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 
-  if (isPublic) return NextResponse.next();
+  if (isPublic) return intlMiddleware(req);
 
   const token = req.cookies.get("access_token")?.value;
   if (!token) {
-    const loginUrl = new URL("/login", req.url);
+    const loginUrl = new URL(`${prefix}/login`, req.url);
     // Keep the query string: /checkout?draftId=… must survive the login detour.
     loginUrl.searchParams.set("next", `${pathname}${req.nextUrl.search}`);
     return NextResponse.redirect(loginUrl);
   }
 
-  return NextResponse.next();
+  return intlMiddleware(req);
 }
 
 export const config = {

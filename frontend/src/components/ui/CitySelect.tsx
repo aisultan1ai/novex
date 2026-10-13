@@ -1,21 +1,32 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { KZ_CITIES } from "@/lib/cities";
+import { useLocale, useTranslations } from "next-intl";
+import { cityLabel, KZ_CITIES } from "@/lib/cities";
 
 interface CitySelectProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  /** id кнопки — для <label htmlFor> и фокуса на поле с ошибкой. */
+  id?: string;
+  /** Поле не прошло проверку: красная рамка. */
+  invalid?: boolean;
+  /** id текста ошибки под полем (aria-describedby). */
+  describedBy?: string;
 }
 
-export default function CitySelect({ value, onChange, placeholder = "Выберите город" }: CitySelectProps) {
+export default function CitySelect({ value, onChange, placeholder, id, invalid, describedBy }: CitySelectProps) {
+  const t = useTranslations("citySelect");
+  const locale = useLocale();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const filtered = KZ_CITIES.filter((c) =>
-    c.label.toLowerCase().includes(search.toLowerCase()),
+  // Ищем и по русскому, и по казахскому названию: «Караганда» и «Қарағанды».
+  const q = search.toLowerCase();
+  const filtered = KZ_CITIES.filter(
+    (c) => c.label.toLowerCase().includes(q) || cityLabel(c.value, locale).toLowerCase().includes(q),
   );
   const regional = filtered.filter((c) => c.type === "regional");
   const district = filtered.filter((c) => c.type === "district");
@@ -36,12 +47,15 @@ export default function CitySelect({ value, onChange, placeholder = "Выбер�
   return (
     <div style={{ position: "relative" }}>
       <button
+        id={id}
         type="button"
         onClick={() => setOpen((o) => !o)}
+        // У кнопки нет aria-invalid - ошибку зачитывает текст из aria-describedby.
+        aria-describedby={describedBy}
         style={{
           position: "relative",
           width: "100%",
-          border: `1px solid ${open ? "#0B2545" : "#E2E8EE"}`,
+          border: `1px solid ${open ? "#0B2545" : invalid ? "#DC2626" : "#E2E8EE"}`,
           borderRadius: 12,
           padding: "12px 40px 12px 14px",
           background: open ? "#ffffff" : "#f8fafc",
@@ -56,7 +70,7 @@ export default function CitySelect({ value, onChange, placeholder = "Выбер�
         }}
       >
         <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {value || placeholder}
+          {value ? cityLabel(value, locale) : (placeholder ?? t("placeholder"))}
         </span>
         <span
           style={{
@@ -104,7 +118,7 @@ export default function CitySelect({ value, onChange, placeholder = "Выбер�
               ref={searchRef}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Поиск города..."
+              placeholder={t("search")}
               style={{
                 width: "100%",
                 padding: "10px 14px",
@@ -128,17 +142,17 @@ export default function CitySelect({ value, onChange, placeholder = "Выбер�
                   color: "#94a3b8",
                 }}
               >
-                Город не найден
+                {t("notFound")}
               </div>
             ) : (
               <>
                 {regional.length > 0 && (
                   <>
-                    <div style={groupLabelStyle}>Областные центры</div>
+                    <div style={groupLabelStyle}>{t("regional")}</div>
                     {regional.map((c) => (
                       <CityItem
                         key={c.value}
-                        label={c.label}
+                        label={cityLabel(c.value, locale)}
                         active={c.value === value}
                         onSelect={() => select(c.value)}
                       />
@@ -147,11 +161,11 @@ export default function CitySelect({ value, onChange, placeholder = "Выбер�
                 )}
                 {district.length > 0 && (
                   <>
-                    <div style={groupLabelStyle}>Другие города</div>
+                    <div style={groupLabelStyle}>{t("other")}</div>
                     {district.map((c) => (
                       <CityItem
                         key={c.value}
-                        label={c.label}
+                        label={cityLabel(c.value, locale)}
                         active={c.value === value}
                         onSelect={() => select(c.value)}
                       />

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.common.time_utils import utcnow
 from app.core.email import send_email
+from app.core.i18n import current_locale, locale_is_explicit, normalize_locale, pick
 from app.core.exceptions import ConflictError, NotFoundError, UnauthorizedError
 from app.core.redis import get_redis
 from app.core.security import (
@@ -82,6 +83,8 @@ class IdentityService:
             full_name=payload.full_name,
             phone=payload.phone,
             role=customer_role,
+            # Язык страницы регистрации — на нём уйдёт письмо подтверждения.
+            locale=current_locale(),
         )
         from app.common.time_utils import utcnow as _utcnow
         user.pd_consent_at = _utcnow()
@@ -136,25 +139,33 @@ class IdentityService:
         r = get_redis()
         r.setex(f"verify_email:{token}", _VERIFY_EMAIL_TTL, str(user.id))
 
-        verify_link = f"{frontend_url.rstrip('/')}/verify-email?token={token}"
+        # Письмо и ссылка — на языке пользователя (казахская версия сайта на /kz).
+        loc = user.locale
+        prefix = pick(loc, "", "/kz")
+        verify_link = f"{frontend_url.rstrip('/')}{prefix}/verify-email?token={token}"
         safe_email = _html.escape(user.email)
         send_email(
             to=user.email,
-            subject="Подтвердите email — Novex",
+            subject=pick(loc, "Подтвердите email — Novex", "Email-ді растаңыз — Novex"),
             html=f"""
             <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px">
-              <h2 style="color:#0f172a">Подтвердите email</h2>
+              <h2 style="color:#0f172a">{pick(loc, "Подтвердите email", "Email-ді растаңыз")}</h2>
               <p style="color:#475569">
-                Здравствуйте! Вы зарегистрировались на Novex как <b>{safe_email}</b>.<br>
-                Нажмите кнопку ниже, чтобы подтвердить адрес и оформлять заказы.
+                {pick(loc,
+                      f"Здравствуйте! Вы зарегистрировались на Novex как <b>{safe_email}</b>.<br>"
+                      "Нажмите кнопку ниже, чтобы подтвердить адрес и оформлять заказы.",
+                      f"Сәлеметсіз бе! Сіз Novex-те <b>{safe_email}</b> ретінде тіркелдіңіз.<br>"
+                      "Мекенжайды растап, тапсырыс рәсімдеу үшін төмендегі батырманы басыңыз.")}
               </p>
               <a href="{verify_link}"
                  style="display:inline-block;margin:24px 0;padding:12px 28px;background:#0f172a;color:#fff;
                         border-radius:10px;text-decoration:none;font-weight:600">
-                Подтвердить аккаунт
+                {pick(loc, "Подтвердить аккаунт", "Аккаунтты растау")}
               </a>
               <p style="color:#94a3b8;font-size:13px">
-                Ссылка действует 24 часа. Если вы не регистрировались на Novex — просто проигнорируйте это письмо.
+                {pick(loc,
+                      "Ссылка действует 24 часа. Если вы не регистрировались на Novex — просто проигнорируйте это письмо.",
+                      "Сілтеме 24 сағат жарамды. Егер сіз Novex-те тіркелмеген болсаңыз, бұл хатты елемеңіз.")}
               </p>
             </div>
             """,
@@ -221,6 +232,10 @@ class IdentityService:
 
         role_code = user.role.code.value if user.role else RoleCode.CUSTOMER.value
 
+        # Язык страницы входа становится языком писем и уведомлений.
+        if locale_is_explicit() and user.locale != current_locale():
+            self.set_locale(db, user, current_locale())
+
         token = create_access_token(
             {
                 "sub": str(user.id),
@@ -237,6 +252,20 @@ class IdentityService:
             expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
             profile=profile,
         )
+
+    def set_locale(self, db: Session, user: User, locale: str) -> None:
+        """Сохранить язык интерфейса пользователя (ru | kk) — на нём приходят
+        письма и уведомления. Вызывается при входе и при смене языка в
+        переключателе; ошибка записи не мешает основному действию."""
+        loc = normalize_locale(locale)
+        if loc is None or user.locale == loc:
+            return
+        try:
+            user.locale = loc
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.warning("Не удалось сохранить язык пользователя: user_id=%s", user.id, exc_info=True)
 
     def get_profile(self, db: Session, user_id: int) -> ProfileResponse:
         user = self.repository.get_user_by_id(db, user_id)
@@ -329,21 +358,28 @@ class IdentityService:
         r = get_redis()
         r.setex(f"reset:{token}", _RESET_TTL, str(user.id))
 
-        reset_link = f"{frontend_url}/reset-password?token={token}"
+        # Язык письма — язык страницы, с которой запросили сброс (X-Locale);
+        # пользователь не залогинен, поэтому users.locale может быть устаревшим.
+        loc = current_locale()
+        reset_link = f"{frontend_url.rstrip('/')}{pick(loc, '', '/kz')}/reset-password?token={token}"
         safe_email = _html.escape(user.email)
         send_email(
             to=user.email,
-            subject="Сброс пароля — Novex",
+            subject=pick(loc, "Сброс пароля — Novex", "Құпиясөзді қалпына келтіру — Novex"),
             html=f"""
             <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px">
-              <h2 style="color:#0f172a">Сброс пароля</h2>
-              <p style="color:#475569">Вы запросили сброс пароля для аккаунта <b>{safe_email}</b>.</p>
+              <h2 style="color:#0f172a">{pick(loc, "Сброс пароля", "Құпиясөзді қалпына келтіру")}</h2>
+              <p style="color:#475569">{pick(loc,
+                f"Вы запросили сброс пароля для аккаунта <b>{safe_email}</b>.",
+                f"Сіз <b>{safe_email}</b> аккаунты үшін құпиясөзді қалпына келтіруді сұрадыңыз.")}</p>
               <a href="{reset_link}"
                  style="display:inline-block;margin:24px 0;padding:12px 28px;background:#0f172a;color:#fff;
                         border-radius:10px;text-decoration:none;font-weight:600">
-                Сбросить пароль
+                {pick(loc, "Сбросить пароль", "Құпиясөзді қалпына келтіру")}
               </a>
-              <p style="color:#94a3b8;font-size:13px">Ссылка действует 1 час. Если вы не запрашивали сброс — проигнорируйте это письмо.</p>
+              <p style="color:#94a3b8;font-size:13px">{pick(loc,
+                "Ссылка действует 1 час. Если вы не запрашивали сброс — проигнорируйте это письмо.",
+                "Сілтеме 1 сағат жарамды. Егер сіз қалпына келтіруді сұрамаған болсаңыз, бұл хатты елемеңіз.")}</p>
             </div>
             """,
         )
